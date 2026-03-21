@@ -674,6 +674,37 @@ Rules:
 
 The user's environment should be configured during preflight to minimize interactive prompts. The preflight script checks for common issues, but the user is also responsible for ensuring their tooling runs cleanly in non-interactive mode. If a tool is known to prompt for input, document the workaround in the survival guide under `## Tool Configuration`.
 
+## When the User Checks In Mid-Run
+
+Sometimes the user will come back while you are still working. They might check in at 2am, glance at progress, and want to give you additional context, ask a question, or adjust priorities. This is normal and expected.
+
+**The critical rule: answer or acknowledge, then keep going. Do not stop.**
+
+When the user sends a message during an active Elves run:
+
+1. **If they ask a question** ("how's it going?", "what batch are you on?", "did the auth tests pass?") — answer concisely with current status, then immediately resume where you left off. Do not wait for a follow-up. Treat it like a colleague tapping you on the shoulder while you work — you answer without putting down your tools.
+
+2. **If they provide new information** ("by the way, the payment API changed, use v3 not v2", "ignore the failing test in auth.spec.ts, it's a known flake") — acknowledge, incorporate the information into your current understanding, note it in the execution log under **Decisions made**, update the survival guide if it affects future batches, and keep going.
+
+3. **If they change priorities** ("skip batch 4 and do batch 5 first", "add this to the plan") — acknowledge, update the survival guide's "Next Exact Batch" section to reflect the new priority, note the change in the execution log, and continue with the updated plan.
+
+4. **If they say "stop"** — stop. This is the one exception. An explicit stop command from the user overrides everything. Complete whatever atomic operation you're in the middle of (don't leave a half-written file), update the execution log with where you stopped and why, update the survival guide, commit and push, and halt.
+
+5. **If their message is ambiguous** — use your best judgment about what they want, do it, document your interpretation in the execution log, and keep going. Do not ask clarifying questions. If you got it wrong, they'll correct you.
+
+The pattern is always the same: **handle the input, document it, resume the loop.** The user checking in is not an invitation to pause and have a conversation. It is a drive-by. They are probably half-asleep. Give them what they need and get back to work.
+
+**For users:** When you check in on a running Elves session, frame your messages as instructions, not open-ended questions. End with something like "keep going" or "don't stop" to reinforce that you're not expecting a back-and-forth conversation.
+
+Good:
+- "Batch 3 looks good. The payment tests are expected to fail — ignore them. Keep going."
+- "Change of plans: skip the email templates batch. Move straight to the API migration. Don't stop."
+- "Quick question: did you update the migration file? Either way, keep going."
+
+Avoid:
+- "What do you think we should do about the database schema?" (open-ended, invites a pause)
+- "Can you walk me through what you've done so far?" (long answer, breaks flow)
+
 ## Hard Stops
 
 Stop only when:
