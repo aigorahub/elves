@@ -65,7 +65,7 @@ All notable changes to the Elves skill are documented here.
 
 ### Scripts
 
-- `preflight.sh`: comprehensive pre-run checklist (git, auth, project detection, sleep prevention, gates, notifications, env vars, survey suppression, branch staleness)
+- `preflight.sh`: comprehensive pre-run checklist (git, auth, project detection, sleep prevention, gate dry-runs, notification checks, non-interactive env guidance, branch staleness)
 - `notify.sh`: Slack webhook, custom command, or PR comment notification helper. Returns proper exit codes in --test mode for preflight validation
 
 ### Platform Support

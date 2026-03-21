@@ -368,8 +368,8 @@ If the skill directory contains a `config.json`, read it at session start. This 
 ```json
 {
   "batch_sizing": { "team_size": 4, "sprint_weeks": 2 },
-  "notification": "slack",
-  "review_method": "github-pr-comments",
+  "notification": { "method": "slack" },
+  "review": { "method": "github-pr-comments" },
   "default_branch": "main"
 }
 ```
