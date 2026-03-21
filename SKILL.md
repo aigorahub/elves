@@ -284,9 +284,23 @@ Push when done. Return a summary of what changed.
 
 ### 4. Validate
 
+**The goal of validation is zero accumulated debt.** Every batch must be production-ready before you move to the next one. If you skip a failing test or ignore a build warning, the debt compounds across batches and the final output is far from shippable. The user should return to code that is as close to production-ready as it can reasonably be.
+
+Validation has two stages: **local** and **preview**. Run local checks first (they're fast and catch most problems). If the project has a preview deployment, deploy and smoke-test there before moving on. Do not advance to the next batch until both stages pass.
+
+#### Stage 1: Local Validation
+
 Run whatever deterministic gates are available. Discover them from the project or use whatever the user configured in the survival guide under `## Tool Configuration`.
 
-**Auto-discovery order** (run what exists, skip what doesn't):
+Run these in order — each catches a different class of problem:
+
+1. **Lint** — catches style issues, unused imports, obvious mistakes. Fast.
+2. **Typecheck** — catches type errors, interface mismatches, missing properties. Prevents entire categories of runtime bugs.
+3. **Build** — the code must compile / bundle successfully. A batch that doesn't build is not a batch.
+4. **Unit / integration tests** — targeted tests for the code you changed. Run the relevant suites, not the entire test suite (unless it's fast).
+5. **E2E tests** — if the project has Playwright, Cypress, or similar, run the tests that cover flows you touched. The app should actually work, not just compile.
+
+**Auto-discovery** (run what exists, skip what doesn't):
 
 | Project Type | Lint | Typecheck | Build | Test | E2E |
 |---|---|---|---|---|---|
@@ -299,7 +313,47 @@ Run whatever deterministic gates are available. Discover them from the project o
 
 **User overrides** in the survival guide take precedence over auto-discovery.
 
-Every gate must pass before proceeding. If a gate fails, fix the issue and re-run from the failing gate.
+Every gate must pass before proceeding. If a gate fails, fix the issue and re-run from the failing gate. Do not skip a gate and plan to come back to it — that is how debt accumulates.
+
+#### Stage 2: Preview Deployment (if available)
+
+If the project has a preview deployment mechanism (Vercel, Netlify, Railway, a staging server, etc.), deploy after local validation passes and verify the app actually works in a real environment.
+
+The user can configure this in the survival guide:
+
+```markdown
+### Preview Deployment
+- deploy-cmd: `vercel deploy --prebuilt --yes`
+- preview-url: (captured from deploy output)
+- smoke-tests:
+  - `curl -sS -o /dev/null -w "%{http_code}" ${PREVIEW_URL}/`
+  - `curl -sS -o /dev/null -w "%{http_code}" ${PREVIEW_URL}/api/health`
+```
+
+Smoke tests should verify:
+- The app loads (HTTP 200 on key routes)
+- Critical API endpoints respond
+- No server errors in the response
+
+If preview deployment is not configured, skip this stage — but note in the execution log that only local validation was performed.
+
+#### What "passes" means
+
+A batch passes validation when:
+- The code lints cleanly (no errors; warnings are acceptable if pre-existing)
+- Type checking passes with zero errors
+- The build succeeds
+- Relevant tests pass
+- The app runs and behaves correctly (locally or in preview)
+- No new type errors, build warnings, or test failures were introduced
+
+If you introduced a test failure or build warning, fix it before moving on. The next batch inherits everything from this one — debt only grows.
+
+#### Headless app testing
+
+For web applications, consider starting the app locally and running E2E tests against it. This catches problems that unit tests miss — broken routes, missing environment variables, UI regressions, API integration failures. If the project has Playwright or Cypress, use them. If it doesn't, even a basic `curl` against key endpoints after starting the dev server is better than nothing.
+
+The user may also configure visual review (screenshot capture + inspection), simulated user walkthroughs, or custom validation scripts. These all go in the survival guide under `## Tool Configuration` and run as part of this step.
 
 For verbose test suites, consider delegating validation to a subagent so output doesn't flood the coordinator's context.
 
@@ -480,14 +534,17 @@ If you detect an existing survival guide and execution log at startup (not fresh
 
 Do not report "done", "complete", or "ready" unless all of the following are true for the current batch:
 
-1. Deterministic gates were run and results are recorded in the execution log.
-2. Build validation passed (or build errors were resolved).
-3. Review was performed (PR comments read, findings triaged).
-4. The execution log was updated with timestamps, evidence, and commit SHA.
-5. The survival guide was updated with the next batch.
-6. Changes were committed and pushed.
+1. The code lints cleanly and type-checks with zero errors.
+2. The build succeeds.
+3. Relevant tests pass — no new failures introduced.
+4. If preview deployment is configured, the app deploys and smoke tests pass.
+5. Review was performed (PR comments read, findings triaged, blockers fixed).
+6. No accumulated debt — no skipped gates, no "will fix later" items, no known regressions.
+7. The execution log was updated with timestamps, evidence, and commit SHA.
+8. The survival guide was updated with the next batch.
+9. Changes were committed and pushed.
 
-Opening a PR, writing docs, or planning the next batch does not count as completing the current one.
+The output of every batch should be code that is as close to production-ready as it can reasonably be. Opening a PR, writing docs, or planning the next batch does not count as completing the current one.
 
 ## Final Completion
 
