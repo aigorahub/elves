@@ -116,7 +116,10 @@ try_custom_cmd() {
   [ -z "${ELVES_NOTIFY_CMD:-}" ] && return 1
 
   log "Custom command: ${ELVES_NOTIFY_CMD}"
-  # TITLE, BODY, URL are already exported above
+  # SECURITY NOTE: eval is intentional here. ELVES_NOTIFY_CMD is set by the user
+  # in their own environment, not by untrusted input. It allows users to configure
+  # arbitrary notification commands (e.g., 'curl -d "$BODY" ntfy.sh/my-topic').
+  # TITLE, BODY, URL are already exported above.
   if eval "${ELVES_NOTIFY_CMD}" 2>/tmp/elves_custom_cmd_err.txt; then
     log "Custom command: delivered"
     return 0
