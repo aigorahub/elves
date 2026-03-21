@@ -1,5 +1,7 @@
 # Elves
 
+![Elves — they work while you sleep](assets/elves-banner.jpeg)
+
 **They work while you sleep.**
 
 Elves is an open-source Agent Skill for autonomous, multi-batch development. It gives AI coding agents (Claude Code, Codex, or any agent that supports the Agent Skills standard) the ability to execute large development plans unattended — with testing, review, and documentation — while surviving context compaction across long runs.
