@@ -119,7 +119,26 @@ if [ -n "${ELVES_SLACK_WEBHOOK:-}" ]; then
 fi
 ```
 
-### 6. Stale Branch Detection
+### 6. Non-Interactive Environment
+
+Set environment variables that suppress interactive prompts across common tools:
+
+```bash
+export CI=true
+export DEBIAN_FRONTEND=noninteractive
+export HOMEBREW_NO_AUTO_UPDATE=1
+export NEXT_TELEMETRY_DISABLED=1
+export NUXT_TELEMETRY_DISABLED=1
+export DOTNET_CLI_TELEMETRY_OPTOUT=1
+export PYTHONDONTWRITEBYTECODE=1
+export PIP_DISABLE_PIP_VERSION_CHECK=1
+export NPM_CONFIG_YES=true
+echo "✓ Non-interactive environment variables set"
+```
+
+This prevents tools from pausing for update prompts, telemetry opt-ins, surveys, or version check notices during the run. The agent should set these at session start if they are not already present.
+
+### 7. Stale Branch Detection
 
 ```bash
 git fetch origin main 2>/dev/null
@@ -615,14 +634,51 @@ When all batches in the plan are complete (and optionally, after scout mode), or
 
 **Reminder: you do not merge. The PR is ready for the user to review and merge when they return.**
 
+## Never Stop to Ask
+
+**The user is not there. Any pause, prompt, or confirmation dialog that expects human input will stall the entire run with no one to respond. This is the single most common failure mode for overnight sessions.**
+
+Rules:
+
+1. **Never ask the user a question after the session has started.** All questions happen during preflight, before the user goes offline. Once the run begins, you make decisions and document them.
+
+2. **Never use interactive commands.** Every CLI command must run non-interactively. Use flags that suppress prompts:
+   - `--yes`, `--force`, `--no-input`, `--non-interactive`, `--assume-yes`
+   - `git push` (not `git push` with a credential prompt — verify auth in preflight)
+   - `npm install --yes`, `npx --yes`, `pip install --quiet`
+   - `gh pr create --fill` (not interactive mode)
+   - Pipe `yes |` or use `echo y |` as a last resort for tools that insist on confirmation
+
+3. **Suppress all confirmation dialogs, surveys, and update prompts.** Some tools (including AI coding tools) may pop up surveys, update notices, or permission requests. These will break the flow. Mitigations:
+   - Set `CI=true` in your environment — many tools detect this and skip interactive prompts
+   - Set `DEBIAN_FRONTEND=noninteractive` on Linux
+   - Set `HOMEBREW_NO_AUTO_UPDATE=1` on macOS
+   - Disable telemetry/surveys: `NEXT_TELEMETRY_DISABLED=1`, `NUXT_TELEMETRY_DISABLED=1`, `DOTNET_CLI_TELEMETRY_OPTOUT=1`, etc.
+   - If a tool has a `--no-interaction` or `--batch` flag, use it
+
+4. **Never wait for CI to finish before continuing local work.** Push and move on. Read CI results on the next review cycle. Do not poll a CI pipeline in a blocking loop.
+
+5. **If you encounter an unexpected prompt or interactive input request**, do not attempt to answer it interactively. Instead:
+   - Kill the command (if possible)
+   - Log the issue in the execution log with the exact command and prompt text
+   - Find a non-interactive alternative
+   - If no alternative exists, skip that step, log it, and continue
+
+6. **Ambiguous requirements are not a reason to stop.** Make your best judgment call, document it under **Decisions made** in the execution log, and keep moving. The user will review your choices when they return.
+
+The user's environment should be configured during preflight to minimize interactive prompts. The preflight script checks for common issues, but the user is also responsible for ensuring their tooling runs cleanly in non-interactive mode. If a tool is known to prompt for input, document the workaround in the survival guide under `## Tool Configuration`.
+
 ## Hard Stops
 
 Stop only when:
 
-1. You are genuinely blocked with no viable implementation path.
+1. You are genuinely blocked with no viable implementation path — not a decision you can make, but a dependency you cannot resolve.
 2. A merge is requested — you never merge, period.
+3. A destructive action is required that was explicitly listed as a non-negotiable in the plan or survival guide.
 
-Everything else — ambiguous requirements, minor design decisions, non-critical uncertainties — you resolve with your best judgment and document the decision in the execution log under **Decisions made**. The user will review your choices when they return.
+Everything else — ambiguous requirements, minor design decisions, non-critical uncertainties, tools that behave unexpectedly — you resolve with your best judgment and document the decision in the execution log under **Decisions made**. The user will review your choices when they return.
+
+**If in doubt, keep going.** A batch with a documented judgment call is more valuable than a stalled session with a polite question nobody is awake to answer.
 
 ## Structured Session Data
 
