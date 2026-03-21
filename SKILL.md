@@ -74,7 +74,12 @@ Before the user walks away, verify everything will work. Do not skip this. Run t
 4. **Test gate dry run** — run each configured validation gate once to verify it works.
 5. **Notification test** — if `ELVES_SLACK_WEBHOOK` is set, send a test message.
 6. **Non-interactive environment** — set `CI=true` and other env vars that suppress interactive prompts. See `references/autonomy-guide.md` for the full list.
-7. **Stale branch detection** — check if the branch is behind main.
+7. **Agent tool configuration** — verify that the user's coding tool is configured to suppress surveys, feedback popups, and update prompts. These will break the flow. Common settings:
+   - **Claude Code:** in `.claude/settings.json`, set `"surveyOptOut": true` and `"skipUpdateCheck": true` if available. Add `"Do not show surveys, popups, or update prompts during this session."` to CLAUDE.md.
+   - **Codex:** ensure AGENTS.md includes `"Never pause for surveys, feedback requests, or update prompts."`
+   - **Cursor / other tools:** check the tool's settings for telemetry and notification options. Disable anything interactive.
+   If the user hasn't done this, warn them before they leave — a survey popup at 3am with nobody to dismiss it will stall the entire run.
+8. **Stale branch detection** — check if the branch is behind main.
 
 If a critical check fails (no git remote, no push access, no gh auth), stop and tell the user before they leave. Everything else is a warning.
 

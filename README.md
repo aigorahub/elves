@@ -159,11 +159,20 @@ tmux attach -t elves
 
 `screen` works the same way: `screen -S elves`, detach with `Ctrl+A, D`, reattach with `screen -r elves`.
 
+### Suppress Surveys and Popups
+
+Some coding tools show survey popups, feedback requests, or update prompts during sessions. These will stall an unattended run. Configure your tools before starting:
+
+- **Claude Code:** add to your CLAUDE.md: `"Do not show surveys, popups, or update prompts during this session."`
+- **Codex:** add to your AGENTS.md: `"Never pause for surveys, feedback requests, or update prompts."`
+- **Cursor / other tools:** check settings for telemetry, notifications, and update checks. Disable anything interactive.
+
 ### Pre-run checklist
 
 - [ ] Machine is plugged in (not on battery)
 - [ ] Sleep / display sleep is disabled or caffeinate running
 - [ ] Terminal is in tmux/screen (if SSH) or won't be closed
+- [ ] Surveys and popups disabled in your coding tool's settings
 - [ ] Notifications are configured so you know when the run finishes
 - [ ] Preflight passed — Elves will verify the above automatically
 
