@@ -129,11 +129,26 @@ Open Power Options → Change plan settings → set "Put the computer to sleep" 
 
 Running on a cloud VM, GitHub Codespaces, or a remote server eliminates the sleep problem entirely. The session runs independently of your local machine. This is the most reliable option for very long runs.
 
+### SSH Sessions
+
+If you're running over SSH, your session dies when the connection drops. Always use a terminal multiplexer:
+
+```bash
+# Start a new tmux session
+tmux new -s elves
+
+# Run your agent inside tmux, then detach with Ctrl+B, D
+# Reconnect later with:
+tmux attach -t elves
+```
+
+`screen` works the same way: `screen -S elves`, detach with `Ctrl+A, D`, reattach with `screen -r elves`.
+
 ### Pre-run checklist
 
 - [ ] Machine is plugged in (not on battery)
-- [ ] Sleep / display sleep is disabled
-- [ ] Terminal will not close (tmux or screen recommended for SSH sessions)
+- [ ] Sleep / display sleep is disabled or caffeinate running
+- [ ] Terminal is in tmux/screen (if SSH) or won't be closed
 - [ ] Notifications are configured so you know when the run finishes
 - [ ] Preflight passed — Elves will verify the above automatically
 
@@ -283,6 +298,50 @@ elves/
 - **Fail safely, not silently.** If the agent is genuinely blocked, it stops and says so. If a test gate fails, it fixes the issue before continuing. It does not skip gates or paper over failures.
 - **Rollback before every batch.** `elves/pre-batch-N` tags mean any batch can be cleanly unwound without touching other work.
 - **Agent infrastructure is real engineering.** Tight code review systems, organized work trees, failure handling — developers who treat agent infrastructure as a real engineering concern end up with something that functions like a tireless junior team working every hour they're away from their desk.
+
+---
+
+## What Can Go Wrong
+
+Overnight agent runs fail in predictable ways. Knowing the failure modes makes them preventable.
+
+| Failure | What happens | Mitigation |
+|---|---|---|
+| **Machine sleeps** | Session stops silently. You wake up to 45 minutes of work instead of 8 hours. | `caffeinate` (macOS), `systemd-inhibit` (Linux), or run in cloud. Elves preflight warns you. |
+| **Agent runs destructive git commands** | `git reset --hard` wipes hours of uncommitted work. This has happened to real users. | Elves explicitly forbids `git reset --hard`, `git checkout .`, `git push --force`, and `git clean -fd`. The survival guide template includes these as non-negotiables. |
+| **Agent disables or weakens tests** | Agent comments out failing tests, weakens assertions, or shortens timeouts to make the gate pass. You wake up to code that "passes" but is broken. | Elves has a Test Integrity rule: never modify a test to make it pass. Fix the code, not the test. If the agent thinks a test is wrong, it logs the issue and moves on without changing it. |
+| **Context compaction loses instructions** | Long sessions hit memory limits. The agent's conversation gets summarized, and safety instructions disappear. | Elves stores all instructions in files on disk (survival guide, plan, execution log), not in conversation memory. The agent re-reads the survival guide after every push. Compaction can't erase files. |
+| **Interactive prompt stalls the session** | A tool asks for confirmation, a survey pops up, or `npm install` wants input. Nobody is there to click yes. | Elves sets `CI=true` and other non-interactive env vars in preflight. The skill explicitly requires `--yes` flags on all commands. |
+| **Flaky tests block progress** | A test passes locally but fails intermittently. The agent loops trying to fix a non-bug. | The agent logs flaky tests in the execution log and moves on after 3 failed attempts on the same non-deterministic failure. |
+| **Terminal closes (SSH disconnect)** | The SSH connection drops and the session dies. | Use `tmux` or `screen`. Elves mentions this in the pre-run checklist. |
+| **Agent drifts from the plan** | After many batches, the agent starts making changes that weren't in the plan. | The agent re-reads the survival guide after every push and checks the plan hash to detect modifications. The three-document system anchors every decision. |
+
+Most of these are prevented by the preflight checks. Run preflight, fix the warnings, and most overnight failures never happen.
+
+---
+
+## Advanced: Claude Code SessionStart Hook
+
+For Claude Code users, you can make compaction recovery fully automatic by adding a SessionStart hook that loads the survival guide at the beginning of every session.
+
+Add this to your `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "echo '=== ELVES CONTEXT ===' && cat docs/plans/*-survival-guide.md 2>/dev/null && echo '' && echo '=== GIT STATUS ===' && git status --short && echo '' && echo '=== RECENT COMMITS ===' && git log --oneline -5"
+      }
+    ]
+  }
+}
+```
+
+This injects the survival guide, current git status, and recent commits into Claude's context at session start — even after a compaction or restart. The agent gets its bearings immediately without needing to be told to read the files.
+
+Adjust the `cat` path to match where your survival guide lives.
 
 ---
 

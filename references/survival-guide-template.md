@@ -33,6 +33,8 @@ plan, the codebase, or good engineering practice.
 - [Non-negotiable 2 — e.g., "All commits must pass lint and typecheck before push"]
 - [Non-negotiable 3 — e.g., "Do not merge. The user merges when they return."]
 - **You never merge. You never approve a merge. This is always a non-negotiable.**
+- **Never run destructive git commands:** `git reset --hard`, `git checkout .`, `git clean -fd`, `git push --force`, `git rebase` on shared branches. Never. If you think you need one, stop.
+- **Never modify a test to make it pass.** Fix the code, not the test. If you believe a test is wrong, log it and move on — do not change it.
 
 ---
 

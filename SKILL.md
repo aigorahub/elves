@@ -116,6 +116,8 @@ Create a rollback safety point: `git tag elves/pre-batch-N`
 
 Build the batch scope fully. Use descriptive commits referencing which batch item is being addressed. Push after each meaningful chunk. Tag incidental findings as `[elves-scout]` in TODO.md for later.
 
+Write tests for the code you write. Aim for meaningful coverage of the logic you introduce — not just happy paths. The more tests exist, the more reliable your future batches become, because the test suite catches regressions you would otherwise miss. If the project doesn't have a test infrastructure yet, consider setting one up as part of the first batch — it pays for itself immediately.
+
 ### 4. Validate
 
 **The goal is zero accumulated debt.** Every batch must be production-ready before you move to the next one. You are working overnight with no one watching. The tests are the watch.
@@ -160,9 +162,40 @@ Check the clock. If enough time for another batch, start it. Otherwise, scout mo
 
 After all planned batches are complete, if time remains, work through `[elves-scout]` items from TODO.md. Look for adjacent improvements, test gaps, documentation holes. This is bonus work with a clean commit boundary — if the user wants to roll it back, planned work is untouched.
 
+## Forbidden Commands
+
+The following commands are **never allowed** under any circumstances. They destroy work that cannot be recovered, and overnight there is no one to catch the mistake.
+
+- `git reset --hard` — destroys uncommitted and committed work. Never.
+- `git checkout .` — discards all uncommitted changes. Never.
+- `git clean -fd` — deletes untracked files permanently. Never.
+- `git push --force` or `git push -f` — rewrites remote history. Never.
+- `git rebase` on a shared/pushed branch — rewrites history other processes depend on.
+- `rm -rf` on any directory outside your immediate working scope.
+
+If you believe you need one of these commands, you are wrong. Find another way. If there truly is no other way, stop and log the situation — the user will handle it when they return.
+
+This rule survives compaction. If you have lost context and are unsure what is safe, re-read the survival guide. These commands are never safe.
+
+## Test Integrity
+
+**Never modify a test to make it pass. Fix the code, not the test.**
+
+Agents under pressure to clear failing gates will sometimes take shortcuts: weakening assertions, commenting out test cases, shortening timeouts, rewriting tests to match broken behavior, or disabling tests entirely. This is the single most dangerous thing an autonomous agent can do — it makes failures invisible.
+
+Rules:
+- If a test fails, the code is wrong. Fix the code.
+- If you genuinely believe a test is wrong (testing the wrong behavior, outdated assertion), **do not change it.** Log it in the execution log under **Decisions made** with your reasoning and move on. The user will decide.
+- Never comment out, skip, or delete a test.
+- Never weaken an assertion (e.g., changing `assertEquals` to `assertTrue`, removing a check).
+- Never shorten a timeout to avoid a flaky failure — log the flake and continue.
+- If the test suite itself is broken in a way that blocks all progress, log it as a **Hard Stop** and halt.
+
+The tests are the user's insurance policy. You do not get to modify the insurance policy.
+
 ## Compaction Recovery
 
-After any compaction or restart:
+After any compaction or restart, your conversation history is gone. But your instructions are not — they live in files on disk, not in memory. Context compaction cannot erase what lives in the survival guide, plan, and execution log. This is why those documents exist.
 
 1. Read the survival guide first (marked with `READ THIS FILE FIRST` banners).
 2. Read the execution log.
@@ -170,6 +203,8 @@ After any compaction or restart:
 4. Identify the first incomplete batch.
 5. Resume immediately without asking for help.
 6. Do not redo completed work.
+
+Between batches, if your platform supports it, consider proactively compacting with specific instructions: "Preserve: survival guide path, execution log path, plan path, current batch number, PR number, time budget remaining." This produces a better summary than letting autocompact decide what matters.
 
 ## Completion Contract
 

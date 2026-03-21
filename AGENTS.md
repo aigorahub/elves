@@ -82,6 +82,8 @@ git tag elves/pre-batch-N
 ### 3. Implement
 Build the full batch scope. Descriptive commits per batch item. Push after each meaningful chunk. Tiny incidental fixes — handle inline, note in log. Anything substantial outside scope: add to `TODO.md` tagged `[elves-scout]` and keep moving. All work is done directly — Codex does not have built-in subagent support.
 
+Write tests for new code. Cover the logic you introduce — not just happy paths. If the project lacks test infrastructure, set it up in the first batch.
+
 ### 4. Validate
 
 Run available gates; skip missing ones. User overrides in the survival guide take precedence.
@@ -168,15 +170,39 @@ After all planned batches — and only then — with time remaining, look across
 
 Work through `[elves-scout]` items in TODO.md. Implement self-contained items; leave large/ambiguous ones with context for the user. Scout commits follow planned work — clean boundary in history.
 
+## Forbidden Commands
+
+Never, under any circumstances:
+- `git reset --hard` — destroys committed and uncommitted work.
+- `git checkout .` — discards all uncommitted changes.
+- `git clean -fd` — permanently deletes untracked files.
+- `git push --force` / `git push -f` — rewrites remote history.
+- `git rebase` on any shared or pushed branch.
+- `rm -rf` outside your immediate working scope.
+
+If you think you need one of these, you are wrong. Find another way. If truly stuck, stop and log it — the user will handle it.
+
+## Test Integrity
+
+**Never modify a test to make it pass. Fix the code, not the test.**
+
+- Never comment out, skip, or delete a test.
+- Never weaken an assertion.
+- Never shorten a timeout to hide a flaky failure.
+- If you believe a test is wrong, log it under **Decisions made** and move on. The user decides.
+
 ## Compaction Recovery
 
-After any compaction or restart:
+After any compaction or restart, conversation history is gone — but instructions are not. They live in files on disk, not in memory. Context compaction cannot erase what is in the survival guide, plan, and execution log.
+
 1. Read the survival guide first (marked `# READ THIS FILE FIRST AFTER ANY COMPACTION OR RESTART`).
 2. Read the execution log.
 3. Read the plan.
 4. Identify the first incomplete batch and resume immediately.
 
 Do not redo completed work. Do not ask for help. If you detect existing documents at startup, you are resuming — follow this protocol.
+
+Between batches, proactively compact with specific instructions: "Preserve: survival guide path, execution log path, plan path, current batch number, PR number, time budget remaining."
 
 ## Completion Contract
 
