@@ -4,7 +4,7 @@ description: Autonomous multi-batch development agent for long unattended runs. 
 license: MIT
 compatibility: Works with Claude Code, Codex, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
-  author: aigora
+  author: John Ennis
   version: "1.0.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
