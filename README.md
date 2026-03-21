@@ -6,6 +6,8 @@ Elves is an open-source Agent Skill for autonomous, multi-batch development. It 
 
 You write the plan and do the final merge. The agent does everything in between.
 
+**This is v0.** This system works in production at [Aigora](https://aigora.ai), but in conjunction with custom review tools. Many people have asked me to open-source what I'm doing, so here it is — but this is scaffolding, not a finished product. It may not work for you out of the box. Your model, your stack, your test infrastructure, and your review setup will all be different from mine. I'm relying on community feedback to make this skill more generalizable. If something doesn't work, [open an issue](https://github.com/aigorahub/elves/issues). Your experience makes this better for everyone.
+
 ---
 
 ## Why "Elves"?
