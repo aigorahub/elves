@@ -89,9 +89,37 @@ The built-in review is the minimum viable loop. Users can strengthen it by:
 - **Adding a custom review API** (configure in the survival guide under `## Tool Configuration`)
 - **Adding smoke tests** (curl endpoints after preview deployment)
 - **Adding visual review** (screenshot capture and inspection)
+- **Adding verification scripts** (see `references/verification-patterns.md` for headless browser drivers, video recording, state assertions, and more)
 - **Building their own review subagent** with domain-specific knowledge about their codebase
 
 The more review infrastructure you add, the tighter each batch gets before the agent moves on. The built-in review ensures there is always *something* checking the work, even on a fresh project with no bots installed.
+
+## Adversarial Review Pattern
+
+For higher confidence, spawn a second review subagent that has no context from the implementation. This is the "fresh eyes" pattern used internally at Anthropic.
+
+The adversarial reviewer doesn't know what you were trying to do. It reads only the diff and the plan, then critiques from scratch. This catches a category of bugs that the primary review misses: cases where the implementation is internally consistent but doesn't match the requirements, or where the code "makes sense" only if you already know what the author intended.
+
+To use this pattern, spawn a separate subagent after the primary review passes:
+
+```
+You are an adversarial code reviewer. You have not seen this code before.
+
+Read the diff for PR #[NUMBER] and the plan at [PLAN_PATH].
+
+Your job is to find problems. Be skeptical. Assume nothing works until proven otherwise.
+
+For each finding, state:
+- What's wrong
+- Why it matters
+- What the fix should be
+
+Do not be polite. Do not pad with compliments. If the code is correct, say so in one line and stop.
+```
+
+The coordinator fixes any blocking findings from the adversarial review, then runs it again. The loop continues until the adversarial reviewer has nothing left to find.
+
+This pattern is most valuable for security-sensitive code, data integrity logic, and anything where a subtle bug would be expensive. It adds time to each batch, so use it selectively.
 
 ## Why This Matters
 

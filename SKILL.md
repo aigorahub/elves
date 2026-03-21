@@ -360,3 +360,26 @@ Everything else: ambiguous requirements, minor design decisions, unexpected tool
 ## Structured Session Data
 
 Maintain a `.elves-session.json` file with machine-readable session data (session ID, timing, batch status, commits, rollback tags, review findings). This enables future tooling and analytics.
+
+## Persistent Preferences
+
+If the skill directory contains a `config.json`, read it at session start. This stores preferences the user has set in previous sessions so they don't have to reconfigure every time:
+
+```json
+{
+  "batch_sizing": { "team_size": 4, "sprint_weeks": 2 },
+  "notification": "slack",
+  "review_method": "github-pr-comments",
+  "default_branch": "main"
+}
+```
+
+If `config.json` doesn't exist and the user provides preferences during the planning conversation, offer to save them for future sessions.
+
+## Skill Memory
+
+The execution log is a form of memory that improves over time. Each session's log records what worked, what failed, what decisions were made, and how long things took. Over multiple sessions, the logs build a history that makes future planning better: you learn realistic batch timing, which tests are flaky, which review findings are recurring false positives, and where the model struggles.
+
+The `.elves-session.json` files serve the same purpose in machine-readable form. Together, these files make every Elves run smarter than the last because the human uses them to tune the plan and the survival guide.
+
+Also see `references/verification-patterns.md` for product verification techniques (headless browser drivers, video recording, state assertions) that strengthen the validate step beyond basic test gates.

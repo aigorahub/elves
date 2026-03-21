@@ -373,6 +373,28 @@ This injects the survival guide, current git status, and recent commits into Cla
 
 Adjust the `cat` path to match where your survival guide lives.
 
+### Enforce forbidden commands with hooks
+
+Elves tells the agent not to run destructive git commands, but instructions can be forgotten after context compaction. For bulletproof enforcement, add a PreToolUse hook that blocks them deterministically:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "case \"$TOOL_INPUT\" in *'git reset --hard'*|*'git checkout .'*|*'git clean -fd'*|*'git push --force'*|*'git push -f '*|*'rm -rf /'*) echo 'BLOCKED: Forbidden command detected. Elves does not allow destructive git operations.' >&2; exit 1;; esac",
+        "matcher": "Bash"
+      }
+    ]
+  }
+}
+```
+
+This runs before every Bash command and blocks the operation if it matches a forbidden pattern. Unlike instructions (which can be compacted away), hooks are deterministic. The agent can't forget them and can't override them.
+
+This pattern comes from Anthropic's internal practices. Their `/careful` hook uses the same approach to block destructive operations in production environments.
+
 ---
 
 ## The daily briefing
