@@ -98,11 +98,22 @@ If a PR already exists on the current branch, detect it and skip this setup.
 
 Split large programs into batches before coding. The right batch size is **what the current model can get almost certainly correct in a single focused effort** — then verified through testing, review, and deployment before moving on.
 
-In practice, frontier models in 2026 can reliably handle roughly **what a team of 4 developers would accomplish in a 2-week sprint** (~40 person-days of effort). This is a tested, practical benchmark — large enough to make real progress, small enough that the work can be verified with confidence before moving on. If a batch is so large that you can't be confident in the result even after testing and review, it's too large. Split it.
+A good starting benchmark is roughly **what a team of 4 developers would accomplish in a 2-week sprint** (~40 person-days of effort) — this has been tested with frontier models and is large enough to make real progress while small enough to verify with confidence.
+
+But the right batch size depends on your model, your stack, and your experience. Some coding engines (e.g., Codex) can handle larger batches than others. Some tech stacks are more predictable than others. **The user defines the sprint size** in the plan or survival guide:
+
+```markdown
+## Batch Sizing
+- team-size: 6
+- sprint-length: 2 weeks
+- notes: Codex handles larger batches well in this codebase. Increase if batches are passing review cleanly on the first cycle. Decrease if review is finding too many issues.
+```
+
+Tune this over time. If your batches consistently pass validation and review on the first try, they might be too small — you're leaving capacity on the table. If the review loop is churning through many fix cycles per batch, they're too large for the model to get right in one shot. The right size is the largest batch that comes out tight after one or two review cycles.
+
+A single batch is the unit the model can get right. But the plan is not a single batch — it might be 10, 12, or more. The power of Elves is chaining verified batches together, one after another, each building on the solid foundation of the last. A 12-batch plan running overnight is 12 sprints of work — months of human-team output — delivered by morning.
 
 This is what makes the output tight. The agent doesn't race through a huge plan and hope for the best. It does a chunk, tests it, reviews it, deploys it, confirms it works, and only then moves to the next chunk. Each batch stands on the verified foundation of the ones before it. Debt doesn't accumulate because nothing moves forward until it's right.
-
-The user can override batch sizing in the plan or survival guide.
 
 Rules:
 - Each batch must be independently shippable: code, tests, docs, and passing review.
