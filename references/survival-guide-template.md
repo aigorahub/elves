@@ -179,12 +179,11 @@ notification: pr-comment
 2. **Never force-push** the working branch.
 3. **Never rebase** the working branch during a run (it invalidates rollback tags).
 4. **Never merge.** Not even a fast-forward. The user merges when they return.
-5. **If something goes badly wrong**, roll back to the last good tag:
+5. **If something goes badly wrong**, create a fix branch from the last good tag:
    ```bash
-   git reset --hard elves/pre-batch-N
-   git push --force-with-lease
+   git checkout elves/pre-batch-N -b fix/batch-N-recovery
    ```
-   Then document what happened in the execution log and stop. Leave the repo in a clean state.
+   Then document what happened in the execution log and stop. Don't use `git reset --hard` or `git push --force`. Leave the repo in a clean state and let the user decide how to proceed.
 6. **Stage specific files.** Never `git add -A` blindly. Know what you're committing.
 
 ---

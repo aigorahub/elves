@@ -69,7 +69,7 @@ After fixing, the coordinator pushes and runs the review subagent again. The loo
 If the platform doesn't support subagents (some Codex configurations, Claude.ai), the coordinator does this analysis directly:
 
 ```bash
-REPO=$(git remote get-url origin 2>/dev/null | sed 's|.*github.com[:/]||;s|\.git$||')
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 PR_NUMBER=$(gh pr view --json number -q .number)
 
 # Get all review data

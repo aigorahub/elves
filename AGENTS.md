@@ -60,7 +60,7 @@ git add <survival-guide> <execution-log>
 git commit -m "docs: elves session setup"
 git push -u origin HEAD
 gh pr create --title "<title>" --body "<plan summary with batch list>"
-PR_NUMBER=$(gh pr view --json number | python3 -c "import sys,json; print(json.load(sys.stdin)['number'])")
+PR_NUMBER=$(gh pr view --json number -q .number)
 ```
 
 If a PR already exists on the branch, detect it and skip.
@@ -118,7 +118,7 @@ Every gate must pass before proceeding. Fix and re-run from the failing gate.
 
 Read all PR comments, bot reviews, and CI status:
 ```bash
-REPO=$(git remote get-url origin | sed 's|.*github.com[:/]||;s|\.git$||')
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 gh api "repos/${REPO}/pulls/${PR_NUMBER}/comments"  --paginate > /tmp/pr-comments.json
 gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews"   --paginate > /tmp/pr-reviews.json
 gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" --paginate > /tmp/issue-comments.json
