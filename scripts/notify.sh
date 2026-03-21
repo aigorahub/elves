@@ -13,7 +13,7 @@
 #   3. gh pr comment        — post to the current branch's open PR
 #   4. stdout               — echo as last resort
 #
-# Exit: 0 on success or normal operation, 1 if --test fails to deliver
+# Exit: 0 on success or normal operation, 1 if --test cannot reach a real channel
 # =============================================================================
 
 set -uo pipefail
@@ -21,7 +21,10 @@ set -uo pipefail
 # ---------------------------------------------------------------------------
 # Argument handling
 # ---------------------------------------------------------------------------
+TEST_MODE=0
+
 if [ "${1:-}" = "--test" ]; then
+  TEST_MODE=1
   TITLE="Elves Notification Test"
   BODY="This is a test notification sent by notify.sh at $(date). If you see this, notifications are working."
   URL=""
@@ -200,12 +203,12 @@ elif try_gh_pr_comment; then
 else
   log "All notification channels failed or unconfigured — falling back to stdout"
   fallback_stdout
-  DELIVERED=1
+  [ "$TEST_MODE" -eq 0 ] && DELIVERED=1
 fi
 
 # In --test mode, a failure to deliver is a real error (preflight needs to know).
 # In normal mode, notifications are best-effort and should never block the session.
-if [ "${1:-}" = "--test" ] && [ "$DELIVERED" -eq 0 ]; then
+if [ "$TEST_MODE" -eq 1 ] && [ "$DELIVERED" -eq 0 ]; then
   exit 1
 fi
 exit 0
