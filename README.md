@@ -68,10 +68,12 @@ This is the leverage that makes the setup cost worth it. A half hour of planning
 
 ### Riding Along
 
-You don't have to leave. You can watch the agent work, check in, give it additional context, or adjust priorities on the fly. But there is one rule: **every message you send during an active run must end with a clear instruction to keep going.** Say "keep going" or "don't stop" at the end of every message. If you don't, the agent may interpret your message as a request to pause and discuss — which kills the momentum.
+You don't have to leave. You can watch the agent work, check in, give it additional context, or adjust priorities on the fly. But there is one rule: **say "do not stop" in every message.** Be explicit and repetitive. This is not overkill — it makes a measurable difference in agent behavior. Without it, the agent may interpret your message as a request to pause and discuss, which kills the momentum.
 
-Good: "The payment tests are expected to fail — ignore them. Keep going."
+Good: "The payment tests are expected to fail — ignore them. Do not stop. Keep going."
+Good: "Quick question: did you update the migration? Do not stop. Answer my question and keep going, but do not stop."
 Bad: "What do you think we should do about the database schema?"
+Bad: "Looks good so far." (no instruction to continue — agent may pause waiting for more)
 
 ---
 

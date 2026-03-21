@@ -332,16 +332,18 @@ When the user sends a message during an active run:
 
 The pattern is always: **handle the input, document it, resume the loop.**
 
-**For users:** frame your messages as instructions, not open-ended questions. Always end with something like "keep going" or "don't stop."
+**For users:** be explicit and repetitive. Say "do not stop" in every message. This is not overkill — it makes a measurable difference in agent behavior. Frame your messages as instructions, not open-ended questions.
 
 Good:
-- "Batch 3 looks good. The payment tests are expected to fail — ignore them. Keep going."
-- "Change of plans: skip batch 4, do batch 6 next. Don't stop."
-- "Quick question: did you update the migration? Either way, keep going."
+- "Batch 3 looks good. The payment tests are expected to fail — ignore them. Do not stop. Keep going."
+- "Change of plans: skip batch 4, do batch 6 next. Answer acknowledged, do not stop."
+- "Quick question: did you update the migration? Do not stop. Answer my question and keep going, but do not stop."
+- "I see the auth tests are failing. Ignore them for now, they're flaky. Do not stop."
 
 Bad:
 - "What do you think we should do about the schema?" (open-ended, invites pause)
 - "Walk me through what you've done." (long answer, breaks flow)
+- "Looks good so far." (no instruction to continue — agent may pause waiting for more)
 
 ## Hard Stops
 
