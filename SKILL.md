@@ -98,7 +98,7 @@ If a PR already exists on the current branch, detect it and skip this setup.
 
 Split large programs into batches before coding. The right batch size is **what the current model can get almost certainly correct in a single focused effort** — then verified through testing, review, and deployment before moving on.
 
-The default is roughly **what a team of 4 developers would accomplish in a 2-week sprint** (~40 person-days), but this is a starting point. The real constraint is confidence: each batch must be small enough that by the time it passes validation, review, and preview deployment, you are confident it is correct. If a batch is so large that you can't be confident in the result even after testing and review, it's too large. Split it.
+In practice, frontier models in 2026 can reliably handle roughly **what a team of 4 developers would accomplish in a 2-week sprint** (~40 person-days of effort). This is a tested, practical benchmark — large enough to make real progress, small enough that the work can be verified with confidence before moving on. If a batch is so large that you can't be confident in the result even after testing and review, it's too large. Split it.
 
 This is what makes the output tight. The agent doesn't race through a huge plan and hope for the best. It does a chunk, tests it, reviews it, deploys it, confirms it works, and only then moves to the next chunk. Each batch stands on the verified foundation of the ones before it. Debt doesn't accumulate because nothing moves forward until it's right.
 
