@@ -64,9 +64,11 @@ The agent never merges. That gate stays with you.
 
 **1. Install the skill**
 
-- **Claude Code:** copy `SKILL.md` into `.claude/skills/elves.md` in your repo
-- **Codex:** copy `AGENTS.md` into `.agents/skills/elves.md`
-- **Claude.ai:** zip the `elves/` directory and upload as a skill
+See [Installation](#installation) below for full details. The short version:
+
+- **Claude Code:** copy the `elves/` directory into `.claude/skills/elves/` in your repo
+- **Codex:** copy `AGENTS.md` into `.agents/skills/elves/AGENTS.md`
+- **Claude.ai:** zip the `elves/` directory and upload via Settings > Features > Skills
 
 **2. Write a plan**
 
@@ -239,17 +241,19 @@ The agent uses the highest tier you have configured. Non-blocking findings are l
 
 ```
 elves/
-├── SKILL.md                              # Claude Code skill
+├── SKILL.md                              # Claude Code skill (main instructions)
 ├── AGENTS.md                             # Codex variant
 ├── references/
-│   ├── survival-guide-template.md
-│   ├── execution-log-template.md
-│   ├── plan-template.md
-│   ├── kickoff-prompt-template.md
-│   └── tool-config-examples.md
+│   ├── survival-guide-template.md        # Bootstrap template for new projects
+│   ├── execution-log-template.md         # Log entry template
+│   ├── plan-template.md                  # How to write a good plan
+│   ├── kickoff-prompt-template.md        # Copy-paste prompts for starting a run
+│   ├── tool-config-examples.md           # Configs for Node, Python, Go, Rust, etc.
+│   ├── validation-guide.md               # Detailed validation gates and auto-discovery
+│   └── autonomy-guide.md                 # Non-interactive operation and mid-run protocols
 ├── scripts/
-│   ├── preflight.sh
-│   └── notify.sh
+│   ├── preflight.sh                      # Pre-run checklist
+│   └── notify.sh                         # Notification helper
 ├── README.md
 └── LICENSE
 ```
@@ -289,6 +293,126 @@ Block time at the end of your workday — even 30 minutes — to brief your agen
 Friday afternoons deserve more deliberate treatment. The weekend is roughly 60 hours of potential agent runtime. A two-hour planning session on Friday, setting up plans, configuring the survival guide, and queuing batch work, can produce a week's worth of output before Monday morning.
 
 The people who start treating their idle hours as the asset they've suddenly become will have a real advantage.
+
+---
+
+## Installation
+
+Elves can be installed globally (applies to all your projects) or per-project (lives in the repo).
+
+### Global Installation (recommended to start)
+
+Global installation means the skill is always available, no matter which project you're in. Install it once, use it everywhere, and customize it as you learn.
+
+**Claude Code:**
+```bash
+# Create the global skills directory if it doesn't exist
+mkdir -p ~/.claude/skills/elves
+
+# Clone and copy
+git clone https://github.com/aigorahub/elves.git /tmp/elves
+cp -r /tmp/elves/SKILL.md /tmp/elves/references /tmp/elves/scripts ~/.claude/skills/elves/
+rm -rf /tmp/elves
+```
+
+**Codex:**
+```bash
+mkdir -p ~/.codex/skills/elves
+git clone https://github.com/aigorahub/elves.git /tmp/elves
+cp /tmp/elves/AGENTS.md ~/.codex/skills/elves/
+cp -r /tmp/elves/references /tmp/elves/scripts ~/.codex/skills/elves/
+rm -rf /tmp/elves
+```
+
+### Per-Project Installation
+
+Per-project installation puts the skill in your repo so it's versioned with your code and visible to collaborators.
+
+**Claude Code:**
+```bash
+# From your project root
+mkdir -p .claude/skills
+git clone https://github.com/aigorahub/elves.git .claude/skills/elves
+rm -rf .claude/skills/elves/.git  # remove the nested git repo
+```
+
+**Codex:**
+```bash
+mkdir -p .agents/skills
+git clone https://github.com/aigorahub/elves.git .agents/skills/elves
+rm -rf .agents/skills/elves/.git
+```
+
+### Claude.ai (Upload)
+
+1. Download or clone this repo
+2. Zip the `elves/` directory
+3. Go to Settings > Features > Skills > Upload
+4. Upload the zip file
+
+### Validating Your Installation
+
+```bash
+pip install -q skills-ref
+agentskills validate ~/.claude/skills/elves/  # or wherever you installed it
+```
+
+You should see: `Valid skill: ...`
+
+---
+
+## Making It Your Own
+
+**Elves is scaffolding, not a finished product.** It gives you the framework — the loop, the documents, the gates — but every project is different. You are going to need to customize it for your own purposes, and you are going to learn your own lessons along the way.
+
+### What to customize first
+
+**The survival guide template** is where most customization happens. When you generate a survival guide for your project, you'll fill in:
+- Your specific test commands (not every project uses `npm run lint`)
+- Your non-negotiables (what must never happen in your codebase)
+- Your review method (PR comments, a custom API, manual checks)
+- Your notification preference (Slack, email, PR comment)
+- Your batch sizing (maybe your team is 2 people, not 4)
+
+**The validation gates** will be different for every project. A Python data pipeline has different gates than a React web app. Edit the survival guide's `## Tool Configuration` section to match your stack. See [`references/tool-config-examples.md`](references/tool-config-examples.md) for examples across Node, Python, Go, Rust, and monorepos.
+
+**The plan template** is a starting point. Some teams want more structure (acceptance criteria per batch, risk statements). Others want less (just a task list). Make the plan format work for how you think, not how the template thinks.
+
+### What you'll learn by doing
+
+The first time you run Elves overnight, you will discover things no template can predict:
+
+- Which of your test suites is flaky and needs to be fixed before agents can rely on it
+- Which commands in your toolchain prompt for input and need `--yes` flags
+- How long your batches actually take (probably longer than you estimate)
+- Where your plan was vague and the agent had to guess
+- What non-negotiables you forgot to list
+
+This is normal. After each run, read the execution log — especially the **Decisions made** sections — and update your survival guide template with what you learned. The skill gets better every time you use it because *you* get better at writing plans and configuring the harness.
+
+### Editing your global installation
+
+If you installed globally, your customized skill lives at:
+- Claude Code: `~/.claude/skills/elves/SKILL.md`
+- Codex: `~/.codex/skills/elves/AGENTS.md`
+
+Edit these files directly. Add your own defaults, remove sections that don't apply to your work, add project-type-specific guidance. This is your copy — make it yours.
+
+When you want to update from upstream (new features, fixes), pull the latest and merge manually:
+```bash
+git clone https://github.com/aigorahub/elves.git /tmp/elves-update
+diff ~/.claude/skills/elves/SKILL.md /tmp/elves-update/SKILL.md
+# Review the diff, merge what you want, skip what you don't
+```
+
+### Per-project overrides
+
+If you have a global installation but one project needs different behavior, put a project-level copy in `.claude/skills/elves/` inside that repo. The project-level skill takes precedence over the global one.
+
+This is useful when:
+- One project uses Python while your default is Node
+- A project has specific non-negotiables ("never touch the billing module")
+- You want to experiment with a modified workflow without affecting other projects
 
 ---
 
