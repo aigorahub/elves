@@ -1,0 +1,116 @@
+# Kickoff Prompt Template
+
+> This is the message you paste into Claude Code, Codex, or your AI coding agent to start an
+> Elves run. Copy one of the templates below, fill in the brackets, and send it before you go
+> offline.
+>
+> The agent will read your plan, generate the survival guide and execution log if they don't
+> exist, run preflight checks, and start executing immediately.
+
+---
+
+## Minimal Template
+
+> Use this when your plan is self-contained and you don't have special instructions.
+> 3–5 lines is enough.
+
+```
+I'm going offline for [N hours / until ~HH:MM timezone].
+Run the plan at [path/to/plan.md] on branch [branch-name].
+Non-negotiables: [your top 1–2 rules, or "see the plan"].
+```
+
+**Example:**
+
+```
+I'm going offline until 8am ET tomorrow.
+Run the plan at docs/plans/auth-refactor.md on branch feat/jwt-auth.
+Non-negotiables: don't touch the OAuth routes, don't modify public API response shapes.
+```
+
+---
+
+## Full Template
+
+> Use this when you want to be explicit about paths, rules, and any edge cases the agent
+> should know before you walk away.
+
+```
+I'm going offline [until WHEN / for HOW LONG]. Please run the plan autonomously.
+
+**Plan:** [path/to/plan.md]
+**Branch:** [feat/branch-name]
+**Survival guide:** [path/to/survival-guide.md]  (or: "generate from template")
+**Execution log:** [path/to/execution-log.md]    (or: "generate from template")
+
+**Non-negotiables:**
+- [Hard rule 1]
+- [Hard rule 2]
+- [Hard rule 3]
+
+**Special instructions:**
+- [Anything the agent should know that isn't in the plan — environment quirks, known issues,
+  things to watch for, preferred approaches]
+- [E.g., "Redis might be slow to start — give it 10 seconds before running integration tests"]
+- [E.g., "The PR already exists at #42 — don't create a new one"]
+- [E.g., "If Batch 3 turns out to be too risky, stop after Batch 2 and note it in the log"]
+
+**When I return I expect to see:**
+- [What a successful run looks like to you — e.g., "A PR ready to review with all tests passing"]
+```
+
+**Example (filled in):**
+
+```
+I'm going offline until 7:30am ET. Please run the plan autonomously.
+
+**Plan:** docs/plans/auth-refactor.md
+**Branch:** feat/jwt-auth
+**Survival guide:** docs/elves/survival-guide.md  (generate from template if missing)
+**Execution log:** docs/elves/execution-log.md    (generate from template if missing)
+
+**Non-negotiables:**
+- Never modify public /api/* response shapes
+- All commits must pass lint and typecheck before push
+- Do not touch the OAuth routes or password reset flow
+- You never merge — the PR is for me to review
+
+**Special instructions:**
+- Redis can be slow to spin up in the test environment — if integration tests fail on
+  first run, wait 10 seconds and retry once before marking as failed
+- The PR already exists at #84 — don't create a new one
+- If you finish all 3 batches with time to spare, do a scout pass on the files you touched
+  and look for missing test coverage
+
+**When I return I expect to see:**
+- PR #84 updated with all 3 batches committed
+- All 142 auth tests passing
+- Execution log showing timing for each batch and any decisions made
+```
+
+---
+
+## Tips for Writing a Good Kickoff
+
+**Be specific about "when you return"**
+The agent uses this to pace work. "Tomorrow morning" is less useful than "8am ET Wednesday".
+If you don't specify, the agent assumes an 8-hour window.
+
+**Non-negotiables belong in the plan AND the prompt**
+The plan is the source of truth, but repeating the most critical rules in the prompt ensures
+the agent captures them before it starts reading files.
+
+**Mention the existing PR if there is one**
+If a PR already exists on the branch, tell the agent so it doesn't create a duplicate.
+
+**Tell the agent what to do if it finishes early**
+Without guidance, it enters scout mode by default (looking for adjacent improvements).
+If you want it to stop after the plan is done, say so.
+
+**Tell the agent what to do if it gets stuck**
+The default behavior is to stop with a detailed blocker description in the execution log.
+If you want it to skip a batch and try the next one, say so.
+
+**Don't over-specify**
+The agent will read your plan. You don't need to repeat the whole plan in the prompt.
+The prompt is for framing, rules, and anything the plan doesn't cover.
