@@ -1,0 +1,22 @@
+{
+  "_comment": "Elves persistent preferences. Copy this to config.json and customize.",
+  "_docs": "These values are read at session start so you don't have to reconfigure every time.",
+
+  "batch_sizing": {
+    "team_size": 4,
+    "sprint_weeks": 2,
+    "notes": "Adjust based on your model and stack. Codex can handle larger batches."
+  },
+
+  "notification": {
+    "method": "gh-pr-comment",
+    "_alternatives": "slack, custom-cmd, gh-pr-comment"
+  },
+
+  "review": {
+    "method": "github-pr-comments",
+    "_alternatives": "github-pr-comments, custom-api"
+  },
+
+  "default_branch": "main"
+}

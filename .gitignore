@@ -1,5 +1,6 @@
 # Elves runtime artifacts (generated during sessions)
 .elves-session.json
+config.json
 
 # OS files
 .DS_Store

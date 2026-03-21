@@ -288,6 +288,7 @@ The agent uses the highest tier you have configured. Non-blocking findings are l
 elves/
 ├── SKILL.md                              # Claude Code skill (main instructions)
 ├── AGENTS.md                             # Codex variant
+├── config.json.example                   # Persistent preferences template
 ├── references/
 │   ├── survival-guide-template.md        # Bootstrap template for new projects
 │   ├── execution-log-template.md         # Log entry template
@@ -295,7 +296,9 @@ elves/
 │   ├── kickoff-prompt-template.md        # Copy-paste prompts for starting a run
 │   ├── tool-config-examples.md           # Configs for Node, Python, Go, Rust, etc.
 │   ├── validation-guide.md               # Detailed validation gates and auto-discovery
-│   └── autonomy-guide.md                 # Non-interactive operation and mid-run protocols
+│   ├── autonomy-guide.md                 # Non-interactive operation and mid-run protocols
+│   ├── review-subagent.md                # Built-in review protocol and adversarial review
+│   └── verification-patterns.md           # Headless browser, video recording, state assertions
 ├── scripts/
 │   ├── preflight.sh                      # Pre-run checklist
 │   └── notify.sh                         # Notification helper

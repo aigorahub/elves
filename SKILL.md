@@ -374,7 +374,7 @@ If the skill directory contains a `config.json`, read it at session start. This 
 }
 ```
 
-If `config.json` doesn't exist and the user provides preferences during the planning conversation, offer to save them for future sessions.
+If `config.json` doesn't exist and the user provides preferences during the planning conversation, offer to save them for future sessions. See `config.json.example` for the template.
 
 ## Skill Memory
 

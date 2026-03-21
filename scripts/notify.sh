@@ -13,7 +13,7 @@
 #   3. gh pr comment        — post to the current branch's open PR
 #   4. stdout               — echo as last resort
 #
-# Exit: always 0 (errors are logged, not fatal)
+# Exit: 0 on success or normal operation, 1 if --test fails to deliver
 # =============================================================================
 
 set -uo pipefail
@@ -194,4 +194,9 @@ else
   DELIVERED=1
 fi
 
-[ "$DELIVERED" -eq 1 ] && exit 0 || exit 0   # always exit 0 — notifications are best-effort
+# In --test mode, a failure to deliver is a real error (preflight needs to know).
+# In normal mode, notifications are best-effort and should never block the session.
+if [ "${1:-}" = "--test" ] && [ "$DELIVERED" -eq 0 ]; then
+  exit 1
+fi
+exit 0
