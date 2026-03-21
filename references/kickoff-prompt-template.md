@@ -6,6 +6,12 @@
 >
 > The agent will read your plan, generate the survival guide and execution log if they don't
 > exist, run preflight checks, and start executing immediately.
+>
+> **The Daily Briefing.** Block time at the end of your workday — even 30 minutes — to brief
+> your agents. Load them with enough well-defined work to keep them running through the night.
+> Friday afternoons deserve more deliberate treatment: the weekend is roughly 60 hours of
+> potential agent runtime. A two-hour planning session on Friday can produce a week's worth of
+> output before Monday morning.
 
 ---
 
@@ -114,3 +120,9 @@ If you want it to skip a batch and try the next one, say so.
 **Don't over-specify**
 The agent will read your plan. You don't need to repeat the whole plan in the prompt.
 The prompt is for framing, rules, and anything the plan doesn't cover.
+
+**Friday kickoffs are special**
+The weekend is ~60 hours of potential runtime. If you have a big feature plan, Friday afternoon
+is the time to queue it. Spend 1-2 hours writing a thorough plan, configuring the survival
+guide, and running preflight. Then walk away and let the agent work through Saturday and Sunday.
+You may return Monday to a week's worth of output waiting for review.

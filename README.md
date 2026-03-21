@@ -8,6 +8,22 @@ You write the plan and do the final merge. The agent does everything in between.
 
 ---
 
+## Why "Elves"?
+
+In the old fairy tale, a tired shoemaker goes to bed with work undone and wakes to find it finished. That story is the premise of this skill.
+
+Throughout economic history, wealth creation has followed a consistent pattern: a resource sits idle until someone builds a tool that makes it useful. Coal sat in the ground until the steam engine. Cars sat in driveways until Uber. Spare bedrooms sat empty until Airbnb. The resource already existed — what was missing was the mechanism.
+
+Every knowledge worker has 12 to 14 hours each day when they are not working — evenings, nights, weekends. For most of history, that time was genuinely unproductive. AI agents change that. A well-configured agent can execute code, run tests, conduct reviews, and document decisions while its owner is asleep. The sleeping hours are now a resource. They weren't before.
+
+The question is no longer "what can I have my AI do today?" It's "what will my AI be doing at 2am on Saturday?"
+
+Elves is the mechanism. It converts idle hours into shipped code.
+
+*Based on [The Shoemaker's Elves](https://x.com/johnennis/status/1893694505032986896) by John Ennis.*
+
+---
+
 ## How It Works
 
 ```
@@ -246,12 +262,24 @@ elves/
 
 ## Philosophy
 
-- **Human does planning and final review.** The agent does everything in between.
+- **Human does planning and final review.** The agent does everything in between. Good managers think constantly about whether the people and resources they're responsible for are being deployed well. That instinct now applies to your agents.
+- **The 14-hour resource.** Every knowledge worker has 12-14 hours per day when they're not working. Elves converts those hours into shipped code. A two-hour planning session on Friday can produce a week's worth of output before you touch your keyboard on Monday.
 - **Three documents are the agent's memory.** Without them, long runs drift and repeat work. With them, a restarted agent picks up exactly where it left off.
 - **Never merge.** The PR is for review, not for merging. That gate stays with the human.
 - **Document every decision.** Anything the agent decides without user input goes in the execution log under *Decisions made*. The human reviews these choices when they return.
 - **Fail safely, not silently.** If the agent is genuinely blocked, it stops and says so. If a test gate fails, it fixes the issue before continuing. It does not skip gates or paper over failures.
 - **Rollback before every batch.** `elves/pre-batch-N` tags mean any batch can be cleanly unwound without touching other work.
+- **Agent infrastructure is real engineering.** Tight code review systems, organized work trees, failure handling — developers who treat agent infrastructure as a real engineering concern end up with something that functions like a tireless junior team working every hour they're away from their desk.
+
+---
+
+## The Daily Briefing
+
+Block time at the end of your workday — even 30 minutes — to brief your agents. Load them with enough well-defined work to keep them running through the night. Before you go offline, everything needs to be provisioned and pointed in the right direction.
+
+Friday afternoons deserve more deliberate treatment. The weekend is roughly 60 hours of potential agent runtime. A two-hour planning session on Friday, setting up plans, configuring the survival guide, and queuing batch work, can produce a week's worth of output before Monday morning.
+
+The people who start treating their idle hours as the asset they've suddenly become will have a real advantage.
 
 ---
 
