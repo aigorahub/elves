@@ -274,8 +274,8 @@ The tests are the user's insurance policy. You don't get to modify the insurance
 After any compaction or restart, your conversation history is gone. But your instructions aren't. They live in files on disk, not in memory. Context compaction can't erase what lives in the survival guide, plan, and execution log. This is why those documents exist.
 
 1. Read the survival guide first (marked with `READ THIS FILE FIRST` banners).
-2. Read the execution log.
-3. Read the plan.
+2. Read the plan.
+3. Read the execution log.
 4. Identify the first incomplete batch.
 5. Resume immediately without asking for help.
 6. Don't redo completed work.

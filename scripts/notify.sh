@@ -37,6 +37,15 @@ fi
 
 export TITLE BODY URL
 
+SLACK_RESPONSE_FILE=$(mktemp "${TMPDIR:-/tmp}/elves-slack-response.XXXXXX")
+CUSTOM_ERR_FILE=$(mktemp "${TMPDIR:-/tmp}/elves-custom-cmd.XXXXXX")
+GH_ERR_FILE=$(mktemp "${TMPDIR:-/tmp}/elves-gh-comment.XXXXXX")
+
+cleanup() {
+  rm -f "${SLACK_RESPONSE_FILE}" "${CUSTOM_ERR_FILE}" "${GH_ERR_FILE}"
+}
+trap cleanup EXIT
+
 # ---------------------------------------------------------------------------
 # Logging helper (goes to stderr so it doesn't pollute piped output)
 # ---------------------------------------------------------------------------
@@ -94,7 +103,7 @@ PYEOF
     return 1
   fi
 
-  HTTP_CODE=$(curl -s -o /tmp/elves_slack_response.txt -w "%{http_code}" \
+  HTTP_CODE=$(curl -s -o "${SLACK_RESPONSE_FILE}" -w "%{http_code}" \
     -X POST "${ELVES_SLACK_WEBHOOK}" \
     -H "Content-Type: application/json" \
     -d "$PAYLOAD" 2>/dev/null || echo "000")
@@ -103,7 +112,7 @@ PYEOF
     log "Slack: delivered (HTTP 200)"
     return 0
   else
-    RESPONSE=$(cat /tmp/elves_slack_response.txt 2>/dev/null || echo "(no body)")
+    RESPONSE=$(cat "${SLACK_RESPONSE_FILE}" 2>/dev/null || echo "(no body)")
     err "Slack: HTTP ${HTTP_CODE} — ${RESPONSE}"
     return 1
   fi
@@ -120,11 +129,11 @@ try_custom_cmd() {
   # in their own environment, not by untrusted input. It allows users to configure
   # arbitrary notification commands (e.g., 'curl -d "$BODY" ntfy.sh/my-topic').
   # TITLE, BODY, URL are already exported above.
-  if eval "${ELVES_NOTIFY_CMD}" 2>/tmp/elves_custom_cmd_err.txt; then
+  if eval "${ELVES_NOTIFY_CMD}" 2>"${CUSTOM_ERR_FILE}"; then
     log "Custom command: delivered"
     return 0
   else
-    ERR_MSG=$(cat /tmp/elves_custom_cmd_err.txt 2>/dev/null | head -3 || echo "(no output)")
+    ERR_MSG=$(cat "${CUSTOM_ERR_FILE}" 2>/dev/null | head -3 || echo "(no output)")
     err "Custom command failed: ${ERR_MSG}"
     return 1
   fi
@@ -154,11 +163,11 @@ ${BODY}"
 [Open](${URL})"
   fi
 
-  if gh pr comment --body "$COMMENT_BODY" 2>/tmp/elves_gh_err.txt; then
+  if gh pr comment --body "$COMMENT_BODY" 2>"${GH_ERR_FILE}"; then
     log "PR comment posted (PR #${PR_NUMBER})"
     return 0
   else
-    ERR_MSG=$(cat /tmp/elves_gh_err.txt 2>/dev/null | head -3 || echo "(no output)")
+    ERR_MSG=$(cat "${GH_ERR_FILE}" 2>/dev/null | head -3 || echo "(no output)")
     err "gh pr comment failed: ${ERR_MSG}"
     return 1
   fi
