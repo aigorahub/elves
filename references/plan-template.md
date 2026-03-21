@@ -1,8 +1,12 @@
 # Plan: [Short Descriptive Title]
 
-> A plan is the written brief you hand to Elves before going offline. It is read at the start of
-> every batch and after every compaction. Write it precisely — the agent treats it as the source of
-> truth for what should be built.
+> A plan is the front end of the Human Sandwich — the part where the human decides what is worth
+> working on and specifies the problem fully. This is the hardest part of any project and it is
+> entirely yours. No AI can tell you what matters. That's your job.
+>
+> The agent treats this plan as the source of truth for what should be built. It is read at the
+> start of every batch and after every compaction. Write it precisely. A half hour spent on a
+> good plan can unlock days of autonomous execution and months of equivalent output.
 >
 > This template shows you how to write a good plan. Replace all `[brackets]` with your content.
 > Remove sections that don't apply. The example at the bottom shows a real-ish plan you can use

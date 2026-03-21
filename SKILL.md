@@ -88,19 +88,26 @@ Record the time budget in the execution log.
 
 If a PR already exists on the current branch, detect it and skip this setup.
 
-**Why the PR must exist before any code is written:** The PR is where reviewer bots do their work. If the user has GitHub review bots installed (CodeRabbit, Copilot, SonarCloud, etc.), those bots will review every push automatically. The earlier the PR exists, the more review feedback accumulates. By the time the user wakes up, the PR has a rich history of bot reviews, agent responses, and iterative fixes. This is the review infrastructure that makes overnight runs trustworthy.
+**Why the PR must exist before any code is written:** The PR is where the review loop happens. After every batch, you read the PR comments, fix what they found, push, and iterate until the batch is clean. If the user has reviewer bots installed (CodeRabbit, Copilot, SonarCloud, etc.), those bots review every push automatically — and you read and act on their feedback as part of the loop. The review is not something that accumulates for the human to read in the morning. The review is part of your loop. You iterate on it until the batch is tight, then move on.
 
-**The PR is not the deliverable. The deliverable is work that is ready to review.** The user should expect to spend 30-60 minutes reviewing the PR before merging. The agent's job is to get the work as close to production-ready as possible, but the final judgment is always human.
+**The PR is not the deliverable. The deliverable is work that has already been through many review cycles.** By the time the user wakes up, each batch has been implemented, tested, reviewed, fixed, re-tested, and re-reviewed — possibly multiple times. The human's final review is a pass on work that is already tight, not a first look at raw output.
 
 **You never merge. The user merges when they return.**
 
 ## Batch Decomposition
 
-Split large programs into batches before coding. Default batch size: **what a team of 4 developers would accomplish in a 2-week sprint** (~40 person-days). The user can override this in the plan or survival guide.
+Split large programs into batches before coding. The right batch size is **what the current model can get almost certainly correct in a single focused effort** — then verified through testing, review, and deployment before moving on.
+
+The default is roughly **what a team of 4 developers would accomplish in a 2-week sprint** (~40 person-days), but this is a starting point. The real constraint is confidence: each batch must be small enough that by the time it passes validation, review, and preview deployment, you are confident it is correct. If a batch is so large that you can't be confident in the result even after testing and review, it's too large. Split it.
+
+This is what makes the output tight. The agent doesn't race through a huge plan and hope for the best. It does a chunk, tests it, reviews it, deploys it, confirms it works, and only then moves to the next chunk. Each batch stands on the verified foundation of the ones before it. Debt doesn't accumulate because nothing moves forward until it's right.
+
+The user can override batch sizing in the plan or survival guide.
 
 Rules:
 - Each batch must be independently shippable: code, tests, docs, and passing review.
-- If a batch feels too large, split it before writing code.
+- Each batch must pass validation, review, AND preview deployment (if configured) before the next batch starts.
+- If a batch feels too large for the model to get right with high confidence, split it before writing code.
 - Record the batch breakdown with estimates in the execution log before implementation begins.
 - Create a rollback tag before each batch: `git tag elves/pre-batch-N`
 
@@ -151,11 +158,19 @@ Every gate must pass. If a gate fails, fix it and re-run from that gate. Do not 
 
 ### 5. Review
 
-Read all PR comments and review threads via `gh api`. Categorize findings by severity. Fix blocking issues (critical/high). Defer complex non-blocking issues to TODO.md. After fixing, push and re-read comments. Repeat until no blockers remain.
+**This is where the Ralph Loop does its real work.** You built something (implement). You checked it (validate). Now you get independent feedback (review) and feed it back into the next iteration. This cycle is what makes the output converge on something good rather than something that merely compiles.
 
-If the same non-actionable finding persists for 3 cycles, log your assessment and move on.
+The built-in review works out of the box with zero configuration:
 
-The user may also configure an external review API or additional checks (smoke tests, visual review, doc checks) in the survival guide. See `references/tool-config-examples.md` for options.
+1. **Read all PR comments** — bot reviews, CI results, any human feedback — via `gh api`.
+2. **Spawn a review subagent** (if supported) to read the comments, the diff, and the plan, then produce a structured assessment: what's blocking, what's a warning, what's fine. If subagents aren't available, do this analysis directly.
+3. **Fix blocking issues** — real bugs, security problems, correctness failures. These must be fixed before moving on.
+4. **Push fixes, then re-read comments.** New pushes may trigger new bot reviews. Read those too.
+5. **Repeat until the batch is clean.** No unresolved blockers. The loop continues until the review step has nothing left to find.
+
+If the same non-actionable finding persists for 3 cycles, log your assessment and move on. Do not make unnecessary code changes to appease a finding you believe is wrong.
+
+The user can fortify this with additional review tools configured in the survival guide — external review APIs, smoke tests, visual review, custom scripts. See `references/tool-config-examples.md`. But the built-in PR comment review works for everyone with `gh` auth and is the minimum viable review loop.
 
 ### 6. Document
 
@@ -235,13 +250,14 @@ A batch is not done unless:
 2. Build succeeds.
 3. Relevant tests pass — no new failures.
 4. Preview deploys and smoke tests pass (if configured).
-5. Review performed — blockers fixed.
-6. No accumulated debt — no skipped gates, no "will fix later" items.
-7. Execution log updated with timestamps, evidence, and commit SHA.
-8. Survival guide updated with next batch.
-9. Changes committed and pushed.
+5. Review performed — the review loop ran until no blockers remained.
+6. No accumulated debt — no skipped gates, no "will fix later" items, no known regressions.
+7. You are confident the batch is correct — not "probably fine," but verified through testing, review, and deployment.
+8. Execution log updated with timestamps, evidence, and commit SHA.
+9. Survival guide updated with next batch.
+10. Changes committed and pushed.
 
-The output of every batch should be as close to production-ready as it can reasonably be.
+Every batch must be tight before you move on. The next batch builds on this one. If this one is shaky, everything after it is shaky. The output of every batch should be as close to production-ready as it can reasonably be.
 
 ## Final Completion
 

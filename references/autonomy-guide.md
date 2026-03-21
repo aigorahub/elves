@@ -2,7 +2,9 @@
 
 ## The Core Problem
 
-The user is not there. Any pause, prompt, or confirmation dialog that expects human input will stall the entire run with no one to respond. **This is the single most common failure mode for overnight sessions.** The rules below exist to prevent it.
+The user is not there. They are asleep, or at dinner, or spending time with their family. The whole point of Elves is that the 12 to 14 hours each day when the user is not working become productive hours. But that only works if the loop keeps running.
+
+Any pause, prompt, or confirmation dialog that expects human input will stall the entire run with no one to respond. **This is the single most common failure mode for overnight sessions.** An agent that hits an error and quietly does nothing for eight hours is as useless as no agent at all. The rules below exist to prevent it.
 
 ---
 

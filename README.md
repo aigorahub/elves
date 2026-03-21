@@ -53,8 +53,8 @@ After any compaction or restart, the agent reads these three files in order and 
 The shape of productive work is changing. The human operates on both ends — specifying problems and reviewing output — while the agent runs loops in the middle.
 
 - **Front end (human):** Decide what's worth working on. Write the plan. Specify the problem fully. 30 minutes to an hour.
-- **Middle (agent):** Open a branch, commit the plans, open a PR, then run the loop — implement, validate, review, fix, iterate. This runs for hours or days while you sleep. Reviewer bots on the PR provide feedback at every push.
-- **Back end (human):** Review the output. Read the execution log. Check the PR reviews. Merge what's good, fix what isn't. 30 minutes to an hour.
+- **Middle (agent):** Open a branch, commit the plans, open a PR, then run the loop — implement, validate, review, fix, iterate. For each batch, the agent builds the code, runs the tests, reads the PR review comments (from bots or humans), fixes what the reviews found, pushes, and iterates until the batch is tight. Then it moves to the next batch. This runs for hours or days while you sleep.
+- **Back end (human):** Review the output. By the time you look at the PR, every batch has already been through multiple rounds of implement-test-review-fix. Your review is a final pass on work that's already tight, not a first look at raw output. 30 minutes to an hour.
 
 The agent never merges. That gate stays with you.
 
@@ -252,7 +252,7 @@ Each batch must be independently shippable: code, tests, docs, and passing revie
 
 | Tier | Method | Configuration |
 |---|---|---|
-| **Tier 1** | GitHub PR comments | Default — zero config. Agent reads all comments, categorizes by severity, fixes blockers. |
+| **Tier 1** | GitHub PR comments + built-in review subagent | Default — zero config. Agent spawns a review subagent that reads all PR comments, the diff, and the plan, then produces a structured assessment. Agent fixes blockers and iterates until the batch is clean. |
 | **Tier 2** | Custom review API | Set `method: custom-api` and `review-api-url` in survival guide. |
 | **Tier 3** | Additional checks | Smoke tests, screenshot diffs, doc checks, or any custom script returning 0/non-zero. |
 

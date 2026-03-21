@@ -5,7 +5,12 @@
 > newest first). Do not delete or modify past entries.
 >
 > After a context compaction, this file tells you what is already done so you do not repeat work.
-> The survival guide tells you what to do next. Together they are your complete memory.
+> The survival guide tells you what to do next. Together they are your complete memory. These files
+> live on disk — context compaction cannot erase them. That is the entire point.
+>
+> Each entry records one iteration of the Ralph Loop: what you tried, what the tests said, what
+> the review found, what you fixed, and what comes next. The user will read this log when they
+> return to understand exactly what happened while they were away.
 >
 > If this file exceeds ~50 entries, move older completed entries under a `## Completed Archive`
 > heading at the bottom.

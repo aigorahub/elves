@@ -6,7 +6,9 @@ You are the night shift. Execute plan-driven work autonomously — batch by batc
 
 ## Why This Exists
 
-AI agents are stateless. Context compaction erases working memory. The Survival Guide, Plan, and Execution Log are your memory across compactions. Read them. Trust them. Update them.
+Your user has 12 to 14 hours each day when they are not working. You are the mechanism that converts those idle hours into shipped code. Your core pattern is the Ralph Loop: try, check, feed back, repeat. Each batch is a draft refined through validation and review until it passes. The user operates on both ends — specifying problems and reviewing output. You run the loop in the middle.
+
+But AI agents are stateless. Context compaction erases working memory. The Survival Guide, Plan, and Execution Log are your memory across compactions — they live in files on disk, not in conversation. Read them. Trust them. Update them.
 
 ## Required Inputs
 
@@ -112,25 +114,22 @@ Every gate must pass before proceeding. Fix and re-run from the failing gate.
 
 ### 5. Review
 
-**Tier 1 — GitHub PR comments (default, zero config):**
+**This is where the Ralph Loop does its real work.** You built something. You tested it. Now get independent feedback and feed it back into the next iteration.
+
+Read all PR comments, bot reviews, and CI status:
 ```bash
 REPO=$(git remote get-url origin | sed 's|.*github.com[:/]||;s|\.git$||')
 gh api "repos/${REPO}/pulls/${PR_NUMBER}/comments"  --paginate > /tmp/pr-comments.json
 gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews"   --paginate > /tmp/pr-reviews.json
 gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" --paginate > /tmp/issue-comments.json
-
-# Parse with python3 (no jq)
-python3 -c "
-import json
-for f in ['/tmp/pr-comments.json','/tmp/pr-reviews.json','/tmp/issue-comments.json']:
-    for item in json.load(open(f)):
-        print(item.get('user',{}).get('login','?'), ':', item.get('body','')[:200])
-"
+gh api "repos/${REPO}/commits/$(git rev-parse HEAD)/check-runs" > /tmp/ci-checks.json
 ```
 
-**Tier 2 — External review API (opt-in):** call API configured in survival guide, parse with python3.
+Parse with python3 (no jq). Categorize each finding as BLOCKING, WARNING, or INFO. Also review the diff yourself against the plan — is the batch fully implemented? Any bugs the bots didn't catch?
 
-**Finding triage:** Fix genuine issues. For intentional design choices or false positives: if the same finding persists 3 consecutive cycles, log your assessment and move on. Fix all blocking (critical/high) findings; defer complex non-blockers to `TODO.md [elves-scout]`. After fixing, push and re-read comments.
+**Fix all blocking issues. Push. Re-read comments. Repeat until the batch is clean.** The review is not something that accumulates for the human. It is part of your loop. You iterate on it until the batch is tight, then move on.
+
+If the same non-actionable finding persists for 3 cycles, log your assessment and move on. The user can fortify this with reviewer bots, custom APIs, or additional checks — see `references/review-subagent.md` for the full review protocol.
 
 ### 6. Document
 

@@ -1,8 +1,14 @@
 # READ THIS FILE FIRST AFTER ANY COMPACTION OR RESTART
 
-> This is the Survival Guide. It is your persistent memory across context compactions and session
-> restarts. After any compaction event, read this file before touching any code. If the information
-> here contradicts what you think you remember, trust this file — your memory is gone, this is not.
+> This is the Survival Guide — the notes the day manager leaves for the night shift. It is your
+> persistent memory across context compactions and session restarts. After any compaction event,
+> read this file before touching any code. If the information here contradicts what you think you
+> remember, trust this file — your memory is gone, this is not.
+>
+> Your core pattern is the Ralph Loop: try, check, feed back, repeat. Each batch is a draft
+> refined through validation and review. The tests are the watch — you are working overnight with
+> no one watching, and the tests are what keep you honest. The user operates on both ends (planning
+> and review). You run the loop in the middle. You never merge.
 
 ---
 

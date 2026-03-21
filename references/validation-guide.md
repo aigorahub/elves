@@ -2,6 +2,8 @@
 
 ## Philosophy
 
+The Ralph Loop only works if the evaluation step is honest. Try, check, feed back, repeat — but if the "check" step lies, the loop converges on garbage. That is why validation is the most important phase.
+
 **The goal of validation is zero accumulated debt.** Every batch must be production-ready before you move to the next one. If you skip a failing test or ignore a build warning, the debt compounds across batches and the final output is far from shippable. The user should return to code that is as close to production-ready as it can reasonably be.
 
 **You are working overnight with no one watching. The tests are the watch.** Without them, you produce code that compiles, passes lint, and does the wrong thing. The test gates are non-negotiable — a batch is not done until they all pass.
