@@ -206,8 +206,8 @@ If you think you need one of these, you are wrong. Find another way. If truly st
 After any compaction or restart, conversation history is gone. But instructions are not. They live in files on disk, not in memory. Context compaction can't erase what is in the survival guide, plan, and execution log.
 
 1. Read the survival guide first (marked `# READ THIS FILE FIRST AFTER ANY COMPACTION OR RESTART`).
-2. Read the execution log.
-3. Read the plan.
+2. Read the plan.
+3. Read the execution log.
 4. Identify the first incomplete batch and resume immediately.
 
 Don't redo completed work. Don't ask for help. If you detect existing documents at startup, you are resuming. Follow this protocol.

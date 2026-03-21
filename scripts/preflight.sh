@@ -46,17 +46,24 @@ is_cloud_env() {
   [ -n "${OPENAI_CODEX:-}" ] && return 0
   # GitHub Codespaces
   [ -n "${CODESPACES:-}" ] && return 0
-  # Generic CI signals
-  [ -n "${CI:-}" ] && return 0
+  # Explicit hosted CI providers
   [ -n "${GITHUB_ACTIONS:-}" ] && return 0
   [ -n "${GITLAB_CI:-}" ] && return 0
   [ -n "${CIRCLECI:-}" ] && return 0
-  # Cloud VM heuristics (no battery hardware)
-  if [ "$(uname -s)" = "Linux" ]; then
-    ls /sys/class/power_supply/ 2>/dev/null | grep -q "BAT" || return 0
-  fi
   return 1
 }
+
+declare -a PREFLIGHT_ENV=(
+  "CI=true"
+  "DEBIAN_FRONTEND=noninteractive"
+  "HOMEBREW_NO_AUTO_UPDATE=1"
+  "NEXT_TELEMETRY_DISABLED=1"
+  "NUXT_TELEMETRY_DISABLED=1"
+  "DOTNET_CLI_TELEMETRY_OPTOUT=1"
+  "PYTHONDONTWRITEBYTECODE=1"
+  "PIP_DISABLE_PIP_VERSION_CHECK=1"
+  "NPM_CONFIG_YES=true"
+)
 
 # ---------------------------------------------------------------------------
 # 1. Git remote
@@ -140,7 +147,32 @@ if [ $PROJECT_NODE -eq 0 ] && [ $PROJECT_PYTHON -eq 0 ] && \
 fi
 
 # ---------------------------------------------------------------------------
-# 5. Validation gate probe (check commands exist / scripts are defined)
+# 5. Non-interactive environment
+# ---------------------------------------------------------------------------
+header "Non-Interactive Environment"
+
+NON_INTERACTIVE_MISSING=0
+for SPEC in "${PREFLIGHT_ENV[@]}"; do
+  VAR_NAME=${SPEC%%=*}
+  EXPECTED_VALUE=${SPEC#*=}
+  if [ "${!VAR_NAME:-}" != "${EXPECTED_VALUE}" ]; then
+    NON_INTERACTIVE_MISSING=1
+    break
+  fi
+done
+
+if [ "$NON_INTERACTIVE_MISSING" -eq 0 ]; then
+  pass "Recommended non-interactive env vars are already set"
+else
+  warn "Current shell is missing one or more recommended non-interactive env vars"
+  info "Gate dry-runs below will use safe defaults anyway, but export these before a long unattended run:"
+  for SPEC in "${PREFLIGHT_ENV[@]}"; do
+    info "export ${SPEC}"
+  done
+fi
+
+# ---------------------------------------------------------------------------
+# 6. Validation gate dry run
 # ---------------------------------------------------------------------------
 header "Validation Gates"
 
@@ -152,48 +184,121 @@ check_npm_script() {
   return 1
 }
 
+playwright_config_present() {
+  [ -f playwright.config.js ]  || [ -f playwright.config.cjs ] || \
+  [ -f playwright.config.mjs ] || [ -f playwright.config.ts ]
+}
+
+run_gate() {
+  local LABEL="$1"
+  local CMD="$2"
+  local GATE_LOG
+  local OUTPUT
+
+  GATE_LOG=$(mktemp "${TMPDIR:-/tmp}/elves-preflight-gate.XXXXXX")
+  info "${CMD}"
+
+  if env "${PREFLIGHT_ENV[@]}" bash -lc "${CMD}" >"${GATE_LOG}" 2>&1; then
+    pass "${LABEL}"
+  else
+    warn "${LABEL} — failed during preflight dry run"
+    OUTPUT=$(head -5 "${GATE_LOG}" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g')
+    info "Output: ${OUTPUT:-"(no output)"}"
+  fi
+
+  rm -f "${GATE_LOG}"
+}
+
 if [ $PROJECT_NODE -eq 1 ]; then
   echo -e "  ${CYAN}Node.js (${NODE_MGR})${RESET}"
-  for SCRIPT in lint typecheck build test; do
-    if check_npm_script "$SCRIPT"; then
-      pass "  ${NODE_MGR} run ${SCRIPT} — defined"
-    else
-      warn "  ${NODE_MGR} run ${SCRIPT} — not defined in package.json"
+  if ! command -v node &>/dev/null; then
+    fail "  node is not installed"
+  elif ! command -v "${NODE_MGR}" &>/dev/null; then
+    fail "  ${NODE_MGR} is not installed"
+  else
+    for SCRIPT in lint typecheck build test; do
+      if check_npm_script "$SCRIPT"; then
+        case "$NODE_MGR" in
+          npm)
+            if [ "$SCRIPT" = "test" ]; then
+              GATE_CMD="npm test --if-present"
+            else
+              GATE_CMD="npm run ${SCRIPT} --if-present"
+            fi
+            ;;
+          pnpm)
+            GATE_CMD="pnpm ${SCRIPT}"
+            ;;
+          yarn)
+            GATE_CMD="yarn ${SCRIPT}"
+            ;;
+        esac
+        run_gate "  ${GATE_CMD}" "${GATE_CMD}"
+      else
+        info "Skipping ${NODE_MGR} ${SCRIPT} — not defined in package.json"
+      fi
+    done
+
+    if check_npm_script "e2e"; then
+      case "$NODE_MGR" in
+        npm)  GATE_CMD="npm run e2e --if-present" ;;
+        pnpm) GATE_CMD="pnpm e2e" ;;
+        yarn) GATE_CMD="yarn e2e" ;;
+      esac
+      run_gate "  ${GATE_CMD}" "${GATE_CMD}"
+    elif playwright_config_present; then
+      case "$NODE_MGR" in
+        npm)  GATE_CMD="npx playwright test" ;;
+        pnpm) GATE_CMD="pnpm exec playwright test" ;;
+        yarn) GATE_CMD="yarn playwright test" ;;
+      esac
+      run_gate "  ${GATE_CMD}" "${GATE_CMD}"
     fi
-  done
+  fi
 fi
 
 if [ $PROJECT_PYTHON -eq 1 ]; then
   echo -e "  ${CYAN}Python${RESET}"
-  command -v ruff   &>/dev/null && pass "  ruff available (lint)"   || warn "  ruff not found — lint unavailable"
-  command -v mypy   &>/dev/null && pass "  mypy available (typecheck)" || warn "  mypy not found — typecheck unavailable"
-  command -v pytest &>/dev/null && pass "  pytest available (test)"  || warn "  pytest not found — test unavailable"
+  command -v ruff &>/dev/null && run_gate "  ruff check ." "ruff check ." || info "Skipping lint — ruff not found"
+  command -v mypy &>/dev/null && run_gate "  mypy ." "mypy ." || info "Skipping typecheck — mypy not found"
+  command -v pytest &>/dev/null && run_gate "  pytest" "pytest" || info "Skipping tests — pytest not found"
 fi
 
 if [ $PROJECT_GO -eq 1 ]; then
   echo -e "  ${CYAN}Go${RESET}"
-  command -v go           &>/dev/null && pass "  go available (build/test)" || fail "  go not installed"
-  command -v golangci-lint &>/dev/null && pass "  golangci-lint available (lint)" || warn "  golangci-lint not found — lint unavailable"
+  if command -v go &>/dev/null; then
+    run_gate "  go build ./..." "go build ./..."
+    run_gate "  go test ./..." "go test ./..."
+  else
+    fail "  go is not installed"
+  fi
+  command -v golangci-lint &>/dev/null && run_gate "  golangci-lint run" "golangci-lint run" || info "Skipping lint — golangci-lint not found"
 fi
 
 if [ $PROJECT_RUST -eq 1 ]; then
   echo -e "  ${CYAN}Rust${RESET}"
-  command -v cargo &>/dev/null && pass "  cargo available (build/test/clippy)" || fail "  cargo not installed"
+  if command -v cargo &>/dev/null; then
+    run_gate "  cargo clippy" "cargo clippy"
+    run_gate "  cargo build" "cargo build"
+    run_gate "  cargo test" "cargo test"
+  else
+    fail "  cargo is not installed"
+  fi
 fi
 
 if [ $PROJECT_MAKE -eq 1 ]; then
   echo -e "  ${CYAN}Makefile${RESET}"
-  for TARGET in lint typecheck build test; do
+  for TARGET in lint typecheck build test e2e; do
     if make -n "$TARGET" &>/dev/null 2>&1; then
-      pass "  make ${TARGET} — target exists"
+      run_gate "  make ${TARGET}" "make ${TARGET}"
     else
-      warn "  make ${TARGET} — target not defined"
+      info "Skipping make ${TARGET} — target not defined"
     fi
   done
 fi
 
 # ---------------------------------------------------------------------------
-# 6. Sleep prevention
+# 7. Sleep prevention
 # ---------------------------------------------------------------------------
 header "Sleep Prevention"
 
@@ -253,7 +358,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 7. Stale branch detection
+# 8. Stale branch detection
 # ---------------------------------------------------------------------------
 header "Branch Staleness"
 
@@ -275,7 +380,7 @@ else
     pass "Branch is up to date with origin/${DEFAULT_BRANCH}"
   elif [ "$BEHIND" -le 10 ]; then
     warn "Branch is ${BEHIND} commit(s) behind origin/${DEFAULT_BRANCH} — note in survival guide"
-    info "Consider: git merge origin/${DEFAULT_BRANCH}  (or rebase, per project convention)"
+    info "Consider: merge origin/${DEFAULT_BRANCH} into this branch before starting, or cut a fresh branch from the updated default branch"
   else
     fail "Branch is ${BEHIND} commits behind origin/${DEFAULT_BRANCH} — significant drift"
     info "Fix before starting: git merge origin/${DEFAULT_BRANCH}"
@@ -284,7 +389,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 8. Slack webhook test
+# 9. Slack webhook test
 # ---------------------------------------------------------------------------
 header "Slack Notification"
 
@@ -304,7 +409,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 9. Plan file check
+# 10. Plan file check
 # ---------------------------------------------------------------------------
 header "Plan File"
 
@@ -321,7 +426,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 10. Summary
+# 11. Summary
 # ---------------------------------------------------------------------------
 echo
 echo -e "${BOLD}══════════════════════════════════════════════════${RESET}"

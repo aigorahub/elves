@@ -179,12 +179,12 @@ notification: pr-comment
 2. **Never force-push** the working branch.
 3. **Never rebase** the working branch during a run (it invalidates rollback tags).
 4. **Never merge.** Not even a fast-forward. The user merges when they return.
-5. **If something goes badly wrong**, roll back to the last good tag:
+5. **If something goes badly wrong**, stop and create a clean recovery branch from the last good tag instead of rewriting history:
    ```bash
-   git reset --hard elves/pre-batch-N
-   git push --force-with-lease
+   git checkout -b recovery/from-elves-pre-batch-N elves/pre-batch-N
+   git push -u origin HEAD
    ```
-   Then document what happened in the execution log and stop. Leave the repo in a clean state.
+   Then document what happened in the execution log and stop. Leave the original branch untouched for later inspection.
 6. **Stage specific files.** Never `git add -A` blindly. Know what you're committing.
 
 ---
@@ -217,8 +217,8 @@ notification: pr-comment
 When you restart after a compaction, do these steps in order. No shortcuts.
 
 1. Read this file (survival guide). You are doing this now.
-2. Read the execution log. Find the last completed batch and the last **Decisions made** entry.
-3. Read the plan. Confirm the overall scope hasn't changed (compare hash if recorded above).
+2. Read the plan. Confirm the overall scope hasn't changed (compare hash if recorded above).
+3. Read the execution log. Find the last completed batch and the last **Decisions made** entry.
 4. Identify the first incomplete batch (look at Current Phase and Next Exact Batch above).
 5. Check the clock. How much time budget remains?
 6. Resume immediately. Don't ask for help. Don't redo completed work.
