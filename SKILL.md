@@ -29,16 +29,40 @@ But AI agents are stateless. Context compaction erases working memory. Without p
 
 The Survival Guide, Plan, and Execution Log are your memory across compactions. They are not overhead — they are the minimum viable infrastructure for the loop to run unsupervised. Read them. Trust them. Update them. They are what make you reliable enough to justify the user walking away.
 
-## Required Inputs
+## Phase 1: Planning (Interactive)
 
-Before starting, confirm you have all four:
+Elves starts with a conversation. The user invokes the skill, and you work together to build the plan before any code is written. This is the most important phase — the quality of the plan determines the quality of the overnight run.
 
-1. **Plan path** — a file describing the work (e.g., `docs/plans/my-plan.md`).
-2. **Survival guide path** — the standing brief with mission, rules, and next steps.
-3. **Execution log path** — the running record of completed work.
-4. **Active branch name** — the branch you are working on.
+**Expect this to take about 30 minutes.** This is not magic. The user invests 30 minutes on the front end planning with you, and 30 minutes on the back end reviewing your work. In between, the elves may run for 10, 20, or more hours and produce months of equivalent output. The leverage is enormous, but it requires a real planning conversation — not a one-line prompt.
 
-If any are missing, ask the user to provide them. If the user gives a kickoff prompt with paths, extract them from there. If the survival guide or execution log don't exist yet, generate them from the templates in `references/survival-guide-template.md` and `references/execution-log-template.md`, filling in project-specific details from the plan.
+### What to talk about
+
+1. **What are we building?** Understand the goal. Ask clarifying questions. Help the user think through scope, constraints, and what "done" looks like. If the user has a rough idea, help them sharpen it. If they have a detailed spec, confirm you understand it.
+
+2. **Break it into batches.** Work with the user to decompose the work into sprint-sized batches. Each batch should be something the model can get right with high confidence. Discuss what order makes sense, what depends on what, and where the risks are.
+
+3. **Define the sprint size.** Ask the user what batch size works for their model and stack. The default is ~4 developers x 2 weeks, but experienced users may push larger (especially with Codex) or go smaller for unfamiliar territory. If the user doesn't know, start with the default and note that it can be tuned.
+
+4. **Set non-negotiables.** What must never happen? What must always be true? These go in the survival guide and are the guardrails for the entire run.
+
+5. **Configure the tools.** What test commands exist? Is there a preview deployment? What review infrastructure is in place (bots, CI, custom APIs)? How should notifications work?
+
+6. **Set the time budget.** When is the user leaving? When will they be back? This determines pacing.
+
+The user may have their own planning skills, tools, or workflows they want to use during this phase — that's great. Use whatever produces the best plan. The output of this phase is what matters: a clear plan with batches, a configured survival guide, and an execution log ready to go.
+
+### What this phase produces
+
+By the end of the planning conversation, you should have:
+
+1. **Plan** — a file describing the work, broken into batches (e.g., `docs/plans/my-plan.md`).
+2. **Survival guide** — the standing brief with mission, rules, tool config, batch sizing, and next steps.
+3. **Execution log** — initialized and ready for the first entry.
+4. **Active branch name** — agreed with the user.
+
+If the survival guide or execution log don't exist yet, generate them from the templates in `references/survival-guide-template.md` and `references/execution-log-template.md`, filling in details from the planning conversation.
+
+Once the plan is solid and the user says go, move to Phase 2.
 
 ## Preflight
 
