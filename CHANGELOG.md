@@ -2,7 +2,7 @@
 
 All notable changes to the Elves skill are documented here.
 
-## [1.0.0] — 2026-03-21
+## [1.0.0] - 2026-03-21
 
 ### Core Skill
 
@@ -18,7 +18,7 @@ All notable changes to the Elves skill are documented here.
 ### Safety
 
 - Forbidden Commands: `git reset --hard`, `git checkout .`, `git clean -fd`, `git push --force`, `git rebase` on shared branches
-- Test Integrity: never modify a test to make it pass — fix the code, not the test
+- Test Integrity: never modify a test to make it pass. Fix the code, not the test.
 - Never Stop to Ask: non-interactive operation with `CI=true` and comprehensive env var hardening
 - Mid-run check-in protocol: answer concisely, keep going
 
@@ -26,7 +26,7 @@ All notable changes to the Elves skill are documented here.
 
 - Two-stage validation: local gates then preview deployment
 - Auto-discovery for Node.js, Python, Go, Rust, and Makefile projects
-- Zero accumulated debt philosophy — every batch must be production-ready
+- Zero accumulated debt philosophy. Every batch must be production-ready.
 - Headless app testing guidance
 
 ### Review
@@ -62,7 +62,7 @@ All notable changes to the Elves skill are documented here.
 
 ### Platform Support
 
-- Claude Code (SKILL.md) — full feature set with subagents
-- Codex (AGENTS.md) — all work done directly, concise format
-- Claude.ai — zip upload
+- Claude Code (SKILL.md): full feature set with subagents
+- Codex (AGENTS.md): all work done directly, concise format
+- Claude.ai: zip upload
 - Any Agent Skills compatible platform

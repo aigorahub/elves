@@ -1,6 +1,6 @@
 # Built-in Review Subagent
 
-This is the default review mechanism for Elves. It works out of the box with zero configuration — all it needs is `gh` CLI auth and an open PR.
+This is the default review mechanism for Elves. It works out of the box with zero configuration. All it needs is `gh` CLI auth and an open PR.
 
 ## What It Does
 
@@ -11,7 +11,7 @@ After each batch, the coordinator spawns this subagent to perform an independent
 3. Reads the plan to understand what the batch was supposed to accomplish
 4. Produces a structured assessment: what's blocking, what's a warning, what's fine
 
-The coordinator then acts on the findings — fixing blockers, logging decisions, pushing fixes. New pushes trigger new bot reviews. The coordinator runs the review subagent again. This loop continues until the batch is clean.
+The coordinator then acts on the findings. It fixes blockers, logs decisions, pushes fixes. New pushes trigger new bot reviews. The coordinator runs the review subagent again. This loop continues until the batch is clean.
 
 ## How to Invoke
 
@@ -85,11 +85,11 @@ Parse with python3. Categorize each finding. Fix blockers. Push. Repeat.
 
 The built-in review is the minimum viable loop. Users can strengthen it by:
 
-- **Installing GitHub reviewer bots** (CodeRabbit, GitHub Copilot code review, SonarCloud, etc.) — these produce detailed, automated reviews on every push that the subagent reads and acts on
-- **Adding a custom review API** — configure in the survival guide under `## Tool Configuration`
-- **Adding smoke tests** — curl endpoints after preview deployment
-- **Adding visual review** — screenshot capture and inspection
-- **Building their own review subagent** — with domain-specific knowledge about their codebase
+- **Installing GitHub reviewer bots** (CodeRabbit, GitHub Copilot code review, SonarCloud, etc.): these produce detailed, automated reviews on every push that the subagent reads and acts on
+- **Adding a custom review API** (configure in the survival guide under `## Tool Configuration`)
+- **Adding smoke tests** (curl endpoints after preview deployment)
+- **Adding visual review** (screenshot capture and inspection)
+- **Building their own review subagent** with domain-specific knowledge about their codebase
 
 The more review infrastructure you add, the tighter each batch gets before the agent moves on. The built-in review ensures there is always *something* checking the work, even on a fresh project with no bots installed.
 

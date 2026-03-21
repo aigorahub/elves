@@ -1,8 +1,8 @@
-# Autonomy Guide — Staying Unattended
+# Autonomy Guide: Staying Unattended
 
 ## The Core Problem
 
-The user is not there. They are asleep, or at dinner, or spending time with their family. The whole point of Elves is that the 12 to 14 hours each day when the user is not working become productive hours. But that only works if the loop keeps running.
+The user isn't there. They are asleep, or at dinner, or spending time with their family. The whole point of Elves is that the 12 to 14 hours each day when the user isn't working become productive hours. But that only works if the loop keeps running.
 
 Any pause, prompt, or confirmation dialog that expects human input will stall the entire run with no one to respond. **This is the single most common failure mode for overnight sessions.** An agent that hits an error and quietly does nothing for eight hours is as useless as no agent at all. The rules below exist to prevent it.
 
@@ -21,18 +21,18 @@ If something is ambiguous, apply your best judgment, note it under **Decisions m
 Every CLI command must run non-interactively. Use flags that suppress prompts:
 
 - `--yes`, `--force`, `--no-input`, `--non-interactive`, `--assume-yes`
-- `git push` — verify auth in preflight so no credential prompt appears at runtime
+- `git push` (verify auth in preflight so no credential prompt appears at runtime)
 - `npm install --yes`, `npx --yes`, `pip install --quiet`
-- `gh pr create --fill` — not interactive mode
+- `gh pr create --fill` (not interactive mode)
 - Pipe `yes |` or use `echo y |` as a last resort for tools that insist on confirmation
 
 If a tool has a `--no-interaction` or `--batch` flag, use it.
 
 ### Rule 3: Suppress All Confirmation Dialogs, Surveys, and Update Prompts
 
-Some tools — including AI coding tools — may pop up surveys, update notices, or permission requests. These will break the flow. Mitigations:
+Some tools (including AI coding tools) may pop up surveys, update notices, or permission requests. These will break the flow. Mitigations:
 
-- Set `CI=true` — many tools detect this and skip interactive prompts entirely
+- Set `CI=true` (many tools detect this and skip interactive prompts entirely)
 - Set `DEBIAN_FRONTEND=noninteractive` on Linux
 - Set `HOMEBREW_NO_AUTO_UPDATE=1` on macOS
 - Disable telemetry and surveys: `NEXT_TELEMETRY_DISABLED=1`, `NUXT_TELEMETRY_DISABLED=1`, `DOTNET_CLI_TELEMETRY_OPTOUT=1`
@@ -41,11 +41,11 @@ See the [Preflight Non-Interactive Environment](#preflight-non-interactive-envir
 
 ### Rule 4: Never Wait for CI in a Blocking Loop
 
-Never wait for CI to finish before continuing local work. Push and move on. Read CI results on the next review cycle. Do not poll a CI pipeline in a blocking loop — it wastes time budget and can stall indefinitely if the pipeline is slow.
+Never wait for CI to finish before continuing local work. Push and move on. Read CI results on the next review cycle. Don't poll a CI pipeline in a blocking loop; it wastes time budget and can stall indefinitely if the pipeline is slow.
 
 ### Rule 5: Handle Unexpected Prompts Without Pausing
 
-If you encounter an unexpected prompt or interactive input request, do not attempt to answer it interactively. Instead:
+If you encounter an unexpected prompt or interactive input request, don't attempt to answer it interactively. Instead:
 
 1. Kill the command (if possible)
 2. Log the issue in the execution log with the exact command and prompt text
@@ -64,9 +64,9 @@ Make your best judgment call, document it under **Decisions made** in the execut
 
 Sometimes the user will come back while you are still working. They might check in at 2am, glance at progress, and want to give you additional context, ask a question, or adjust priorities. This is normal and expected.
 
-**The critical rule: answer or acknowledge, then keep going. Do not stop.**
+**The critical rule: answer or acknowledge, then keep going. Don't stop.**
 
-The user checking in is not an invitation to pause and have a conversation. It is a drive-by. They are probably half-asleep. Give them what they need and get back to work.
+The user checking in isn't an invitation to pause and have a conversation. It's a drive-by. They are probably half-asleep. Give them what they need and get back to work.
 
 The pattern is always the same: **handle the input, document it, resume the loop.**
 
@@ -76,7 +76,7 @@ The pattern is always the same: **handle the input, document it, resume the loop
 
 *Examples: "how's it going?", "what batch are you on?", "did the auth tests pass?"*
 
-Answer concisely with current status, then immediately resume where you left off. Do not wait for a follow-up. Treat it like a colleague tapping you on the shoulder while you work — you answer without putting down your tools.
+Answer concisely with current status, then immediately resume where you left off. Don't wait for a follow-up. Treat it like a colleague tapping you on the shoulder while you work. You answer without putting down your tools.
 
 ### Scenario 2: They Provide New Information
 
@@ -94,7 +94,7 @@ Acknowledge, update the survival guide's "Next Exact Batch" section to reflect t
 
 Stop. This is the one exception to all of the above. An explicit stop command from the user overrides everything.
 
-Complete whatever atomic operation you're in the middle of — do not leave a half-written file or a broken commit. Then:
+Complete whatever atomic operation you're in the middle of. Don't leave a half-written file or a broken commit. Then:
 
 1. Update the execution log with where you stopped and why
 2. Update the survival guide to reflect the current stopping point
@@ -103,7 +103,7 @@ Complete whatever atomic operation you're in the middle of — do not leave a ha
 
 ### Scenario 5: Their Message Is Ambiguous
 
-Use your best judgment about what they want, do it, document your interpretation in the execution log, and keep going. Do not ask clarifying questions. If you got it wrong, they'll correct you.
+Use your best judgment about what they want, do it, document your interpretation in the execution log, and keep going. Don't ask clarifying questions. If you got it wrong, they'll correct you.
 
 ---
 
@@ -112,13 +112,13 @@ Use your best judgment about what they want, do it, document your interpretation
 When you check in on a running Elves session, frame your messages as instructions rather than open-ended questions. End with something like "keep going" or "don't stop" to reinforce that you're not expecting a back-and-forth conversation.
 
 **Good:**
-- "Batch 3 looks good. The payment tests are expected to fail — ignore them. Keep going."
+- "Batch 3 looks good. The payment tests are expected to fail, so ignore them. Keep going."
 - "Change of plans: skip the email templates batch. Move straight to the API migration. Don't stop."
 - "Quick question: did you update the migration file? Either way, keep going."
 
 **Avoid:**
-- "What do you think we should do about the database schema?" — open-ended, invites a pause
-- "Can you walk me through what you've done so far?" — long answer, breaks flow
+- "What do you think we should do about the database schema?" (open-ended, invites a pause)
+- "Can you walk me through what you've done so far?" (long answer, breaks flow)
 
 ---
 
@@ -139,4 +139,4 @@ export NPM_CONFIG_YES=true
 echo "✓ Non-interactive environment variables set"
 ```
 
-The agent should set these at the start of every session if they are not already present. The user's environment should also be configured during preflight to minimize interactive prompts — if a tool is known to prompt for input, document the workaround in the survival guide under `## Tool Configuration`.
+The agent should set these at the start of every session if they are not already present. The user's environment should also be configured during preflight to minimize interactive prompts. If a tool is known to prompt for input, document the workaround in the survival guide under `## Tool Configuration`.

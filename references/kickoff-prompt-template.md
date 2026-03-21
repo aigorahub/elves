@@ -7,7 +7,7 @@
 > The agent will read your plan, generate the survival guide and execution log if they don't
 > exist, run preflight checks, and start executing immediately.
 >
-> **The Daily Briefing.** Block time at the end of your workday — even 30 minutes — to brief
+> **The Daily Briefing.** Block time at the end of your workday (even 30 minutes) to brief
 > your agents. Load them with enough well-defined work to keep them running through the night.
 > Friday afternoons deserve more deliberate treatment: the weekend is roughly 60 hours of
 > potential agent runtime. A two-hour planning session on Friday can produce a week's worth of
@@ -55,14 +55,14 @@ I'm going offline [until WHEN / for HOW LONG]. Please run the plan autonomously.
 - [Hard rule 3]
 
 **Special instructions:**
-- [Anything the agent should know that isn't in the plan — environment quirks, known issues,
+- [Anything the agent should know that isn't in the plan. Environment quirks, known issues,
   things to watch for, preferred approaches]
-- [E.g., "Redis might be slow to start — give it 10 seconds before running integration tests"]
-- [E.g., "The PR already exists at #42 — don't create a new one"]
+- [E.g., "Redis might be slow to start. Give it 10 seconds before running integration tests."]
+- [E.g., "The PR already exists at #42. Don't create a new one."]
 - [E.g., "If Batch 3 turns out to be too risky, stop after Batch 2 and note it in the log"]
 
 **When I return I expect to see:**
-- [What a successful run looks like to you — e.g., "A PR ready to review with all tests passing"]
+- [What a successful run looks like to you. E.g., "All batches complete, tests passing, ready for my review."]
 ```
 
 **Example (filled in):**
@@ -79,12 +79,12 @@ I'm going offline until 7:30am ET. Please run the plan autonomously.
 - Never modify public /api/* response shapes
 - All commits must pass lint and typecheck before push
 - Do not touch the OAuth routes or password reset flow
-- You never merge — the PR is for me to review
+- You never merge. The PR is for me to review.
 
 **Special instructions:**
-- Redis can be slow to spin up in the test environment — if integration tests fail on
+- Redis can be slow to spin up in the test environment. If integration tests fail on
   first run, wait 10 seconds and retry once before marking as failed
-- The PR already exists at #84 — don't create a new one
+- The PR already exists at #84. Don't create a new one.
 - If you finish all 3 batches with time to spare, do a scout pass on the files you touched
   and look for missing test coverage
 

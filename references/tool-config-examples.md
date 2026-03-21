@@ -10,7 +10,7 @@
 
 ---
 
-## Node.js — npm (Minimal)
+## Node.js - npm (Minimal)
 
 > Use when your project has some but not all of lint/typecheck/build/test configured.
 > Only include what you actually have. The agent skips missing entries.
@@ -28,7 +28,7 @@ notification: pr-comment
 
 ---
 
-## Node.js — npm (Full)
+## Node.js - npm (Full)
 
 > Use when you have the full suite including E2E and a preview URL for smoke testing.
 
@@ -47,7 +47,7 @@ notification: slack-webhook    # requires ELVES_SLACK_WEBHOOK env var
 
 ---
 
-## Node.js — pnpm (Minimal)
+## Node.js - pnpm (Minimal)
 
 ```yaml
 ## Tool Configuration
@@ -62,7 +62,7 @@ notification: pr-comment
 
 ---
 
-## Node.js — pnpm (Full)
+## Node.js - pnpm (Full)
 
 ```yaml
 ## Tool Configuration
@@ -81,7 +81,7 @@ notification: slack-webhook
 
 ---
 
-## Python — ruff + mypy + pytest (Minimal)
+## Python - ruff + mypy + pytest (Minimal)
 
 > Use when you have basic linting and testing but no type checking configured.
 
@@ -96,7 +96,7 @@ notification: pr-comment
 
 ---
 
-## Python — ruff + mypy + pytest (Full)
+## Python - ruff + mypy + pytest (Full)
 
 > Use when you have the full Python quality suite. `ruff format --check` validates formatting
 > without changing files.
@@ -202,7 +202,7 @@ notification: pr-comment
 
 ---
 
-## Monorepo — Turborepo (Full)
+## Monorepo - Turborepo (Full)
 
 > Turborepo caches task results across packages. Use `--filter` to run tasks in a specific
 > package during development, or run without filter for the full repo.
@@ -228,7 +228,7 @@ notification: slack-webhook
 
 ---
 
-## Monorepo — Nx (Full)
+## Monorepo - Nx (Full)
 
 ```yaml
 ## Tool Configuration
@@ -275,14 +275,14 @@ notification: pr-comment
 > Choose one notification method. Only one is active at a time.
 
 ```yaml
-# Option 1: PR comment — zero config, always available
+# Option 1: PR comment (zero config, always available)
 notification: pr-comment
 
-# Option 2: Slack webhook — requires ELVES_SLACK_WEBHOOK env var
+# Option 2: Slack webhook (requires ELVES_SLACK_WEBHOOK env var)
 notification: slack-webhook
 # export ELVES_SLACK_WEBHOOK=https://hooks.slack.com/services/T.../B.../...
 
-# Option 3: Custom command — any shell command or script
+# Option 3: Custom command (any shell command or script)
 notification: custom-cmd
 # export ELVES_NOTIFY_CMD="curl -s -X POST https://ntfy.sh/my-topic -d 'Elves done'"
 # export ELVES_NOTIFY_CMD="osascript -e 'display notification \"Elves done\" with title \"Elves\"'"
@@ -294,14 +294,14 @@ notification: custom-cmd
 ## Notes on Tool Configuration
 
 **Precedence:** Commands in `## Tool Configuration` always take precedence over auto-discovery.
-If you configure a command here, the agent will use it — even if the auto-discovered command
+If you configure a command here, the agent will use it, even if the auto-discovered command
 would produce the same result.
 
 **Blank or omitted fields:** If a field is absent, the agent falls back to auto-discovery
 for that step. If auto-discovery also finds nothing, the step is skipped silently.
 
 **Exit codes:** Every configured command must return exit code 0 for pass, non-zero for fail.
-The agent treats any non-zero exit as a gate failure and will not proceed until it is resolved.
+The agent treats any non-zero exit as a gate failure and won't proceed until it is resolved.
 
 **Environment variables:** Commands can reference environment variables using `${VAR_NAME}`
 syntax. The agent will substitute them at runtime. Sensitive values should be in the

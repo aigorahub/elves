@@ -1,14 +1,14 @@
 # Elves
 
-![Elves — they work while you sleep](assets/elves-banner.jpeg)
+![Elves - they work while you sleep](assets/elves-banner.jpeg)
 
 **They work while you sleep.**
 
-Elves is an open-source Agent Skill for autonomous, multi-batch development. It gives AI coding agents (Claude Code, Codex, or any agent that supports the Agent Skills standard) the ability to execute large development plans unattended — with testing, review, and documentation — while surviving context compaction across long runs.
+Elves is an open-source Agent Skill for autonomous, multi-batch development. It gives AI coding agents (Claude Code, Codex, or any agent that supports the Agent Skills standard) the ability to execute large development plans unattended (with testing, review, and documentation) while surviving context compaction across long runs.
 
 You write the plan and do the final merge. The agent does everything in between.
 
-**This is v0.** This system works in production at [Aigora](https://aigora.ai), but in conjunction with custom review tools. Many people have asked me to open-source what I'm doing, so here it is — but this is scaffolding, not a finished product. It may not work for you out of the box. Your model, your stack, your test infrastructure, and your review setup will all be different from mine. I'm relying on community feedback to make this skill more generalizable. If something doesn't work, [open an issue](https://github.com/aigorahub/elves/issues). Your experience makes this better for everyone.
+**This is v0.** This system works in production at [Aigora](https://aigora.ai), but in conjunction with custom review tools. Many people have asked me to open-source what I'm doing, so here it is. But this is scaffolding, not a finished product. It may not work for you out of the box. Your model, your stack, your test infrastructure, and your review setup will all be different from mine. I'm relying on community feedback to make this skill more generalizable. If something doesn't work, [open an issue](https://github.com/aigorahub/elves/issues). Your experience makes this better for everyone.
 
 ---
 
@@ -16,72 +16,72 @@ You write the plan and do the final merge. The agent does everything in between.
 
 In the old fairy tale, a tired shoemaker goes to bed with work undone and wakes to find it finished. That story is the premise of this skill.
 
-Throughout economic history, wealth creation has followed a consistent pattern: a resource sits idle until someone builds a tool that makes it useful. Coal sat in the ground until the steam engine. Cars sat in driveways until Uber. Spare bedrooms sat empty until Airbnb. The resource already existed — what was missing was the mechanism.
+Throughout economic history, wealth creation has followed a consistent pattern: a resource sits idle until someone builds a tool that makes it useful. Coal sat in the ground until the steam engine. Cars sat in driveways until Uber. Spare bedrooms sat empty until Airbnb. The resource already existed. What was missing was the mechanism.
 
-Every knowledge worker has 12 to 14 hours each day when they are not working — evenings, nights, weekends. For most of history, that time was genuinely unproductive. AI agents change that. A well-configured agent can execute code, run tests, conduct reviews, and document decisions while its owner is asleep. The sleeping hours are now a resource. They weren't before.
+Every knowledge worker has 12 to 14 hours each day when they are not working: evenings, nights, weekends. For most of history, that time was genuinely unproductive. AI agents change that. A well-configured agent can execute code, run tests, conduct reviews, and document decisions while its owner is asleep. The sleeping hours are now a resource. They weren't before.
 
 The question is no longer "what can I have my AI do today?" It's "what will my AI be doing at 2am on Saturday?"
 
 Elves is the mechanism. It converts idle hours into shipped code.
 
-The core pattern is the Ralph Loop: try, check, feed back, repeat. An AI doesn't return correct or incorrect answers — it returns drafts. Judging AI on its first attempt is like judging a tree by its first day of growth. The people who get extraordinary results aren't writing better prompts. They are running better loops.
+The core pattern is the Ralph Loop: try, check, feed back, repeat. An AI doesn't return correct or incorrect answers. It returns drafts. Judging AI on its first attempt is like judging a tree by its first day of growth. The people who get extraordinary results aren't writing better prompts. They are running better loops.
 
-Elves is the harness that lets the Ralph Loop run for hours without supervision — with a Survival Guide so the agent knows what it's doing, an Execution Log so it can recover after a restart, and test gates so it knows whether its work is actually correct before it moves on.
+Elves is the harness that lets the Ralph Loop run for hours without supervision, with a Survival Guide so the agent knows what it's doing, an Execution Log so it can recover after a restart, and test gates so it knows whether its work is actually correct before it moves on.
 
 *Part of a series by John Ennis: [The Shoemaker's Elves](https://x.com/johnennis/status/2025904571311141215) (the 14-hour resource), [The Survival Guide](https://x.com/johnennis/status/2028960113646604794) (keeping agents on track), and [Water the Tree](https://x.com/johnennis/status/2034300044212351114) (the Ralph Loop).*
 
 ---
 
-## How It Works
+## How it works
 
 ```
 Plan → Batch → Implement → Validate → Review → Document → Continue
 ```
 
-Elves runs a tight loop. For each batch of planned work, the agent implements the changes, runs validation gates, reads PR review comments, fixes any blocking findings, updates the documentation, and pushes a checkpoint — then immediately starts the next batch. No waiting, no prompting, no drift.
+Elves runs a tight loop. For each batch of planned work, the agent implements the changes, runs validation gates, reads PR review comments, fixes any blocking findings, updates the documentation, and pushes a checkpoint, then immediately starts the next batch. No waiting, no prompting, no drift.
 
-### The Three-Document System
+### The three-document system
 
-AI agents are stateless. Context compaction erases working memory. Elves solves this with three persistent documents that serve as the agent's memory across compactions, restarts, and long multi-hour runs:
+AI agents are stateless. Context compaction erases working memory. Elves solves this with three persistent documents that act as the agent's memory across compactions, restarts, and long multi-hour runs:
 
 | Document | Purpose |
 |---|---|
-| **Plan** | What needs to be built — the authoritative scope |
+| **Plan** | What needs to be built (the authoritative scope) |
 | **Survival Guide** | Standing brief: mission, rules, tool config, current phase, next batch |
 | **Execution Log** | Running record of every batch completed, every decision made, every commit pushed |
 
-After any compaction or restart, the agent reads these three files in order and resumes without losing its place. The survival guide is marked `# READ THIS FILE FIRST AFTER ANY COMPACTION OR RESTART` so the agent cannot miss it.
+After any compaction or restart, the agent reads these three files in order and resumes without losing its place. The survival guide is marked `# READ THIS FILE FIRST AFTER ANY COMPACTION OR RESTART` so the agent can't miss it.
 
-### The Human Sandwich
+### The human sandwich
 
-The shape of productive work is changing. The human operates on both ends — specifying problems and reviewing output — while the agent runs loops in the middle.
+The shape of productive work is changing. The human operates on both ends: specifying problems and reviewing output, while the agent runs loops in the middle.
 
 - **Front end (human):** Decide what's worth working on. Write the plan. Specify the problem fully. 30 minutes to an hour.
-- **Middle (agent):** Open a branch, commit the plans, open a PR, then run the loop — implement, validate, review, fix, iterate. For each batch, the agent builds the code, runs the tests, reads the PR review comments (from bots or humans), fixes what the reviews found, pushes, and iterates until the batch is tight. Then it moves to the next batch. This runs for hours or days while you sleep.
+- **Middle (agent):** Open a branch, commit the plans, open a PR, then run the loop: implement, validate, review, fix, iterate. For each batch, the agent builds the code, runs the tests, reads the PR review comments (from bots or humans), fixes what the reviews found, pushes, and iterates until the batch is tight. Then it moves to the next batch. This runs for hours or days while you sleep.
 - **Back end (human):** Review the output. By the time you look at the PR, every batch has already been through multiple rounds of implement-test-review-fix. Your review is a final pass on work that's already tight, not a first look at raw output. 30 minutes to an hour.
 
 The agent never merges. That gate stays with you.
 
-### What to Expect
+### What to expect
 
-**The elves will not do the job perfectly.** That is not the goal. The goal is leverage. AI returns drafts, not finished products. But the drafts are refined through dozens of Ralph Loop iterations — try, check, feed back, repeat — and by the time you review the work, it is far closer to done than anything you could have produced in the same wall-clock time. See [Water the Tree](https://x.com/johnennis/status/2034300044212351114) for the full philosophy.
+**The elves won't do the job perfectly.** That isn't the goal. The goal is leverage. AI returns drafts, not finished products. But the drafts are refined through dozens of Ralph Loop iterations, and by the time you review the work, it's far closer to done than anything you could have produced in the same wall-clock time. See [Water the Tree](https://x.com/johnennis/status/2034300044212351114) for the full philosophy.
 
-The math is striking. You spend 30 minutes writing a plan. The agent runs for 10-20 hours. You spend 30-60 minutes reviewing the PR. In that 1-2 hours of your time, you may get weeks or months of equivalent human output. The exact multiplier depends on your project, your plan quality, and your test infrastructure — but ratios of 100:1 to 500:1 (agent hours per human hour) are real. In practice, users have reported getting 6-9 months of equivalent work done in a total of 3-4 hours of human time across planning, monitoring, and review.
+The math is striking. You spend 30 minutes writing a plan. The agent runs for 10-20 hours. You spend 30-60 minutes reviewing the PR. In that 1-2 hours of your time, you may get weeks or months of equivalent human output. The exact multiplier depends on your project, your plan quality, and your test infrastructure, but ratios of 100:1 to 500:1 (agent hours per human hour) are real. In practice, users have reported getting 6-9 months of equivalent work done in a total of 3-4 hours of human time across planning, monitoring, and review.
 
 This is the leverage that makes the setup cost worth it. A half hour of planning unlocks days of autonomous execution.
 
-### Riding Along
+### Riding along
 
-You don't have to leave. You can watch the agent work, check in, give it additional context, or adjust priorities on the fly. But there is one rule: **say "do not stop" in every message.** Be explicit and repetitive. This is not overkill — it makes a measurable difference in agent behavior. Without it, the agent may interpret your message as a request to pause and discuss, which kills the momentum.
+You don't have to leave. You can watch the agent work, check in, give it additional context, or adjust priorities on the fly. But there is one rule: **say "do not stop" in every message.** Be explicit and repetitive. This isn't overkill. It makes a measurable difference in agent behavior. Without it, the agent may interpret your message as a request to pause and discuss, which kills the momentum.
 
-Good: "The payment tests are expected to fail — ignore them. Do not stop. Keep going."
+Good: "The payment tests are expected to fail. Ignore them. Do not stop. Keep going."
 Good: "Quick question: did you update the migration? Do not stop. Answer my question and keep going, but do not stop."
 Bad: "What do you think we should do about the database schema?"
-Bad: "Looks good so far." (no instruction to continue — agent may pause waiting for more)
+Bad: "Looks good so far." (no instruction to continue, so the agent may pause waiting for more)
 
 ---
 
-## Quick Start
+## Quick start
 
 **1. Install the skill**
 
@@ -101,27 +101,27 @@ Use [`references/kickoff-prompt-template.md`](references/kickoff-prompt-template
 
 **4. Walk away**
 
-Elves runs preflight checks first — git access, test gates, sleep prevention, notifications. Once preflight passes, the agent starts executing batches and won't stop until the plan is complete or time runs out.
+Elves runs preflight checks first: git access, test gates, sleep prevention, notifications. Once preflight passes, the agent starts executing batches and won't stop until the plan is complete or time runs out.
 
 ---
 
 ## Features
 
 - **Multi-batch execution** with configurable batch sizing (default: 4 developers × 2-week sprint)
-- **Context compaction survival** via the three-document system — reads survival guide, plan, and execution log after every compaction
-- **Auto-discovered validation gates** for Node.js, Python, Go, Rust, and Makefile projects — no configuration required
-- **Pluggable review** — GitHub PR comments by default (zero config), custom review API opt-in, additional custom checks
-- **Subagent delegation** for long runs (Claude Code) — coordinator manages the loop, subagents do the deep work
-- **Rollback safety** — `git tag elves/pre-batch-N` before every batch, so any batch can be cleanly unwound
-- **Scout mode** — after all planned work is done, the agent looks for adjacent improvements, test gaps, and documentation holes
-- **Time-aware pacing** — tracks how long each batch takes and uses that to decide whether to start another batch or wrap up cleanly
-- **Slack notifications** (or any custom command) — know when your run finishes without watching the terminal
+- **Context compaction survival** via the three-document system: reads survival guide, plan, and execution log after every compaction
+- **Auto-discovered validation gates** for Node.js, Python, Go, Rust, and Makefile projects. No configuration required.
+- **Pluggable review**: GitHub PR comments by default (zero config), custom review API opt-in, additional custom checks
+- **Subagent delegation** for long runs (Claude Code): coordinator manages the loop, subagents do the deep work
+- **Rollback safety**: `git tag elves/pre-batch-N` before every batch, so any batch can be cleanly unwound
+- **Scout mode**: after all planned work is done, the agent looks for adjacent improvements, test gaps, and documentation holes
+- **Time-aware pacing**: tracks how long each batch takes and uses that to decide whether to start another batch or wrap up cleanly
+- **Slack notifications** (or any custom command): know when your run finishes without watching the terminal
 - **Structured session data** in `.elves-session.json` for tooling, dashboards, and analytics
-- **Comprehensive preflight checks** — git remote, push access, GitHub CLI auth, test gates, sleep prevention, Slack webhook, stale branch detection
+- **Comprehensive preflight checks**: git remote, push access, GitHub CLI auth, test gates, sleep prevention, Slack webhook, stale branch detection
 
 ---
 
-## Preventing Sleep / Shutdown
+## Preventing sleep / shutdown
 
 This is the most common failure mode for overnight runs. If your machine sleeps, the session stops. Handle this before you walk away.
 
@@ -134,7 +134,7 @@ caffeinate -dims &
 
 Or wrap your agent command: `caffeinate -dims <your-agent-command>`
 
-Elves preflight will warn you if `caffeinate` is not running and if you are on battery power.
+Elves preflight will warn you if `caffeinate` isn't running and if you are on battery power.
 
 ### Linux
 
@@ -146,11 +146,11 @@ systemd-inhibit --what=idle <your-agent-command>
 
 Open Power Options → Change plan settings → set "Put the computer to sleep" to **Never** for the duration of the run. Restore it afterward.
 
-### Cloud / Remote (recommended for reliability)
+### Cloud / remote (recommended for reliability)
 
 Running on a cloud VM, GitHub Codespaces, or a remote server eliminates the sleep problem entirely. The session runs independently of your local machine. This is the most reliable option for very long runs.
 
-### SSH Sessions
+### SSH sessions
 
 If you're running over SSH, your session dies when the connection drops. Always use a terminal multiplexer:
 
@@ -165,7 +165,7 @@ tmux attach -t elves
 
 `screen` works the same way: `screen -S elves`, detach with `Ctrl+A, D`, reattach with `screen -r elves`.
 
-### Suppress Surveys and Popups
+### Suppress surveys and popups
 
 Some coding tools show survey popups, feedback requests, or update prompts during sessions. These will stall an unattended run. Configure your tools before starting:
 
@@ -180,18 +180,18 @@ Some coding tools show survey popups, feedback requests, or update prompts durin
 - [ ] Terminal is in tmux/screen (if SSH) or won't be closed
 - [ ] Surveys and popups disabled in your coding tool's settings
 - [ ] Notifications are configured so you know when the run finishes
-- [ ] Preflight passed — Elves will verify the above automatically
+- [ ] Preflight passed (Elves will verify the above automatically)
 
 ---
 
-## Monitoring Your Run
+## Monitoring your run
 
-You do not need to watch the terminal. Here is how to check in from elsewhere.
+You don't need to watch the terminal. Here's how to check in from elsewhere.
 
 **GitKraken** is the recommended way to monitor visually. Open it on the working branch and watch:
-- **Commit graph** — steady commit cadence means the agent is making progress. A long gap may mean a slow test suite, a stuck review cycle, or an unexpected blocker.
-- **Branch activity** — new commits appear as the agent completes each batch and pushes a checkpoint.
-- **PR status** — review comments arriving on the PR means the review step is working.
+- **Commit graph**: steady commit cadence means the agent is making progress. A long gap may mean a slow test suite, a stuck review cycle, or an unexpected blocker.
+- **Branch activity**: new commits appear as the agent completes each batch and pushes a checkpoint.
+- **PR status**: review comments arriving on the PR means the review step is working.
 
 **Slack notifications** deliver a completion message when the session ends (or when a batch completes, if you configure that). You can check your phone without opening a terminal.
 
@@ -199,9 +199,9 @@ You do not need to watch the terminal. Here is how to check in from elsewhere.
 
 ---
 
-## Setting Up Notifications
+## Setting up notifications
 
-### Slack (Recommended)
+### Slack (recommended)
 
 1. Go to [api.slack.com/apps](https://api.slack.com/apps) and create a new app (from scratch).
 2. Under **Features**, select **Incoming Webhooks** and enable it.
@@ -215,7 +215,7 @@ export ELVES_SLACK_WEBHOOK="https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
 
 Elves preflight will send a test message to confirm the webhook works before you walk away.
 
-### Custom Notifications
+### Custom notifications
 
 Set `ELVES_NOTIFY_CMD` to any shell command you want run at session completion:
 
@@ -233,7 +233,7 @@ If neither `ELVES_SLACK_WEBHOOK` nor `ELVES_NOTIFY_CMD` is set, Elves falls back
 
 ## Configuration
 
-### Tool Configuration
+### Tool configuration
 
 Tool-specific configuration lives in the survival guide under `## Tool Configuration`. This keeps the agent's instructions with the session rather than scattered across environment variables.
 
@@ -254,11 +254,11 @@ See [`references/tool-config-examples.md`](references/tool-config-examples.md) f
 - method: github-pr-comments
 ```
 
-If you do not configure validation gates, Elves auto-discovers them from your project files (`package.json`, `Makefile`, `pyproject.toml`, `Cargo.toml`, `go.mod`).
+If you don't configure validation gates, Elves auto-discovers them from your project files (`package.json`, `Makefile`, `pyproject.toml`, `Cargo.toml`, `go.mod`).
 
-### Batch Sizing
+### Batch sizing
 
-The default batch size is what a team of 4 developers would accomplish in a 2-week sprint — roughly 40 person-days of effort. This limits blast radius and makes compaction recovery tractable.
+The default batch size is what a team of 4 developers would accomplish in a 2-week sprint: roughly 40 person-days of effort. This limits blast radius and makes compaction recovery tractable.
 
 Override in your plan or survival guide:
 
@@ -270,11 +270,11 @@ Override in your plan or survival guide:
 
 Each batch must be independently shippable: code, tests, docs, and passing review before moving on.
 
-### Review Methods
+### Review methods
 
 | Tier | Method | Configuration |
 |---|---|---|
-| **Tier 1** | GitHub PR comments + built-in review subagent | Default — zero config. Agent spawns a review subagent that reads all PR comments, the diff, and the plan, then produces a structured assessment. Agent fixes blockers and iterates until the batch is clean. |
+| **Tier 1** | GitHub PR comments + built-in review subagent | Default (zero config). Agent spawns a review subagent that reads all PR comments, the diff, and the plan, then produces a structured assessment. Agent fixes blockers and iterates until the batch is clean. |
 | **Tier 2** | Custom review API | Set `method: custom-api` and `review-api-url` in survival guide. |
 | **Tier 3** | Additional checks | Smoke tests, screenshot diffs, doc checks, or any custom script returning 0/non-zero. |
 
@@ -282,7 +282,7 @@ The agent uses the highest tier you have configured. Non-blocking findings are l
 
 ---
 
-## File Structure
+## File structure
 
 ```
 elves/
@@ -305,7 +305,7 @@ elves/
 
 ---
 
-## Platform Support
+## Platform support
 
 | Platform | File | Subagents | Notes |
 |---|---|---|---|
@@ -318,20 +318,20 @@ elves/
 
 ## Philosophy
 
-- **The Human Sandwich.** The human operates on both ends: specifying problems and reviewing output. The agent runs the loop in the middle. Your working hours become morning for reviewing last night's output, afternoon for setting up the next run.
+- **The human sandwich.** The human operates on both ends: specifying problems and reviewing output. The agent runs the loop in the middle. Your working hours become morning for reviewing last night's output, afternoon for setting up the next run.
 - **The Ralph Loop.** Try, check, feed back, repeat. AI returns drafts, not answers. A dumb, stubborn loop beats over-engineered sophistication because AI is non-deterministic. Any single attempt might fail. But if you keep trying, checking, and feeding back, the process converges.
 - **The 14-hour resource.** Every knowledge worker has 12-14 hours per day when they're not working. Elves converts those hours into shipped code. A two-hour planning session on Friday can produce a week's worth of output before you touch your keyboard on Monday.
-- **Three documents are the agent's memory.** Without them, long runs drift and repeat work. With them, a restarted agent picks up exactly where it left off. These aren't overhead — they are the minimum viable infrastructure for the loop to run unsupervised.
+- **Three documents are the agent's memory.** Without them, long runs drift and repeat work. With them, a restarted agent picks up exactly where it left off. These aren't overhead: they're the minimum viable infrastructure for the loop to run unsupervised.
 - **Tests are the watch.** An agent working overnight has no one watching. The tests are the watch. Without them, you wake up to code that compiles, passes lint, and does the wrong thing.
 - **Never merge.** The PR is for review, not for merging. That gate stays with the human.
 - **Document every decision.** Anything the agent decides without user input goes in the execution log under *Decisions made*. The human reviews these choices when they return.
-- **Fail safely, not silently.** If the agent is genuinely blocked, it stops and says so. If a test gate fails, it fixes the issue before continuing. It does not skip gates or paper over failures.
+- **Fail safely, not silently.** If the agent is genuinely blocked, it stops and says so. If a test gate fails, it fixes the issue before continuing. It doesn't skip gates or paper over failures.
 - **Rollback before every batch.** `elves/pre-batch-N` tags mean any batch can be cleanly unwound without touching other work.
-- **Agent infrastructure is real engineering.** Tight code review systems, organized work trees, failure handling — developers who treat agent infrastructure as a real engineering concern end up with something that functions like a tireless junior team working every hour they're away from their desk.
+- **Agent infrastructure is real engineering.** Developers who treat agent infrastructure as a real engineering concern (tight code review systems, organized work trees, failure handling) end up with something that functions like a tireless junior team working every hour they're away from their desk.
 
 ---
 
-## What Can Go Wrong
+## What can go wrong
 
 Overnight agent runs fail in predictable ways. Knowing the failure modes makes them preventable.
 
@@ -350,7 +350,7 @@ Most of these are prevented by the preflight checks. Run preflight, fix the warn
 
 ---
 
-## Advanced: Claude Code SessionStart Hook
+## Advanced: Claude Code SessionStart hook
 
 For Claude Code users, you can make compaction recovery fully automatic by adding a SessionStart hook that loads the survival guide at the beginning of every session.
 
@@ -369,15 +369,15 @@ Add this to your `.claude/settings.json`:
 }
 ```
 
-This injects the survival guide, current git status, and recent commits into Claude's context at session start — even after a compaction or restart. The agent gets its bearings immediately without needing to be told to read the files.
+This injects the survival guide, current git status, and recent commits into Claude's context at session start, even after a compaction or restart. The agent gets its bearings immediately without needing to be told to read the files.
 
 Adjust the `cat` path to match where your survival guide lives.
 
 ---
 
-## The Daily Briefing
+## The daily briefing
 
-Block time at the end of your workday — even 30 minutes — to brief your agents. Load them with enough well-defined work to keep them running through the night. Before you go offline, everything needs to be provisioned and pointed in the right direction.
+Block time at the end of your workday (even 30 minutes) to brief your agents. Load them with enough well-defined work to keep them running through the night. Before you go offline, everything needs to be provisioned and pointed in the right direction.
 
 Friday afternoons deserve more deliberate treatment. The weekend is roughly 60 hours of potential agent runtime. A two-hour planning session on Friday, setting up plans, configuring the survival guide, and queuing batch work, can produce a week's worth of output before Monday morning.
 
@@ -389,7 +389,7 @@ The people who start treating their idle hours as the asset they've suddenly bec
 
 Elves can be installed globally (applies to all your projects) or per-project (lives in the repo).
 
-### Global Installation (recommended to start)
+### Global installation (recommended to start)
 
 Global installation means the skill is always available, no matter which project you're in. Install it once, use it everywhere, and customize it as you learn.
 
@@ -413,7 +413,7 @@ cp -r /tmp/elves/references /tmp/elves/scripts ~/.codex/skills/elves/
 rm -rf /tmp/elves
 ```
 
-### Per-Project Installation
+### Per-project installation
 
 Per-project installation puts the skill in your repo so it's versioned with your code and visible to collaborators.
 
@@ -432,14 +432,14 @@ git clone https://github.com/aigorahub/elves.git .agents/skills/elves
 rm -rf .agents/skills/elves/.git
 ```
 
-### Claude.ai (Upload)
+### Claude.ai (upload)
 
 1. Download or clone this repo
 2. Zip the `elves/` directory
 3. Go to Settings > Features > Skills > Upload
 4. Upload the zip file
 
-### Validating Your Installation
+### Validating your installation
 
 ```bash
 pip install -q skills-ref
@@ -450,9 +450,9 @@ You should see: `Valid skill: ...`
 
 ---
 
-## Making It Your Own
+## Making it your own
 
-**Elves is scaffolding, not a finished product.** It gives you the framework — the loop, the documents, the gates — but every project is different. You are going to need to customize it for your own purposes, and you are going to learn your own lessons along the way.
+**Elves is scaffolding, not a finished product.** It gives you the framework: the loop, the documents, the gates. But every project is different. You'll need to customize it for your own purposes, and you'll learn your own lessons along the way.
 
 ### What to customize first
 
@@ -469,7 +469,7 @@ You should see: `Valid skill: ...`
 
 ### What you'll learn by doing
 
-The first time you run Elves overnight, you will discover things no template can predict:
+The first time you run Elves overnight, you'll discover things no template can predict:
 
 - Which of your test suites is flaky and needs to be fixed before agents can rely on it
 - Which commands in your toolchain prompt for input and need `--yes` flags
@@ -477,15 +477,11 @@ The first time you run Elves overnight, you will discover things no template can
 - Where your plan was vague and the agent had to guess
 - What non-negotiables you forgot to list
 
-This is normal. After each run, read the execution log — especially the **Decisions made** sections — and update your survival guide template with what you learned. The skill gets better every time you use it because *you* get better at writing plans and configuring the harness.
+This is normal. After each run, read the execution log (especially the **Decisions made** sections) and update your survival guide template with what you learned. The skill gets better every time you use it because *you* get better at writing plans and configuring the harness.
 
 ### Editing your global installation
 
-If you installed globally, your customized skill lives at:
-- Claude Code: `~/.claude/skills/elves/SKILL.md`
-- Codex: `~/.codex/skills/elves/AGENTS.md`
-
-Edit these files directly. Add your own defaults, remove sections that don't apply to your work, add project-type-specific guidance. This is your copy — make it yours.
+If you installed globally, your customized skill lives at `~/.claude/skills/elves/SKILL.md` (Claude Code) or `~/.codex/skills/elves/AGENTS.md` (Codex). Edit these files directly. Add your own defaults, remove sections that don't apply to your work, add project-type-specific guidance. This is your copy. Make it yours.
 
 When you want to update from upstream (new features, fixes), pull the latest and merge manually:
 ```bash
@@ -510,7 +506,7 @@ This is useful when:
 Issues and pull requests are welcome. If you find a bug, have a feature idea, or want to add support for a new platform or tool, open an issue to discuss it first.
 
 When submitting a PR:
-- Keep changes focused — one concern per PR.
+- Keep changes focused: one concern per PR.
 - Update the relevant template or reference file if your change affects agent behavior.
 - Test your change with at least one real overnight run if possible.
 
@@ -518,6 +514,6 @@ When submitting a PR:
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE).
 
 Copyright (c) 2026 Aigora.

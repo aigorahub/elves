@@ -2,19 +2,19 @@
 
 ## Philosophy
 
-The Ralph Loop only works if the evaluation step is honest. Try, check, feed back, repeat — but if the "check" step lies, the loop converges on garbage. That is why validation is the most important phase.
+The Ralph Loop only works if the evaluation step is honest. Try, check, feed back, repeat. But if the "check" step lies, the loop converges on garbage. That's why validation is the most important phase.
 
 **The goal of validation is zero accumulated debt.** Every batch must be production-ready before you move to the next one. If you skip a failing test or ignore a build warning, the debt compounds across batches and the final output is far from shippable. The user should return to code that is as close to production-ready as it can reasonably be.
 
-**You are working overnight with no one watching. The tests are the watch.** Without them, you produce code that compiles, passes lint, and does the wrong thing. The test gates are non-negotiable — a batch is not done until they all pass.
+**You are working overnight with no one watching. The tests are the watch.** Without them, you produce code that compiles, passes lint, and does the wrong thing. The test gates are non-negotiable. A batch isn't done until they all pass.
 
 ---
 
 ## The Two-Stage Validation Model
 
-Validation has two stages: **local** and **preview**. Run local checks first — they are fast and catch most problems. If the project has a preview deployment, deploy and smoke-test there before moving on.
+Validation has two stages: **local** and **preview**. Run local checks first. They are fast and catch most problems. If the project has a preview deployment, deploy and smoke-test there before moving on.
 
-**Do not advance to the next batch until both stages pass.**
+**Don't advance to the next batch until both stages pass.**
 
 ---
 
@@ -22,11 +22,11 @@ Validation has two stages: **local** and **preview**. Run local checks first —
 
 Run whatever deterministic gates are available. Discover them from the project, or use whatever the user configured in the survival guide under `## Tool Configuration`.
 
-Run these gates **in order** — each catches a different class of problem:
+Run these gates **in order**. Each catches a different class of problem:
 
 ### 1. Lint
 
-Catches style issues, unused imports, and obvious mistakes. This is the fastest gate and the first line of defense. Fix lint errors before running anything else — they often indicate deeper problems.
+Catches style issues, unused imports, and obvious mistakes. This is the fastest gate and the first line of defense. Fix lint errors before running anything else; they often indicate deeper problems.
 
 ### 2. Typecheck
 
@@ -34,7 +34,7 @@ Catches type errors, interface mismatches, and missing properties. Type checking
 
 ### 3. Build
 
-The code must compile or bundle successfully. A batch that doesn't build is not a batch — it cannot be shipped, reviewed, or deployed. Build errors must be fixed before any further validation is meaningful.
+The code must compile or bundle successfully. A batch that doesn't build isn't a batch. It can't be shipped, reviewed, or deployed. Fix build errors before any further validation is meaningful.
 
 ### 4. Unit / Integration Tests
 
@@ -48,15 +48,15 @@ If the project has Playwright, Cypress, or a similar framework, run the tests th
 
 ### Auto-Discovery Table
 
-Run what exists, skip what doesn't. If a command is not present in the project, omit it rather than failing:
+Run what exists, skip what doesn't. If a command isn't present in the project, omit it rather than failing:
 
 | Project Type   | Lint                          | Typecheck                      | Build                   | Test                    | E2E                                         |
 |----------------|-------------------------------|--------------------------------|-------------------------|-------------------------|---------------------------------------------|
 | Node (npm)     | `npm run lint --if-present`   | `npm run typecheck --if-present` | `npm run build --if-present` | `npm test --if-present` | `npx playwright test` (if installed)        |
 | Node (pnpm)    | `pnpm lint`                   | `pnpm typecheck`               | `pnpm build`            | `pnpm test`             | `pnpm exec playwright test`                 |
-| Python         | `ruff check .`                | `mypy .`                       | —                       | `pytest`                | —                                           |
-| Go             | `golangci-lint run`           | (built into compile)           | `go build ./...`        | `go test ./...`         | —                                           |
-| Rust           | `cargo clippy`                | (built into compile)           | `cargo build`           | `cargo test`            | —                                           |
+| Python         | `ruff check .`                | `mypy .`                       | (none)                  | `pytest`                | (none)                                      |
+| Go             | `golangci-lint run`           | (built into compile)           | `go build ./...`        | `go test ./...`         | (none)                                      |
+| Rust           | `cargo clippy`                | (built into compile)           | `cargo build`           | `cargo test`            | (none)                                      |
 | Makefile       | `make lint`                   | `make typecheck`               | `make build`            | `make test`             | `make e2e`                                  |
 
 ### User Overrides
@@ -65,7 +65,7 @@ Run what exists, skip what doesn't. If a command is not present in the project, 
 
 ---
 
-Every gate must pass before proceeding. If a gate fails, fix the issue and re-run **from the failing gate**. Do not skip a gate and plan to come back to it — that is how debt accumulates.
+Every gate must pass before proceeding. If a gate fails, fix the issue and re-run **from the failing gate**. Don't skip a gate and plan to come back to it. That's how debt accumulates.
 
 ---
 
@@ -90,7 +90,7 @@ The user configures this in the survival guide:
 - Critical API endpoints respond
 - No server errors in the response
 
-If preview deployment is not configured, skip this stage — but note in the execution log that only local validation was performed.
+If preview deployment isn't configured, skip this stage. Note in the execution log that only local validation was performed.
 
 ---
 
@@ -105,7 +105,7 @@ A batch passes validation when **all** of the following are true:
 - The app runs and behaves correctly (locally or in preview)
 - No new type errors, build warnings, or test failures were introduced
 
-If you introduced a test failure or build warning, fix it before moving on. The next batch inherits everything from this one — debt only grows.
+If you introduced a test failure or build warning, fix it before moving on. The next batch inherits everything from this one. Debt only grows.
 
 ---
 
@@ -133,4 +133,4 @@ Delegate validation when:
 - Multiple test frameworks are running in sequence
 - E2E tests produce screenshots or trace files
 
-Do not delegate validation when the suite is small and fast — the overhead of spawning a subagent isn't worth it for a 10-second test run.
+Don't delegate validation when the suite is small and fast. The overhead of spawning a subagent isn't worth it for a 10-second test run.
