@@ -20,7 +20,11 @@ The question is no longer "what can I have my AI do today?" It's "what will my A
 
 Elves is the mechanism. It converts idle hours into shipped code.
 
-*Based on [The Shoemaker's Elves](https://x.com/johnennis/status/2025904571311141215) by John Ennis.*
+The core pattern is the Ralph Loop: try, check, feed back, repeat. An AI doesn't return correct or incorrect answers — it returns drafts. Judging AI on its first attempt is like judging a tree by its first day of growth. The people who get extraordinary results aren't writing better prompts. They are running better loops.
+
+Elves is the harness that lets the Ralph Loop run for hours without supervision — with a Survival Guide so the agent knows what it's doing, an Execution Log so it can recover after a restart, and test gates so it knows whether its work is actually correct before it moves on.
+
+*Part of a series by John Ennis: [The Shoemaker's Elves](https://x.com/johnennis/status/2025904571311141215) (the 14-hour resource), [The Survival Guide](https://x.com/johnennis/status/2028960113646604794) (keeping agents on track), and [Water the Tree](https://x.com/johnennis/status/2034300044212351114) (the Ralph Loop).*
 
 ---
 
@@ -44,10 +48,13 @@ AI agents are stateless. Context compaction erases working memory. Elves solves 
 
 After any compaction or restart, the agent reads these three files in order and resumes without losing its place. The survival guide is marked `# READ THIS FILE FIRST AFTER ANY COMPACTION OR RESTART` so the agent cannot miss it.
 
-### Who does what
+### The Human Sandwich
 
-- **Human:** writes the plan, runs preflight, walks away, reviews the PR, and merges.
-- **Agent:** executes every batch, runs tests, reads review comments, fixes blockers, documents decisions, and sends a completion notification when done.
+The shape of productive work is changing. The human operates on both ends — specifying problems and reviewing output — while the agent runs loops in the middle.
+
+- **Front end (human):** Decide what's worth working on. Write the plan. Specify the problem fully. What are we trying to accomplish? What does success look like? What are the constraints?
+- **Middle (agent):** Run the loop. Implement, validate, review, fix, iterate. This happens while you sleep.
+- **Back end (human):** Review the output. Catch the remaining issues. Provide final judgment. Merge.
 
 The agent never merges. That gate stays with you.
 
@@ -262,9 +269,11 @@ elves/
 
 ## Philosophy
 
-- **Human does planning and final review.** The agent does everything in between. Good managers think constantly about whether the people and resources they're responsible for are being deployed well. That instinct now applies to your agents.
+- **The Human Sandwich.** The human operates on both ends: specifying problems and reviewing output. The agent runs the loop in the middle. Your working hours become morning for reviewing last night's output, afternoon for setting up the next run.
+- **The Ralph Loop.** Try, check, feed back, repeat. AI returns drafts, not answers. A dumb, stubborn loop beats over-engineered sophistication because AI is non-deterministic. Any single attempt might fail. But if you keep trying, checking, and feeding back, the process converges.
 - **The 14-hour resource.** Every knowledge worker has 12-14 hours per day when they're not working. Elves converts those hours into shipped code. A two-hour planning session on Friday can produce a week's worth of output before you touch your keyboard on Monday.
-- **Three documents are the agent's memory.** Without them, long runs drift and repeat work. With them, a restarted agent picks up exactly where it left off.
+- **Three documents are the agent's memory.** Without them, long runs drift and repeat work. With them, a restarted agent picks up exactly where it left off. These aren't overhead — they are the minimum viable infrastructure for the loop to run unsupervised.
+- **Tests are the watch.** An agent working overnight has no one watching. The tests are the watch. Without them, you wake up to code that compiles, passes lint, and does the wrong thing.
 - **Never merge.** The PR is for review, not for merging. That gate stays with the human.
 - **Document every decision.** Anything the agent decides without user input goes in the execution log under *Decisions made*. The human reviews these choices when they return.
 - **Fail safely, not silently.** If the agent is genuinely blocked, it stops and says so. If a test gate fails, it fixes the issue before continuing. It does not skip gates or paper over failures.
