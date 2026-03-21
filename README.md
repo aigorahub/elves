@@ -20,7 +20,7 @@ The question is no longer "what can I have my AI do today?" It's "what will my A
 
 Elves is the mechanism. It converts idle hours into shipped code.
 
-*Based on [The Shoemaker's Elves](https://x.com/johnennis/status/1893694505032986896) by John Ennis.*
+*Based on [The Shoemaker's Elves](https://x.com/johnennis/status/2025904571311141215) by John Ennis.*
 
 ---
 
