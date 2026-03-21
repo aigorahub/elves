@@ -308,9 +308,35 @@ Key rules:
 - Never ask questions after the session starts — make decisions, document them.
 - Use non-interactive flags on every command (`--yes`, `--force`, `CI=true`).
 - Suppress surveys, update prompts, and telemetry dialogs.
-- If the user checks in mid-run, answer concisely and keep going. Do not stop.
 
-See `references/autonomy-guide.md` for the complete guide including environment variables, mid-run check-in protocols, and good/bad message examples for users.
+See `references/autonomy-guide.md` for the complete guide including environment variables and technical details.
+
+## When the User Is Along for the Ride
+
+The user doesn't have to leave. They can watch, check in, or ride along for the whole run. But there is one rule they must follow:
+
+**Every message to you during an active run must end with a clear instruction to keep going.** If the user sends a message without this, you may interpret it as a request to pause and discuss — which kills the momentum.
+
+When the user sends a message during an active run:
+
+1. **Question** — answer concisely, then resume immediately. Do not wait for follow-up.
+2. **New information** — acknowledge, incorporate, note in the execution log, keep going.
+3. **Priority change** — update the survival guide, log it, continue with the new plan.
+4. **"Stop"** — the one exception. Clean halt, update docs, commit, push.
+5. **Ambiguous** — best judgment, document your interpretation, keep going.
+
+The pattern is always: **handle the input, document it, resume the loop.**
+
+**For users:** frame your messages as instructions, not open-ended questions. Always end with something like "keep going" or "don't stop."
+
+Good:
+- "Batch 3 looks good. The payment tests are expected to fail — ignore them. Keep going."
+- "Change of plans: skip batch 4, do batch 6 next. Don't stop."
+- "Quick question: did you update the migration? Either way, keep going."
+
+Bad:
+- "What do you think we should do about the schema?" (open-ended, invites pause)
+- "Walk me through what you've done." (long answer, breaks flow)
 
 ## Hard Stops
 

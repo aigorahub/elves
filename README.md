@@ -66,6 +66,13 @@ The math is striking. You spend 30 minutes writing a plan. The agent runs for 10
 
 This is the leverage that makes the setup cost worth it. A half hour of planning unlocks days of autonomous execution.
 
+### Riding Along
+
+You don't have to leave. You can watch the agent work, check in, give it additional context, or adjust priorities on the fly. But there is one rule: **every message you send during an active run must end with a clear instruction to keep going.** Say "keep going" or "don't stop" at the end of every message. If you don't, the agent may interpret your message as a request to pause and discuss — which kills the momentum.
+
+Good: "The payment tests are expected to fail — ignore them. Keep going."
+Bad: "What do you think we should do about the database schema?"
+
 ---
 
 ## Quick Start
