@@ -60,18 +60,39 @@ Record the session start time. Ask the user when they'll be back (or assume 8 ho
 
 Record the time budget in the execution log.
 
-## PR Lifecycle
+## Setup: Branch, Plan, PR
 
-A PR must exist before the review step can work. At the start of the first batch:
+**Before writing any code**, set up the working environment. This happens once at the start of the session.
 
-1. Create a feature branch if not on one: `git checkout -b feat/<name-from-plan>`
-2. Create an initial empty commit and push: `git commit --allow-empty -m "chore: initial commit"` then `git push -u origin HEAD`
-3. Open a PR: `gh pr create --title "<title>" --body "<plan summary>"`
-4. Capture the PR number: `gh pr view --json number -q .number`
+1. **Create a feature branch** if not already on one:
+   ```bash
+   git checkout -b feat/<name-from-plan>
+   ```
 
-If a PR already exists, detect it and skip this setup.
+2. **Write up the plans.** Generate the survival guide and execution log from templates (if they don't already exist). Read the plan and decompose it into batches. Record the batch breakdown with estimates in the execution log. Commit all planning documents:
+   ```bash
+   git add <survival-guide> <execution-log> <plan-if-new>
+   git commit -m "docs: elves session setup — survival guide, execution log, batch plan"
+   ```
 
-**The PR is for review, not for merging. You never merge.**
+3. **Push and open a PR immediately:**
+   ```bash
+   git push -u origin HEAD
+   gh pr create --title "<concise title from plan>" --body "<plan summary with batch list>"
+   ```
+
+4. **Capture the PR number** for later:
+   ```bash
+   gh pr view --json number -q .number
+   ```
+
+If a PR already exists on the current branch, detect it and skip this setup.
+
+**Why the PR must exist before any code is written:** The PR is where reviewer bots do their work. If the user has GitHub review bots installed (CodeRabbit, Copilot, SonarCloud, etc.), those bots will review every push automatically. The earlier the PR exists, the more review feedback accumulates. By the time the user wakes up, the PR has a rich history of bot reviews, agent responses, and iterative fixes. This is the review infrastructure that makes overnight runs trustworthy.
+
+**The PR is not the deliverable. The deliverable is work that is ready to review.** The user should expect to spend 30-60 minutes reviewing the PR before merging. The agent's job is to get the work as close to production-ready as possible, but the final judgment is always human.
+
+**You never merge. The user merges when they return.**
 
 ## Batch Decomposition
 

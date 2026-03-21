@@ -52,11 +52,19 @@ After any compaction or restart, the agent reads these three files in order and 
 
 The shape of productive work is changing. The human operates on both ends — specifying problems and reviewing output — while the agent runs loops in the middle.
 
-- **Front end (human):** Decide what's worth working on. Write the plan. Specify the problem fully. What are we trying to accomplish? What does success look like? What are the constraints?
-- **Middle (agent):** Run the loop. Implement, validate, review, fix, iterate. This happens while you sleep.
-- **Back end (human):** Review the output. Catch the remaining issues. Provide final judgment. Merge.
+- **Front end (human):** Decide what's worth working on. Write the plan. Specify the problem fully. 30 minutes to an hour.
+- **Middle (agent):** Open a branch, commit the plans, open a PR, then run the loop — implement, validate, review, fix, iterate. This runs for hours or days while you sleep. Reviewer bots on the PR provide feedback at every push.
+- **Back end (human):** Review the output. Read the execution log. Check the PR reviews. Merge what's good, fix what isn't. 30 minutes to an hour.
 
 The agent never merges. That gate stays with you.
+
+### What to Expect
+
+**The elves will not do the job perfectly.** That is not the goal. The goal is leverage. AI returns drafts, not finished products. But the drafts are refined through dozens of Ralph Loop iterations — try, check, feed back, repeat — and by the time you review the work, it is far closer to done than anything you could have produced in the same wall-clock time. See [Water the Tree](https://x.com/johnennis/status/2034300044212351114) for the full philosophy.
+
+The math is striking. You spend 30 minutes writing a plan. The agent runs for 10-20 hours. You spend 30-60 minutes reviewing the PR. In that 1-2 hours of your time, you may get weeks or months of equivalent human output. The exact multiplier depends on your project, your plan quality, and your test infrastructure — but ratios of 100:1 to 500:1 (agent hours per human hour) are real. In practice, users have reported getting 6-9 months of equivalent work done in a total of 3-4 hours of human time across planning, monitoring, and review.
+
+This is the leverage that makes the setup cost worth it. A half hour of planning unlocks days of autonomous execution.
 
 ---
 

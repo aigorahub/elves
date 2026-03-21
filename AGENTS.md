@@ -44,17 +44,28 @@ Run each configured validation gate once to confirm it works. If a gate fails, w
 
 Record session start. If the user hasn't given a return time, ask once; default to 8 hours. Track phase duration (implement/validate/review) per batch. Before each new batch, check the clock — if within 30 minutes of deadline, go straight to Final Completion.
 
-## PR Lifecycle
+## Setup: Branch, Plan, PR
+
+**Before writing any code**, set up the working environment:
+
+1. Create a feature branch if not on one.
+2. Generate survival guide and execution log from templates (if they don't exist). Decompose the plan into batches. Record batch breakdown in the execution log.
+3. Commit all planning documents, push, and open a PR immediately.
 
 ```bash
 git checkout -b feat/<descriptive-name>
-git commit --allow-empty -m "chore: initial commit for <name>"
+git add <survival-guide> <execution-log>
+git commit -m "docs: elves session setup"
 git push -u origin HEAD
-gh pr create --title "<title>" --body "<plan summary>"
+gh pr create --title "<title>" --body "<plan summary with batch list>"
 PR_NUMBER=$(gh pr view --json number | python3 -c "import sys,json; print(json.load(sys.stdin)['number'])")
 ```
 
-If a PR already exists on the branch, skip creation. The PR is for review — you never merge.
+If a PR already exists on the branch, detect it and skip.
+
+The PR must exist before any code is written. Reviewer bots (CodeRabbit, Copilot, SonarCloud, etc.) review every push automatically. The earlier the PR exists, the more review feedback accumulates.
+
+**The PR is not the deliverable. The deliverable is work that is ready to review.** You never merge.
 
 ## Batch Decomposition
 
