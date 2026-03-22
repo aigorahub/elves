@@ -176,7 +176,7 @@ Some coding tools show survey popups, feedback requests, or update prompts durin
 
 ### Pre-run checklist
 
-- [ ] Agent has the permissions it needs (file access, git push, `gh` auth, any tool approvals). If your platform requires you to approve actions (file writes, terminal commands, etc.), grant those permissions before you walk away. A permission prompt at 3am with nobody to click "allow" will stall the entire run.
+- [ ] Agent has the permissions it needs (file access, git push, `gh` auth, any tool approvals). If your platform requires you to approve actions (file writes, terminal commands, etc.), grant those permissions before you walk away. A permission prompt at 3am with nobody to click "allow" will stall the entire run. You're granting these permissions at your own risk. See [Disclaimer](#disclaimer).
 - [ ] Machine is plugged in (not on battery)
 - [ ] Sleep / display sleep is disabled or caffeinate running
 - [ ] Terminal is in tmux/screen (if SSH) or won't be closed
@@ -554,7 +554,11 @@ When submitting a PR:
 
 ## Disclaimer
 
-Use at your own risk, as with all AI coding tools. Elves includes safety measures (forbidden commands, test integrity rules, rollback tags), but no software is foolproof. Always review the PR before merging. Neither Aigora nor John Ennis are responsible for any code changes, data loss, or other consequences. See the [MIT license](LICENSE) for the full terms.
+This software is provided "as is", without warranty of any kind, express or implied. Neither Aigora nor John Ennis are liable for any claims, damages, or other liability arising from using this software. That includes code changes, data loss, security incidents, infrastructure costs, or anything else that happens. The [MIT license](LICENSE) already says this, but we want to be clear about it here too.
+
+Elves expects you to grant your AI agent the permissions it needs to run autonomously. That might mean file system access, git push, GitHub CLI auth, shell command execution, or other tool approvals depending on your platform. If the agent has to pause and wait for permission during an unattended run, it'll stall. So the skill works best when you pre-approve what the agent will need. You're granting those permissions at your own risk. Know what you're allowing before you walk away.
+
+There's nothing uniquely dangerous about Elves. It uses standard tools (git, GitHub, your existing test suite) and it has safety measures (forbidden commands, test integrity rules, rollback tags). But no software is foolproof, and an agent running for hours with broad permissions can make mistakes. Always review the PR before merging.
 
 ---
 
