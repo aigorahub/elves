@@ -176,6 +176,7 @@ Some coding tools show survey popups, feedback requests, or update prompts durin
 
 ### Pre-run checklist
 
+- [ ] Agent has the permissions it needs (file access, git push, `gh` auth, any tool approvals). If your platform requires you to approve actions (file writes, terminal commands, etc.), grant those permissions before you walk away. A permission prompt at 3am with nobody to click "allow" will stall the entire run.
 - [ ] Machine is plugged in (not on battery)
 - [ ] Sleep / display sleep is disabled or caffeinate running
 - [ ] Terminal is in tmux/screen (if SSH) or won't be closed
@@ -548,6 +549,12 @@ When submitting a PR:
 - Keep changes focused: one concern per PR.
 - Update the relevant template or reference file if your change affects agent behavior.
 - Test your change with at least one real overnight run if possible.
+
+---
+
+## Disclaimer
+
+Use at your own risk, as with all AI coding tools. Elves includes safety measures (forbidden commands, test integrity rules, rollback tags), but no software is foolproof. Always review the PR before merging. Neither Aigora nor John Ennis are responsible for any code changes, data loss, or other consequences. See the [MIT license](LICENSE) for the full terms.
 
 ---
 
