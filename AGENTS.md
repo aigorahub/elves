@@ -10,6 +10,30 @@ Your user has 12 to 14 hours each day when they aren't working. You are the mech
 
 But AI agents are stateless. Context compaction erases working memory. The Survival Guide, Plan, and Execution Log are your memory across compactions. They live in files on disk, not in conversation. Read them. Trust them. Update them.
 
+## Run Mode
+
+Every session has a run mode. Persist it in the survival guide under `## Run Control`.
+
+**Finite** (default): work toward completion, then Final Completion.
+
+**Open-ended**: continue until the user explicitly stops you or a true blocker is reached. Final Completion is disabled.
+
+Trigger open-ended when the user says: "keep going until I stop you," "do not stop," "run indefinitely," "keep auditing," "never stop unless blocked."
+
+### Open-ended rules
+
+A checkpoint is not completion. A commit is not completion. A PR is not completion. A summary is not completion. After each, continue immediately.
+
+- Final Completion is disabled unless the user explicitly requests stop.
+- After every checkpoint, begin the next highest-value task.
+- Only stop for: explicit user stop, genuine blocker, or hard environment failure.
+
+See `references/open-ended-guide.md` for detailed patterns.
+
+### Pre-Final Guard
+
+Before any final response: (1) Did the user ask to stop? (2) Is run mode finite? (3) If open-ended, is there a true blocker? If answers don't justify stopping, continue the run.
+
 ## Required Inputs
 
 1. **Plan path**: file describing the work.
@@ -183,7 +207,9 @@ python3 -c "import hashlib,sys; print(hashlib.md5(open(sys.argv[1],'rb').read())
 ```
 
 ### 10. Continue or Stop
-If enough time budget remains for another batch (based on average so far), start it immediately. Otherwise go to scout mode or Final Completion. Don't pause. Don't wait for input.
+**Finite:** if enough time budget remains, start the next batch. Otherwise, scout mode or Final Completion.
+
+**Open-ended:** continue automatically after every checkpoint. Do not stop because the batch is complete, because a PR exists, or because the user is away. Only stop for explicit user stop or a blocker with no recovery path.
 
 ## Scout Mode
 
@@ -220,9 +246,10 @@ If you think you need one of these, you are wrong. Find another way. If truly st
 After any compaction or restart, conversation history is gone. But instructions are not. They live in files on disk, not in memory. Context compaction can't erase what is in the survival guide, plan, and execution log.
 
 1. Read the survival guide first (marked `# READ THIS FILE FIRST AFTER ANY COMPACTION OR RESTART`).
-2. Read the plan.
-3. Read the execution log.
-4. Identify the first incomplete batch and resume immediately.
+2. **Read the Run Control section.** If `run-mode: open-ended`, you are not allowed to stop on your own. This is the most important thing to recover.
+3. Read the plan.
+4. Read the execution log.
+5. Identify the first incomplete batch and resume immediately.
 
 Don't redo completed work. Don't ask for help. If you detect existing documents at startup, you are resuming. Follow this protocol.
 
@@ -239,6 +266,8 @@ Don't report "done" unless all are true for the current batch:
 6. Changes committed and pushed.
 
 ## Final Completion
+
+**Finite mode only.** If open-ended, do not perform Final Completion unless the user explicitly requests stop or a true blocker forces it.
 
 When all batches are done (or time is up):
 

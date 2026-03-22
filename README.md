@@ -8,7 +8,7 @@ Elves is an open-source Agent Skill for autonomous, multi-batch development. It 
 
 You write the plan and do the final merge. The agent does everything in between.
 
-**This is v0.** The system I use in production at [Aigora](https://aigora.ai) is more elaborate than what you see here. It includes custom review tools, proprietary verification infrastructure, and integration with our internal deployment pipeline. I've extracted the key ideas and patterns into something that works with standard tools (git, GitHub PRs, CI) so it's useful to anyone, not just people with my exact setup. But this is scaffolding, not a finished product. It may not work for you out of the box. Your model, your stack, your test infrastructure, and your review setup will all be different from mine. I'm relying on community feedback to make this skill more generalizable. If something doesn't work, [open an issue](https://github.com/aigorahub/elves/issues). Your experience makes this better for everyone.
+**This is v0.** The system I use in production at [Aigora](https://aigora.ai) is more elaborate than what you see here. It includes custom review tools, proprietary verification infrastructure, and integration with our internal deployment pipeline. I've extracted the key ideas and patterns into something that works with standard tools (git, GitHub PRs, CI) so it's useful to anyone, not just people with my exact setup. I'll be using this open-source version myself going forward (with my additional tooling bolted on), so it will continue to improve from real production use. But this is scaffolding, not a finished product. It may not work for you out of the box. Your model, your stack, your test infrastructure, and your review setup will all be different from mine. I'm relying on community feedback to make this skill more generalizable. If something doesn't work, [open an issue](https://github.com/aigorahub/elves/issues). Your experience makes this better for everyone.
 
 ---
 
@@ -114,7 +114,8 @@ Elves runs preflight checks first: git access, test gates, sleep prevention, not
 - **Subagent delegation** for long runs (Claude Code): coordinator manages the loop, subagents do the deep work
 - **Rollback safety**: `git tag elves/pre-batch-N` before every batch, so any batch can be cleanly unwound
 - **Scout mode**: after all planned work is done, the agent looks for adjacent improvements, test gaps, and documentation holes
-- **Time-aware pacing**: tracks how long each batch takes and uses that to decide whether to start another batch or wrap up cleanly
+- **Two run modes**: finite (deadline-based, default) or open-ended (continue until explicitly stopped). Open-ended mode disables Final Completion and treats every checkpoint as a relaunch point.
+- **Time-aware pacing**: tracks how long each batch takes and uses that to decide whether to start another batch or wrap up cleanly (finite mode)
 - **Slack notifications** (or any custom command): know when your run finishes without watching the terminal
 - **Structured session data** in `.elves-session.json` for tooling, dashboards, and analytics
 - **Comprehensive preflight checks**: git remote, push access, GitHub CLI auth, test gates, sleep prevention, Slack webhook, stale branch detection
@@ -298,7 +299,8 @@ elves/
 │   ├── validation-guide.md               # Detailed validation gates and auto-discovery
 │   ├── autonomy-guide.md                 # Non-interactive operation and mid-run protocols
 │   ├── review-subagent.md                # Built-in review protocol and adversarial review
-│   └── verification-patterns.md           # Headless browser, video recording, state assertions
+│   ├── verification-patterns.md           # Headless browser, video recording, state assertions
+│   └── open-ended-guide.md               # Open-ended mode patterns, QA/audit expansion rules
 ├── scripts/
 │   ├── preflight.sh                      # Pre-run checklist
 │   └── notify.sh                         # Notification helper
