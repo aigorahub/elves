@@ -76,7 +76,7 @@ Run each configured validation gate once to confirm it works. If a gate fails, w
 
 ## Time Awareness
 
-Record session start. If the user hasn't given a return time, ask once; default to 8 hours. Track phase duration (implement/validate/review) per batch. Before each new batch, check the clock. If within 30 minutes of deadline, go straight to Final Completion.
+Record session start. If the user hasn't given a return time, ask once; default to 8 hours. Track phase duration (implement/validate/review) per batch. Before each new batch, check the clock. If within 30 minutes of deadline, go straight to Final Completion. (In open-ended mode, there is no deadline. Keep going.)
 
 ## Setup: Branch, Plan, PR
 

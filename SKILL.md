@@ -125,7 +125,7 @@ If a critical check fails (no git remote, no push access, no gh auth), stop and 
 
 ## Time Awareness
 
-Record the session start time. Ask the user when they'll be back (or assume 8 hours). Track how long each batch takes and use that to decide whether to start another batch or wrap up cleanly. Before each new batch, check the clock. If within 30 minutes of the deadline, skip to Final Completion.
+Record the session start time. Ask the user when they'll be back (or assume 8 hours). Track how long each batch takes and use that to decide whether to start another batch or wrap up cleanly. Before each new batch, check the clock. If within 30 minutes of the deadline, skip to Final Completion. (In open-ended mode, there is no deadline. Keep going.)
 
 Record the time budget in the execution log.
 
