@@ -40,6 +40,14 @@ BEHIND=$(git rev-list HEAD..origin/main --count 2>/dev/null || echo 0)
 [ "$BEHIND" -gt 0 ] && echo "⚠ Branch is $BEHIND commits behind main."
 ```
 
+**Gitignore ephemeral artifacts:** append tool working directories to `.gitignore` so they never get committed:
+```
+# Elves ephemeral artifacts
+.playwright-mcp/
+docs/audit/
+```
+Add any other tool-specific directories. Commit the `.gitignore` update as part of session setup.
+
 Run each configured validation gate once to confirm it works. If a gate fails, warn the user before they leave. Codex runs in a cloud environment, so skip sleep/battery checks. If `ELVES_SLACK_WEBHOOK` is set, send a test notification.
 
 ## Time Awareness
@@ -157,9 +165,15 @@ Update "Current Phase" and "Next Exact Batch". A stale survival guide sends the 
 ### 8. Commit and Push
 ```bash
 git add <specific-files>   # never git add -A
-git commit -m "chore(elves): checkpoint — batch N complete"
+git commit -m "[Batch N/Total] <description>"
 git push
 ```
+
+Always include batch progress in the commit message. Examples:
+- `[Batch 3/12] Add payment processing endpoints`
+- `[Batch 3/12] Review fixes: input validation, error handling`
+
+This lets anyone watching the commit graph see exactly where the run stands.
 
 ### 9. Re-read the Survival Guide
 **After every push, re-read the survival guide before doing anything else.** Also verify the plan hasn't changed:
@@ -232,7 +246,14 @@ When all batches are done (or time is up):
 2. Update `.elves-session.json` with final state (session_id, started, plan_path, plan_hash, branch, pr_number, batches array with timing/commit/rollback_tag/review_findings, scout_items, status).
 3. Final pass through TODO.md.
 4. Update survival guide.
-5. Notify. Slack webhook if `ELVES_SLACK_WEBHOOK` set, else `ELVES_NOTIFY_CMD` if set, else leave a PR comment:
+5. **Clean up operational artifacts.** Remove Elves session infrastructure from the branch so the PR diff contains only product code:
+   ```bash
+   git rm docs/survival-guide.md docs/execution-log.md .elves-session.json
+   git commit -m "chore: remove elves session artifacts from PR"
+   ```
+   The plan file (`docs/plans/*.md`) is kept by default. These files still exist in branch history for reference.
+6. Push.
+7. Notify. Slack webhook if `ELVES_SLACK_WEBHOOK` set, else `ELVES_NOTIFY_CMD` if set, else leave a PR comment:
    ```bash
    gh pr comment --body "## Elves Session Complete\n\n**Batches:** N of M\n**Status:** [status]\n\nSee execution log for details."
    ```

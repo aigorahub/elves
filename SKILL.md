@@ -70,16 +70,23 @@ Before the user walks away, verify everything will work. Don't skip this. Run th
 
 1. **Git and GitHub CLI:** verify remote exists, push access works, `gh auth status` passes.
 2. **Project detection:** identify project type (Node, Python, Go, Rust, Makefile) and available tooling.
-3. **Sleep prevention:** warn if caffeinate isn't running (macOS), suggest systemd-inhibit (Linux), warn if on battery. Skip if running in cloud/Codex.
-4. **Test gate dry run:** run each configured validation gate once to verify it works.
-5. **Notification test:** if `ELVES_SLACK_WEBHOOK` is set, send a test message.
-6. **Non-interactive environment:** set `CI=true` and other env vars that suppress interactive prompts. See `references/autonomy-guide.md` for the full list.
-7. **Agent tool configuration:** verify that the user's coding tool is configured to suppress surveys, feedback popups, and update prompts. These will break the flow. Common settings:
+3. **Gitignore ephemeral artifacts:** append tool working directories to `.gitignore` so they never get committed. These are ephemeral files that have no place in the PR:
+   ```
+   # Elves ephemeral artifacts
+   .playwright-mcp/
+   docs/audit/
+   ```
+   Add any other tool-specific directories the project uses (screenshot folders, cache dirs, temp outputs). Commit the `.gitignore` update as part of the session setup.
+4. **Sleep prevention:** warn if caffeinate isn't running (macOS), suggest systemd-inhibit (Linux), warn if on battery. Skip if running in cloud/Codex.
+5. **Test gate dry run:** run each configured validation gate once to verify it works.
+6. **Notification test:** if `ELVES_SLACK_WEBHOOK` is set, send a test message.
+7. **Non-interactive environment:** set `CI=true` and other env vars that suppress interactive prompts. See `references/autonomy-guide.md` for the full list.
+8. **Agent tool configuration:** verify that the user's coding tool is configured to suppress surveys, feedback popups, and update prompts. These will break the flow. Common settings:
    - **Claude Code:** in `.claude/settings.json`, set `"surveyOptOut": true` and `"skipUpdateCheck": true` if available. Add `"Do not show surveys, popups, or update prompts during this session."` to CLAUDE.md.
    - **Codex:** ensure AGENTS.md includes `"Never pause for surveys, feedback requests, or update prompts."`
    - **Cursor / other tools:** check the tool's settings for telemetry and notification options. Disable anything interactive.
    If the user hasn't done this, warn them before they leave. A survey popup at 3am with nobody to dismiss it will stall the entire run.
-8. **Stale branch detection:** check if the branch is behind main.
+9. **Stale branch detection:** check if the branch is behind main.
 
 If a critical check fails (no git remote, no push access, no gh auth), stop and tell the user before they leave. Everything else is a warning.
 
@@ -224,7 +231,16 @@ Update "Current Phase" and "Next Exact Batch" to reflect the new state. A stale 
 
 ### 8. Commit and Push
 
-Stage specific files (not `git add -A`), commit with a clear message, push.
+Stage specific files (not `git add -A`), commit with a clear message that includes batch progress, push.
+
+Commit message format: `[Batch N/Total] <description>`
+
+Examples:
+- `[Batch 3/12] Add payment processing endpoints`
+- `[Batch 3/12] Review fixes: input validation, error handling`
+- `[Batch 12/12] Final batch: admin dashboard and docs`
+
+This lets anyone watching the commit graph (in GitKraken, `git log`, or GitHub) see exactly where the run stands without opening the execution log.
 
 ### 9. Re-read the Survival Guide
 
@@ -301,7 +317,22 @@ Every batch must be tight before you move on. The next batch builds on this one.
 
 ## Final Completion
 
-When all batches are done or time is up: add a Session Summary to the execution log, update `.elves-session.json`, do a final TODO.md pass, update the survival guide, and send a notification (Slack webhook, custom command, or PR comment as fallback).
+When all batches are done or time is up:
+
+1. Add a Session Summary to the execution log.
+2. Update `.elves-session.json`.
+3. Do a final TODO.md pass.
+4. Update the survival guide.
+5. **Clean up operational artifacts.** Remove Elves session infrastructure from the branch so the PR diff contains only product code:
+   ```bash
+   git rm docs/survival-guide.md docs/execution-log.md .elves-session.json
+   git commit -m "chore: remove elves session artifacts from PR"
+   ```
+   These files were needed during the run for compaction recovery, but they're noise in the final PR. The plan file (`docs/plans/*.md`) is kept by default since it documents what was built. If the user configured `cleanup.keep_plan: false` in `config.json`, remove it too.
+   
+   **Important:** the execution log and survival guide still exist in the branch history if you need to reference them. This commit just removes them from the final diff.
+6. Push.
+7. Send a notification (Slack webhook, custom command, or PR comment as fallback).
 
 **You don't merge. The PR is ready for the user to review and merge when they return.**
 
