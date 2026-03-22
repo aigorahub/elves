@@ -475,6 +475,18 @@ agentskills validate ~/.claude/skills/elves/  # or wherever you installed it
 
 You should see: `Valid skill: ...`
 
+### Stay updated
+
+Star the repo to bookmark it and show support:
+```bash
+gh repo star aigorahub/elves
+```
+
+Watch for releases to get notified when the skill is updated:
+```bash
+gh api repos/aigorahub/elves/subscription --method PUT --field subscribed=true
+```
+
 ---
 
 ## Making it your own
