@@ -29,6 +29,37 @@ But AI agents are stateless. Context compaction erases working memory. Without p
 
 The Survival Guide, Plan, and Execution Log are your memory across compactions. They aren't overhead. They're the minimum viable infrastructure for the loop to run unsupervised. Read them. Trust them. Update them. They're what make you reliable enough to justify the user walking away.
 
+## Run Mode
+
+Every session has a run mode. Determine it during planning and persist it in the survival guide under `## Run Control`.
+
+**Finite mode** (default): work toward completion, then Final Completion. Use when there's a defined scope and a return time.
+
+**Open-ended mode**: continue autonomously until the user explicitly stops you or a true blocker is reached. Final Completion is disabled. There is no natural stopping point.
+
+Trigger open-ended mode when the user says things like: "keep going until I stop you," "do not stop," "keep iterating," "run indefinitely," "keep auditing," "keep amassing findings," or "never stop unless blocked."
+
+### Open-ended rules
+
+A successful checkpoint is not completion. A clean commit is not completion. A pushed PR is not completion. An updated execution log is not completion. A useful summary is not completion. After each of these, continue immediately.
+
+- Final Completion is disabled. Do not perform it unless the user explicitly requests a stop, summary, or handoff.
+- After every checkpoint, immediately begin the next highest-value task: next planned batch, scout mode, or broader exploratory work.
+- Summaries belong in the execution log and progress updates, not in a final response that ends the turn.
+- Only stop for: explicit user stop/pause, genuine blocker with no viable workaround, or hard environment failure after recovery attempts.
+
+For exploratory work (QA, UX audit, bug hunting, backlog generation), there is no natural "done" state. When findings start repeating, broaden coverage: new viewports, new tools, alternate states, failure states, accessibility, repeated interactions, discoverability gaps. See `references/open-ended-guide.md` for detailed expansion patterns.
+
+### Pre-Final Guard
+
+Before sending any final response that would end the turn, answer these questions:
+
+1. Did the user explicitly ask to stop, pause, summarize, or hand off?
+2. Is the run mode finite?
+3. If open-ended, is there a true blocker with no workaround?
+
+If the answers don't justify stopping, do not send a final response. Continue the run.
+
 ## Phase 1: Planning (Interactive)
 
 Elves starts with a conversation. The user invokes the skill, and you work together to build the plan before any code is written. This is the most important phase. The quality of the plan determines the quality of the overnight run.
@@ -47,7 +78,9 @@ Elves starts with a conversation. The user invokes the skill, and you work toget
 
 5. **Configure the tools.** What test commands exist? Is there a preview deployment? What review infrastructure is in place (bots, CI, custom APIs)? How should notifications work?
 
-6. **Set the time budget.** When is the user leaving? When will they be back? This determines pacing.
+6. **Set the run mode.** Finite (default) or open-ended? If the user says anything like "keep going until I stop you" or "run indefinitely," set open-ended mode. Persist this in the survival guide under `## Run Control`.
+
+7. **Set the time budget.** When is the user leaving? When will they be back? This determines pacing. (In open-ended mode, the time budget is "until the user stops me.")
 
 The user may have their own planning skills, tools, or workflows they want to use during this phase. That's great. Use whatever produces the best plan. The output of this phase is what matters: a clear plan with batches, a configured survival guide, and an execution log ready to go.
 
@@ -70,22 +103,29 @@ Before the user walks away, verify everything will work. Don't skip this. Run th
 
 1. **Git and GitHub CLI:** verify remote exists, push access works, `gh auth status` passes.
 2. **Project detection:** identify project type (Node, Python, Go, Rust, Makefile) and available tooling.
-3. **Sleep prevention:** warn if caffeinate isn't running (macOS), suggest systemd-inhibit (Linux), warn if on battery. Skip if running in cloud/Codex.
-4. **Test gate dry run:** run each configured validation gate once to verify it works.
-5. **Notification test:** if `ELVES_SLACK_WEBHOOK` is set, send a test message.
-6. **Non-interactive environment:** set `CI=true` and other env vars that suppress interactive prompts. See `references/autonomy-guide.md` for the full list.
-7. **Agent tool configuration:** verify that the user's coding tool is configured to suppress surveys, feedback popups, and update prompts. These will break the flow. Common settings:
+3. **Gitignore ephemeral artifacts:** append tool working directories to `.gitignore` so they never get committed. These are ephemeral files that have no place in the PR:
+   ```
+   # Elves ephemeral artifacts
+   .playwright-mcp/
+   docs/audit/
+   ```
+   Add any other tool-specific directories the project uses (screenshot folders, cache dirs, temp outputs). Commit the `.gitignore` update as part of the session setup.
+4. **Sleep prevention:** warn if caffeinate isn't running (macOS), suggest systemd-inhibit (Linux), warn if on battery. Skip if running in cloud/Codex.
+5. **Test gate dry run:** run each configured validation gate once to verify it works.
+6. **Notification test:** if `ELVES_SLACK_WEBHOOK` is set, send a test message.
+7. **Non-interactive environment:** set `CI=true` and other env vars that suppress interactive prompts. See `references/autonomy-guide.md` for the full list.
+8. **Agent tool configuration:** verify that the user's coding tool is configured to suppress surveys, feedback popups, and update prompts. These will break the flow. Common settings:
    - **Claude Code:** in `.claude/settings.json`, set `"surveyOptOut": true` and `"skipUpdateCheck": true` if available. Add `"Do not show surveys, popups, or update prompts during this session."` to CLAUDE.md.
    - **Codex:** ensure AGENTS.md includes `"Never pause for surveys, feedback requests, or update prompts."`
    - **Cursor / other tools:** check the tool's settings for telemetry and notification options. Disable anything interactive.
    If the user hasn't done this, warn them before they leave. A survey popup at 3am with nobody to dismiss it will stall the entire run.
-8. **Stale branch detection:** check if the branch is behind main.
+9. **Stale branch detection:** check if the branch is behind main.
 
 If a critical check fails (no git remote, no push access, no gh auth), stop and tell the user before they leave. Everything else is a warning.
 
 ## Time Awareness
 
-Record the session start time. Ask the user when they'll be back (or assume 8 hours). Track how long each batch takes and use that to decide whether to start another batch or wrap up cleanly. Before each new batch, check the clock. If within 30 minutes of the deadline, skip to Final Completion.
+Record the session start time. Ask the user when they'll be back (or assume 8 hours). Track how long each batch takes and use that to decide whether to start another batch or wrap up cleanly. Before each new batch, check the clock. If within 30 minutes of the deadline, skip to Final Completion. (In open-ended mode, there is no deadline. Keep going.)
 
 Record the time budget in the execution log.
 
@@ -224,7 +264,16 @@ Update "Current Phase" and "Next Exact Batch" to reflect the new state. A stale 
 
 ### 8. Commit and Push
 
-Stage specific files (not `git add -A`), commit with a clear message, push.
+Stage specific files (not `git add -A`), commit with a clear message that includes batch progress, push.
+
+Commit message format: `[Batch N/Total] <description>`
+
+Examples:
+- `[Batch 3/12] Add payment processing endpoints`
+- `[Batch 3/12] Review fixes: input validation, error handling`
+- `[Batch 12/12] Final batch: admin dashboard and docs`
+
+This lets anyone watching the commit graph (in GitKraken, `git log`, or GitHub) see exactly where the run stands without opening the execution log.
 
 ### 9. Re-read the Survival Guide
 
@@ -232,7 +281,9 @@ Stage specific files (not `git add -A`), commit with a clear message, push.
 
 ### 10. Continue or Stop
 
-Check the clock. If there's enough time for another batch, start it. Otherwise, scout mode or Final Completion. Don't pause. Don't wait for user input.
+**Finite mode:** check the clock. If there's enough time for another batch, start it. Otherwise, scout mode or Final Completion. Don't pause. Don't wait for user input.
+
+**Open-ended mode:** continue automatically after every checkpoint. Do not stop because the current batch is complete, because enough findings have been collected, because a PR exists, or because the user is away. Only stop if the user explicitly says stop or you hit a blocker with no recovery path.
 
 ## Scout Mode
 
@@ -274,11 +325,12 @@ The tests are the user's insurance policy. You don't get to modify the insurance
 After any compaction or restart, your conversation history is gone. But your instructions aren't. They live in files on disk, not in memory. Context compaction can't erase what lives in the survival guide, plan, and execution log. This is why those documents exist.
 
 1. Read the survival guide first (marked with `READ THIS FILE FIRST` banners).
-2. Read the plan.
-3. Read the execution log.
-4. Identify the first incomplete batch.
-5. Resume immediately without asking for help.
-6. Don't redo completed work.
+2. **Read the Run Control section.** Confirm the run mode and stop policy. If the **Run mode** is `open-ended`, you are not allowed to stop on your own. This is the most important thing to recover.
+3. Read the plan.
+4. Read the execution log.
+5. Identify the first incomplete batch.
+6. Resume immediately without asking for help.
+7. Don't redo completed work.
 
 Between batches, if your platform supports it, consider proactively compacting with specific instructions: "Preserve: survival guide path, execution log path, plan path, current batch number, PR number, time budget remaining." This produces a better summary than letting autocompact decide what matters.
 
@@ -301,7 +353,24 @@ Every batch must be tight before you move on. The next batch builds on this one.
 
 ## Final Completion
 
-When all batches are done or time is up: add a Session Summary to the execution log, update `.elves-session.json`, do a final TODO.md pass, update the survival guide, and send a notification (Slack webhook, custom command, or PR comment as fallback).
+**This section applies only in finite mode.** If the **Run mode** is `open-ended`, do not perform Final Completion unless the user explicitly requests a stop, summary, or handoff, or a true blocker forces termination.
+
+When all batches are done or time is up:
+
+1. Add a Session Summary to the execution log.
+2. Update `.elves-session.json`.
+3. Do a final TODO.md pass.
+4. Update the survival guide.
+5. **Clean up operational artifacts.** Remove Elves session infrastructure from the branch so the PR diff contains only product code. Use the actual paths from this session (recorded in the survival guide and `.elves-session.json`), not hard-coded defaults:
+   ```bash
+   git rm <survival-guide-path> <execution-log-path> .elves-session.json
+   git commit -m "chore: remove elves session artifacts from PR"
+   ```
+   These files were needed during the run for compaction recovery, but they're noise in the final PR. The plan file is kept by default since it documents what was built. If the user configured `cleanup.keep_plan: false` in `config.json`, add the plan path to the `git rm` command as well.
+   
+   **Important:** the execution log and survival guide still exist in the branch history if you need to reference them. This commit just removes them from the final diff.
+6. Push.
+7. Send a notification (Slack webhook, custom command, or PR comment as fallback).
 
 **You don't merge. The PR is ready for the user to review and merge when they return.**
 

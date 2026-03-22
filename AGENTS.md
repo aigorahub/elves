@@ -10,6 +10,30 @@ Your user has 12 to 14 hours each day when they aren't working. You are the mech
 
 But AI agents are stateless. Context compaction erases working memory. The Survival Guide, Plan, and Execution Log are your memory across compactions. They live in files on disk, not in conversation. Read them. Trust them. Update them.
 
+## Run Mode
+
+Every session has a run mode. Persist it in the survival guide under `## Run Control`.
+
+**Finite** (default): work toward completion, then Final Completion.
+
+**Open-ended**: continue until the user explicitly stops you or a true blocker is reached. Final Completion is disabled.
+
+Trigger open-ended when the user says: "keep going until I stop you," "do not stop," "run indefinitely," "keep auditing," "never stop unless blocked."
+
+### Open-ended rules
+
+A checkpoint is not completion. A commit is not completion. A PR is not completion. A summary is not completion. After each, continue immediately.
+
+- Final Completion is disabled unless the user explicitly requests stop.
+- After every checkpoint, begin the next highest-value task.
+- Only stop for: explicit user stop, genuine blocker, or hard environment failure.
+
+See `references/open-ended-guide.md` for detailed patterns.
+
+### Pre-Final Guard
+
+Before any final response: (1) Did the user ask to stop? (2) Is run mode finite? (3) If open-ended, is there a true blocker? If answers don't justify stopping, continue the run.
+
 ## Required Inputs
 
 1. **Plan path**: file describing the work.
@@ -40,11 +64,19 @@ BEHIND=$(git rev-list HEAD..origin/main --count 2>/dev/null || echo 0)
 [ "$BEHIND" -gt 0 ] && echo "⚠ Branch is $BEHIND commits behind main."
 ```
 
+**Gitignore ephemeral artifacts:** append tool working directories to `.gitignore` so they never get committed:
+```
+# Elves ephemeral artifacts
+.playwright-mcp/
+docs/audit/
+```
+Add any other tool-specific directories. Commit the `.gitignore` update as part of session setup.
+
 Run each configured validation gate once to confirm it works. If a gate fails, warn the user before they leave. Codex runs in a cloud environment, so skip sleep/battery checks. If `ELVES_SLACK_WEBHOOK` is set, send a test notification.
 
 ## Time Awareness
 
-Record session start. If the user hasn't given a return time, ask once; default to 8 hours. Track phase duration (implement/validate/review) per batch. Before each new batch, check the clock. If within 30 minutes of deadline, go straight to Final Completion.
+Record session start. If the user hasn't given a return time, ask once; default to 8 hours. Track phase duration (implement/validate/review) per batch. Before each new batch, check the clock. If within 30 minutes of deadline, go straight to Final Completion. (In open-ended mode, there is no deadline. Keep going.)
 
 ## Setup: Branch, Plan, PR
 
@@ -157,9 +189,15 @@ Update "Current Phase" and "Next Exact Batch". A stale survival guide sends the 
 ### 8. Commit and Push
 ```bash
 git add <specific-files>   # never git add -A
-git commit -m "chore(elves): checkpoint — batch N complete"
+git commit -m "[Batch N/Total] <description>"
 git push
 ```
+
+Always include batch progress in the commit message. Examples:
+- `[Batch 3/12] Add payment processing endpoints`
+- `[Batch 3/12] Review fixes: input validation, error handling`
+
+This lets anyone watching the commit graph see exactly where the run stands.
 
 ### 9. Re-read the Survival Guide
 **After every push, re-read the survival guide before doing anything else.** Also verify the plan hasn't changed:
@@ -169,7 +207,9 @@ python3 -c "import hashlib,sys; print(hashlib.md5(open(sys.argv[1],'rb').read())
 ```
 
 ### 10. Continue or Stop
-If enough time budget remains for another batch (based on average so far), start it immediately. Otherwise go to scout mode or Final Completion. Don't pause. Don't wait for input.
+**Finite:** if enough time budget remains, start the next batch. Otherwise, scout mode or Final Completion.
+
+**Open-ended:** continue automatically after every checkpoint. Do not stop because the batch is complete, because a PR exists, or because the user is away. Only stop for explicit user stop or a blocker with no recovery path.
 
 ## Scout Mode
 
@@ -206,9 +246,10 @@ If you think you need one of these, you are wrong. Find another way. If truly st
 After any compaction or restart, conversation history is gone. But instructions are not. They live in files on disk, not in memory. Context compaction can't erase what is in the survival guide, plan, and execution log.
 
 1. Read the survival guide first (marked `# READ THIS FILE FIRST AFTER ANY COMPACTION OR RESTART`).
-2. Read the plan.
-3. Read the execution log.
-4. Identify the first incomplete batch and resume immediately.
+2. **Read the Run Control section.** If the **Run mode** is `open-ended`, you are not allowed to stop on your own. This is the most important thing to recover.
+3. Read the plan.
+4. Read the execution log.
+5. Identify the first incomplete batch and resume immediately.
 
 Don't redo completed work. Don't ask for help. If you detect existing documents at startup, you are resuming. Follow this protocol.
 
@@ -226,13 +267,22 @@ Don't report "done" unless all are true for the current batch:
 
 ## Final Completion
 
+**Finite mode only.** If open-ended, do not perform Final Completion unless the user explicitly requests stop or a true blocker forces it.
+
 When all batches are done (or time is up):
 
 1. Add a **Session Summary** to the top of the execution log: duration, batches completed, time breakdown, status.
 2. Update `.elves-session.json` with final state (session_id, started, plan_path, plan_hash, branch, pr_number, batches array with timing/commit/rollback_tag/review_findings, scout_items, status).
 3. Final pass through TODO.md.
 4. Update survival guide.
-5. Notify. Slack webhook if `ELVES_SLACK_WEBHOOK` set, else `ELVES_NOTIFY_CMD` if set, else leave a PR comment:
+5. **Clean up operational artifacts.** Remove Elves session infrastructure from the branch so the PR diff contains only product code. Use the actual paths from this session (from the survival guide or `.elves-session.json`), not hard-coded defaults:
+   ```bash
+   git rm <survival-guide-path> <execution-log-path> .elves-session.json
+   git commit -m "chore: remove elves session artifacts from PR"
+   ```
+   The plan file is kept by default. If `cleanup.keep_plan: false` in `config.json`, add the plan path to `git rm` as well. These files still exist in branch history for reference.
+6. Push.
+7. Notify. Slack webhook if `ELVES_SLACK_WEBHOOK` set, else `ELVES_NOTIFY_CMD` if set, else leave a PR comment:
    ```bash
    gh pr comment --body "## Elves Session Complete\n\n**Batches:** N of M\n**Status:** [status]\n\nSee execution log for details."
    ```

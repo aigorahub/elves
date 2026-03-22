@@ -20,11 +20,20 @@ session-cookie approach. All existing auth tests must pass. The public API surfa
 
 ---
 
+## Run Control
+
+- **Run mode:** [finite | open-ended]
+- **Stop policy:** [deadline | explicit-user-stop | blocker-only]
+- **User intent:** [copy the exact controlling instruction here, e.g., "I'll be back at 8am" or "Keep going until I stop you."]
+- **Final-response policy:** [allowed | disallowed until stop]
+
+---
+
 ## Session Budget
 
 - **Started:** [YYYY-MM-DD HH:MM timezone]
-- **User returns:** ~[YYYY-MM-DD HH:MM timezone]
-- **Time budget:** ~[N] hours
+- **User returns:** ~[YYYY-MM-DD HH:MM timezone] _("never" if open-ended)_
+- **Time budget:** ~[N] hours _("unlimited" if open-ended)_
 - **Average batch time so far:** [Xm] _(update after each batch)_
 - **Batches remaining:** [N of M]
 
@@ -217,11 +226,12 @@ notification: pr-comment
 When you restart after a compaction, do these steps in order. No shortcuts.
 
 1. Read this file (survival guide). You are doing this now.
-2. Read the plan. Confirm the overall scope hasn't changed (compare hash if recorded above).
-3. Read the execution log. Find the last completed batch and the last **Decisions made** entry.
-4. Identify the first incomplete batch (look at Current Phase and Next Exact Batch above).
-5. Check the clock. How much time budget remains?
-6. Resume immediately. Don't ask for help. Don't redo completed work.
+2. **Read the Run Control section above.** Confirm the run mode and stop policy. If open-ended, you are not allowed to stop on your own. This is the most important thing to recover.
+3. Read the plan. Confirm the overall scope hasn't changed (compare hash if recorded above).
+4. Read the execution log. Find the last completed batch and the last **Decisions made** entry.
+5. Identify the first incomplete batch (look at Current Phase and Next Exact Batch above).
+6. Check the clock. How much time budget remains? (If open-ended: unlimited.)
+7. Resume immediately. Don't ask for help. Don't redo completed work.
 
 The execution log is your proof of what is done. If something appears in the log as complete, it is
 complete. Don't re-implement it.

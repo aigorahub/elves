@@ -18,5 +18,10 @@
     "_alternatives": "github-pr-comments, custom-api"
   },
 
-  "default_branch": "main"
+  "default_branch": "main",
+
+  "cleanup": {
+    "keep_plan": true,
+    "_comment": "If false, the plan file is also removed in the final cleanup commit."
+  }
 }
