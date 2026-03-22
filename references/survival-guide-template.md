@@ -226,7 +226,7 @@ notification: pr-comment
 When you restart after a compaction, do these steps in order. No shortcuts.
 
 1. Read this file (survival guide). You are doing this now.
-2. **Read the Run Control section above.** Confirm the run mode and stop policy. If open-ended, you are not allowed to stop on your own.
+2. **Read the Run Control section above.** Confirm the run mode and stop policy. If open-ended, you are not allowed to stop on your own. This is the most important thing to recover.
 3. Read the plan. Confirm the overall scope hasn't changed (compare hash if recorded above).
 4. Read the execution log. Find the last completed batch and the last **Decisions made** entry.
 5. Identify the first incomplete batch (look at Current Phase and Next Exact Batch above).

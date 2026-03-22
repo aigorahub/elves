@@ -147,7 +147,30 @@ if [ $PROJECT_NODE -eq 0 ] && [ $PROJECT_PYTHON -eq 0 ] && \
 fi
 
 # ---------------------------------------------------------------------------
-# 5. Non-interactive environment
+# 5. Ephemeral artifact gitignore
+# ---------------------------------------------------------------------------
+header "Ephemeral Artifact Gitignore"
+
+# Check if common tool working directories are gitignored
+EPHEMERAL_DIRS=(.playwright-mcp docs/audit)
+MISSING_IGNORES=0
+
+for DIR in "${EPHEMERAL_DIRS[@]}"; do
+  if git check-ignore -q "$DIR" 2>/dev/null; then
+    pass "${DIR}/ is gitignored"
+  else
+    MISSING_IGNORES=1
+    warn "${DIR}/ is NOT in .gitignore — add it to prevent committing ephemeral artifacts"
+    info "echo '${DIR}/' >> .gitignore"
+  fi
+done
+
+if [ "$MISSING_IGNORES" -eq 0 ]; then
+  pass "All known ephemeral directories are gitignored"
+fi
+
+# ---------------------------------------------------------------------------
+# 6. Non-interactive environment
 # ---------------------------------------------------------------------------
 header "Non-Interactive Environment"
 
@@ -172,7 +195,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 6. Validation gate dry run
+# 7. Validation gate dry run
 # ---------------------------------------------------------------------------
 header "Validation Gates"
 
@@ -297,7 +320,7 @@ if [ $PROJECT_MAKE -eq 1 ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 7. Sleep prevention
+# 8. Sleep prevention
 # ---------------------------------------------------------------------------
 header "Sleep Prevention"
 
@@ -357,7 +380,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 8. Stale branch detection
+# 9. Stale branch detection
 # ---------------------------------------------------------------------------
 header "Branch Staleness"
 
@@ -388,7 +411,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 9. Slack webhook test
+# 10. Slack webhook test
 # ---------------------------------------------------------------------------
 header "Slack Notification"
 
@@ -408,7 +431,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 10. Plan file check
+# 11. Plan file check
 # ---------------------------------------------------------------------------
 header "Plan File"
 
@@ -425,7 +448,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 11. Summary
+# 12. Summary
 # ---------------------------------------------------------------------------
 echo
 echo -e "${BOLD}══════════════════════════════════════════════════${RESET}"

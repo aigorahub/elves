@@ -325,7 +325,7 @@ The tests are the user's insurance policy. You don't get to modify the insurance
 After any compaction or restart, your conversation history is gone. But your instructions aren't. They live in files on disk, not in memory. Context compaction can't erase what lives in the survival guide, plan, and execution log. This is why those documents exist.
 
 1. Read the survival guide first (marked with `READ THIS FILE FIRST` banners).
-2. **Read the Run Control section.** Confirm the run mode and stop policy. If `run-mode: open-ended`, you are not allowed to stop on your own. This is the most important thing to recover.
+2. **Read the Run Control section.** Confirm the run mode and stop policy. If the **Run mode** is `open-ended`, you are not allowed to stop on your own. This is the most important thing to recover.
 3. Read the plan.
 4. Read the execution log.
 5. Identify the first incomplete batch.
@@ -353,7 +353,7 @@ Every batch must be tight before you move on. The next batch builds on this one.
 
 ## Final Completion
 
-**This section applies only in finite mode.** If `run-mode: open-ended`, do not perform Final Completion unless the user explicitly requests a stop, summary, or handoff, or a true blocker forces termination.
+**This section applies only in finite mode.** If the **Run mode** is `open-ended`, do not perform Final Completion unless the user explicitly requests a stop, summary, or handoff, or a true blocker forces termination.
 
 When all batches are done or time is up:
 
@@ -361,12 +361,12 @@ When all batches are done or time is up:
 2. Update `.elves-session.json`.
 3. Do a final TODO.md pass.
 4. Update the survival guide.
-5. **Clean up operational artifacts.** Remove Elves session infrastructure from the branch so the PR diff contains only product code:
+5. **Clean up operational artifacts.** Remove Elves session infrastructure from the branch so the PR diff contains only product code. Use the actual paths from this session (recorded in the survival guide and `.elves-session.json`), not hard-coded defaults:
    ```bash
-   git rm docs/survival-guide.md docs/execution-log.md .elves-session.json
+   git rm <survival-guide-path> <execution-log-path> .elves-session.json
    git commit -m "chore: remove elves session artifacts from PR"
    ```
-   These files were needed during the run for compaction recovery, but they're noise in the final PR. The plan file (`docs/plans/*.md`) is kept by default since it documents what was built. If the user configured `cleanup.keep_plan: false` in `config.json`, remove it too.
+   These files were needed during the run for compaction recovery, but they're noise in the final PR. The plan file is kept by default since it documents what was built. If the user configured `cleanup.keep_plan: false` in `config.json`, add the plan path to the `git rm` command as well.
    
    **Important:** the execution log and survival guide still exist in the branch history if you need to reference them. This commit just removes them from the final diff.
 6. Push.

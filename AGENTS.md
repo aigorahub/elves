@@ -246,7 +246,7 @@ If you think you need one of these, you are wrong. Find another way. If truly st
 After any compaction or restart, conversation history is gone. But instructions are not. They live in files on disk, not in memory. Context compaction can't erase what is in the survival guide, plan, and execution log.
 
 1. Read the survival guide first (marked `# READ THIS FILE FIRST AFTER ANY COMPACTION OR RESTART`).
-2. **Read the Run Control section.** If `run-mode: open-ended`, you are not allowed to stop on your own. This is the most important thing to recover.
+2. **Read the Run Control section.** If the **Run mode** is `open-ended`, you are not allowed to stop on your own. This is the most important thing to recover.
 3. Read the plan.
 4. Read the execution log.
 5. Identify the first incomplete batch and resume immediately.
@@ -275,12 +275,12 @@ When all batches are done (or time is up):
 2. Update `.elves-session.json` with final state (session_id, started, plan_path, plan_hash, branch, pr_number, batches array with timing/commit/rollback_tag/review_findings, scout_items, status).
 3. Final pass through TODO.md.
 4. Update survival guide.
-5. **Clean up operational artifacts.** Remove Elves session infrastructure from the branch so the PR diff contains only product code:
+5. **Clean up operational artifacts.** Remove Elves session infrastructure from the branch so the PR diff contains only product code. Use the actual paths from this session (from the survival guide or `.elves-session.json`), not hard-coded defaults:
    ```bash
-   git rm docs/survival-guide.md docs/execution-log.md .elves-session.json
+   git rm <survival-guide-path> <execution-log-path> .elves-session.json
    git commit -m "chore: remove elves session artifacts from PR"
    ```
-   The plan file (`docs/plans/*.md`) is kept by default. These files still exist in branch history for reference.
+   The plan file is kept by default. If `cleanup.keep_plan: false` in `config.json`, add the plan path to `git rm` as well. These files still exist in branch history for reference.
 6. Push.
 7. Notify. Slack webhook if `ELVES_SLACK_WEBHOOK` set, else `ELVES_NOTIFY_CMD` if set, else leave a PR comment:
    ```bash
