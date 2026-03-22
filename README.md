@@ -176,7 +176,7 @@ Some coding tools show survey popups, feedback requests, or update prompts durin
 
 ### Pre-run checklist
 
-- [ ] Agent has the permissions it needs (file access, git push, `gh` auth, any tool approvals). If your platform requires you to approve actions (file writes, terminal commands, etc.), grant those permissions before you walk away. A permission prompt at 3am with nobody to click "allow" will stall the entire run. **Granting broad permissions to an AI agent is your decision and your responsibility.** Understand what you are allowing before you allow it. See [Disclaimer](#disclaimer).
+- [ ] Agent has the permissions it needs (file access, git push, `gh` auth, any tool approvals). If your platform requires you to approve actions (file writes, terminal commands, etc.), grant those permissions before you walk away. A permission prompt at 3am with nobody to click "allow" will stall the entire run. You're granting these permissions at your own risk. See [Disclaimer](#disclaimer).
 - [ ] Machine is plugged in (not on battery)
 - [ ] Sleep / display sleep is disabled or caffeinate running
 - [ ] Terminal is in tmux/screen (if SSH) or won't be closed
@@ -554,11 +554,11 @@ When submitting a PR:
 
 ## Disclaimer
 
-**This software is provided "as is", without warranty of any kind, express or implied.** Neither Aigora nor John Ennis shall be liable for any claim, damages, or other liability arising from the use of this software, including but not limited to code changes, data loss, security incidents, infrastructure costs, or any other consequences. This is already covered by the [MIT license](LICENSE), but we want to be explicit.
+This software is provided "as is", without warranty of any kind, express or implied. Neither Aigora nor John Ennis are liable for any claims, damages, or other liability arising from using this software. That includes code changes, data loss, security incidents, infrastructure costs, or anything else that happens. The [MIT license](LICENSE) already says this, but we want to be clear about it here too.
 
-**Elves expects you to grant your AI agent the permissions it needs to operate autonomously.** This may include file system access, git push, GitHub CLI authentication, shell command execution, and other tool approvals depending on your platform. If the agent has to pause and wait for permission during an unattended run, it will stall. That means the skill works best when you pre-approve the actions the agent will need. **You are granting those permissions at your own risk.** Understand what you are allowing, review your platform's permission model, and make an informed decision before you walk away.
+Elves expects you to grant your AI agent the permissions it needs to run autonomously. That might mean file system access, git push, GitHub CLI auth, shell command execution, or other tool approvals depending on your platform. If the agent has to pause and wait for permission during an unattended run, it'll stall. So the skill works best when you pre-approve what the agent will need. You're granting those permissions at your own risk. Know what you're allowing before you walk away.
 
-There is nothing uniquely dangerous about Elves. It uses standard tools (git, GitHub, your existing test suite) and includes safety measures (forbidden commands, test integrity rules, rollback tags). But no software is foolproof, and an agent running for hours with broad permissions can do real work, which means it can also make real mistakes. Always review the PR before merging. The final gate is yours.
+There's nothing uniquely dangerous about Elves. It uses standard tools (git, GitHub, your existing test suite) and it has safety measures (forbidden commands, test integrity rules, rollback tags). But no software is foolproof, and an agent running for hours with broad permissions can make mistakes. Always review the PR before merging.
 
 ---
 
