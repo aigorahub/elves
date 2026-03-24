@@ -77,10 +77,10 @@ The goal is that each batch leaves the codebase easier to work on, not harder. F
 2. **Centralize over duplicate:** Did the batch introduce new helpers, utilities, or abstractions that duplicate existing ones in the codebase? Search for similar functions. If `formatDate()` already exists in the codebase and the batch added a new one, that's a finding.
 3. **Extend over create:** Did the batch build on existing patterns and modules, or create parallel implementations? New files that replicate the structure of existing files are a red flag.
 4. **Architecture first:** Does the new code respect the codebase's existing architecture — module boundaries, data flow, naming conventions, test organization? Or does it introduce novel patterns that conflict with what's already there?
-5. **Pattern consistency:** Does the new code follow the naming conventions, error handling patterns, and API response structures already established in the codebase?
-6. **No unjustified hardcoded constants:** Are there magic numbers, URLs, timeouts, thresholds, or config values hardcoded inline? Check the commit message — if the coding agent justified the hardcoding (e.g., protocol-required value, mathematical constant), evaluate whether the justification holds. If there's no justification, flag it.
-7. **Progressive conditioning:** Does this batch leave the repo easier to work on? Look for: clear type annotations on new code, focused single-purpose functions, consistent naming, updated docs and agent instructions (CLAUDE.md, TODO.md).
-8. **Thrashing signals:** Were the same files modified 5+ times in the batch's commit history without clear forward progress? This suggests symptom-chasing rather than root-cause fixing.
+5. **Proactive pattern detection:** Does the new code follow the naming conventions, error handling patterns, and API response structures already established in the codebase? Match existing conventions exactly.
+6. **Progressive repo conditioning:** Does this batch leave the repo easier to work on? Look for: clear type annotations on new code, focused single-purpose functions, consistent naming, updated docs and agent instructions (CLAUDE.md, TODO.md).
+7. **No hardcoded constants without justification:** Are there magic numbers, URLs, timeouts, thresholds, or config values hardcoded inline? Check the commit message — if the coding agent justified the hardcoding (e.g., protocol-required value, mathematical constant), evaluate whether the justification holds. If there's no justification, flag it.
+8. **Runaway detection:** Were the same files modified 5+ times in the batch's commit history without clear forward progress? This suggests symptom-chasing rather than root-cause fixing.
 
 Mark code quality issues as:
 - BLOCKING if they introduce duplication, violate existing architecture, or band-aid a root cause
@@ -116,11 +116,14 @@ For each contract item, one line:
 - ⚠️ [item] — implemented but [concern]
 
 ### Code Quality
-- **Duplication:** [any new code that duplicates existing utilities/patterns — name both]
-- **Architecture:** [any violations of existing module boundaries, data flow, or conventions]
 - **Root cause:** [any fixes that patch symptoms rather than addressing underlying problems]
-- **Pattern consistency:** [any deviations from established naming, error handling, or structure]
+- **Duplication:** [any new code that duplicates existing utilities/patterns — name both]
+- **Extend over create:** [any parallel implementations that should have extended existing code]
+- **Architecture:** [any violations of existing module boundaries, data flow, or conventions]
+- **Pattern detection:** [any deviations from established naming, error handling, or structure]
 - **Progressive conditioning:** [did this batch leave the repo easier or harder to work on?]
+- **Hardcoded constants:** [any unjustified magic numbers/URLs/thresholds — note whether commit message provides justification]
+- **Thrashing:** [any files modified 5+ times without clear forward progress]
 If all clear, state: "No code quality issues. Batch follows existing patterns and conventions."
 
 ### New Issues Found in Diff Review

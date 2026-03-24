@@ -490,7 +490,7 @@ A batch isn't done unless:
 6. Review performed. The review loop ran until no blockers remained. All review threads resolved or replied to.
 7. No accumulated debt: no skipped gates, no "will fix later" items, no known regressions.
 8. **Documentation is up to date.** Any user-facing behavior changed by this batch must be reflected in the relevant docs — README, API docs, inline doc comments, config references, migration guides, changelogs, or whatever the project uses. Stale docs are debt. A user who reads the docs and gets wrong information is worse off than a user with no docs at all.
-9. `.elves-session.json` updated with batch status, commit SHA, and completion timestamp.
+9. `.elves-session.json` updated with batch status, commit SHA, completion timestamp, and `review_comments` dispositions.
 10. You're confident the batch is correct. Not "probably fine," but verified through testing, review, and deployment.
 11. Execution log updated with timestamps, evidence, and commit SHA.
 12. Survival guide updated with next batch.
@@ -623,6 +623,16 @@ Maintain a `.elves-session.json` file with machine-readable session data (sessio
       "summary": "Cognitive complexity of handleAuth() is 18 (threshold 15)",
       "disposition": "dismissed",
       "reason": "Function is a straightforward switch; splitting would reduce readability"
+    },
+    {
+      "id": 1234567892,
+      "type": "review_thread",
+      "source": "copilot",
+      "batch": 2,
+      "cycle": 1,
+      "summary": "Consider extracting retry logic into shared utility",
+      "disposition": "deferred",
+      "reason": "Valid but scope is too large for this batch — added to TODO.md [elves-scout]"
     }
   ]
 }
