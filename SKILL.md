@@ -179,7 +179,7 @@ Record the time budget in the execution log.
 2. **Write up the plans.** Generate the survival guide and execution log from templates (if they don't already exist). Read the plan and decompose it into batches. Record the batch breakdown with estimates in the execution log. Commit all planning documents:
    ```bash
    git add <survival-guide> <execution-log> <plan-if-new>
-   git commit -m "docs: elves session setup — survival guide, execution log, batch plan"
+   git commit -m "[<branch> · Batch 0/N] Session setup — survival guide, execution log, batch plan"
    ```
 
 3. **Push and open a PR immediately:**
@@ -293,7 +293,7 @@ For trivial batches (documentation-only, config changes, dependency bumps), the 
 
 ### 5. Implement
 
-Build the batch scope fully. Push after each meaningful chunk. Tag incidental findings as `[elves-scout]` in TODO.md for later.
+Build the batch scope fully. Push after each meaningful chunk — and **every commit must follow the progress report format** from step 10: `[<branch> · Batch N/Total] <what you are doing>`. This applies to mid-implementation commits too, not just batch-end commits. Tag incidental findings as `[elves-scout]` in TODO.md for later.
 
 **Use commit messages to communicate with the reviewer.** The reviewer reads your commit history to understand not just *what* you changed but *why*. Every commit should reference which batch item is being addressed. When you make a design choice that isn't obvious — choosing one approach over another, hardcoding a value, deviating from a pattern — explain your reasoning in the commit message body. This is the communication channel between you and the reviewer. Without it, the reviewer flags something, you silently change it back, the reviewer flags it again, and you burn cycles arguing through code. With it, the reviewer reads your justification first and only flags things where the reasoning is actually wrong.
 
@@ -363,17 +363,26 @@ Update "Current Phase" and "Next Exact Batch" to reflect the new state. A stale 
 
 Stage specific files (not `git add -A`), commit with a clear message that includes batch progress, push.
 
-Commit message format: `[Batch N/Total] <description>`
+**Every commit must follow this format. No exceptions.** The commit subject line is a progress report. Anyone watching the branch — the human, the reviewer, a dashboard, `git log --oneline` — should be able to see exactly where the run stands without opening any other file.
 
-The subject line tells the reader *what*. The body tells them *why*. Use the body to communicate design decisions, justifications for non-obvious choices, and context the reviewer needs to evaluate the change fairly.
+Commit subject format: `[<branch> · Batch N/Total] <what you are doing>`
+
+The subject has three parts:
+1. **Branch name** — which feature branch this is on
+2. **Batch progress** — which batch out of how many
+3. **What you are doing** — concise description of the change
+
+The body tells the reader *why*. Use the body to communicate design decisions, justifications for non-obvious choices, and context the reviewer needs to evaluate the change fairly.
+
+**This format applies to every commit during the run:** implementation commits, review fix commits, doc updates, and session setup commits. Not just the final batch commit. The human may check `git log` at 3am to see if you're still making progress. If they see three commits with no batch prefix, they have no idea where you are.
 
 Examples:
 ```
-[Batch 3/12] Add payment processing endpoints
+[feat/payment-system · Batch 3/12] Add charge creation endpoint and webhook handler
 ```
 
 ```
-[Batch 3/12] Use Stripe's idempotency keys instead of our own dedup logic
+[feat/payment-system · Batch 3/12] Use Stripe's idempotency keys instead of our own dedup logic
 
 Stripe already handles idempotent retries natively via the Idempotency-Key
 header. Building our own dedup table would duplicate this and add a
@@ -381,7 +390,7 @@ consistency problem. Hardcoded 24h TTL matches Stripe's documented window.
 ```
 
 ```
-[Batch 3/12] Review fixes: input validation, error handling
+[feat/payment-system · Batch 3/12] Review fixes: input validation, error handling
 
 Fixed: email regex was anchored incorrectly (CodeRabbit #42).
 Dismissed: "extract timeout to constants" — the 30s value is Stripe's
@@ -389,7 +398,11 @@ documented webhook timeout, not a tunable parameter. Justified in code
 comment referencing their docs.
 ```
 
-This lets anyone watching the commit graph see where the run stands. More importantly, it gives the reviewer the context they need to evaluate your choices without having to guess at your reasoning — and it prevents review cycles from devolving into arguments where neither side understands the other.
+```
+[feat/payment-system · Batch 3/12] Add E2E test for checkout flow
+```
+
+This lets anyone watching the commit graph see where the run stands, which branch it's on, and what's happening right now. It also gives the reviewer the context they need to evaluate your choices without guessing.
 
 ### 11. Re-read the Survival Guide
 

@@ -106,7 +106,7 @@ Record session start. If the user hasn't given a return time, ask once; default 
 ```bash
 git checkout -b feat/<descriptive-name>
 git add <survival-guide> <execution-log>
-git commit -m "docs: elves session setup"
+git commit -m "[<branch> · Batch 0/N] Session setup — survival guide, execution log, batch plan"
 git push -u origin HEAD
 gh pr create --title "<title>" --body "<plan summary with batch list>"
 PR_NUMBER=$(gh pr view --json number -q .number)
@@ -166,7 +166,7 @@ If you can't write concrete acceptance criteria, the batch scope is too vague �
 
 **Use commit messages to communicate with the reviewer.** The reviewer reads your commit history. Every commit should reference which batch item is being addressed. When you make a non-obvious choice (hardcoded value, pattern deviation, design tradeoff), explain your reasoning in the commit body. This prevents review cycles from devolving into arguments where neither side understands the other.
 
-Build the full batch scope. Push after each meaningful chunk. Handle tiny incidental fixes inline and note them in the log. Anything substantial outside scope: add to `TODO.md` tagged `[elves-scout]` and keep moving. All work is done directly. Codex doesn't have built-in subagent support.
+Build the full batch scope. Push after each meaningful chunk — **every commit must follow the progress format** from step 10: `[<branch> · Batch N/Total] <what you are doing>`. Handle tiny incidental fixes inline and note them in the log. Anything substantial outside scope: add to `TODO.md` tagged `[elves-scout]` and keep moving. All work is done directly. Codex doesn't have built-in subagent support.
 
 Write tests for new code. Cover the logic you introduce, not just happy paths. If the project lacks test infrastructure, set it up in the first batch. During long implementation stretches, periodically update the execution log with progress notes to protect against mid-batch compaction.
 
@@ -246,17 +246,20 @@ Update "Current Phase" and "Next Exact Batch". A stale survival guide sends the 
 ### 10. Commit and Push
 ```bash
 git add <specific-files>   # never git add -A
-git commit -m "[Batch N/Total] <description>"
+git commit -m "[<branch> · Batch N/Total] <what you are doing>"
 git push
 ```
 
-The subject line tells the reader *what*. The body tells them *why* — design decisions, justifications for hardcoded values, rationale for dismissed findings. This is how you communicate with the reviewer.
+**Every commit must follow this format. No exceptions.** The subject line is a progress report — branch name, batch progress, and what you're doing. Anyone checking `git log` at 3am should see exactly where the run stands.
+
+The body tells the reader *why* — design decisions, justifications for hardcoded values, rationale for dismissed findings. This is how you communicate with the reviewer.
+
+This applies to **every commit during the run**: implementation, review fixes, doc updates, session setup. Not just batch-end commits.
 
 Examples:
-- `[Batch 3/12] Add payment processing endpoints`
-- `[Batch 3/12] Review fixes: input validation, error handling` with body explaining what was fixed and what was dismissed with reasoning
-
-This lets anyone watching the commit graph see where the run stands, and gives the reviewer the context to evaluate your choices without guessing.
+- `[feat/auth · Batch 3/12] Add payment processing endpoints`
+- `[feat/auth · Batch 3/12] Review fixes: input validation, error handling` (body explains what was fixed/dismissed and why)
+- `[feat/auth · Batch 3/12] Add E2E test for checkout flow`
 
 ### 11. Re-read the Survival Guide
 **After every push, re-read the survival guide before doing anything else.** Also verify the plan hasn't changed:
