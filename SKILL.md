@@ -228,11 +228,11 @@ Then identify the first incomplete batch.
 
 ### 2. Verify Green
 
-**Before starting new work, confirm the project is in a working state.** Run the build and test gates from the previous batch. If anything is broken, fix it before proceeding — don't start a new batch on a cracked foundation.
+**Before starting new work, confirm the project is in a working state.** Run all validation gates (lint, typecheck, build, test). If anything is broken, fix it before proceeding — don't start a new batch on a cracked foundation.
 
 This catches edge cases where the previous batch passed gates but a subsequent push (review fixes, doc updates, merge from main) introduced a quiet regression. It's a cheap check that prevents expensive debugging later.
 
-If this is the first batch and no code exists yet, skip this step.
+If this is the first batch and no code exists yet, run a minimal smoke test instead: confirm the dev server starts, the test runner works, and dependencies are installed. If dependencies are missing (fresh clone or sandbox), install them first.
 
 ### 3. Tag
 
@@ -261,11 +261,15 @@ The contract goes in the execution log under the batch entry:
 
 The contract keeps implementation focused and gives the validate/review steps clear targets. If you can't write concrete acceptance criteria, the batch scope is too vague — sharpen it before coding.
 
+For trivial batches (documentation-only, config changes, dependency bumps), the contract can be a single line: "Update README with API examples. Acceptance: README contains curl examples for all endpoints." Don't let the contract become bureaucracy for obvious work.
+
 ### 5. Implement
 
 Build the batch scope fully. Use descriptive commits referencing which batch item is being addressed. Push after each meaningful chunk. Tag incidental findings as `[elves-scout]` in TODO.md for later.
 
 Write tests for the code you write. Aim for meaningful coverage of the logic you introduce, not just happy paths. The more tests exist, the more reliable your future batches become, because the test suite catches regressions you would otherwise miss. If the project doesn't have a test infrastructure yet, consider setting one up as part of the first batch. It pays for itself immediately.
+
+**During long implementation stretches, periodically update the execution log with progress notes** — even before validation is complete. If compaction happens mid-implementation, the execution log is your lifeline. A stale log forces the next context to guess what you were doing. A current log lets it pick up exactly where you left off.
 
 ### 6. Validate
 
@@ -300,6 +304,10 @@ The user can fortify this with additional review tools configured in the surviva
 ### 8. Document
 
 Update the execution log with a timestamped entry covering: batch name, timing breakdown, what changed, commands run, test results, review findings, decisions made, commit SHA, rollback tag, and next steps.
+
+**Close the loop on the contract.** Mark each acceptance criterion from step 4 as met or note exceptions. If a criterion wasn't met, explain why and whether it's deferred or dropped. The contract is write-only if you don't check it off.
+
+Also update `.elves-session.json` — set the current batch status to `"complete"`, record the commit SHA and completion timestamp. This keeps the JSON in sync with the execution log so either can be used for recovery.
 
 Keep entries concise. If the log exceeds ~50 entries, archive older ones under `## Completed Archive`.
 
@@ -371,11 +379,12 @@ After any compaction or restart, your conversation history is gone. But your ins
 
 1. Read the survival guide first (marked with `READ THIS FILE FIRST` banners).
 2. **Read the Run Control section.** Confirm the run mode and stop policy. If the **Run mode** is `open-ended`, you are not allowed to stop on your own. This is the most important thing to recover.
-3. Read the plan.
-4. Read the execution log.
-5. Identify the first incomplete batch.
-6. Resume immediately without asking for help.
-7. Don't redo completed work.
+3. Read `.elves-session.json` to quickly determine the current batch, PR number, and what's complete. This is the fastest signal.
+4. Read the plan.
+5. Read the execution log.
+6. Identify the first incomplete batch.
+7. Resume immediately without asking for help.
+8. Don't redo completed work.
 
 Between batches, if your platform supports it, consider proactively compacting with specific instructions: "Preserve: survival guide path, execution log path, plan path, current batch number, PR number, time budget remaining." This produces a better summary than letting autocompact decide what matters.
 

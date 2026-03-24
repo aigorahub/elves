@@ -121,7 +121,7 @@ Identify the first incomplete batch.
 
 ### 2. Verify Green
 
-**Before starting new work, confirm the project is in a working state.** Run the build and test gates. If anything is broken, fix it first — don't start a new batch on a cracked foundation. Skip this step if this is the first batch and no code exists yet.
+**Before starting new work, confirm the project is in a working state.** Run all validation gates (lint, typecheck, build, test). If anything is broken, fix it first — don't start a new batch on a cracked foundation. If dependencies are missing (fresh clone or Codex sandbox), install them first (`npm install`, `pip install -r requirements.txt`, etc.). On the first batch with no existing code, run a minimal smoke test instead: confirm the dev server starts and the test runner works.
 
 ### 3. Tag
 ```bash
@@ -142,12 +142,12 @@ git tag elves/pre-batch-N
 - [ ] [Testable criterion 2]
 ```
 
-If you can't write concrete acceptance criteria, the batch scope is too vague — sharpen it before coding.
+If you can't write concrete acceptance criteria, the batch scope is too vague — sharpen it before coding. For trivial batches (docs, config), the contract can be a single line.
 
 ### 5. Implement
 Build the full batch scope. Descriptive commits per batch item. Push after each meaningful chunk. Handle tiny incidental fixes inline and note them in the log. Anything substantial outside scope: add to `TODO.md` tagged `[elves-scout]` and keep moving. All work is done directly. Codex doesn't have built-in subagent support.
 
-Write tests for new code. Cover the logic you introduce, not just happy paths. If the project lacks test infrastructure, set it up in the first batch.
+Write tests for new code. Cover the logic you introduce, not just happy paths. If the project lacks test infrastructure, set it up in the first batch. During long implementation stretches, periodically update the execution log with progress notes to protect against mid-batch compaction.
 
 ### 6. Validate
 
@@ -193,6 +193,7 @@ Append to execution log:
 **Budget remaining:** ~[X]h [X]m
 
 **What changed:** [files/components]
+**Contract status:** [all criteria met / exceptions: ...]
 **Test results:** [PASS/FAIL]
 **Review findings:** [Severity] [Title] → [Resolved/Dismissed + reason]
 **Decisions made:** [every judgment call made without user input]
@@ -200,6 +201,8 @@ Append to execution log:
 
 **Next:** 1. [next task]  2. [task after]
 ```
+
+Also update `.elves-session.json` — set the batch status to `"complete"`, record commit SHA and timestamp.
 
 If the log exceeds ~50 entries, move completed entries to a `## Completed Archive` section.
 
@@ -267,9 +270,10 @@ After any compaction or restart, conversation history is gone. But instructions 
 
 1. Read the survival guide first (marked `# READ THIS FILE FIRST AFTER ANY COMPACTION OR RESTART`).
 2. **Read the Run Control section.** If the **Run mode** is `open-ended`, you are not allowed to stop on your own. This is the most important thing to recover.
-3. Read the plan.
-4. Read the execution log.
-5. Identify the first incomplete batch and resume immediately.
+3. Read `.elves-session.json` to quickly determine the current batch, PR number, and what's complete.
+4. Read the plan.
+5. Read the execution log.
+6. Identify the first incomplete batch and resume immediately.
 
 Don't redo completed work. Don't ask for help. If you detect existing documents at startup, you are resuming. Follow this protocol.
 
@@ -280,12 +284,14 @@ Between batches, proactively compact with specific instructions: "Preserve: surv
 ## Completion Contract
 
 Don't report "done" unless all are true for the current batch:
-1. Deterministic gates ran; results recorded.
-2. Build validation passed.
-3. PR comments read; findings triaged.
-4. Execution log updated with timestamps, evidence, and commit SHA.
-5. Survival guide updated with next batch.
-6. Changes committed and pushed.
+1. All validation gates passed (lint, typecheck, build, test).
+2. No accumulated debt: no skipped gates, no "will fix later" items, no known regressions.
+3. Contract acceptance criteria marked as met (or exceptions documented).
+4. PR comments read; findings triaged. Review loop ran until no blockers remained.
+5. `.elves-session.json` updated with batch status, commit SHA, and completion timestamp.
+6. Execution log updated with timestamps, evidence, and commit SHA.
+7. Survival guide updated with next batch.
+8. Changes committed and pushed.
 
 ## Final Completion
 
@@ -316,5 +322,6 @@ When all batches are done (or time is up):
 Stop only when:
 1. Genuinely blocked with no viable path.
 2. A merge is requested. Never, period.
+3. A destructive action is required that was explicitly listed as a non-negotiable in the survival guide.
 
 Everything else: resolve with best judgment, document under **Decisions made**.
