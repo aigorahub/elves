@@ -24,16 +24,23 @@ The coordinator spawns this review with a prompt like:
 ```
 Review the current state of PR #[NUMBER] for repo [OWNER/REPO].
 
+**Today's date is [DATE].** Your training data has a cutoff. The codebase may use libraries, APIs, model versions, or conventions that are newer than what you know. **The current codebase is the source of truth, not your training data.** If the code uses a library version, model name, API endpoint, or SDK that you don't recognize, assume the coding agent has verified it is correct and current. Do NOT flag something as wrong just because it doesn't match what you expect from your training data. If you genuinely believe something is outdated or incorrect, state your concern but note that you may be working from stale knowledge.
+
 ## What to read
 
-1. All PR review threads (focus on **unresolved** threads — resolved threads have already been addressed)
-2. All issue comments (focus on comments **without a reply from the agent** — replied comments have been addressed)
-3. CI check status: gh api "repos/OWNER/REPO/commits/HEAD/check-runs"
-4. The plan at [PLAN_PATH]
-5. The batch contract in the execution log at [EXECUTION_LOG_PATH] under the current batch heading
-6. The `review_comments` array in [SESSION_JSON_PATH] to see what was already handled in previous cycles
+1. **The commit history for this batch.** Run `git log` for the batch's commits and read the messages carefully — both subject lines and bodies. The coding agent communicates through commit messages: design decisions, justifications for non-obvious choices, reasons for hardcoded values, explanations for pattern deviations. Before flagging something, check whether the commit message already justifies it. A choice that is explained and reasoned in the commit is an intentional design decision, not a finding (unless the reasoning is actually wrong).
+2. All PR review threads (focus on **unresolved** threads — resolved threads have already been addressed)
+3. All issue comments (focus on comments **without a reply from the agent** — replied comments have been addressed)
+4. CI check status: gh api "repos/OWNER/REPO/commits/HEAD/check-runs"
+5. The plan at [PLAN_PATH]
+6. The batch contract in the execution log at [EXECUTION_LOG_PATH] under the current batch heading
+7. The `review_comments` array in [SESSION_JSON_PATH] to see what was already handled in previous cycles
 
 ```bash
+# Commit history for the batch
+git log --format='%H %s' elves/pre-batch-N..HEAD
+# Read full commit messages (subject + body) for context
+git log elves/pre-batch-N..HEAD
 # Fetch review threads — filter for unresolved
 gh api "repos/OWNER/REPO/pulls/NUMBER/comments" --paginate
 gh api "repos/OWNER/REPO/pulls/NUMBER/reviews" --paginate
@@ -71,8 +78,9 @@ The goal is that each batch leaves the codebase easier to work on, not harder. F
 3. **Extend over create:** Did the batch build on existing patterns and modules, or create parallel implementations? New files that replicate the structure of existing files are a red flag.
 4. **Architecture first:** Does the new code respect the codebase's existing architecture — module boundaries, data flow, naming conventions, test organization? Or does it introduce novel patterns that conflict with what's already there?
 5. **Pattern consistency:** Does the new code follow the naming conventions, error handling patterns, and API response structures already established in the codebase?
-6. **Progressive conditioning:** Does this batch leave the repo easier to work on? Look for: clear type annotations on new code, focused single-purpose functions, consistent naming, updated docs and agent instructions (CLAUDE.md, TODO.md).
-7. **Thrashing signals:** Were the same files modified 5+ times in the batch's commit history without clear forward progress? This suggests symptom-chasing rather than root-cause fixing.
+6. **No unjustified hardcoded constants:** Are there magic numbers, URLs, timeouts, thresholds, or config values hardcoded inline? Check the commit message — if the coding agent justified the hardcoding (e.g., protocol-required value, mathematical constant), evaluate whether the justification holds. If there's no justification, flag it.
+7. **Progressive conditioning:** Does this batch leave the repo easier to work on? Look for: clear type annotations on new code, focused single-purpose functions, consistent naming, updated docs and agent instructions (CLAUDE.md, TODO.md).
+8. **Thrashing signals:** Were the same files modified 5+ times in the batch's commit history without clear forward progress? This suggests symptom-chasing rather than root-cause fixing.
 
 Mark code quality issues as:
 - BLOCKING if they introduce duplication, violate existing architecture, or band-aid a root cause
@@ -198,11 +206,13 @@ To use this pattern, spawn a separate subagent after the primary review passes:
 
 ```
 You are an adversarial code reviewer. You have not seen this code before.
+Today's date is [DATE]. The codebase is the source of truth, not your training data. If the code uses libraries, model versions, or APIs you don't recognize, assume the coding agent has verified they are current.
 
 Read:
 1. The diff for PR #[NUMBER]
-2. The plan at [PLAN_PATH]
-3. The batch contract in the execution log at [EXECUTION_LOG_PATH]
+2. The commit history: git log elves/pre-batch-N..HEAD (read the full messages — the coding agent explains decisions here)
+3. The plan at [PLAN_PATH]
+4. The batch contract in the execution log at [EXECUTION_LOG_PATH]
 
 Your job is to find problems, verify the work matches the contract, and check code quality. Be skeptical. Assume nothing works until proven otherwise.
 

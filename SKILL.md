@@ -49,7 +49,11 @@ These principles govern how you write code during implementation and how the rev
 
 6. **Progressive repo conditioning.** Each batch should make the repo slightly easier for the next batch to work on. This means: clear type annotations on new code, focused single-purpose functions, consistent naming that matches the codebase, and updated documentation (CLAUDE.md, AGENTS.md, README, TODO.md) that reflects the current state. Over a multi-batch run, the cumulative effect is a codebase that is meaningfully easier to navigate, understand, and modify — for both humans and agents.
 
-7. **Runaway detection.** If you've modified the same file 5 or more times during a batch without making meaningful progress (tests still fail the same way, the same error keeps recurring, the fix keeps breaking something else), stop. You are thrashing. Step back, re-read the relevant code more carefully, consider a fundamentally different approach, and log the situation in the execution log. Thrashing is a signal that you're treating symptoms, not causes.
+7. **No hardcoded constants without justification.** Extract magic numbers, URLs, timeouts, thresholds, feature flags, and configuration values to a constants file, config object, or environment variable — wherever the project keeps them. If you believe a value should be hardcoded (e.g., a mathematical constant, a protocol-required value, a truly fixed enum), you must justify it in the commit message. The reviewer will flag unjustified hardcoded values, and "it was easier" is not a justification.
+
+8. **Runaway detection.** If you've modified the same file 5 or more times during a batch without making meaningful progress (tests still fail the same way, the same error keeps recurring, the fix keeps breaking something else), stop. You are thrashing. Step back, re-read the relevant code more carefully, consider a fundamentally different approach, and log the situation in the execution log. Thrashing is a signal that you're treating symptoms, not causes.
+
+**For reviewers:** The current codebase is the source of truth, not your training data. The coding agent can search the web in real time and may be using libraries, APIs, model versions, or SDK methods that are newer than what you know. If the code references `gemini-3.1` and you only know about `gemini-1.5`, don't flag it — the codebase is probably right and you are probably stale. If you genuinely believe something is outdated, state your concern but acknowledge your knowledge may be behind. Always pass today's date to the review subagent so it knows the temporal context.
 
 These principles apply to **all code changes**, including review fixes. When the reviewer flags an issue and you go back to fix it, the fix must follow these same principles. Don't slap a band-aid on the reviewer's finding — fix the root cause. Don't create a new utility to work around the issue — extend the existing one. The review-fix cycle is where agents are most tempted to take shortcuts because the pressure to "just make it pass" is highest. Resist that pressure.
 
@@ -289,7 +293,9 @@ For trivial batches (documentation-only, config changes, dependency bumps), the 
 
 ### 5. Implement
 
-Build the batch scope fully. Use descriptive commits referencing which batch item is being addressed. Push after each meaningful chunk. Tag incidental findings as `[elves-scout]` in TODO.md for later.
+Build the batch scope fully. Push after each meaningful chunk. Tag incidental findings as `[elves-scout]` in TODO.md for later.
+
+**Use commit messages to communicate with the reviewer.** The reviewer reads your commit history to understand not just *what* you changed but *why*. Every commit should reference which batch item is being addressed. When you make a design choice that isn't obvious — choosing one approach over another, hardcoding a value, deviating from a pattern — explain your reasoning in the commit message body. This is the communication channel between you and the reviewer. Without it, the reviewer flags something, you silently change it back, the reviewer flags it again, and you burn cycles arguing through code. With it, the reviewer reads your justification first and only flags things where the reasoning is actually wrong.
 
 **Before writing new code, read the surrounding code.** Understand the patterns, conventions, and abstractions already in use. Search for existing utilities before creating new ones. Follow the Code Quality Philosophy: root cause over band-aids, centralize over duplicate, extend over create, architecture first. The fastest way to generate technical debt overnight is to write code that ignores what already exists.
 
@@ -320,14 +326,15 @@ The review has three jobs: **find bugs**, **verify the batch matches its contrac
 The built-in review works out of the box with zero configuration:
 
 1. **Read all PR feedback.** Fetch review threads, issue comments, and CI check runs via `gh api`. Every comment from every source — human reviewers, bot reviewers (CodeRabbit, Copilot, SonarCloud, etc.), and CI — must be read. Don't sample. Read all of them.
-2. **Spawn a review subagent** (if supported) to read the comments, the diff, the plan, **and the batch contract from step 4.** The subagent produces a structured assessment covering: what's blocking, what's a warning, what's fine, and whether every contract item was delivered. If subagents aren't available, do this analysis directly.
-3. **Check contract completeness.** Walk through each behavior and acceptance criterion from the contract. Is it implemented? Is it tested? If something is missing, go back to Implement (step 5) and finish it before continuing the review loop. A batch that passes all gates but skips a contract item is incomplete, not clean.
-4. **Fix blocking issues:** real bugs, security problems, correctness failures. These must be fixed before moving on.
-5. **Resolve addressed comments on GitHub.** After fixing an issue raised in a review thread, resolve that thread via the API so it's marked as handled. For issue comments that can't be resolved as threads, reply with a short disposition (e.g., "Fixed in abc1234" or "Dismissed: false positive, see execution log"). This is how you track what's been dealt with — unresolved threads and unreplied comments are your remaining work queue.
-6. **Record dispositions in `.elves-session.json`.** For each comment you address, log its ID, source, disposition, and the review cycle it was handled in. This survives compaction and lets the next context skip already-handled comments without re-reading and re-evaluating them. See the schema in **Structured Session Data**.
-7. **Push fixes, then re-read comments.** New pushes trigger new bot reviews. Only read **new and unresolved** comments — resolved threads and replied-to comments from previous cycles are done. Don't re-litigate settled findings.
-8. **Repeat until the batch is clean.** No unresolved threads, no unreplied bot comments, no missing contract items. The loop continues until there is nothing left to address.
-9. **Verify documentation is current.** Before exiting the review loop, check that any user-facing behavior changed by this batch is reflected in the project's documentation. This includes README files, API docs, inline doc comments, config references, migration guides, and changelogs — whatever the project uses. If docs are stale, update them now. Don't defer this to a later batch. Stale documentation is silent debt: the code is correct but the user doesn't know how to use it correctly. A batch with good code and wrong docs is not shippable.
+2. **Read the commit history for the batch.** The coding agent communicates through commit messages — not just what changed but *why*. Before flagging something, check whether the commit message already justifies the choice. A hardcoded value with a documented justification in the commit body is an intentional design decision, not a finding. A deviation from pattern with a clear rationale is not a violation. The commit messages are the coding agent's side of the conversation. Read them.
+3. **Spawn a review subagent** (if supported) to read the comments, the diff, the commit history, the plan, **and the batch contract from step 4.** Tell the subagent today's date and instruct it to **trust the codebase as the source of truth** — the coding agent can search in real time and may be using libraries, APIs, or model versions that are newer than the reviewer's training data. The subagent produces a structured assessment covering: what's blocking, what's a warning, what's fine, and whether every contract item was delivered. If subagents aren't available, do this analysis directly.
+4. **Check contract completeness.** Walk through each behavior and acceptance criterion from the contract. Is it implemented? Is it tested? If something is missing, go back to Implement (step 5) and finish it before continuing the review loop. A batch that passes all gates but skips a contract item is incomplete, not clean.
+5. **Fix blocking issues:** real bugs, security problems, correctness failures. These must be fixed before moving on.
+6. **Resolve addressed comments on GitHub.** After fixing an issue raised in a review thread, resolve that thread via the API so it's marked as handled. For issue comments that can't be resolved as threads, reply with a short disposition (e.g., "Fixed in abc1234" or "Dismissed: false positive, see execution log"). This is how you track what's been dealt with — unresolved threads and unreplied comments are your remaining work queue.
+7. **Record dispositions in `.elves-session.json`.** For each comment you address, log its ID, source, disposition, and the review cycle it was handled in. This survives compaction and lets the next context skip already-handled comments without re-reading and re-evaluating them. See the schema in **Structured Session Data**.
+8. **Push fixes, then re-read comments.** Use commit messages to explain your fixes and justify any decisions — the reviewer reads them on the next cycle. Only read **new and unresolved** comments — resolved threads and replied-to comments from previous cycles are done. Don't re-litigate settled findings.
+9. **Repeat until the batch is clean.** No unresolved threads, no unreplied bot comments, no missing contract items. The loop continues until there is nothing left to address.
+10. **Verify documentation is current.** Before exiting the review loop, check that any user-facing behavior changed by this batch is reflected in the project's documentation. This includes README files, API docs, inline doc comments, config references, migration guides, and changelogs — whatever the project uses. If docs are stale, update them now. Don't defer this to a later batch. Stale documentation is silent debt: the code is correct but the user doesn't know how to use it correctly. A batch with good code and wrong docs is not shippable.
 
 **Triage every review finding into one of three categories:**
 - **Genuine issue:** a real bug, security problem, quality violation, or missing contract item. Fix it.
@@ -358,12 +365,31 @@ Stage specific files (not `git add -A`), commit with a clear message that includ
 
 Commit message format: `[Batch N/Total] <description>`
 
-Examples:
-- `[Batch 3/12] Add payment processing endpoints`
-- `[Batch 3/12] Review fixes: input validation, error handling`
-- `[Batch 12/12] Final batch: admin dashboard and docs`
+The subject line tells the reader *what*. The body tells them *why*. Use the body to communicate design decisions, justifications for non-obvious choices, and context the reviewer needs to evaluate the change fairly.
 
-This lets anyone watching the commit graph (in GitKraken, `git log`, or GitHub) see exactly where the run stands without opening the execution log.
+Examples:
+```
+[Batch 3/12] Add payment processing endpoints
+```
+
+```
+[Batch 3/12] Use Stripe's idempotency keys instead of our own dedup logic
+
+Stripe already handles idempotent retries natively via the Idempotency-Key
+header. Building our own dedup table would duplicate this and add a
+consistency problem. Hardcoded 24h TTL matches Stripe's documented window.
+```
+
+```
+[Batch 3/12] Review fixes: input validation, error handling
+
+Fixed: email regex was anchored incorrectly (CodeRabbit #42).
+Dismissed: "extract timeout to constants" — the 30s value is Stripe's
+documented webhook timeout, not a tunable parameter. Justified in code
+comment referencing their docs.
+```
+
+This lets anyone watching the commit graph see where the run stands. More importantly, it gives the reviewer the context they need to evaluate your choices without having to guess at your reasoning — and it prevents review cycles from devolving into arguments where neither side understands the other.
 
 ### 11. Re-read the Survival Guide
 

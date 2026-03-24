@@ -20,7 +20,10 @@ AI agents tend toward spaghetti: quick fixes, duplicated utilities, novel patter
 4. **Architecture first.** Understand and respect the codebase's existing patterns, module boundaries, naming conventions, and data flow. The existing code is the source of truth, not your priors.
 5. **Proactive pattern detection.** Match existing conventions exactly: error handling, API responses, component structure, test naming.
 6. **Progressive repo conditioning.** Leave the repo easier for the next batch: clear type annotations, focused functions, consistent naming, updated docs and agent instructions.
-7. **Runaway detection.** If you've modified the same file 5+ times without meaningful progress, stop. Step back, re-read, try a fundamentally different approach. Log the situation.
+7. **No hardcoded constants without justification.** Extract magic numbers, URLs, timeouts, thresholds, and config values to a constants file, config object, or env var. If a value must be hardcoded, justify it in the commit message. The reviewer will flag unjustified hardcoded values.
+8. **Runaway detection.** If you've modified the same file 5+ times without meaningful progress, stop. Step back, re-read, try a fundamentally different approach. Log the situation.
+
+**For reviewers:** The current codebase is the source of truth, not your training data. The coding agent can search in real time and may use libraries, model versions, or APIs newer than what you know. Don't flag something as wrong just because it doesn't match your training data. Always pass today's date to review subagents.
 
 These apply to all code, including review fixes. When fixing a reviewer finding, fix the root cause — don't band-aid it.
 
@@ -161,7 +164,9 @@ If you can't write concrete acceptance criteria, the batch scope is too vague �
 ### 5. Implement
 **Before writing new code, read the surrounding code.** Understand the patterns, conventions, and abstractions already in use. Search for existing utilities before creating new ones. Follow the Code Quality Philosophy: root cause over band-aids, centralize over duplicate, extend over create, architecture first.
 
-Build the full batch scope. Descriptive commits per batch item. Push after each meaningful chunk. Handle tiny incidental fixes inline and note them in the log. Anything substantial outside scope: add to `TODO.md` tagged `[elves-scout]` and keep moving. All work is done directly. Codex doesn't have built-in subagent support.
+**Use commit messages to communicate with the reviewer.** The reviewer reads your commit history. Every commit should reference which batch item is being addressed. When you make a non-obvious choice (hardcoded value, pattern deviation, design tradeoff), explain your reasoning in the commit body. This prevents review cycles from devolving into arguments where neither side understands the other.
+
+Build the full batch scope. Push after each meaningful chunk. Handle tiny incidental fixes inline and note them in the log. Anything substantial outside scope: add to `TODO.md` tagged `[elves-scout]` and keep moving. All work is done directly. Codex doesn't have built-in subagent support.
 
 Write tests for new code. Cover the logic you introduce, not just happy paths. If the project lacks test infrastructure, set it up in the first batch. During long implementation stretches, periodically update the execution log with progress notes to protect against mid-batch compaction.
 
@@ -184,7 +189,7 @@ Every gate must pass before proceeding. Fix and re-run from the failing gate.
 
 **This is where the Ralph Loop does its real work.** You built something. You tested it. Now get independent feedback and feed it back into the next iteration.
 
-Read **all** PR feedback — every review thread, issue comment, and CI check run. Don't sample:
+**Read the commit history first** (`git log elves/pre-batch-N..HEAD`). The coding agent communicates through commit messages — design decisions, justifications, rationale for non-obvious choices. Before flagging something, check whether the commit already explains why. Then read **all** PR feedback — every review thread, issue comment, and CI check run. Don't sample:
 ```bash
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 gh api "repos/${REPO}/pulls/${PR_NUMBER}/comments"  --paginate > /tmp/pr-comments.json
@@ -245,11 +250,13 @@ git commit -m "[Batch N/Total] <description>"
 git push
 ```
 
-Always include batch progress in the commit message. Examples:
-- `[Batch 3/12] Add payment processing endpoints`
-- `[Batch 3/12] Review fixes: input validation, error handling`
+The subject line tells the reader *what*. The body tells them *why* — design decisions, justifications for hardcoded values, rationale for dismissed findings. This is how you communicate with the reviewer.
 
-This lets anyone watching the commit graph see exactly where the run stands.
+Examples:
+- `[Batch 3/12] Add payment processing endpoints`
+- `[Batch 3/12] Review fixes: input validation, error handling` with body explaining what was fixed and what was dismissed with reasoning
+
+This lets anyone watching the commit graph see where the run stands, and gives the reviewer the context to evaluate your choices without guessing.
 
 ### 11. Re-read the Survival Guide
 **After every push, re-read the survival guide before doing anything else.** Also verify the plan hasn't changed:
