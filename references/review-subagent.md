@@ -25,18 +25,30 @@ Review the current state of PR #[NUMBER] for repo [OWNER/REPO].
 
 ## What to read
 
-1. All PR comments: gh api "repos/OWNER/REPO/pulls/NUMBER/comments" --paginate
-2. All review threads: gh api "repos/OWNER/REPO/pulls/NUMBER/reviews" --paginate
-3. All issue comments: gh api "repos/OWNER/REPO/issues/NUMBER/comments" --paginate
-4. CI check status: gh api "repos/OWNER/REPO/commits/HEAD/check-runs"
-5. The plan at [PLAN_PATH]
-6. The batch contract in the execution log at [EXECUTION_LOG_PATH] under the current batch heading
+1. All PR review threads (focus on **unresolved** threads — resolved threads have already been addressed)
+2. All issue comments (focus on comments **without a reply from the agent** — replied comments have been addressed)
+3. CI check status: gh api "repos/OWNER/REPO/commits/HEAD/check-runs"
+4. The plan at [PLAN_PATH]
+5. The batch contract in the execution log at [EXECUTION_LOG_PATH] under the current batch heading
+6. The `review_comments` array in [SESSION_JSON_PATH] to see what was already handled in previous cycles
 
-## For each PR comment or finding:
+```bash
+# Fetch review threads — filter for unresolved
+gh api "repos/OWNER/REPO/pulls/NUMBER/comments" --paginate
+gh api "repos/OWNER/REPO/pulls/NUMBER/reviews" --paginate
+# Fetch issue comments — check which have agent replies
+gh api "repos/OWNER/REPO/issues/NUMBER/comments" --paginate
+# CI status
+gh api "repos/OWNER/REPO/commits/HEAD/check-runs"
+```
+
+**Skip comments already recorded as handled in `.elves-session.json`.** Only evaluate new and unresolved findings. This prevents re-litigating settled issues across review cycles.
+
+## For each NEW or UNRESOLVED comment or finding:
 - Categorize as: BLOCKING (must fix), WARNING (should fix), INFO (note only)
 - Identify the source: human reviewer, bot (name which bot), CI check
 - Summarize what the issue is and what file/line it references
-- If it's a duplicate of a previous finding, note that
+- Note the comment ID so the coordinator can resolve/reply to it after fixing
 
 ## Contract verification (this is as important as bug-finding):
 
@@ -84,7 +96,39 @@ For each contract item, one line:
 5. **Info**: Log in execution log, no action.
 6. **New issues**: Treat as blocking if they're bugs or security; treat as warnings otherwise.
 
-After fixing, the coordinator pushes and runs the review subagent again. The loop repeats until the report comes back with zero blocking items and every contract item is ✅.
+### Resolving Comments After Fixes
+
+After fixing issues, the coordinator must close the loop on every comment:
+
+**Review threads** (from bot reviewers and humans): Resolve the thread on GitHub via the API. This marks it as handled so subsequent review cycles only see new, unresolved threads.
+
+```bash
+# Resolve a review thread by its thread ID
+gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "THREAD_NODE_ID"}) { thread { isResolved } } }'
+```
+
+To get thread IDs, fetch review threads with the `node_id` field included. The node ID is the GraphQL ID needed for resolution.
+
+**Issue comments** (bot summaries, general feedback): Reply with a short disposition so the comment is visibly addressed:
+
+```bash
+gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" -f body="Fixed in $(git rev-parse --short HEAD). [Validation: added input validation to email field per CodeRabbit finding.]"
+```
+
+Or for dismissals: "Dismissed: false positive. Function is a straightforward switch statement; splitting would reduce readability. See execution log batch 1, cycle 2."
+
+**Record every disposition** in `.elves-session.json` under `review_comments` with: comment ID, type (`review_thread` or `issue_comment`), source (which bot or reviewer), batch number, review cycle, one-line summary, disposition (`fixed`, `dismissed`, `deferred`), and fix commit or reason.
+
+### The Work Queue
+
+After resolution, the work queue for the next review cycle is simply:
+- Unresolved review threads (GitHub is the source of truth)
+- Issue comments with no reply from the agent
+- New comments triggered by the latest push
+
+If the queue is empty and the contract is fully ✅, the batch is clean.
+
+After fixing, the coordinator pushes and runs the review subagent again. The loop repeats until the report comes back with zero blocking items, every contract item is ✅, and the work queue is empty.
 
 ## When Subagents Aren't Available
 
@@ -101,7 +145,7 @@ gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" --paginate > /tmp/issue-comm
 gh api "repos/${REPO}/commits/$(git rev-parse HEAD)/check-runs" > /tmp/ci-checks.json
 ```
 
-Parse with python3. Categorize each finding. Fix blockers. Push. Repeat.
+Parse with python3. Filter out comments already recorded in `.elves-session.json`. Categorize each remaining finding. Fix blockers. Resolve threads / reply to comments. Record dispositions. Push. Repeat.
 
 ## Fortifying the Review
 

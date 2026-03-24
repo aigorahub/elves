@@ -168,7 +168,7 @@ Every gate must pass before proceeding. Fix and re-run from the failing gate.
 
 **This is where the Ralph Loop does its real work.** You built something. You tested it. Now get independent feedback and feed it back into the next iteration.
 
-Read all PR comments, bot reviews, and CI status:
+Read **all** PR feedback — every review thread, issue comment, and CI check run. Don't sample:
 ```bash
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 gh api "repos/${REPO}/pulls/${PR_NUMBER}/comments"  --paginate > /tmp/pr-comments.json
@@ -181,9 +181,16 @@ Parse with python3 (no jq). Categorize each finding as BLOCKING, WARNING, or INF
 
 The review has two jobs: **find bugs** and **verify the batch matches its contract.** Walk through each behavior and acceptance criterion from the contract (step 4). Is it implemented? Is it tested? A batch that passes all gates but skips a contract item is incomplete, not clean. If something is missing, go back to Implement (step 5) and finish it. Also review the diff yourself against the plan — any bugs the bots didn't catch? Any changes outside scope that shouldn't be there?
 
-**Fix all blocking issues. Finish missing contract items. Push. Re-read comments. Repeat until the batch is clean and the contract is fully delivered.** The review isn't something that accumulates for the human. It's part of your loop. You iterate on it until the batch is tight, then move on.
+**Fix all blocking issues. Finish missing contract items. Push.**
 
-If the same non-actionable finding persists for 3 cycles, log your assessment and move on. The user can fortify this with reviewer bots, custom APIs, or additional checks. See `references/review-subagent.md` for the full review protocol.
+**After fixing, resolve what you've addressed:**
+- **Review threads:** resolve via the API so they're marked as handled.
+- **Issue comments** (can't be "resolved"): reply with a short disposition ("Fixed in abc1234" or "Dismissed: false positive").
+- **Record each disposition** in `.elves-session.json` under `review_comments` with the comment ID, source, and resolution.
+
+**Re-read only new and unresolved comments.** Resolved threads and replied-to comments from previous cycles are done. Don't re-litigate settled findings. **Repeat until no unresolved threads, no unreplied bot comments, and no missing contract items remain.**
+
+If the same non-actionable finding persists for 3 cycles, resolve/reply with your assessment and move on. See `references/review-subagent.md` for the full review protocol.
 
 ### 8. Document
 

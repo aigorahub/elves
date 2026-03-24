@@ -293,14 +293,16 @@ The review has two jobs: **find bugs** and **verify the batch matches its contra
 
 The built-in review works out of the box with zero configuration:
 
-1. **Read all PR comments** (bot reviews, CI results, any human feedback) via `gh api`.
+1. **Read all PR feedback.** Fetch review threads, issue comments, and CI check runs via `gh api`. Every comment from every source — human reviewers, bot reviewers (CodeRabbit, Copilot, SonarCloud, etc.), and CI — must be read. Don't sample. Read all of them.
 2. **Spawn a review subagent** (if supported) to read the comments, the diff, the plan, **and the batch contract from step 4.** The subagent produces a structured assessment covering: what's blocking, what's a warning, what's fine, and whether every contract item was delivered. If subagents aren't available, do this analysis directly.
 3. **Check contract completeness.** Walk through each behavior and acceptance criterion from the contract. Is it implemented? Is it tested? If something is missing, go back to Implement (step 5) and finish it before continuing the review loop. A batch that passes all gates but skips a contract item is incomplete, not clean.
 4. **Fix blocking issues:** real bugs, security problems, correctness failures. These must be fixed before moving on.
-5. **Push fixes, then re-read comments.** New pushes may trigger new bot reviews. Read those too.
-6. **Repeat until the batch is clean.** No unresolved blockers, no missing contract items. The loop continues until the review step has nothing left to find.
+5. **Resolve addressed comments on GitHub.** After fixing an issue raised in a review thread, resolve that thread via the API so it's marked as handled. For issue comments that can't be resolved as threads, reply with a short disposition (e.g., "Fixed in abc1234" or "Dismissed: false positive, see execution log"). This is how you track what's been dealt with — unresolved threads and unreplied comments are your remaining work queue.
+6. **Record dispositions in `.elves-session.json`.** For each comment you address, log its ID, source, disposition, and the review cycle it was handled in. This survives compaction and lets the next context skip already-handled comments without re-reading and re-evaluating them. See the schema in **Structured Session Data**.
+7. **Push fixes, then re-read comments.** New pushes trigger new bot reviews. Only read **new and unresolved** comments — resolved threads and replied-to comments from previous cycles are done. Don't re-litigate settled findings.
+8. **Repeat until the batch is clean.** No unresolved threads, no unreplied bot comments, no missing contract items. The loop continues until there is nothing left to address.
 
-If the same non-actionable finding persists for 3 cycles, log your assessment and move on. Don't make unnecessary code changes to appease a finding you believe is wrong.
+If the same non-actionable finding persists for 3 cycles, resolve/reply with your assessment and move on. Don't make unnecessary code changes to appease a finding you believe is wrong — but do document your reasoning in the reply so the human can see it.
 
 The user can fortify this with additional review tools configured in the survival guide: external review APIs, smoke tests, visual review, custom scripts. See `references/tool-config-examples.md`. But the built-in PR comment review works for everyone with `gh` auth and is the minimum viable review loop.
 
@@ -514,9 +516,38 @@ Maintain a `.elves-session.json` file with machine-readable session data (sessio
       "started_at": "2026-03-24T23:16:00Z",
       "completed_at": null
     }
+  ],
+  "review_comments": [
+    {
+      "id": 1234567890,
+      "type": "review_thread",
+      "source": "coderabbit",
+      "batch": 1,
+      "cycle": 1,
+      "summary": "Missing input validation on email field",
+      "disposition": "fixed",
+      "fix_commit": "def5678"
+    },
+    {
+      "id": 1234567891,
+      "type": "issue_comment",
+      "source": "sonarcloud",
+      "batch": 1,
+      "cycle": 2,
+      "summary": "Cognitive complexity of handleAuth() is 18 (threshold 15)",
+      "disposition": "dismissed",
+      "reason": "Function is a straightforward switch; splitting would reduce readability"
+    }
   ]
 }
 ```
+
+The `review_comments` array is the compaction-safe record of every comment handled during the session. After compaction, it tells the next context exactly which comments have been dealt with and how — no need to re-read and re-evaluate hundreds of bot comments.
+
+**Comment types and how to track them:**
+- `review_thread`: Can be resolved on GitHub via the API. Resolve after fixing. Status is authoritative on GitHub; the JSON is backup.
+- `issue_comment`: Cannot be "resolved" on GitHub. Reply with a disposition. The JSON tracks that it was handled.
+- `check_run`: Pass/fail is inherent. No tracking needed — just re-run after fixes.
 
 After compaction, this file is the fastest way to determine exactly where the run stands. Read it before the execution log when recovering state.
 
