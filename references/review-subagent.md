@@ -86,6 +86,13 @@ Mark code quality issues as:
 - BLOCKING if they introduce duplication, violate existing architecture, or band-aid a root cause
 - WARNING if they miss an opportunity to improve (e.g., could have added types, could have consolidated)
 
+## Bug-fix quality check:
+
+If this review cycle includes fixes for previously reported bugs, verify:
+- Did the fix include a **category test** — a test that catches not just the specific bug but the class of bug it belongs to? (e.g., not just "null check on email field" but "null/undefined/empty across the user input interface")
+- Did the category test surface and fix **related bugs**, or was only the reported instance patched?
+- If a bug was fixed with no category test, or with a test that only covers the exact reported instance, mark it BLOCKING: "Bug fix for [issue] needs a category test — see bug-fix protocol."
+
 ## Also review the diff for:
 - Obvious bugs, security issues, or missing error handling
 - Changes outside the batch scope that shouldn't be there
@@ -122,7 +129,7 @@ If all clear, state: "No code quality issues. Batch follows existing patterns an
 
 ## What the Coordinator Does With the Report
 
-1. **Blocking items**: Fix each one. This is non-negotiable.
+1. **Blocking items (bugs)**: Fix each one using the **bug-fix protocol**. For every bug: (a) diagnose the *category* of bug — is this a missing null check? unvalidated input? off-by-one? (b) write a test that catches the category, not just the instance — if one endpoint has a missing null check, test null/undefined/empty across all similar endpoints. (c) Run the test before fixing to surface related bugs. (d) Fix all failures — the reported bug and every sibling. (e) Confirm green. This prevents the same category of bug from surfacing again in the next batch.
 2. **Contract items marked ❌**: Go back to Implement (step 5) and finish what's missing. These are blocking — an incomplete contract means an incomplete batch.
 3. **Contract items marked ⚠️**: Evaluate the concern. Fix if it's a real gap; log if it's a judgment call.
 4. **Code quality findings**: Duplication and architecture violations are blocking — fix them now, not later. Remove the duplicate and use the existing utility. Refactor to follow the established pattern. Root-cause band-aids are blocking if they hide a bug, warning if they're just suboptimal. Pattern consistency issues are warnings.

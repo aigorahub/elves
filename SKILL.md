@@ -315,7 +315,7 @@ Validate against the **batch contract** from step 4. Every acceptance criterion 
 
 See `references/validation-guide.md` for the complete validation system including auto-discovery tables, preview deployment configuration, and detailed gate explanations.
 
-Every gate must pass. If a gate fails, fix it and re-run from that gate. Don't skip a gate. Debt only grows.
+Every gate must pass. If a gate fails, apply the **bug-fix protocol**: diagnose the category of failure, write a test that catches the category (not just this instance), run it to find related failures, fix them all, then re-run from the failing gate. Don't skip a gate. Debt only grows.
 
 ### 7. Review
 
@@ -329,7 +329,19 @@ The built-in review works out of the box with zero configuration:
 2. **Read the commit history for the batch.** The coding agent communicates through commit messages — not just what changed but *why*. Before flagging something, check whether the commit message already justifies the choice. A hardcoded value with a documented justification in the commit body is an intentional design decision, not a finding. A deviation from pattern with a clear rationale is not a violation. The commit messages are the coding agent's side of the conversation. Read them.
 3. **Spawn a review subagent** (if supported) to read the comments, the diff, the commit history, the plan, **and the batch contract from step 4.** Tell the subagent today's date and instruct it to **trust the codebase as the source of truth** — the coding agent can search in real time and may be using libraries, APIs, or model versions that are newer than the reviewer's training data. The subagent produces a structured assessment covering: what's blocking, what's a warning, what's fine, and whether every contract item was delivered. If subagents aren't available, do this analysis directly.
 4. **Check contract completeness.** Walk through each behavior and acceptance criterion from the contract. Is it implemented? Is it tested? If something is missing, go back to Implement (step 5) and finish it before continuing the review loop. A batch that passes all gates but skips a contract item is incomplete, not clean.
-5. **Fix blocking issues:** real bugs, security problems, correctness failures. These must be fixed before moving on.
+5. **Fix blocking issues** using the **bug-fix protocol:** When a bug is found — whether by the reviewer, a bot, CI, or your own analysis — don't just fix the specific instance. Follow this sequence:
+
+   **a. Diagnose the category.** What kind of bug is this? Off-by-one? Missing null check? Unvalidated input? Race condition? Incorrect type coercion? The specific bug is a symptom. The category is the disease.
+
+   **b. Write a test that catches the category, not just the instance.** If the bug is a missing null check on user input, don't write a test for that one field — write a test that exercises null/undefined/empty inputs across the relevant interface. If it's an off-by-one in pagination, test boundary conditions for all paginated endpoints. The test should be precise enough to catch this bug and every sibling bug of the same type.
+
+   **c. Run the test immediately.** Before fixing anything, run the new test against the current code. It should fail for the reported bug — if it doesn't, the test isn't catching what you think it's catching. It may also fail for related bugs you haven't seen yet. Good. You've just found them before the user did.
+
+   **d. Fix all failures, not just the reported one.** Fix the original bug and every related failure the category test surfaced. This is the root-cause principle applied to bugs: if one endpoint has a missing null check, the odds are good that others do too. Fix them all now.
+
+   **e. Re-run and confirm green.** All category tests pass. All existing tests still pass. No regressions.
+
+   This is more work per bug, but it means the same category of bug never appears twice in the run. Without this protocol, agents play whack-a-mole: fix the reported bug, move on, get flagged for the same bug in a different place next batch. The category test prevents that.
 6. **Resolve addressed comments on GitHub.** After fixing an issue raised in a review thread, resolve that thread via the API so it's marked as handled. For issue comments that can't be resolved as threads, reply with a short disposition (e.g., "Fixed in abc1234" or "Dismissed: false positive, see execution log"). This is how you track what's been dealt with — unresolved threads and unreplied comments are your remaining work queue.
 7. **Record dispositions in `.elves-session.json`.** For each comment you address, log its ID, source, disposition, and the review cycle it was handled in. This survives compaction and lets the next context skip already-handled comments without re-reading and re-evaluating them. See the schema in **Structured Session Data**.
 8. **Push fixes, then re-read comments.** Use commit messages to explain your fixes and justify any decisions — the reviewer reads them on the next cycle. Only read **new and unresolved** comments — resolved threads and replied-to comments from previous cycles are done. Don't re-litigate settled findings.

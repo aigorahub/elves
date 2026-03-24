@@ -183,7 +183,7 @@ Run available gates; skip missing ones. User overrides in the survival guide tak
 | Rust | `cargo clippy` | (none) | `cargo build` | `cargo test` |
 | Makefile | `make lint` | `make typecheck` | `make build` | `make test` |
 
-Every gate must pass before proceeding. Fix and re-run from the failing gate.
+Every gate must pass before proceeding. If a gate fails, apply the **bug-fix protocol**: diagnose the category, write a test that catches the category, find related failures, fix them all, then re-run from the failing gate.
 
 ### 7. Review
 
@@ -204,7 +204,14 @@ The review has three jobs: **find bugs**, **verify the batch matches its contrac
 
 Also review the diff for code quality: does the batch introduce duplicated utilities that already exist in the codebase? Does it ignore established patterns or architecture? Are fixes addressing root causes or patching symptoms? Does the batch leave the repo easier or harder to work on? Duplication and architecture violations are blocking. Band-aids are blocking if they hide bugs. When fixing code quality findings, follow the same philosophy — don't create a bigger band-aid to fix a band-aid.
 
-**Fix all blocking issues. Finish missing contract items. Push.**
+**Fix all blocking issues using the bug-fix protocol.** When a bug is found:
+1. **Diagnose the category** — what kind of bug is this? Missing null check? Unvalidated input? Off-by-one? The specific bug is a symptom; the category is the disease.
+2. **Write a test that catches the category, not just the instance** — if the bug is a missing null check on one field, test null/undefined/empty across the relevant interface. The test should catch this bug and every sibling.
+3. **Run the test before fixing** — it should fail for the reported bug. It may also fail for related bugs you haven't seen yet. Good.
+4. **Fix all failures** — the original bug and every related failure the category test surfaced.
+5. **Re-run and confirm green** — category tests pass, existing tests still pass, no regressions.
+
+This prevents whack-a-mole: same category of bug surfacing in a different place next batch. **Finish missing contract items. Push.**
 
 **After fixing, resolve what you've addressed:**
 - **Review threads:** resolve via the API so they're marked as handled.
