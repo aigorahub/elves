@@ -21,7 +21,7 @@ AI agents tend toward spaghetti: quick fixes, duplicated utilities, novel patter
 5. **Proactive pattern detection.** Match existing conventions exactly: error handling, API responses, component structure, test naming.
 6. **Progressive repo conditioning.** Leave the repo easier for the next batch: clear type annotations, focused functions, consistent naming, updated docs and agent instructions.
 7. **No hardcoded constants without justification.** Extract magic numbers, URLs, timeouts, thresholds, and config values to a constants file, config object, or env var. If a value must be hardcoded, justify it in the commit message. The reviewer will flag unjustified hardcoded values.
-8. **Runaway detection.** If you've modified the same file 5+ times without meaningful progress, stop. Step back, re-read, try a fundamentally different approach. Log the situation.
+8. **Runaway detection.** If you've modified the same file 5+ times without meaningful progress, stop. Step back, re-read, try a fundamentally different approach. Log the situation. (The 5-modification threshold is a default; override in the survival guide under `## Run Control`.)
 
 **For reviewers:** The current codebase is the source of truth, not your training data. The coding agent can search in real time and may use libraries, model versions, or APIs newer than what you know. Don't flag something as wrong just because it doesn't match your training data. Always pass today's date to review subagents.
 
@@ -222,7 +222,7 @@ This prevents whack-a-mole: same category of bug surfacing in a different place 
 
 **Before exiting the review loop, verify documentation is current.** Any user-facing behavior changed by this batch must be reflected in the project's docs (README, API docs, inline doc comments, config references, changelogs). Stale docs are debt. Update them now, not later.
 
-**Triage every finding:** genuine issue (fix it), intentional design (resolve with justification — don't change code), or false positive (resolve with reasoning — move on). Never make unnecessary code changes just to appease a finding. If the same non-actionable finding persists for 3 cycles, resolve with your assessment. See `references/review-subagent.md` for the full review protocol.
+**Triage every finding:** genuine issue (fix it), intentional design (resolve with justification — don't change code), or false positive (resolve with reasoning — move on). Never make unnecessary code changes just to appease a finding. If the same non-actionable finding persists for 3 cycles, resolve with your assessment. (The 3-cycle threshold is a default; override in the survival guide under `## Run Control`.) See `references/review-subagent.md` for the full review protocol.
 
 ### 8. Document
 
@@ -335,7 +335,7 @@ Don't report "done" unless all are true for the current batch:
 3. Contract acceptance criteria marked as met (or exceptions documented).
 4. PR comments read; findings triaged. Review loop ran until no blockers remained. All review threads resolved or replied to.
 5. **Documentation is up to date.** Any user-facing behavior changed by this batch is reflected in the relevant docs (README, API docs, inline doc comments, config references, changelogs). Stale docs are debt.
-6. `.elves-session.json` updated with batch status, commit SHA, and completion timestamp.
+6. `.elves-session.json` updated with batch status, commit SHA, completion timestamp, and `review_comments` dispositions. The schema includes a `batches` array (id, name, status, commit, rollback_tag, started_at, completed_at) and a `review_comments` array (id, type, source, batch, cycle, summary, disposition, fix_commit/reason). See `SKILL.md` **Structured Session Data** for the full schema.
 7. Execution log updated with timestamps, evidence, and commit SHA.
 8. Survival guide updated with next batch.
 9. Changes committed and pushed.
@@ -353,7 +353,7 @@ When all batches are done (or time is up):
 5. **Clean up operational artifacts.** Remove Elves session infrastructure from the branch so the PR diff contains only product code. Use the actual paths from this session (from the survival guide or `.elves-session.json`), not hard-coded defaults:
    ```bash
    git rm <survival-guide-path> <execution-log-path> .elves-session.json
-   git commit -m "chore: remove elves session artifacts from PR"
+   git commit -m "[<branch> · Batch N/N] Remove elves session artifacts from PR"
    ```
    The plan file is kept by default. If `cleanup.keep_plan: false` in `config.json`, add the plan path to `git rm` as well. These files still exist in branch history for reference.
 6. Push.

@@ -51,7 +51,7 @@ These principles govern how you write code during implementation and how the rev
 
 7. **No hardcoded constants without justification.** Extract magic numbers, URLs, timeouts, thresholds, feature flags, and configuration values to a constants file, config object, or environment variable — wherever the project keeps them. If you believe a value should be hardcoded (e.g., a mathematical constant, a protocol-required value, a truly fixed enum), you must justify it in the commit message. The reviewer will flag unjustified hardcoded values, and "it was easier" is not a justification.
 
-8. **Runaway detection.** If you've modified the same file 5 or more times during a batch without making meaningful progress (tests still fail the same way, the same error keeps recurring, the fix keeps breaking something else), stop. You are thrashing. Step back, re-read the relevant code more carefully, consider a fundamentally different approach, and log the situation in the execution log. Thrashing is a signal that you're treating symptoms, not causes.
+8. **Runaway detection.** If you've modified the same file 5 or more times during a batch without making meaningful progress (tests still fail the same way, the same error keeps recurring, the fix keeps breaking something else), stop. You are thrashing. Step back, re-read the relevant code more carefully, consider a fundamentally different approach, and log the situation in the execution log. Thrashing is a signal that you're treating symptoms, not causes. (The 5-modification threshold is a default; override in the survival guide under `## Run Control`.)
 
 **For reviewers:** The current codebase is the source of truth, not your training data. The coding agent can search the web in real time and may be using libraries, APIs, model versions, or SDK methods that are newer than what you know. If the code references `gemini-3.1` and you only know about `gemini-1.5`, don't flag it — the codebase is probably right and you are probably stale. If you genuinely believe something is outdated, state your concern but acknowledge your knowledge may be behind. Always pass today's date to the review subagent so it knows the temporal context.
 
@@ -353,7 +353,7 @@ The built-in review works out of the box with zero configuration:
 - **Intentional design:** the reviewer flagged something that is correct and deliberate. Resolve/reply with a justification explaining why it's intentional. Don't change the code.
 - **False positive:** the reviewer (usually a bot) flagged something that isn't actually an issue — a hallucination, a misunderstanding of the context, or an outdated rule. Resolve/reply with your reasoning and move on.
 
-Never make unnecessary code changes just to appease a finding. If the finding is wrong, say so and document why. If the same non-actionable finding persists for 3 cycles, resolve it with your assessment — you've given it a fair hearing.
+Never make unnecessary code changes just to appease a finding. If the finding is wrong, say so and document why. If the same non-actionable finding persists for 3 cycles, resolve it with your assessment — you've given it a fair hearing. (The 3-cycle threshold is a default; override in the survival guide under `## Run Control`.)
 
 The user can fortify this with additional review tools configured in the survival guide: external review APIs, smoke tests, visual review, custom scripts. See `references/tool-config-examples.md`. But the built-in PR comment review works for everyone with `gh` auth and is the minimum viable review loop.
 
@@ -486,13 +486,15 @@ A batch isn't done unless:
 2. Build succeeds.
 3. Relevant tests pass with no new failures.
 4. Preview deploys and smoke tests pass (if configured).
-5. Review performed. The review loop ran until no blockers remained. All review threads resolved or replied to.
-6. No accumulated debt: no skipped gates, no "will fix later" items, no known regressions.
-7. **Documentation is up to date.** Any user-facing behavior changed by this batch must be reflected in the relevant docs — README, API docs, inline doc comments, config references, migration guides, changelogs, or whatever the project uses. Stale docs are debt. A user who reads the docs and gets wrong information is worse off than a user with no docs at all.
-8. You're confident the batch is correct. Not "probably fine," but verified through testing, review, and deployment.
-9. Execution log updated with timestamps, evidence, and commit SHA.
-10. Survival guide updated with next batch.
-11. Changes committed and pushed.
+5. Contract acceptance criteria marked as met (or exceptions documented with reasoning).
+6. Review performed. The review loop ran until no blockers remained. All review threads resolved or replied to.
+7. No accumulated debt: no skipped gates, no "will fix later" items, no known regressions.
+8. **Documentation is up to date.** Any user-facing behavior changed by this batch must be reflected in the relevant docs — README, API docs, inline doc comments, config references, migration guides, changelogs, or whatever the project uses. Stale docs are debt. A user who reads the docs and gets wrong information is worse off than a user with no docs at all.
+9. `.elves-session.json` updated with batch status, commit SHA, and completion timestamp.
+10. You're confident the batch is correct. Not "probably fine," but verified through testing, review, and deployment.
+11. Execution log updated with timestamps, evidence, and commit SHA.
+12. Survival guide updated with next batch.
+13. Changes committed and pushed.
 
 Every batch must be tight before you move on. The next batch builds on this one. If this one is shaky, everything after it is shaky. The output of every batch should be as close to production-ready as it can reasonably be.
 
@@ -509,7 +511,7 @@ When all batches are done or time is up:
 5. **Clean up operational artifacts.** Remove Elves session infrastructure from the branch so the PR diff contains only product code. Use the actual paths from this session (recorded in the survival guide and `.elves-session.json`), not hard-coded defaults:
    ```bash
    git rm <survival-guide-path> <execution-log-path> .elves-session.json
-   git commit -m "chore: remove elves session artifacts from PR"
+   git commit -m "[<branch> · Batch N/N] Remove elves session artifacts from PR"
    ```
    These files were needed during the run for compaction recovery, but they're noise in the final PR. The plan file is kept by default since it documents what was built. If the user configured `cleanup.keep_plan: false` in `config.json`, add the plan path to the `git rm` command as well.
    
