@@ -60,11 +60,21 @@ Before sending any final response that would end the turn, answer these question
 
 If the answers don't justify stopping, do not send a final response. Continue the run.
 
-## Phase 1: Planning (Interactive)
+## Phase 1: Planning
 
-Elves starts with a conversation. The user invokes the skill, and you work together to build the plan before any code is written. This is the most important phase. The quality of the plan determines the quality of the overnight run.
+Elves starts with planning. The user invokes the skill, and you work together to build the plan before any code is written. This is the most important phase. The quality of the plan determines the quality of the overnight run.
+
+There are two ways to plan: **interactive** (default) and **autonomous**.
+
+### Interactive planning (default)
 
 **Expect this to take about 30 minutes.** This isn't magic. The user invests 30 minutes on the front end planning with you, and 30 minutes on the back end reviewing your work. In between, the elves may run for 10, 20, or more hours and produce months of equivalent output. The return is enormous, but it requires a real planning conversation, not a one-line prompt.
+
+### Autonomous planning (optional)
+
+If the user provides a brief prompt (1-4 sentences) and wants to skip the interactive conversation, act as a **planner agent**: expand the brief into a full product spec with batches, then present it for approval. Focus the spec on product context and high-level technical design. Avoid granular implementation details — those cascade errors into downstream batches. Be ambitious about scope; the user can always trim.
+
+The planner output replaces the interactive conversation but produces the same artifacts: a plan file, a configured survival guide, and an initialized execution log. The user must approve the expanded plan before execution begins — autonomous planning does not mean autonomous approval.
 
 ### What to talk about
 
@@ -216,27 +226,62 @@ For every batch, execute this full cycle:
 
 Then identify the first incomplete batch.
 
-### 2. Tag
+### 2. Verify Green
+
+**Before starting new work, confirm the project is in a working state.** Run the build and test gates from the previous batch. If anything is broken, fix it before proceeding — don't start a new batch on a cracked foundation.
+
+This catches edge cases where the previous batch passed gates but a subsequent push (review fixes, doc updates, merge from main) introduced a quiet regression. It's a cheap check that prevents expensive debugging later.
+
+If this is the first batch and no code exists yet, skip this step.
+
+### 3. Tag
 
 Create a rollback safety point: `git tag elves/pre-batch-N`
 
-### 3. Implement
+### 4. Contract
+
+**Before writing code, define what "done" looks like for this batch.** Write a short contract: the specific behaviors this batch will implement and the concrete, testable acceptance criteria that prove it works. This is inspired by the generator/evaluator pattern — the contract is the agreement between "build it" and "verify it" before either begins.
+
+The contract goes in the execution log under the batch entry:
+
+```markdown
+### Batch 3: Payment Processing
+**Contract:**
+- POST /api/payments creates a charge and returns 201 with charge ID
+- Failed charges return 402 with error code
+- Webhook endpoint validates signatures and updates order status
+- E2E: user can complete checkout flow and see confirmation page
+
+**Acceptance criteria:**
+- [ ] Unit tests for charge creation (success + failure paths)
+- [ ] Integration test for webhook signature validation
+- [ ] E2E test: full checkout flow via browser automation
+- [ ] All existing tests still pass
+```
+
+The contract keeps implementation focused and gives the validate/review steps clear targets. If you can't write concrete acceptance criteria, the batch scope is too vague — sharpen it before coding.
+
+### 5. Implement
 
 Build the batch scope fully. Use descriptive commits referencing which batch item is being addressed. Push after each meaningful chunk. Tag incidental findings as `[elves-scout]` in TODO.md for later.
 
 Write tests for the code you write. Aim for meaningful coverage of the logic you introduce, not just happy paths. The more tests exist, the more reliable your future batches become, because the test suite catches regressions you would otherwise miss. If the project doesn't have a test infrastructure yet, consider setting one up as part of the first batch. It pays for itself immediately.
 
-### 4. Validate
+### 6. Validate
 
 **The goal is zero accumulated debt.** Every batch must be production-ready before you move to the next one. You're working overnight with no one watching. The tests are the watch.
 
 Validation has two stages: **local** (lint, typecheck, build, test, E2E) then **preview** (deploy and smoke-test if configured). Don't advance until both pass.
 
+**Browser-driven verification is strongly recommended for any project with a UI.** Unit tests verify logic; browser automation verifies the app actually works as a user would experience it. Without it, agents routinely produce code that compiles and passes unit tests but doesn't function end-to-end. If the project doesn't have Playwright or Cypress set up, consider adding it in the first batch — it catches an entire class of bugs that other gates miss. Use the Playwright MCP or similar browser automation to click through the running application like a user: test UI interactions, verify API responses, check database state. See `references/verification-patterns.md` for patterns.
+
+Validate against the **batch contract** from step 4. Every acceptance criterion should have a corresponding gate result. If an acceptance criterion can't be verified by the existing gates, that's a gap — add a test or verification step before moving on.
+
 See `references/validation-guide.md` for the complete validation system including auto-discovery tables, preview deployment configuration, and detailed gate explanations.
 
 Every gate must pass. If a gate fails, fix it and re-run from that gate. Don't skip a gate. Debt only grows.
 
-### 5. Review
+### 7. Review
 
 **This is where the Ralph Loop does its real work.** You built something (implement). You checked it (validate). Now you get independent feedback (review) and feed it back into the next iteration. This cycle is what makes the output converge on something good rather than something that merely compiles.
 
@@ -252,17 +297,17 @@ If the same non-actionable finding persists for 3 cycles, log your assessment an
 
 The user can fortify this with additional review tools configured in the survival guide: external review APIs, smoke tests, visual review, custom scripts. See `references/tool-config-examples.md`. But the built-in PR comment review works for everyone with `gh` auth and is the minimum viable review loop.
 
-### 6. Document
+### 8. Document
 
 Update the execution log with a timestamped entry covering: batch name, timing breakdown, what changed, commands run, test results, review findings, decisions made, commit SHA, rollback tag, and next steps.
 
 Keep entries concise. If the log exceeds ~50 entries, archive older ones under `## Completed Archive`.
 
-### 7. Update the Survival Guide
+### 9. Update the Survival Guide
 
 Update "Current Phase" and "Next Exact Batch" to reflect the new state. A stale survival guide sends the next session down the wrong path.
 
-### 8. Commit and Push
+### 10. Commit and Push
 
 Stage specific files (not `git add -A`), commit with a clear message that includes batch progress, push.
 
@@ -275,11 +320,11 @@ Examples:
 
 This lets anyone watching the commit graph (in GitKraken, `git log`, or GitHub) see exactly where the run stands without opening the execution log.
 
-### 9. Re-read the Survival Guide
+### 11. Re-read the Survival Guide
 
 **After every push, re-read the survival guide before doing anything else.** Also verify the plan file hasn't changed since session start.
 
-### 10. Continue or Stop
+### 12. Continue or Stop
 
 **Finite mode:** check the clock. If there's enough time for another batch, start it. Otherwise, scout mode or Final Completion. Don't pause. Don't wait for user input.
 
@@ -333,6 +378,8 @@ After any compaction or restart, your conversation history is gone. But your ins
 7. Don't redo completed work.
 
 Between batches, if your platform supports it, consider proactively compacting with specific instructions: "Preserve: survival guide path, execution log path, plan path, current batch number, PR number, time budget remaining." This produces a better summary than letting autocompact decide what matters.
+
+**Model-tier note:** Frontier models (Opus-class) handle long continuous sessions well and rarely exhibit context anxiety or drift after compaction. The recovery protocol above is still the safety net, but you may find you need it less often. On smaller models, the recovery protocol is critical — follow it rigorously after every compaction event.
 
 ## Completion Contract
 
@@ -429,6 +476,37 @@ Everything else: ambiguous requirements, minor design decisions, unexpected tool
 ## Structured Session Data
 
 Maintain a `.elves-session.json` file with machine-readable session data (session ID, timing, batch status, commits, rollback tags, review findings). This enables future tooling and analytics.
+
+**Batch status tracking belongs in JSON, not just Markdown.** Models are less likely to corrupt structured JSON than free-form Markdown during updates. The `.elves-session.json` file should include a `batches` array that tracks the status of each batch:
+
+```json
+{
+  "session_id": "elves-2026-03-24-auth-system",
+  "pr_number": 42,
+  "batches": [
+    {
+      "id": 1,
+      "name": "Database schema and models",
+      "status": "complete",
+      "commit": "abc1234",
+      "rollback_tag": "elves/pre-batch-1",
+      "started_at": "2026-03-24T22:00:00Z",
+      "completed_at": "2026-03-24T23:15:00Z"
+    },
+    {
+      "id": 2,
+      "name": "Auth endpoints",
+      "status": "in_progress",
+      "commit": null,
+      "rollback_tag": "elves/pre-batch-2",
+      "started_at": "2026-03-24T23:16:00Z",
+      "completed_at": null
+    }
+  ]
+}
+```
+
+After compaction, this file is the fastest way to determine exactly where the run stands. Read it before the execution log when recovering state.
 
 ## Persistent Preferences
 

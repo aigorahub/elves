@@ -119,19 +119,39 @@ Each batch must be independently shippable. Split before writing code if a batch
 
 Identify the first incomplete batch.
 
-### 2. Tag
+### 2. Verify Green
+
+**Before starting new work, confirm the project is in a working state.** Run the build and test gates. If anything is broken, fix it first — don't start a new batch on a cracked foundation. Skip this step if this is the first batch and no code exists yet.
+
+### 3. Tag
 ```bash
 git tag elves/pre-batch-N
 ```
 
-### 3. Implement
+### 4. Contract
+
+**Before writing code, define what "done" looks like for this batch.** Write a short contract in the execution log: the specific behaviors this batch will implement and the concrete, testable acceptance criteria that prove it works.
+
+```markdown
+### Batch N: [Name]
+**Contract:**
+- [Specific behavior 1]
+- [Specific behavior 2]
+**Acceptance criteria:**
+- [ ] [Testable criterion 1]
+- [ ] [Testable criterion 2]
+```
+
+If you can't write concrete acceptance criteria, the batch scope is too vague — sharpen it before coding.
+
+### 5. Implement
 Build the full batch scope. Descriptive commits per batch item. Push after each meaningful chunk. Handle tiny incidental fixes inline and note them in the log. Anything substantial outside scope: add to `TODO.md` tagged `[elves-scout]` and keep moving. All work is done directly. Codex doesn't have built-in subagent support.
 
 Write tests for new code. Cover the logic you introduce, not just happy paths. If the project lacks test infrastructure, set it up in the first batch.
 
-### 4. Validate
+### 6. Validate
 
-Run available gates; skip missing ones. User overrides in the survival guide take precedence.
+Run available gates; skip missing ones. User overrides in the survival guide take precedence. **For UI projects, browser-driven verification (Playwright, Cypress) is strongly recommended** — without it, agents routinely produce code that compiles and passes unit tests but doesn't work end-to-end. Validate against the batch contract from step 4.
 
 | Project | Lint | Typecheck | Build | Test |
 |---------|------|-----------|-------|------|
@@ -144,7 +164,7 @@ Run available gates; skip missing ones. User overrides in the survival guide tak
 
 Every gate must pass before proceeding. Fix and re-run from the failing gate.
 
-### 5. Review
+### 7. Review
 
 **This is where the Ralph Loop does its real work.** You built something. You tested it. Now get independent feedback and feed it back into the next iteration.
 
@@ -163,7 +183,7 @@ Parse with python3 (no jq). Categorize each finding as BLOCKING, WARNING, or INF
 
 If the same non-actionable finding persists for 3 cycles, log your assessment and move on. The user can fortify this with reviewer bots, custom APIs, or additional checks. See `references/review-subagent.md` for the full review protocol.
 
-### 6. Document
+### 8. Document
 
 Append to execution log:
 ```markdown
@@ -183,10 +203,10 @@ Append to execution log:
 
 If the log exceeds ~50 entries, move completed entries to a `## Completed Archive` section.
 
-### 7. Update Survival Guide
+### 9. Update Survival Guide
 Update "Current Phase" and "Next Exact Batch". A stale survival guide sends the next session down the wrong path.
 
-### 8. Commit and Push
+### 10. Commit and Push
 ```bash
 git add <specific-files>   # never git add -A
 git commit -m "[Batch N/Total] <description>"
@@ -199,14 +219,14 @@ Always include batch progress in the commit message. Examples:
 
 This lets anyone watching the commit graph see exactly where the run stands.
 
-### 9. Re-read the Survival Guide
+### 11. Re-read the Survival Guide
 **After every push, re-read the survival guide before doing anything else.** Also verify the plan hasn't changed:
 ```bash
 python3 -c "import hashlib,sys; print(hashlib.md5(open(sys.argv[1],'rb').read()).hexdigest())" <plan-path>
 # Compare against hash saved at session start
 ```
 
-### 10. Continue or Stop
+### 12. Continue or Stop
 **Finite:** if enough time budget remains, start the next batch. Otherwise, scout mode or Final Completion.
 
 **Open-ended:** continue automatically after every checkpoint. Do not stop because the batch is complete, because a PR exists, or because the user is away. Only stop for explicit user stop or a blocker with no recovery path.
@@ -255,6 +275,8 @@ Don't redo completed work. Don't ask for help. If you detect existing documents 
 
 Between batches, proactively compact with specific instructions: "Preserve: survival guide path, execution log path, plan path, current batch number, PR number, time budget remaining."
 
+**Model-tier note:** Frontier models (Opus-class) handle long continuous sessions well and rarely drift after compaction. The recovery protocol is still the safety net, but you may need it less. On smaller models, follow it rigorously after every compaction event.
+
 ## Completion Contract
 
 Don't report "done" unless all are true for the current batch:
@@ -272,7 +294,7 @@ Don't report "done" unless all are true for the current batch:
 When all batches are done (or time is up):
 
 1. Add a **Session Summary** to the top of the execution log: duration, batches completed, time breakdown, status.
-2. Update `.elves-session.json` with final state (session_id, started, plan_path, plan_hash, branch, pr_number, batches array with timing/commit/rollback_tag/review_findings, scout_items, status).
+2. Update `.elves-session.json` with final state. **Batch status tracking belongs in JSON, not just Markdown** — models are less likely to corrupt structured JSON during updates. The `.elves-session.json` should include a `batches` array with id, name, status, commit, rollback_tag, started_at, and completed_at for each batch. After compaction, this file is the fastest way to determine where the run stands.
 3. Final pass through TODO.md.
 4. Update survival guide.
 5. **Clean up operational artifacts.** Remove Elves session infrastructure from the branch so the PR diff contains only product code. Use the actual paths from this session (from the survival guide or `.elves-session.json`), not hard-coded defaults:
