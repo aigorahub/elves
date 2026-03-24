@@ -10,6 +10,20 @@ Your user has 12 to 14 hours each day when they aren't working. You are the mech
 
 But AI agents are stateless. Context compaction erases working memory. The Survival Guide, Plan, and Execution Log are your memory across compactions. They live in files on disk, not in conversation. Read them. Trust them. Update them.
 
+## Code Quality Philosophy
+
+AI agents tend toward spaghetti: quick fixes, duplicated utilities, novel patterns that ignore existing conventions. Over a multi-batch run, this compounds into massive technical debt. **Each batch must leave the codebase easier to work on, not harder.**
+
+1. **Root cause over band-aids.** Fix the underlying problem, not the symptom. A quick fix that hides a bug is worse than no fix.
+2. **Centralize over duplicate.** Search for existing utilities before creating new ones. Never create a second version of something that already exists.
+3. **Extend over create.** Build on existing abstractions and modules. Adding to what exists beats inventing something new.
+4. **Architecture first.** Understand and respect the codebase's existing patterns, module boundaries, naming conventions, and data flow. The existing code is the source of truth, not your priors.
+5. **Proactive pattern detection.** Match existing conventions exactly: error handling, API responses, component structure, test naming.
+6. **Progressive repo conditioning.** Leave the repo easier for the next batch: clear type annotations, focused functions, consistent naming, updated docs and agent instructions.
+7. **Runaway detection.** If you've modified the same file 5+ times without meaningful progress, stop. Step back, re-read, try a fundamentally different approach. Log the situation.
+
+These apply to all code, including review fixes. When fixing a reviewer finding, fix the root cause — don't band-aid it.
+
 ## Run Mode
 
 Every session has a run mode. Persist it in the survival guide under `## Run Control`.
@@ -145,6 +159,8 @@ git tag elves/pre-batch-N
 If you can't write concrete acceptance criteria, the batch scope is too vague — sharpen it before coding. For trivial batches (docs, config), the contract can be a single line.
 
 ### 5. Implement
+**Before writing new code, read the surrounding code.** Understand the patterns, conventions, and abstractions already in use. Search for existing utilities before creating new ones. Follow the Code Quality Philosophy: root cause over band-aids, centralize over duplicate, extend over create, architecture first.
+
 Build the full batch scope. Descriptive commits per batch item. Push after each meaningful chunk. Handle tiny incidental fixes inline and note them in the log. Anything substantial outside scope: add to `TODO.md` tagged `[elves-scout]` and keep moving. All work is done directly. Codex doesn't have built-in subagent support.
 
 Write tests for new code. Cover the logic you introduce, not just happy paths. If the project lacks test infrastructure, set it up in the first batch. During long implementation stretches, periodically update the execution log with progress notes to protect against mid-batch compaction.
@@ -179,7 +195,9 @@ gh api "repos/${REPO}/commits/$(git rev-parse HEAD)/check-runs" > /tmp/ci-checks
 
 Parse with python3 (no jq). Categorize each finding as BLOCKING, WARNING, or INFO.
 
-The review has two jobs: **find bugs** and **verify the batch matches its contract.** Walk through each behavior and acceptance criterion from the contract (step 4). Is it implemented? Is it tested? A batch that passes all gates but skips a contract item is incomplete, not clean. If something is missing, go back to Implement (step 5) and finish it. Also review the diff yourself against the plan — any bugs the bots didn't catch? Any changes outside scope that shouldn't be there?
+The review has three jobs: **find bugs**, **verify the batch matches its contract**, and **enforce the Code Quality Philosophy.** Walk through each behavior and acceptance criterion from the contract (step 4). Is it implemented? Is it tested? A batch that passes all gates but skips a contract item is incomplete, not clean. If something is missing, go back to Implement (step 5) and finish it.
+
+Also review the diff for code quality: does the batch introduce duplicated utilities that already exist in the codebase? Does it ignore established patterns or architecture? Are fixes addressing root causes or patching symptoms? Does the batch leave the repo easier or harder to work on? Duplication and architecture violations are blocking. Band-aids are blocking if they hide bugs. When fixing code quality findings, follow the same philosophy — don't create a bigger band-aid to fix a band-aid.
 
 **Fix all blocking issues. Finish missing contract items. Push.**
 
@@ -192,7 +210,7 @@ The review has two jobs: **find bugs** and **verify the batch matches its contra
 
 **Before exiting the review loop, verify documentation is current.** Any user-facing behavior changed by this batch must be reflected in the project's docs (README, API docs, inline doc comments, config references, changelogs). Stale docs are debt. Update them now, not later.
 
-If the same non-actionable finding persists for 3 cycles, resolve/reply with your assessment and move on. See `references/review-subagent.md` for the full review protocol.
+**Triage every finding:** genuine issue (fix it), intentional design (resolve with justification — don't change code), or false positive (resolve with reasoning — move on). Never make unnecessary code changes just to appease a finding. If the same non-actionable finding persists for 3 cycles, resolve with your assessment. See `references/review-subagent.md` for the full review protocol.
 
 ### 8. Document
 

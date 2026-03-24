@@ -29,6 +29,30 @@ But AI agents are stateless. Context compaction erases working memory. Without p
 
 The Survival Guide, Plan, and Execution Log are your memory across compactions. They aren't overhead. They're the minimum viable infrastructure for the loop to run unsupervised. Read them. Trust them. Update them. They're what make you reliable enough to justify the user walking away.
 
+## Code Quality Philosophy
+
+AI coding agents have a natural tendency toward spaghetti: quick fixes instead of root causes, new utilities instead of extending existing ones, novel patterns instead of following established conventions. Over a 12-batch overnight run, these small shortcuts compound into massive technical debt. The codebase gets harder to work on with every batch instead of easier.
+
+**The goal is the opposite: each batch should leave the codebase in better shape than it found it.** Not just "no new debt" but active conditioning — the repo should converge toward being easier to work on over time.
+
+These principles govern how you write code during implementation and how the reviewer evaluates your work:
+
+1. **Root cause over band-aids.** Fix the underlying problem, not the symptom. If a test fails, don't patch the specific failure — understand why it fails and fix the root cause. A quick fix that makes the test pass but leaves the underlying bug is worse than no fix at all, because now the bug is hidden.
+
+2. **Centralize over duplicate.** Before writing a new helper, utility, or abstraction, search the codebase for an existing one that does the same thing or nearly the same thing. Extend it if needed. Do not create a second `formatDate()`, a second API client wrapper, or a second validation helper. Duplication across batches is the most common form of agent-generated debt.
+
+3. **Extend over create.** Build on existing abstractions, modules, and patterns rather than creating parallel implementations. If the codebase has a request handler pattern, follow it. If it has a component structure, use it. Adding to what exists is almost always better than inventing something new.
+
+4. **Architecture first.** Before writing code, understand the codebase's architecture: its module boundaries, its data flow patterns, its naming conventions, its test organization. Respect these. Don't introduce a new architectural pattern just because you prefer it or because it's what your training data suggests. The existing architecture is the source of truth, not your priors.
+
+5. **Proactive pattern detection.** Actively look for and follow established patterns in the codebase. How are errors handled? How are API responses structured? How are components organized? How are tests named? Match the existing conventions exactly. Consistency across the codebase is more valuable than any individual "improvement."
+
+6. **Progressive repo conditioning.** Each batch should make the repo slightly easier for the next batch to work on. This means: clear type annotations on new code, focused single-purpose functions, consistent naming that matches the codebase, and updated documentation (CLAUDE.md, AGENTS.md, README, TODO.md) that reflects the current state. Over a multi-batch run, the cumulative effect is a codebase that is meaningfully easier to navigate, understand, and modify — for both humans and agents.
+
+7. **Runaway detection.** If you've modified the same file 5 or more times during a batch without making meaningful progress (tests still fail the same way, the same error keeps recurring, the fix keeps breaking something else), stop. You are thrashing. Step back, re-read the relevant code more carefully, consider a fundamentally different approach, and log the situation in the execution log. Thrashing is a signal that you're treating symptoms, not causes.
+
+These principles apply to **all code changes**, including review fixes. When the reviewer flags an issue and you go back to fix it, the fix must follow these same principles. Don't slap a band-aid on the reviewer's finding — fix the root cause. Don't create a new utility to work around the issue — extend the existing one. The review-fix cycle is where agents are most tempted to take shortcuts because the pressure to "just make it pass" is highest. Resist that pressure.
+
 ## Run Mode
 
 Every session has a run mode. Determine it during planning and persist it in the survival guide under `## Run Control`.
@@ -267,6 +291,8 @@ For trivial batches (documentation-only, config changes, dependency bumps), the 
 
 Build the batch scope fully. Use descriptive commits referencing which batch item is being addressed. Push after each meaningful chunk. Tag incidental findings as `[elves-scout]` in TODO.md for later.
 
+**Before writing new code, read the surrounding code.** Understand the patterns, conventions, and abstractions already in use. Search for existing utilities before creating new ones. Follow the Code Quality Philosophy: root cause over band-aids, centralize over duplicate, extend over create, architecture first. The fastest way to generate technical debt overnight is to write code that ignores what already exists.
+
 Write tests for the code you write. Aim for meaningful coverage of the logic you introduce, not just happy paths. The more tests exist, the more reliable your future batches become, because the test suite catches regressions you would otherwise miss. If the project doesn't have a test infrastructure yet, consider setting one up as part of the first batch. It pays for itself immediately.
 
 **During long implementation stretches, periodically update the execution log with progress notes** — even before validation is complete. If compaction happens mid-implementation, the execution log is your lifeline. A stale log forces the next context to guess what you were doing. A current log lets it pick up exactly where you left off.
@@ -289,7 +315,7 @@ Every gate must pass. If a gate fails, fix it and re-run from that gate. Don't s
 
 **This is where the Ralph Loop does its real work.** You built something (implement). You checked it (validate). Now you get independent feedback (review) and feed it back into the next iteration. This cycle is what makes the output converge on something good rather than something that merely compiles.
 
-The review has two jobs: **find bugs** and **verify the batch matches its contract.** A batch that is bug-free but only implements half the contract isn't done. A batch that implements the full contract but has a security hole isn't done either. Both must pass.
+The review has three jobs: **find bugs**, **verify the batch matches its contract**, and **enforce the Code Quality Philosophy.** A batch that is bug-free but only implements half the contract isn't done. A batch that implements the full contract but has a security hole isn't done. A batch that works perfectly but introduces duplicated utilities, ignores existing patterns, or band-aids over root causes isn't done either — it makes every future batch harder.
 
 The built-in review works out of the box with zero configuration:
 
@@ -303,7 +329,12 @@ The built-in review works out of the box with zero configuration:
 8. **Repeat until the batch is clean.** No unresolved threads, no unreplied bot comments, no missing contract items. The loop continues until there is nothing left to address.
 9. **Verify documentation is current.** Before exiting the review loop, check that any user-facing behavior changed by this batch is reflected in the project's documentation. This includes README files, API docs, inline doc comments, config references, migration guides, and changelogs — whatever the project uses. If docs are stale, update them now. Don't defer this to a later batch. Stale documentation is silent debt: the code is correct but the user doesn't know how to use it correctly. A batch with good code and wrong docs is not shippable.
 
-If the same non-actionable finding persists for 3 cycles, resolve/reply with your assessment and move on. Don't make unnecessary code changes to appease a finding you believe is wrong — but do document your reasoning in the reply so the human can see it.
+**Triage every review finding into one of three categories:**
+- **Genuine issue:** a real bug, security problem, quality violation, or missing contract item. Fix it.
+- **Intentional design:** the reviewer flagged something that is correct and deliberate. Resolve/reply with a justification explaining why it's intentional. Don't change the code.
+- **False positive:** the reviewer (usually a bot) flagged something that isn't actually an issue — a hallucination, a misunderstanding of the context, or an outdated rule. Resolve/reply with your reasoning and move on.
+
+Never make unnecessary code changes just to appease a finding. If the finding is wrong, say so and document why. If the same non-actionable finding persists for 3 cycles, resolve it with your assessment — you've given it a fair hearing.
 
 The user can fortify this with additional review tools configured in the survival guide: external review APIs, smoke tests, visual review, custom scripts. See `references/tool-config-examples.md`. But the built-in PR comment review works for everyone with `gh` auth and is the minimum viable review loop.
 

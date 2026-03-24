@@ -10,9 +10,10 @@ After each batch, the coordinator spawns this subagent to perform an independent
 2. Reads the diff for the current batch
 3. Reads the plan to understand the broader goal
 4. **Reads the batch contract** (from the execution log) to know exactly what was supposed to be delivered — specific behaviors and testable acceptance criteria
-5. Produces a structured assessment: what's blocking, what's a warning, what's fine, and whether every contract item was delivered
+5. **Evaluates code quality** against the Code Quality Philosophy (see SKILL.md)
+6. Produces a structured assessment: what's blocking, what's a warning, what's fine, whether every contract item was delivered, and whether the code leaves the repo in better shape
 
-The reviewer doesn't just look for errors. It verifies the work matches the batch that was supposed to be done. A bug-free batch that only implements half its contract is incomplete. A fully-implemented batch with a security hole needs fixing. Both checks must pass.
+The reviewer has three jobs: find bugs, verify the contract, and enforce code quality. A bug-free batch that only implements half its contract is incomplete. A fully-implemented batch with a security hole needs fixing. A batch that works perfectly but introduces duplicated utilities, ignores existing patterns, or band-aids over root causes makes every future batch harder — that's blocking too.
 
 The coordinator then acts on the findings. It fixes blockers, finishes missing contract items, logs decisions, pushes fixes. New pushes trigger new bot reviews. The coordinator runs the review subagent again. This loop continues until the batch is clean and the contract is fully delivered.
 
@@ -61,6 +62,22 @@ For EACH acceptance criterion:
 - Can it be verified from the diff and test results?
 - If a criterion has no corresponding test or verification, mark it BLOCKING.
 
+## Code quality review (the Code Quality Philosophy):
+
+The goal is that each batch leaves the codebase easier to work on, not harder. For each of these, check the diff:
+
+1. **Root cause over band-aids:** Are fixes addressing the actual problem, or patching symptoms? Look for: try/catch blocks that swallow errors, special-case conditionals that work around deeper issues, "retry and hope" patterns.
+2. **Centralize over duplicate:** Did the batch introduce new helpers, utilities, or abstractions that duplicate existing ones in the codebase? Search for similar functions. If `formatDate()` already exists in the codebase and the batch added a new one, that's a finding.
+3. **Extend over create:** Did the batch build on existing patterns and modules, or create parallel implementations? New files that replicate the structure of existing files are a red flag.
+4. **Architecture first:** Does the new code respect the codebase's existing architecture — module boundaries, data flow, naming conventions, test organization? Or does it introduce novel patterns that conflict with what's already there?
+5. **Pattern consistency:** Does the new code follow the naming conventions, error handling patterns, and API response structures already established in the codebase?
+6. **Progressive conditioning:** Does this batch leave the repo easier to work on? Look for: clear type annotations on new code, focused single-purpose functions, consistent naming, updated docs and agent instructions (CLAUDE.md, TODO.md).
+7. **Thrashing signals:** Were the same files modified 5+ times in the batch's commit history without clear forward progress? This suggests symptom-chasing rather than root-cause fixing.
+
+Mark code quality issues as:
+- BLOCKING if they introduce duplication, violate existing architecture, or band-aid a root cause
+- WARNING if they miss an opportunity to improve (e.g., could have added types, could have consolidated)
+
 ## Also review the diff for:
 - Obvious bugs, security issues, or missing error handling
 - Changes outside the batch scope that shouldn't be there
@@ -83,6 +100,14 @@ For each contract item, one line:
 - ❌ [item] — [what's missing]
 - ⚠️ [item] — implemented but [concern]
 
+### Code Quality
+- **Duplication:** [any new code that duplicates existing utilities/patterns — name both]
+- **Architecture:** [any violations of existing module boundaries, data flow, or conventions]
+- **Root cause:** [any fixes that patch symptoms rather than addressing underlying problems]
+- **Pattern consistency:** [any deviations from established naming, error handling, or structure]
+- **Progressive conditioning:** [did this batch leave the repo easier or harder to work on?]
+If all clear, state: "No code quality issues. Batch follows existing patterns and conventions."
+
 ### New Issues Found in Diff Review
 - [anything you spotted that the bots didn't]
 ```
@@ -92,9 +117,12 @@ For each contract item, one line:
 1. **Blocking items**: Fix each one. This is non-negotiable.
 2. **Contract items marked ❌**: Go back to Implement (step 5) and finish what's missing. These are blocking — an incomplete contract means an incomplete batch.
 3. **Contract items marked ⚠️**: Evaluate the concern. Fix if it's a real gap; log if it's a judgment call.
-4. **Warnings**: Fix easy ones inline. Defer complex ones to TODO.md tagged `[elves-scout]`.
-5. **Info**: Log in execution log, no action.
-6. **New issues**: Treat as blocking if they're bugs or security; treat as warnings otherwise.
+4. **Code quality findings**: Duplication and architecture violations are blocking — fix them now, not later. Remove the duplicate and use the existing utility. Refactor to follow the established pattern. Root-cause band-aids are blocking if they hide a bug, warning if they're just suboptimal. Pattern consistency issues are warnings.
+5. **Warnings**: Fix easy ones inline. Defer complex ones to TODO.md tagged `[elves-scout]`.
+6. **Info**: Log in execution log, no action.
+7. **New issues**: Treat as blocking if they're bugs or security; treat as warnings otherwise.
+
+**Critical: fixes must follow the same Code Quality Philosophy.** When the reviewer flags duplication and you go back to fix it, don't create a *third* copy to "consolidate" the first two — actually find the existing utility and use it. When the reviewer flags a band-aid, don't add a bigger band-aid — fix the root cause. The review-fix cycle is where agents are most tempted to take shortcuts because the pressure to "just make it pass" is highest. The reviewer will check the fix too.
 
 ### Resolving Comments After Fixes
 
@@ -176,9 +204,11 @@ Read:
 2. The plan at [PLAN_PATH]
 3. The batch contract in the execution log at [EXECUTION_LOG_PATH]
 
-Your job is to find problems AND verify the work matches the contract. Be skeptical. Assume nothing works until proven otherwise.
+Your job is to find problems, verify the work matches the contract, and check code quality. Be skeptical. Assume nothing works until proven otherwise.
 
 For each contract item: is it actually delivered, or does the code just look like it might be? Trace from the contract through the implementation to the test. If any link in that chain is missing, it's a finding.
+
+For code quality: does this batch introduce duplicated utilities, ignore existing patterns, or band-aid over root causes? Does new code follow the codebase's conventions (naming, error handling, module structure)? Does this batch leave the repo easier or harder to work on?
 
 For each finding, state:
 - What's wrong
