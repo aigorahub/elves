@@ -44,7 +44,7 @@ Targeted tests for the code you changed. Run the relevant suites, not the entire
 
 If the project has Playwright, Cypress, or a similar framework, run the tests that cover the flows you touched. The app should actually work, not just compile. E2E tests catch integration failures that unit tests miss: broken routes, missing environment variables, UI regressions, and API mismatches.
 
-**For any project with a user interface, browser-driven verification is strongly recommended, not optional.** Without it, agents routinely produce code that compiles, passes lint, passes unit tests, and does not actually work when a user clicks through it. Use Playwright MCP or similar browser automation tools to interact with the running application the way a real user would: click buttons, fill forms, navigate between pages, and assert on the visible result.
+**For any project with a user interface, browser-driven verification is strongly recommended.** Without it, agents routinely produce code that compiles, passes lint, passes unit tests, and does not actually work when a user clicks through it. Use Playwright, Cypress, or similar browser automation tools to interact with the running application the way a real user would: click buttons, fill forms, navigate between pages, and assert on the visible result.
 
 If the project doesn't have an E2E framework yet, consider setting one up in the first batch. Even a minimal Playwright test that launches the app and verifies the home page loads catches more bugs than no browser verification at all.
 

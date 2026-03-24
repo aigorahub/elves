@@ -2,6 +2,23 @@
 
 All notable changes to the Elves skill are documented here.
 
+## [1.1.0] - 2026-03-24
+
+### Harness Design Improvements
+
+- Added **Verify Green** step (step 2): agents confirm the project is in a working state before starting each batch
+- Added **Contract** step (step 4): agents define testable acceptance criteria before writing code (generator/evaluator pattern)
+- Two-stage validation now explicit in core loop: local gates then preview deployment
+- Structured session data (`.elves-session.json`) tracks `review_comments` dispositions (`fixed`, `dismissed`, `deferred`) for compaction recovery
+- Strengthened review loop with commit-message-as-communication-channel guidance
+- Consistent philosophy principles (1-8) across SKILL.md, AGENTS.md, and review-subagent.md
+- Cross-references between AGENTS.md and reference docs (validation-guide.md, verification-patterns.md)
+- Browser verification language clarified: "strongly recommended" (not blocking for non-UI projects)
+- Generalized browser automation references to "Playwright, Cypress, or similar" (not Playwright MCP-specific)
+- Dependency installation examples added to SKILL.md Verify Green step
+- Batch sizing examples clarified as overrides of the stated default
+- Configurable thresholds (5-modification, 3-cycle) noted as overridable via survival guide
+
 ## [1.0.0] - 2026-03-21
 
 ### Core Skill

@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "1.0.0"
+  version: "1.1.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -260,7 +260,7 @@ Then identify the first incomplete batch.
 
 This catches edge cases where the previous batch passed gates but a subsequent push (review fixes, doc updates, merge from main) introduced a quiet regression. It's a cheap check that prevents expensive debugging later.
 
-If this is the first batch and no code exists yet, run a minimal smoke test instead: confirm the dev server starts, the test runner works, and dependencies are installed. If dependencies are missing (fresh clone or sandbox), install them first.
+If this is the first batch and no code exists yet, run a minimal smoke test instead: confirm the dev server starts, the test runner works, and dependencies are installed. If dependencies are missing (fresh clone or sandbox), install them first (`npm install`, `pip install -r requirements.txt`, etc.).
 
 ### 3. Tag
 
@@ -309,7 +309,7 @@ Write tests for the code you write. Aim for meaningful coverage of the logic you
 
 Validation has two stages: **local** (lint, typecheck, build, test, E2E) then **preview** (deploy and smoke-test if configured). Don't advance until both pass.
 
-**Browser-driven verification is strongly recommended for any project with a UI.** Unit tests verify logic; browser automation verifies the app actually works as a user would experience it. Without it, agents routinely produce code that compiles and passes unit tests but doesn't function end-to-end. If the project doesn't have Playwright or Cypress set up, consider adding it in the first batch — it catches an entire class of bugs that other gates miss. Use the Playwright MCP or similar browser automation to click through the running application like a user: test UI interactions, verify API responses, check database state. See `references/verification-patterns.md` for patterns.
+**Browser-driven verification is strongly recommended for any project with a UI.** Unit tests verify logic; browser automation verifies the app actually works as a user would experience it. Without it, agents routinely produce code that compiles and passes unit tests but doesn't function end-to-end. If the project doesn't have Playwright or Cypress set up, consider adding it in the first batch — it catches an entire class of bugs that other gates miss. Use Playwright, Cypress, or similar browser automation to click through the running application like a user: test UI interactions, verify API responses, check database state. See `references/verification-patterns.md` for patterns.
 
 Validate against the **batch contract** from step 4. Every acceptance criterion should have a corresponding gate result. If an acceptance criterion can't be verified by the existing gates, that's a gap — add a test or verification step before moving on.
 
