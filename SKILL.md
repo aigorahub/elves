@@ -289,13 +289,16 @@ Every gate must pass. If a gate fails, fix it and re-run from that gate. Don't s
 
 **This is where the Ralph Loop does its real work.** You built something (implement). You checked it (validate). Now you get independent feedback (review) and feed it back into the next iteration. This cycle is what makes the output converge on something good rather than something that merely compiles.
 
+The review has two jobs: **find bugs** and **verify the batch matches its contract.** A batch that is bug-free but only implements half the contract isn't done. A batch that implements the full contract but has a security hole isn't done either. Both must pass.
+
 The built-in review works out of the box with zero configuration:
 
 1. **Read all PR comments** (bot reviews, CI results, any human feedback) via `gh api`.
-2. **Spawn a review subagent** (if supported) to read the comments, the diff, and the plan, then produce a structured assessment: what's blocking, what's a warning, what's fine. If subagents aren't available, do this analysis directly.
-3. **Fix blocking issues:** real bugs, security problems, correctness failures. These must be fixed before moving on.
-4. **Push fixes, then re-read comments.** New pushes may trigger new bot reviews. Read those too.
-5. **Repeat until the batch is clean.** No unresolved blockers. The loop continues until the review step has nothing left to find.
+2. **Spawn a review subagent** (if supported) to read the comments, the diff, the plan, **and the batch contract from step 4.** The subagent produces a structured assessment covering: what's blocking, what's a warning, what's fine, and whether every contract item was delivered. If subagents aren't available, do this analysis directly.
+3. **Check contract completeness.** Walk through each behavior and acceptance criterion from the contract. Is it implemented? Is it tested? If something is missing, go back to Implement (step 5) and finish it before continuing the review loop. A batch that passes all gates but skips a contract item is incomplete, not clean.
+4. **Fix blocking issues:** real bugs, security problems, correctness failures. These must be fixed before moving on.
+5. **Push fixes, then re-read comments.** New pushes may trigger new bot reviews. Read those too.
+6. **Repeat until the batch is clean.** No unresolved blockers, no missing contract items. The loop continues until the review step has nothing left to find.
 
 If the same non-actionable finding persists for 3 cycles, log your assessment and move on. Don't make unnecessary code changes to appease a finding you believe is wrong.
 

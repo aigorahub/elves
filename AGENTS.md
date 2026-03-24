@@ -177,9 +177,11 @@ gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" --paginate > /tmp/issue-comm
 gh api "repos/${REPO}/commits/$(git rev-parse HEAD)/check-runs" > /tmp/ci-checks.json
 ```
 
-Parse with python3 (no jq). Categorize each finding as BLOCKING, WARNING, or INFO. Also review the diff yourself against the plan. Is the batch fully implemented? Any bugs the bots didn't catch?
+Parse with python3 (no jq). Categorize each finding as BLOCKING, WARNING, or INFO.
 
-**Fix all blocking issues. Push. Re-read comments. Repeat until the batch is clean.** The review isn't something that accumulates for the human. It's part of your loop. You iterate on it until the batch is tight, then move on.
+The review has two jobs: **find bugs** and **verify the batch matches its contract.** Walk through each behavior and acceptance criterion from the contract (step 4). Is it implemented? Is it tested? A batch that passes all gates but skips a contract item is incomplete, not clean. If something is missing, go back to Implement (step 5) and finish it. Also review the diff yourself against the plan — any bugs the bots didn't catch? Any changes outside scope that shouldn't be there?
+
+**Fix all blocking issues. Finish missing contract items. Push. Re-read comments. Repeat until the batch is clean and the contract is fully delivered.** The review isn't something that accumulates for the human. It's part of your loop. You iterate on it until the batch is tight, then move on.
 
 If the same non-actionable finding persists for 3 cycles, log your assessment and move on. The user can fortify this with reviewer bots, custom APIs, or additional checks. See `references/review-subagent.md` for the full review protocol.
 
