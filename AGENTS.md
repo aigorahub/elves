@@ -120,7 +120,7 @@ The PR must exist before any code is written. Reviewer bots (CodeRabbit, Copilot
 
 ## Batch Decomposition
 
-Default: **4 developers × 2-week sprint** (~40 person-days). Override in plan/survival guide:
+Default: **4 developers × 2-week sprint** (~40 person-days). Override in plan/survival guide (example shows a smaller team):
 ```markdown
 ## Batch Sizing
 - team-size: 2
@@ -183,7 +183,7 @@ Run available gates; skip missing ones. User overrides in the survival guide tak
 | Rust | `cargo clippy` | (none) | `cargo build` | `cargo test` |
 | Makefile | `make lint` | `make typecheck` | `make build` | `make test` |
 
-Every gate must pass before proceeding. If a gate fails, apply the **bug-fix protocol**: diagnose the category, write a test that catches the category, find related failures, fix them all, then re-run from the failing gate.
+Every gate must pass before proceeding. If a gate fails, apply the **bug-fix protocol**: diagnose the category, write a test that catches the category, find related failures, fix them all, then re-run from the failing gate. See `references/validation-guide.md` for the full two-stage validation system (local + preview deployment).
 
 ### 7. Review
 
