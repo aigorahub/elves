@@ -247,7 +247,7 @@ Also update `.elves-session.json` — set the batch status to `"complete"`, reco
 
 If the log exceeds ~50 entries, move completed entries to a `## Completed Archive` section.
 
-### 9. Update Survival Guide
+### 9. Update the Survival Guide
 Update "Current Phase" and "Next Exact Batch". A stale survival guide sends the next session down the wrong path.
 
 ### 10. Commit and Push
@@ -329,8 +329,9 @@ Between batches, proactively compact with specific instructions: "Preserve: surv
 
 ## Completion Contract
 
-Don't report "done" unless all are true for the current batch:
-1. All validation gates passed (lint, typecheck, build, test).
+Don't report "done" unless all are true for the current batch. This is a condensed checklist; see `SKILL.md` **Completion Contract** for the full 13-item version.
+
+1. All validation gates passed (lint, typecheck, build, test, preview if configured).
 2. No accumulated debt: no skipped gates, no "will fix later" items, no known regressions.
 3. Contract acceptance criteria marked as met (or exceptions documented).
 4. PR comments read; findings triaged. Review loop ran until no blockers remained. All review threads resolved or replied to.
