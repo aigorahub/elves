@@ -301,6 +301,7 @@ The built-in review works out of the box with zero configuration:
 6. **Record dispositions in `.elves-session.json`.** For each comment you address, log its ID, source, disposition, and the review cycle it was handled in. This survives compaction and lets the next context skip already-handled comments without re-reading and re-evaluating them. See the schema in **Structured Session Data**.
 7. **Push fixes, then re-read comments.** New pushes trigger new bot reviews. Only read **new and unresolved** comments — resolved threads and replied-to comments from previous cycles are done. Don't re-litigate settled findings.
 8. **Repeat until the batch is clean.** No unresolved threads, no unreplied bot comments, no missing contract items. The loop continues until there is nothing left to address.
+9. **Verify documentation is current.** Before exiting the review loop, check that any user-facing behavior changed by this batch is reflected in the project's documentation. This includes README files, API docs, inline doc comments, config references, migration guides, and changelogs — whatever the project uses. If docs are stale, update them now. Don't defer this to a later batch. Stale documentation is silent debt: the code is correct but the user doesn't know how to use it correctly. A batch with good code and wrong docs is not shippable.
 
 If the same non-actionable finding persists for 3 cycles, resolve/reply with your assessment and move on. Don't make unnecessary code changes to appease a finding you believe is wrong — but do document your reasoning in the reply so the human can see it.
 
@@ -403,12 +404,13 @@ A batch isn't done unless:
 2. Build succeeds.
 3. Relevant tests pass with no new failures.
 4. Preview deploys and smoke tests pass (if configured).
-5. Review performed. The review loop ran until no blockers remained.
+5. Review performed. The review loop ran until no blockers remained. All review threads resolved or replied to.
 6. No accumulated debt: no skipped gates, no "will fix later" items, no known regressions.
-7. You're confident the batch is correct. Not "probably fine," but verified through testing, review, and deployment.
-8. Execution log updated with timestamps, evidence, and commit SHA.
-9. Survival guide updated with next batch.
-10. Changes committed and pushed.
+7. **Documentation is up to date.** Any user-facing behavior changed by this batch must be reflected in the relevant docs — README, API docs, inline doc comments, config references, migration guides, changelogs, or whatever the project uses. Stale docs are debt. A user who reads the docs and gets wrong information is worse off than a user with no docs at all.
+8. You're confident the batch is correct. Not "probably fine," but verified through testing, review, and deployment.
+9. Execution log updated with timestamps, evidence, and commit SHA.
+10. Survival guide updated with next batch.
+11. Changes committed and pushed.
 
 Every batch must be tight before you move on. The next batch builds on this one. If this one is shaky, everything after it is shaky. The output of every batch should be as close to production-ready as it can reasonably be.
 

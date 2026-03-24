@@ -190,6 +190,8 @@ The review has two jobs: **find bugs** and **verify the batch matches its contra
 
 **Re-read only new and unresolved comments.** Resolved threads and replied-to comments from previous cycles are done. Don't re-litigate settled findings. **Repeat until no unresolved threads, no unreplied bot comments, and no missing contract items remain.**
 
+**Before exiting the review loop, verify documentation is current.** Any user-facing behavior changed by this batch must be reflected in the project's docs (README, API docs, inline doc comments, config references, changelogs). Stale docs are debt. Update them now, not later.
+
 If the same non-actionable finding persists for 3 cycles, resolve/reply with your assessment and move on. See `references/review-subagent.md` for the full review protocol.
 
 ### 8. Document
@@ -296,11 +298,12 @@ Don't report "done" unless all are true for the current batch:
 1. All validation gates passed (lint, typecheck, build, test).
 2. No accumulated debt: no skipped gates, no "will fix later" items, no known regressions.
 3. Contract acceptance criteria marked as met (or exceptions documented).
-4. PR comments read; findings triaged. Review loop ran until no blockers remained.
-5. `.elves-session.json` updated with batch status, commit SHA, and completion timestamp.
-6. Execution log updated with timestamps, evidence, and commit SHA.
-7. Survival guide updated with next batch.
-8. Changes committed and pushed.
+4. PR comments read; findings triaged. Review loop ran until no blockers remained. All review threads resolved or replied to.
+5. **Documentation is up to date.** Any user-facing behavior changed by this batch is reflected in the relevant docs (README, API docs, inline doc comments, config references, changelogs). Stale docs are debt.
+6. `.elves-session.json` updated with batch status, commit SHA, and completion timestamp.
+7. Execution log updated with timestamps, evidence, and commit SHA.
+8. Survival guide updated with next batch.
+9. Changes committed and pushed.
 
 ## Final Completion
 
