@@ -141,7 +141,7 @@ Each batch must be independently shippable. Split before writing code if a batch
 Agents naturally rush validation and review — resist this. Implementation produces a draft. Validation and review produce something shippable. The default split is **equal thirds** (implement, validate, review); override in the survival guide under `## Run Control`. Whatever the split, validation and review are not afterthoughts. Track per-phase time in the execution log.
 
 ### 1. Orient: Read in order (prevents drift after compaction)
-1. Survival guide  2. Plan  3. Execution log  4. Constitution (`docs/constitution.md` or `CONSTITUTION.md`, if it exists)  5. Project TODO/backlog
+1. Survival guide  2. `.elves-session.json` (if it exists)  3. Plan  4. Execution log  5. Constitution (`docs/constitution.md` or `CONSTITUTION.md`, if it exists)  6. Project TODO/backlog
 
 Identify the first incomplete batch.
 
@@ -244,7 +244,11 @@ This prevents whack-a-mole: same category of bug surfacing in a different place 
 
 Never make unnecessary code changes just to appease a finding. If the same non-actionable finding persists for 3 cycles, resolve with your assessment. (The 3-cycle threshold is a default; override in the survival guide under `## Run Control`.) See `references/review-subagent.md` for the full review protocol.
 
-### 8. Document
+### 8. Legality Check (the Judge)
+
+**If a constitution exists, run the legality check now.** Read the constitution, identify which intentions could be affected by the current batch, and trace flows and invariants through the code. Produce a verdict: **PASS**, **WARN**, **FAIL**, or **UNCHANGED** for each. All PASS/UNCHANGED: continue. Any WARN: fix or document. Any FAIL: blocked until fixed. Codex doesn't have subagents, so do the check directly. See **Constitution and the Legality Check** for the full framework. If no constitution exists, skip this step.
+
+### 9. Document
 
 Append to execution log:
 ```markdown
@@ -267,10 +271,10 @@ Also update `.elves-session.json` — set the batch status to `"complete"`, reco
 
 If the log exceeds ~50 entries, move completed entries to a `## Completed Archive` section.
 
-### 9. Update the Survival Guide
+### 10. Update the Survival Guide
 Update "Current Phase" and "Next Exact Batch". A stale survival guide sends the next session down the wrong path.
 
-### 10. Commit and Push
+### 11. Commit and Push
 ```bash
 git add <specific-files>   # never git add -A
 git commit -m "[<branch> · Batch N/Total] <what you are doing>"
@@ -288,27 +292,29 @@ Examples:
 - `[feat/auth · Batch 3/12] Review fixes: input validation, error handling` (body explains what was fixed/dismissed and why)
 - `[feat/auth · Batch 3/12] Add E2E test for checkout flow`
 
-### 11. Re-read the Survival Guide
+### 12. Re-read the Survival Guide
 **After every push, re-read the survival guide before doing anything else.** Also verify the plan hasn't changed:
 ```bash
 python3 -c "import hashlib,sys; print(hashlib.md5(open(sys.argv[1],'rb').read()).hexdigest())" <plan-path>
 # Compare against hash saved at session start
 ```
 
-### 11a. PR Loop — Poll After Every Push
+### 13. PR Loop — Poll After Every Push
 
 **After every push — including mid-implementation pushes — poll PR comments, inline review comments, and check status before starting any new work.** Don't assume silence means no comments. Bots and CI run asynchronously.
 
-This is a lightweight check, not a full review cycle. The full review in step 7 is comprehensive. Step 11a is a quick scan for new signals:
+This is a lightweight check, not a full review cycle. The full review in step 7 is comprehensive. Step 13 is a quick scan for new signals:
 
 1. **Fetch new PR comments and review threads** via `gh api`. Only read what's new since your last poll.
 2. **Check CI/check status.** If checks are failing, diagnose and fix before moving on.
 3. **Triage new comments** using the same four categories from step 7 (fix now / defer / intentional design / false positive). Quick fixes can be handled inline. If findings require a deeper fix-push-repoll loop, follow the full step 7 protocol.
 4. **Record dispositions** in `.elves-session.json`.
 
+**If `gh api` calls fail**, retry with exponential backoff (30s, 60s, 120s). If auth has expired (401/403 on all endpoints), log as a **Hard Stop**. Transient failures: log and continue.
+
 Skipping this means review feedback piles up silently and the user returns to a PR full of unaddressed comments.
 
-### 12. Entropy Check (every 3 batches)
+### 14. Entropy Check (every 3 batches)
 
 **Every 3 completed batches, do a cross-batch quality scan before starting the next batch.** The per-batch review (step 7) evaluates the batch in isolation. The entropy check evaluates what's accumulated: patterns that drifted, utilities duplicated across batches, naming conventions that diverged, abstractions that grew inconsistent.
 
@@ -316,7 +322,7 @@ Skipping this means review feedback piles up silently and the user returns to a 
 
 If you find drift, fix it in a small focused commit: `[<branch> · Entropy check after Batch N] <what you consolidated>`. If nothing needs fixing, skip and move on. Should take minutes, not hours. The 3-batch cadence is a default; override in the survival guide under `## Run Control`.
 
-### 13. Continue or Stop
+### 15. Continue or Stop
 **Finite:** if enough time budget remains, start the next batch. Otherwise, scout mode or Final Completion.
 
 **Open-ended:** continue automatically after every checkpoint. Do not stop because the batch is complete, because a PR exists, or because the user is away. Only stop for explicit user stop or a blocker with no recovery path.
@@ -371,17 +377,18 @@ Between batches, proactively compact with specific instructions: "Preserve: surv
 
 ## Completion Contract
 
-Don't report "done" unless all are true for the current batch. This is a condensed checklist; see `SKILL.md` **Completion Contract** for the full 13-item version.
+Don't report "done" unless all are true for the current batch. This is a condensed checklist; see `SKILL.md` **Completion Contract** for the full 14-item version.
 
-1. All validation gates passed (lint, typecheck, build, test, preview if configured).
+1. Touched-surface validation gates passed (lint, typecheck, build, test, preview if configured). Broad regression runs at entropy checks and before the Readiness Gate.
 2. No accumulated debt: no skipped gates, no "will fix later" items, no known regressions.
 3. Contract acceptance criteria marked as met (or exceptions documented).
 4. PR comments read; findings triaged. Review loop ran until no blockers remained. All review threads resolved or replied to.
-5. **Documentation is up to date.** Any user-facing behavior changed by this batch is reflected in the relevant docs (README, API docs, inline doc comments, config references, changelogs). Stale docs are debt.
-6. `.elves-session.json` updated with batch status, commit SHA, completion timestamp, and `review_comments` dispositions. The schema includes a `batches` array (id, name, status, commit, rollback_tag, started_at, completed_at) and a `review_comments` array (id, type, source, batch, cycle, summary, disposition, fix_commit/reason). See `SKILL.md` **Structured Session Data** for the full schema.
-7. Execution log updated with timestamps, evidence, and commit SHA.
-8. Survival guide updated with next batch.
-9. Changes committed and pushed.
+5. Legality check passed (if a constitution exists). No unresolved FAIL verdicts.
+6. **Documentation is up to date.** Any user-facing behavior changed by this batch is reflected in the relevant docs (README, API docs, inline doc comments, config references, changelogs). Stale docs are debt.
+7. `.elves-session.json` updated with batch status, commit SHA, completion timestamp, and `review_comments` dispositions. The schema includes a `batches` array (id, name, status, commit, rollback_tag, started_at, completed_at) and a `review_comments` array (id, type, source, batch, cycle, summary, disposition, fix_commit/reason). See `SKILL.md` **Structured Session Data** for the full schema.
+8. Execution log updated with timestamps, evidence, and commit SHA.
+9. Survival guide updated with next batch.
+10. Changes committed and pushed.
 
 ## Constitution and the Legality Check
 
@@ -468,3 +475,7 @@ Stop only when:
 3. A destructive action is required that was explicitly listed as a non-negotiable in the survival guide.
 
 Everything else: resolve with best judgment, document under **Decisions made**.
+
+## Persistent Preferences
+
+If the skill directory contains a `config.json`, read it at session start. This stores preferences from previous sessions (batch sizing, notification method, review method, default branch, cleanup behavior). See `config.json.example` for the template and `SKILL.md` **Persistent Preferences** for the full description.
