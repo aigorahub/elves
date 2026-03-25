@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "1.3.0"
+  version: "1.3.1"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -140,7 +140,7 @@ By the end of the planning conversation, you should have:
 3. **Execution log:** initialized and ready for the first entry.
 4. **Active branch name:** agreed with the user.
 
-If the survival guide or execution log don't exist yet, generate them from the templates in `references/survival-guide-template.md` and `references/execution-log-template.md`, filling in details from the planning conversation.
+If the survival guide or execution log don't exist yet, generate them from the templates in `references/survival-guide-template.md` and `references/execution-log-template.md`, filling in details from the planning conversation. See `references/plan-template.md` for plan structure guidance and `references/kickoff-prompt-template.md` for how users start the session.
 
 Once the plan is solid and the user says go, move to Phase 2.
 
@@ -212,7 +212,7 @@ If a PR already exists on the current branch, detect it and skip this setup.
 
 **You never merge. The user merges when they return.**
 
-## Batch Decomposition
+### Batch Decomposition
 
 Split large programs into batches before coding. The right batch size is **what the current model can get almost certainly correct in a single focused effort**, then verified through testing, review, and deployment before moving on.
 
@@ -258,7 +258,7 @@ If your environment doesn't support subagents, do all work directly. The core lo
 
 For every batch, execute this full cycle:
 
-### Time Allocation
+#### Time Allocation
 
 Left to their own instincts, agents spend 80% of batch time implementing and rush through validation and review. This is backwards. Implementation produces a draft. Validation and review produce something shippable. If you finish implementing and feel like the batch is "almost done," you're wrong — you've produced a first draft that hasn't been tested or reviewed yet.
 
@@ -281,10 +281,11 @@ Track time per phase in the execution log (Implement Xm / Validate Xm / Review X
 **Read these files in order. This is the most important step. It prevents drift after compaction.**
 
 1. Survival guide
-2. Plan
-3. Execution log
-4. Constitution (`docs/constitution.md` or `CONSTITUTION.md`, if it exists)
-5. Any project-level TODO or backlog file (if it exists)
+2. `.elves-session.json` (if it exists — fastest signal for current batch, PR number, and handled comments)
+3. Plan
+4. Execution log
+5. Constitution (`docs/constitution.md` or `CONSTITUTION.md`, if it exists)
+6. Any project-level TODO or backlog file (if it exists)
 
 Then identify the first incomplete batch.
 
@@ -349,7 +350,7 @@ This takes minutes and prevents hours of review churn. The survey makes principl
 
 If the contract's **Build on** section is stale or incomplete (the codebase changed since the contract was written), update it before coding.
 
-Build the batch scope fully. Push after each meaningful chunk — and **every commit must follow the progress report format** from step 10: `[<branch> · Batch N/Total] <what you are doing>`. This applies to mid-implementation commits too, not just batch-end commits. Tag incidental findings as `[elves-scout]` in TODO.md for later.
+Build the batch scope fully. Push after each meaningful chunk — and **every commit must follow the progress report format** from step 11: `[<branch> · Batch N/Total] <what you are doing>`. This applies to mid-implementation commits too, not just batch-end commits. Tag incidental findings as `[elves-scout]` in TODO.md for later.
 
 **Use commit messages to communicate with the reviewer.** The reviewer reads your commit history to understand not just *what* you changed but *why*. Every commit should reference which batch item is being addressed. When you make a design choice that isn't obvious — choosing one approach over another, hardcoding a value, deviating from a pattern — explain your reasoning in the commit message body. This is the communication channel between you and the reviewer. Without it, the reviewer flags something, you silently change it back, the reviewer flags it again, and you burn cycles arguing through code. With it, the reviewer reads your justification first and only flags things where the reasoning is actually wrong.
 
@@ -412,9 +413,23 @@ The built-in review works out of the box with zero configuration:
 
 Never make unnecessary code changes just to appease a finding. If the finding is wrong, say so and document why. If the same non-actionable finding persists for 3 cycles, resolve it with your assessment — you've given it a fair hearing. (The 3-cycle threshold is a default; override in the survival guide under `## Run Control`.)
 
-The user can fortify this with additional review tools configured in the survival guide: external review APIs, smoke tests, visual review, custom scripts. See `references/tool-config-examples.md`. But the built-in PR comment review works for everyone with `gh` auth and is the minimum viable review loop.
+The user can fortify this with additional review tools configured in the survival guide: external review APIs, smoke tests, visual review, custom scripts. See `references/tool-config-examples.md` for tool configuration and `references/review-subagent.md` for the full review subagent protocol. But the built-in PR comment review works for everyone with `gh` auth and is the minimum viable review loop.
 
-### 8. Document
+### 8. Legality Check (the Judge)
+
+**If a constitution exists, run the legality check now.** This is separate from validation (step 6) and code review (step 7). After the batch passes both, the judge verifies the app still keeps all its promises. See **Constitution and the Legality Check** for the full framework.
+
+Read the constitution, identify which intentions could be affected by the current batch, and trace flows and invariants through the code. Produce a verdict for each: **PASS**, **WARN**, **FAIL**, or **UNCHANGED**.
+
+- **All PASS or UNCHANGED:** continue to step 9.
+- **Any WARN:** review and either fix or document why it's a false positive.
+- **Any FAIL:** batch is blocked. Fix the issue, re-run validation (step 6), and re-run the judge before continuing.
+
+If a Judge skill exists, use it. If not, spawn a read-only review subagent with the constitution and the diff. If subagents aren't available, do the check directly. The check must happen regardless of tooling. See `references/review-subagent.md` for the review subagent protocol.
+
+If no constitution exists, skip this step.
+
+### 9. Document
 
 Update the execution log with a timestamped entry covering: batch name, timing breakdown, what changed, commands run, test results, review findings, decisions made, commit SHA, rollback tag, and next steps.
 
@@ -424,11 +439,11 @@ Also update `.elves-session.json` — set the current batch status to `"complete
 
 Keep entries concise. If the log exceeds ~50 entries, archive older ones under `## Completed Archive`.
 
-### 9. Update the Survival Guide
+### 10. Update the Survival Guide
 
 Update "Current Phase" and "Next Exact Batch" to reflect the new state. A stale survival guide sends the next session down the wrong path.
 
-### 10. Commit and Push
+### 11. Commit and Push
 
 Stage specific files (not `git add -A`), commit with a clear message that includes batch progress, push.
 
@@ -473,24 +488,26 @@ comment referencing their docs.
 
 This lets anyone watching the commit graph see where the run stands, which branch it's on, and what's happening right now. It also gives the reviewer the context they need to evaluate your choices without guessing.
 
-### 11. Re-read the Survival Guide
+### 12. Re-read the Survival Guide
 
 **After every push, re-read the survival guide before doing anything else.** Also verify the plan file hasn't changed since session start.
 
-### 11a. PR Loop — Poll After Every Push
+### 13. PR Loop — Poll After Every Push
 
 **After every push — including mid-implementation pushes, not just end-of-batch pushes — poll PR comments, inline review comments, and check status before starting any new work.** Don't assume silence means no comments. Bots and CI run asynchronously — new feedback may have arrived since your last check, even if you just pushed seconds ago.
 
-This is a lightweight check, not a full review cycle. The full review in step 7 is comprehensive (contract verification, code quality audit, documentation check). Step 11a is a quick scan for new signals:
+This is a lightweight check, not a full review cycle. The full review in step 7 is comprehensive (contract verification, code quality audit, documentation check). Step 13 is a quick scan for new signals:
 
 1. **Fetch new PR comments and review threads** via `gh api`. Only read what's new since your last poll.
 2. **Check CI/check status.** If checks are failing, diagnose and fix before moving on.
 3. **Triage new comments** using the same four categories from step 7 (fix now / defer / intentional design / false positive). Quick fixes can be handled inline. If findings require a deeper fix-push-repoll loop, follow the full step 7 protocol.
 4. **Record dispositions** in `.elves-session.json` as described in step 7.
 
+**If `gh api` calls fail** (rate limiting, auth expiration, network issues), retry with exponential backoff (wait 30s, 60s, 120s). If the failure persists after 3 retries, log it in the execution log and continue with the batch — don't let a transient GitHub API issue block the entire run. If auth has expired (401/403 on all endpoints), log it as a **Hard Stop** — the review loop can't function without API access.
+
 This is not optional. Skipping it means review feedback piles up silently and the user returns to a PR full of unaddressed comments. The PR loop is what makes the difference between "autonomous completion" and "visible collaborative review cadence."
 
-### 12. Entropy Check (every 3 batches)
+### 14. Entropy Check (every 3 batches)
 
 **Every 3 completed batches, do a cross-batch quality scan before starting the next batch.** The per-batch review (step 7) evaluates the batch in isolation. The entropy check evaluates what's accumulated across batches: patterns that drifted, utilities that were duplicated in different batches, naming conventions that diverged, abstractions that grew inconsistent.
 
@@ -506,7 +523,7 @@ If you find drift, fix it now in a small focused commit: `[<branch> · Entropy c
 
 If nothing needs fixing, skip it and move on. This should take minutes, not hours. The 3-batch cadence is a default; override in the survival guide under `## Run Control`.
 
-### 13. Continue or Stop
+### 15. Continue or Stop
 
 **Finite mode:** check the clock. If there's enough time for another batch, start it. Otherwise, scout mode or Final Completion. Don't pause. Don't wait for user input.
 
@@ -571,17 +588,18 @@ A batch isn't done unless:
 
 1. Code lints cleanly and type-checks with zero errors.
 2. Build succeeds.
-3. Relevant tests pass with no new failures.
+3. Touched-surface tests pass with no new failures. (Broad regression proof runs at entropy checks and before the Readiness Gate — see **Proof Scope**.)
 4. Preview deploys and smoke tests pass (if configured).
 5. Contract acceptance criteria marked as met (or exceptions documented with reasoning).
 6. Review performed. The review loop ran until no blockers remained. All review threads resolved or replied to.
-7. No accumulated debt: no skipped gates, no "will fix later" items, no known regressions.
-8. **Documentation is up to date.** Any user-facing behavior changed by this batch must be reflected in the relevant docs — README, API docs, inline doc comments, config references, migration guides, changelogs, or whatever the project uses. Stale docs are debt. A user who reads the docs and gets wrong information is worse off than a user with no docs at all.
-9. `.elves-session.json` updated with batch status, commit SHA, completion timestamp, and `review_comments` dispositions.
-10. You're confident the batch is correct. Not "probably fine," but verified through testing, review, and deployment.
-11. Execution log updated with timestamps, evidence, and commit SHA.
-12. Survival guide updated with next batch.
-13. Changes committed and pushed.
+7. Legality check passed (if a constitution exists). No unresolved FAIL verdicts.
+8. No accumulated debt: no skipped gates, no "will fix later" items, no known regressions.
+9. **Documentation is up to date.** Any user-facing behavior changed by this batch must be reflected in the relevant docs — README, API docs, inline doc comments, config references, migration guides, changelogs, or whatever the project uses. Stale docs are debt. A user who reads the docs and gets wrong information is worse off than a user with no docs at all.
+10. `.elves-session.json` updated with batch status, commit SHA, completion timestamp, and `review_comments` dispositions.
+11. You're confident the batch is correct. Not "probably fine," but verified through testing, review, and deployment.
+12. Execution log updated with timestamps, evidence, and commit SHA.
+13. Survival guide updated with next batch.
+14. Changes committed and pushed.
 
 Every batch must be tight before you move on. The next batch builds on this one. If this one is shaky, everything after it is shaky. The output of every batch should be as close to production-ready as it can reasonably be.
 
@@ -619,7 +637,7 @@ What doesn't go in the constitution: implementation details, specific UI layouts
 
 ### The judge
 
-The legality check is its own stage in the loop, separate from validation gates and code review. After each batch passes validation and review, the judge runs.
+The legality check runs as step 8 in the Core Loop, after validation (step 6) and review (step 7). This section describes the judge in detail; step 8 is the operational integration.
 
 The judge is a **read-only subagent**. It doesn't modify code. It reads the constitution, identifies which intentions could be affected by the current batch, and traces the flows and invariants through the code. It produces a structured verdict for each intention:
 
@@ -651,7 +669,7 @@ Not all proof is equal. Distinguish between:
 - **Touched-surface proof:** validation focused on the code and behaviors this batch actually changed. This is the minimum required for every batch.
 - **Broad regression proof:** running the full test suite, all E2E scenarios, all viewports, etc. This is valuable but expensive and can be blocked by known issues in unrelated areas.
 
-**Default to touched-surface proof.** Run broad regression proof at entropy check intervals (see step 12) and before calling the branch review-ready (see **Readiness Gate** below). If a broad regression run is blocked by an unrelated known issue, record it in the execution log and fall back to narrower touched-surface proof instead of thrashing. Don't waste hours debugging a pre-existing flake in an area you didn't touch.
+**Default to touched-surface proof.** Run broad regression proof at entropy check intervals (see step 14) and before calling the branch review-ready (see **Readiness Gate** below). If a broad regression run is blocked by an unrelated known issue, record it in the execution log and fall back to narrower touched-surface proof instead of thrashing. Don't waste hours debugging a pre-existing flake in an area you didn't touch.
 
 **Preview proof must be on the exact current runtime tip.** After pushing review fixes, re-deploying, or any commit that changes deployed behavior, re-verify on the current deployed version. Proof from a prior commit does not carry forward after subsequent changes. Don't inherit proof — re-earn it.
 

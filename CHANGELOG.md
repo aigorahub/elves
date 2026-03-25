@@ -2,6 +2,29 @@
 
 All notable changes to the Elves skill are documented here.
 
+## [1.3.1] - 2026-03-25
+
+### Review fixes: structural consistency and operational gaps
+
+#### Core Loop restructuring
+- **Wired the Judge into the Core Loop as step 8.** The legality check was described in a standalone section but had no step number — an agent following steps literally would never run it. Now step 8 sits between Review (7) and Document (9).
+- **Renumbered all Core Loop steps** 1-15. Eliminated the "11a" hack — PR Loop is now step 13.
+- **Fixed heading levels.** Batch Decomposition and Time Allocation were peers of Core Loop when they should have been children.
+
+#### Internal consistency
+- **Unified Orient and Compaction Recovery reading orders.** Added `.elves-session.json` to Orient step.
+- **Clarified proof scope in Completion Contract.** "Relevant tests" → "Touched-surface tests" with note that broad regression runs at entropy checks and Readiness Gate.
+- **Added legality check to Completion Contract** (now 14 items).
+
+#### Operational gaps
+- **Added `gh` API failure/retry guidance** to step 13 (PR Loop).
+- **Added references** to `review-subagent.md`, `plan-template.md`, `kickoff-prompt-template.md`.
+
+#### Cross-file sync
+- AGENTS.md: renumbered steps 1-15, added step 8 (Judge), added `.elves-session.json` to Orient, added legality check to Completion Contract, added `gh` API failure guidance, added Persistent Preferences section.
+- README: changed "v0" to "still early", updated file structure diagram, removed placeholder URL.
+- TODO.md: marked stale PR #5 items as done.
+
 ## [1.3.0] - 2026-03-25
 
 ### PR Loop, Readiness Gate, Constitution & Legality Check
