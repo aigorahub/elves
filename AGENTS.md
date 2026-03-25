@@ -117,7 +117,7 @@ PR_NUMBER=$(gh pr view --json number -q .number)
 
 If a PR already exists on the branch, detect it and skip.
 
-The PR must exist before any code is written. Reviewer bots (CodeRabbit, Copilot, SonarCloud, etc.) review every push automatically. The earlier the PR exists, the more review feedback accumulates.
+**Don't wait to open the PR.** Open it after the first pushed commit — even if it's just session setup documents. Do not delay until the branch is "nearly done" or until the first implementation batch is complete. The PR is your collaboration surface, your review loop, and your visibility tool. Every hour without a PR is an hour where bots can't review, the user can't check in, and comments can't accumulate. Keep using the same PR throughout the run; do not create new PRs for subsequent batches.
 
 **The PR isn't the deliverable. The deliverable is work that is ready to review.** You never merge.
 
@@ -141,7 +141,7 @@ Each batch must be independently shippable. Split before writing code if a batch
 Agents naturally rush validation and review — resist this. Implementation produces a draft. Validation and review produce something shippable. The default split is **equal thirds** (implement, validate, review); override in the survival guide under `## Run Control`. Whatever the split, validation and review are not afterthoughts. Track per-phase time in the execution log.
 
 ### 1. Orient: Read in order (prevents drift after compaction)
-1. Survival guide  2. Plan  3. Execution log  4. Project TODO/backlog
+1. Survival guide  2. Plan  3. Execution log  4. Constitution (`docs/constitution.md` or `CONSTITUTION.md`, if it exists)  5. Project TODO/backlog
 
 Identify the first incomplete batch.
 
@@ -236,7 +236,13 @@ This prevents whack-a-mole: same category of bug surfacing in a different place 
 
 **Before exiting the review loop, verify documentation is current.** Any user-facing behavior changed by this batch must be reflected in the project's docs (README, API docs, inline doc comments, config references, changelogs). Stale docs are debt. Update them now, not later.
 
-**Triage every finding:** genuine issue (fix it), intentional design (resolve with justification — don't change code), or false positive (resolve with reasoning — move on). Never make unnecessary code changes just to appease a finding. If the same non-actionable finding persists for 3 cycles, resolve with your assessment. (The 3-cycle threshold is a default; override in the survival guide under `## Run Control`.) See `references/review-subagent.md` for the full review protocol.
+**Triage every finding into one of four categories:**
+- **Fix now:** a real bug, security problem, quality violation, or missing contract item. Fix it before continuing.
+- **Defer:** valid finding but out of scope for the current batch. Log it in TODO.md with `[elves-scout]`, reply with the deferral reason, and move on.
+- **Intentional design:** the reviewer flagged something that is correct and deliberate. Resolve/reply with a justification. Don't change the code.
+- **False positive:** the reviewer flagged something that isn't actually an issue. Resolve/reply with your reasoning and move on.
+
+Never make unnecessary code changes just to appease a finding. If the same non-actionable finding persists for 3 cycles, resolve with your assessment. (The 3-cycle threshold is a default; override in the survival guide under `## Run Control`.) See `references/review-subagent.md` for the full review protocol.
 
 ### 8. Document
 
@@ -288,6 +294,19 @@ Examples:
 python3 -c "import hashlib,sys; print(hashlib.md5(open(sys.argv[1],'rb').read()).hexdigest())" <plan-path>
 # Compare against hash saved at session start
 ```
+
+### 11a. PR Loop — Poll After Every Push
+
+**After every push — including mid-implementation pushes — poll PR comments, inline review comments, and check status before starting any new work.** Don't assume silence means no comments. Bots and CI run asynchronously.
+
+This is a lightweight check, not a full review cycle. The full review in step 7 is comprehensive. Step 11a is a quick scan for new signals:
+
+1. **Fetch new PR comments and review threads** via `gh api`. Only read what's new since your last poll.
+2. **Check CI/check status.** If checks are failing, diagnose and fix before moving on.
+3. **Triage new comments** using the same four categories from step 7 (fix now / defer / intentional design / false positive). Quick fixes can be handled inline. If findings require a deeper fix-push-repoll loop, follow the full step 7 protocol.
+4. **Record dispositions** in `.elves-session.json`.
+
+Skipping this means review feedback piles up silently and the user returns to a PR full of unaddressed comments.
 
 ### 12. Entropy Check (every 3 batches)
 
@@ -341,7 +360,8 @@ After any compaction or restart, conversation history is gone. But instructions 
 3. Read `.elves-session.json` to quickly determine the current batch, PR number, and what's complete.
 4. Read the plan.
 5. Read the execution log.
-6. Identify the first incomplete batch and resume immediately.
+6. Read the constitution (`docs/constitution.md` or `CONSTITUTION.md`) if it exists.
+7. Identify the first incomplete batch and resume immediately.
 
 Don't redo completed work. Don't ask for help. If you detect existing documents at startup, you are resuming. Follow this protocol.
 
@@ -362,6 +382,59 @@ Don't report "done" unless all are true for the current batch. This is a condens
 7. Execution log updated with timestamps, evidence, and commit SHA.
 8. Survival guide updated with next batch.
 9. Changes committed and pushed.
+
+## Constitution and the Legality Check
+
+The elves loop has three quality layers, each asking a different question:
+
+1. **Correctness** (validation gates): Is this code valid and well-written?
+2. **Plan compliance** (the review step): Does this code do what the plan said to do?
+3. **Legality** (the judge): Does the app still keep all its promises?
+
+Levels 2 and 3 require input from the human. The plan provides level 2. The constitution provides level 3.
+
+### The constitution
+
+If `docs/constitution.md` (or `CONSTITUTION.md`) exists, read it during every Orient step and during compaction recovery. It contains the app's deal-breaker behaviors — the things that, if broken, would make the user revert the entire PR without reading further.
+
+Each intention should be: specific enough to verify, abstract enough to survive refactoring, and stated as behaviors (not implementation details). The constitution contains three kinds of intentions: **flows** (with mermaid diagrams), **business logic**, and **invariants**.
+
+### The judge
+
+After each batch passes validation and review, run the legality check. Read the constitution, identify which intentions could be affected by the current batch, and trace flows and invariants through the code. Produce a verdict for each: **PASS**, **WARN**, **FAIL**, or **UNCHANGED**.
+
+**All PASS or UNCHANGED:** batch continues. **Any WARN:** review and either fix or document why it's a false positive. **Any FAIL:** batch is blocked until the issue is fixed.
+
+Codex doesn't have subagents, so do the legality check directly. Triage findings using the same four categories from step 7. Do not call a branch review-ready with unresolved FAIL findings.
+
+### The flywheel
+
+The constitution grows over time: during planning (propose new intentions for new features), after mistakes (every regression becomes a permanent safeguard), and after incidents (ask "should there have been an intention?"). The agent can draft intentions. **The human must own them.**
+
+## Proof Scope
+
+- **Touched-surface proof:** validation focused on what this batch actually changed. Minimum required for every batch.
+- **Broad regression proof:** full test suite, all E2E scenarios. Run at entropy check intervals (every 3 batches) and before declaring review-ready.
+
+If a broad regression run is blocked by an unrelated known issue, record it and fall back to narrower touched-surface proof instead of thrashing.
+
+**Preview proof must be on the exact current runtime tip.** After pushing review fixes, re-verify on the current deployed version. Don't inherit proof — re-earn it.
+
+**When export or artifact behavior changes, inspect the actual artifact.** Don't just verify success status — download and inspect the output file.
+
+## Readiness Gate
+
+The **Completion Contract** governs individual batches. The **Readiness Gate** governs the branch as a whole before declaring it review-ready. Do not call a branch review-ready unless ALL of the following are true:
+
+1. **Execution log is current.** All batches documented with timestamps, evidence, and commit SHAs.
+2. **Local proof is green on the current tip.** All gates pass on the latest commit.
+3. **Preview proof is green on the current tip** (if deployed behavior was touched).
+4. **Artifact inspection done** for any export/download behavior changes.
+5. **PR comments and checks have been polled.** No unresolved threads, no failing checks.
+6. **Legality check is clean.** If a constitution exists, no unresolved FAIL verdicts.
+7. **Git status is clean.** No uncommitted changes.
+
+If any gate fails, fix it before declaring readiness.
 
 ## Final Completion
 

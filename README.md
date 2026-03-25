@@ -35,7 +35,7 @@ Elves is the harness that lets the Ralph Loop run for hours without supervision,
 ## How it works
 
 ```
-Plan → Batch → Implement → Validate → Review → Document → Continue
+Plan → Batch → Implement → Validate → Review → Judge → Document → Continue
 ```
 
 Elves runs a tight loop. For each batch of planned work, the agent implements the changes, runs validation gates, reads PR review comments, fixes any blocking findings, updates the documentation, and pushes a checkpoint, then immediately starts the next batch. No waiting, no prompting, no drift.
@@ -117,6 +117,9 @@ Elves runs preflight checks first: git access, test gates, sleep prevention, not
 - **Two run modes**: finite (deadline-based, default) or open-ended (continue until explicitly stopped). Open-ended mode disables Final Completion and treats every checkpoint as a relaunch point.
 - **Time-aware pacing**: tracks how long each batch takes and uses that to decide whether to start another batch or wrap up cleanly (finite mode)
 - **Slack notifications** (or any custom command): know when your run finishes without watching the terminal
+- **Constitution and legality check**: human-authored deal-breaker behaviors (`docs/constitution.md`) verified by a read-only judge after each batch. Three quality layers: correctness (tests), plan compliance (review), legality (judge). Success criteria the agent didn't author.
+- **PR Loop**: poll PR comments, inline reviews, and check status after every push — not just at batch boundaries
+- **Readiness Gate**: branch-level checklist (proof on current tip, legality check clean, PR comments resolved, git status clean) before declaring review-ready
 - **Structured session data** in `.elves-session.json` for tooling, dashboards, and analytics
 - **Comprehensive preflight checks**: git remote, push access, GitHub CLI auth, test gates, sleep prevention, Slack webhook, stale branch detection
 
@@ -336,6 +339,7 @@ elves/
 - **Agent infrastructure is real engineering.** Developers who treat agent infrastructure as a real engineering concern (tight code review systems, organized work trees, failure handling) end up with something that functions like a tireless junior team working every hour they're away from their desk.
 - **Quality is not an afterthought.** Agents naturally spend 80% of batch time implementing and rush through validation and review. Elves treats implement, validate, and review as roughly equal phases. Implementation produces a draft. Validation and review produce something shippable.
 - **The philosophy applies everywhere, not just review.** The nine code quality principles (root cause over band-aids, centralize over duplicate, extend over create, etc.) aren't just a reviewer's checklist. They inform how batches are planned (architecture-aware ordering), how contracts are written (what to build on), how implementation begins (pre-implementation survey), and how review verifies (did you actually use what you found?). A principle enforced only at review time creates rework. Applied from planning onward, it prevents the rework from happening.
+- **The constitution is the law of the app.** Tests check whether code works. The constitution checks whether the app keeps its promises. Agents can write code that passes every test and still miss the point — because the agent authored the tests. The constitution provides success criteria from outside the agent's control: human-written intentions at a level of abstraction that requires genuine understanding to verify. You can game a unit test. You can't game "a failed payment never results in a fulfilled order." See [Here Comes the Judge](https://x.com/johnennis/status/...) for the full framework.
 
 ### Prior art and convergence
 

@@ -2,6 +2,38 @@
 
 All notable changes to the Elves skill are documented here.
 
+## [1.3.0] - 2026-03-25
+
+### PR Loop, Readiness Gate, Constitution & Legality Check
+
+#### PR timing and review cadence
+- **"Don't wait to open the PR"** — explicit instruction to open the PR after the first pushed commit, not delay until the branch is nearly done. Keep using the same PR throughout the run.
+- **PR Loop (step 11a):** After every push (including mid-implementation), poll PR comments, inline reviews, and check status before starting new work. Lightweight scan that defers to step 7 for full review cycles.
+
+#### Constitution and the legality check
+- **Three quality layers** made explicit: correctness (validation gates), plan compliance (review step), legality (the judge). Each asks a different question.
+- **The gaming problem:** Explains why agent-authored tests have a ceiling — agents can satisfy every deterministic test while missing the point. The constitution breaks through by providing success criteria the agent didn't author.
+- **The constitution:** `docs/constitution.md` or `CONSTITUTION.md` contains deal-breaker behaviors (flows with mermaid diagrams, business logic, invariants). Read during every Orient step and compaction recovery.
+- **The judge:** Read-only legality check producing PASS/WARN/FAIL/UNCHANGED verdicts per intention. Runs after each batch passes validation and review. FAIL blocks the batch.
+- **The flywheel:** Constitution grows via planning (propose new intentions), mistakes (regressions become safeguards), and incidents. Agent drafts, human owns.
+
+#### Readiness gate
+- **Readiness Gate:** 7-point branch-level checklist before declaring review-ready (local proof on current tip, preview proof, artifact inspection, PR comments polled, legality check clean, git status clean, execution log current). Distinct from the per-batch Completion Contract.
+
+#### Proof scope
+- **Touched-surface vs broad regression proof.** Default to touched-surface per batch; run broad regression at entropy check intervals and before readiness.
+- **Re-earn proof after each push** — don't inherit proof from prior commits after review fixes.
+- **Artifact inspection** — inspect actual downloaded output for export/download changes.
+
+#### Triage and operational specificity
+- **Four-category triage** unified across step 7, step 11a, and judge: fix now, defer, intentional design, false positive. Replaces the previous three-category scheme.
+- **Subagent capacity:** If pool is full, reuse/close idle agents or do work directly. Never skip review.
+- **Process warnings:** Stop and clean up if session/process-count warnings appear.
+
+#### Housekeeping
+- Updated AGENTS.md (Codex variant) with all v1.3.0 changes.
+- Updated CHANGELOG.md and README.md.
+
 ## [1.2.0] - 2026-03-25
 
 ### Harness Design: Full-Lifecycle Philosophy, Time Allocation, and Industry Convergence
