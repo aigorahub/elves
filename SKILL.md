@@ -191,10 +191,10 @@ Record the time budget in the execution log.
    git commit -m "[<branch> · Batch 0/N] Session setup — survival guide, execution log, batch plan"
    ```
 
-3. **Push and open a draft PR immediately:**
+3. **Push and open a PR immediately:**
    ```bash
    git push -u origin HEAD
-   gh pr create --draft --title "<concise title from plan>" --body "<plan summary with batch list>"
+   gh pr create --title "<concise title from plan>" --body "<plan summary with batch list>"
    ```
 
 4. **Capture the PR number** for later:
@@ -204,7 +204,7 @@ Record the time budget in the execution log.
 
 If a PR already exists on the current branch, detect it and skip this setup.
 
-**Don't wait to open the PR.** Open a draft PR after the first pushed commit — even if it's just session setup documents. Do not delay until the branch is "nearly done" or until the first implementation batch is complete. The PR is your collaboration surface, your review loop, and your visibility tool. Every hour without a PR is an hour where bots can't review, the user can't check in, and comments can't accumulate. Keep using the same PR throughout the run; do not create new PRs for subsequent batches. Most review bots (CodeRabbit, SonarCloud, Copilot) review draft PRs by default. If a specific bot requires a non-draft PR, the user should note that in the survival guide and you should open a regular PR instead.
+**Don't wait to open the PR.** Open it after the first pushed commit — even if it's just session setup documents. Do not delay until the branch is "nearly done" or until the first implementation batch is complete. The PR is your collaboration surface, your review loop, and your visibility tool. Every hour without a PR is an hour where bots can't review, the user can't check in, and comments can't accumulate. Keep using the same PR throughout the run; do not create new PRs for subsequent batches.
 
 **Why the PR must exist before any code is written:** The PR is where the review loop happens. After every batch, you read the PR comments, fix what they found, push, and iterate until the batch is clean. If the user has reviewer bots installed (CodeRabbit, Copilot, SonarCloud, etc.), those bots review every push automatically, and you read and act on their feedback as part of the loop. The review isn't something that accumulates for the human to read in the morning. The review is part of your loop. You iterate on it until the batch is tight, then move on.
 
@@ -620,11 +620,6 @@ Do not call a branch review-ready unless ALL of the following are true:
 8. **Constitution is respected.** If `CONSTITUTION.md` exists, no unresolved violations.
 
 If any gate fails, fix it before declaring readiness. This checklist is the final quality gate between "autonomous run complete" and "ready for human review."
-
-**When all gates pass**, mark the PR ready for review (remove draft status) as part of Final Completion:
-```bash
-gh pr ready
-```
 
 ## Final Completion
 
