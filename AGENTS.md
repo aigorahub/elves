@@ -136,9 +136,9 @@ Each batch must be independently shippable. Split before writing code if a batch
 
 ## Core Loop
 
-### Time Allocation: The Rule of Thirds
+### Time Allocation
 
-The implement-validate-review cycle should be roughly **equal thirds** of batch time. Agents naturally rush validation and review — resist this. Implementation produces a draft. Validation and review produce something shippable. If you're spending less than a third of batch time on validation and review combined, increase test coverage, add E2E scenarios, and check contract items more thoroughly. Track per-phase time in the execution log.
+Agents naturally rush validation and review — resist this. Implementation produces a draft. Validation and review produce something shippable. The default split is **equal thirds** (implement, validate, review); override in the survival guide under `## Run Control`. Whatever the split, validation and review are not afterthoughts. Track per-phase time in the execution log.
 
 ### 1. Orient: Read in order (prevents drift after compaction)
 1. Survival guide  2. Plan  3. Execution log  4. Project TODO/backlog

@@ -252,17 +252,21 @@ If your environment doesn't support subagents, do all work directly. The core lo
 
 For every batch, execute this full cycle:
 
-### Time Allocation: The Rule of Thirds
+### Time Allocation
 
-Left to their own instincts, agents spend 80% of batch time implementing and rush through validation and review. This is backwards. The implement-validate-review cycle should be roughly **equal thirds**:
+Left to their own instincts, agents spend 80% of batch time implementing and rush through validation and review. This is backwards. Implementation produces a draft. Validation and review produce something shippable. If you finish implementing and feel like the batch is "almost done," you're wrong — you've produced a first draft that hasn't been tested or reviewed yet.
 
-- **~1/3 implementing** — writing the code, including the pre-implementation survey
-- **~1/3 validating** — running gates, E2E tests, smoke tests, QA checks, preview deployment verification
-- **~1/3 reviewing** — reading PR feedback, checking contract completeness, enforcing the philosophy, fixing findings, re-validating fixes
+The default time split is **equal thirds** — roughly equal time implementing, validating, and reviewing. The user can override this in the survival guide under `## Run Control`:
 
-This isn't a strict clock — some batches are heavier on implementation, some on review. But if you finish implementing and feel like the batch is "almost done," you're wrong. You're one-third done. The validation and review phases are where quality happens. Implementation produces a draft. Validation and review produce something shippable.
+```markdown
+## Time Allocation
+- implement: 40%
+- validate: 30%
+- review: 30%
+- notes: Heavy greenfield work in this project, lighter review expected.
+```
 
-**If you're spending less than a third of batch time on validation and review combined, your batches aren't tight — they're untested.** Increase test coverage, add E2E scenarios, add smoke tests, read PR comments more carefully, check contract items more thoroughly. The time exists to be spent. Spend it on quality.
+Whatever the split, the principle holds: **validation and review are not afterthoughts.** E2E tests, smoke tests, QA checks, contract verification, PR comment triage, philosophy enforcement — these are where quality happens. If the agent is rushing through them, the batches aren't tight.
 
 Track time per phase in the execution log (Implement Xm / Validate Xm / Review Xm) so drift is visible across the run.
 
