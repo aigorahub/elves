@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "1.0.0"
+  version: "1.2.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -28,6 +28,36 @@ The user operates on both ends of the work: specifying problems on the front end
 But AI agents are stateless. Context compaction erases working memory. Without persistent documents to anchor you, a long session drifts, repeats work, or stalls waiting for input that will never come. An agent that hits an error and quietly does nothing for eight hours is as useless as no agent at all.
 
 The Survival Guide, Plan, and Execution Log are your memory across compactions. They aren't overhead. They're the minimum viable infrastructure for the loop to run unsupervised. Read them. Trust them. Update them. They're what make you reliable enough to justify the user walking away.
+
+## Code Quality Philosophy
+
+AI coding agents have a natural tendency toward spaghetti: quick fixes instead of root causes, new utilities instead of extending existing ones, novel patterns instead of following established conventions. Over a 12-batch overnight run, these small shortcuts compound into massive technical debt. The codebase gets harder to work on with every batch instead of easier.
+
+**The goal is the opposite: each batch should leave the codebase in better shape than it found it.** Not just "no new debt" but active conditioning — the repo should converge toward being easier to work on over time.
+
+These principles govern how you write code during implementation and how the reviewer evaluates your work:
+
+1. **Root cause over band-aids.** Fix the underlying problem, not the symptom. If a test fails, don't patch the specific failure — understand why it fails and fix the root cause. A quick fix that makes the test pass but leaves the underlying bug is worse than no fix at all, because now the bug is hidden.
+
+2. **Centralize over duplicate.** Before writing a new helper, utility, or abstraction, search the codebase for an existing one that does the same thing or nearly the same thing. Extend it if needed. Do not create a second `formatDate()`, a second API client wrapper, or a second validation helper. Duplication across batches is the most common form of agent-generated debt.
+
+3. **Extend over create.** Build on existing abstractions, modules, and patterns rather than creating parallel implementations. If the codebase has a request handler pattern, follow it. If it has a component structure, use it. Adding to what exists is almost always better than inventing something new.
+
+4. **Architecture first.** Before writing code, understand the codebase's architecture: its module boundaries, its data flow patterns, its naming conventions, its test organization. Respect these. Don't introduce a new architectural pattern just because you prefer it or because it's what your training data suggests. The existing architecture is the source of truth, not your priors.
+
+5. **Proactive pattern detection.** Actively look for and follow established patterns in the codebase. How are errors handled? How are API responses structured? How are components organized? How are tests named? Match the existing conventions exactly. Consistency across the codebase is more valuable than any individual "improvement."
+
+6. **Progressive repo conditioning.** Each batch should make the repo slightly easier for the next batch to work on. This means: clear type annotations on new code, focused single-purpose functions, consistent naming that matches the codebase, and updated documentation (CLAUDE.md, AGENTS.md, README, TODO.md) that reflects the current state. Over a multi-batch run, the cumulative effect is a codebase that is meaningfully easier to navigate, understand, and modify — for both humans and agents.
+
+7. **No hardcoded constants without justification.** Extract magic numbers, URLs, timeouts, thresholds, feature flags, and configuration values to a constants file, config object, or environment variable — wherever the project keeps them. If you believe a value should be hardcoded (e.g., a mathematical constant, a protocol-required value, a truly fixed enum), you must justify it in the commit message. The reviewer will flag unjustified hardcoded values, and "it was easier" is not a justification.
+
+8. **Runaway detection.** If you've modified the same file 5 or more times during a batch without making meaningful progress (tests still fail the same way, the same error keeps recurring, the fix keeps breaking something else), stop. You are thrashing. Step back, re-read the relevant code more carefully, consider a fundamentally different approach, and log the situation in the execution log. Thrashing is a signal that you're treating symptoms, not causes. (The 5-modification threshold is a default; override in the survival guide under `## Run Control`.)
+
+9. **Favor boring technology.** When choosing libraries, frameworks, or patterns during implementation, prefer well-known, stable, composable options over novel or clever ones. "Boring" technology tends to have stable APIs, strong documentation, and broad representation in training data, which means agents model it more reliably. In some cases, reimplementing a small utility (a retry helper, a concurrency limiter) is cheaper than pulling in an opaque dependency the agent can't fully reason about. If the codebase already uses a library, use it. But when introducing something new, default to the most boring option that works. This is doubly important overnight: there's no one to debug a surprising interaction with an obscure package at 3am.
+
+**For reviewers:** The current codebase is the source of truth, not your training data. The coding agent can search the web in real time and may be using libraries, APIs, model versions, or SDK methods that are newer than what you know. If the code references `gemini-3.1` and you only know about `gemini-1.5`, don't flag it — the codebase is probably right and you are probably stale. If you genuinely believe something is outdated, state your concern but acknowledge your knowledge may be behind. Always pass today's date to the review subagent so it knows the temporal context.
+
+These principles apply to **all code changes**, including review fixes. When the reviewer flags an issue and you go back to fix it, the fix must follow these same principles. Don't slap a band-aid on the reviewer's finding — fix the root cause. Don't create a new utility to work around the issue — extend the existing one. The review-fix cycle is where agents are most tempted to take shortcuts because the pressure to "just make it pass" is highest. Resist that pressure.
 
 ## Run Mode
 
@@ -60,11 +90,21 @@ Before sending any final response that would end the turn, answer these question
 
 If the answers don't justify stopping, do not send a final response. Continue the run.
 
-## Phase 1: Planning (Interactive)
+## Phase 1: Planning
 
-Elves starts with a conversation. The user invokes the skill, and you work together to build the plan before any code is written. This is the most important phase. The quality of the plan determines the quality of the overnight run.
+Elves starts with planning. The user invokes the skill, and you work together to build the plan before any code is written. This is the most important phase. The quality of the plan determines the quality of the overnight run.
+
+There are two ways to plan: **interactive** (default) and **autonomous**.
+
+### Interactive planning (default)
 
 **Expect this to take about 30 minutes.** This isn't magic. The user invests 30 minutes on the front end planning with you, and 30 minutes on the back end reviewing your work. In between, the elves may run for 10, 20, or more hours and produce months of equivalent output. The return is enormous, but it requires a real planning conversation, not a one-line prompt.
+
+### Autonomous planning (optional)
+
+If the user provides a brief prompt (1-4 sentences) and wants to skip the interactive conversation, act as a **planner agent**: expand the brief into a full product spec with batches, then present it for approval. Focus the spec on product context and high-level technical design. Avoid granular implementation details — those cascade errors into downstream batches. Be ambitious about scope; the user can always trim.
+
+The planner output replaces the interactive conversation but produces the same artifacts: a plan file, a configured survival guide, and an initialized execution log. The user must approve the expanded plan before execution begins — autonomous planning does not mean autonomous approval.
 
 ### What to talk about
 
@@ -141,7 +181,7 @@ Record the time budget in the execution log.
 2. **Write up the plans.** Generate the survival guide and execution log from templates (if they don't already exist). Read the plan and decompose it into batches. Record the batch breakdown with estimates in the execution log. Commit all planning documents:
    ```bash
    git add <survival-guide> <execution-log> <plan-if-new>
-   git commit -m "docs: elves session setup — survival guide, execution log, batch plan"
+   git commit -m "[<branch> · Batch 0/N] Session setup — survival guide, execution log, batch plan"
    ```
 
 3. **Push and open a PR immediately:**
@@ -216,70 +256,189 @@ For every batch, execute this full cycle:
 
 Then identify the first incomplete batch.
 
-### 2. Tag
+### 2. Verify Green
+
+**Before starting new work, confirm the project is in a working state.** Run all validation gates (lint, typecheck, build, test). If anything is broken, fix it before proceeding — don't start a new batch on a cracked foundation.
+
+This catches edge cases where the previous batch passed gates but a subsequent push (review fixes, doc updates, merge from main) introduced a quiet regression. It's a cheap check that prevents expensive debugging later.
+
+If this is the first batch and no code exists yet, run a minimal smoke test instead: confirm the dev server starts, the test runner works, and dependencies are installed. If dependencies are missing (fresh clone or sandbox), install them first (`npm install`, `pip install -r requirements.txt`, etc.).
+
+### 3. Tag
 
 Create a rollback safety point: `git tag elves/pre-batch-N`
 
-### 3. Implement
+### 4. Contract
 
-Build the batch scope fully. Use descriptive commits referencing which batch item is being addressed. Push after each meaningful chunk. Tag incidental findings as `[elves-scout]` in TODO.md for later.
+**Before writing code, define what "done" looks like for this batch.** Write a short contract: the specific behaviors this batch will implement and the concrete, testable acceptance criteria that prove it works. This is inspired by the generator/evaluator pattern — the contract is the agreement between "build it" and "verify it" before either begins.
+
+The contract goes in the execution log under the batch entry:
+
+```markdown
+### Batch 3: Payment Processing
+**Contract:**
+- POST /api/payments creates a charge and returns 201 with charge ID
+- Failed charges return 402 with error code
+- Webhook endpoint validates signatures and updates order status
+- E2E: user can complete checkout flow and see confirmation page
+
+**Acceptance criteria:**
+- [ ] Unit tests for charge creation (success + failure paths)
+- [ ] Integration test for webhook signature validation
+- [ ] E2E test: full checkout flow via browser automation
+- [ ] All existing tests still pass
+```
+
+The contract keeps implementation focused and gives the validate/review steps clear targets. If you can't write concrete acceptance criteria, the batch scope is too vague — sharpen it before coding.
+
+For trivial batches (documentation-only, config changes, dependency bumps), the contract can be a single line: "Update README with API examples. Acceptance: README contains curl examples for all endpoints." Don't let the contract become bureaucracy for obvious work.
+
+### 5. Implement
+
+Build the batch scope fully. Push after each meaningful chunk — and **every commit must follow the progress report format** from step 10: `[<branch> · Batch N/Total] <what you are doing>`. This applies to mid-implementation commits too, not just batch-end commits. Tag incidental findings as `[elves-scout]` in TODO.md for later.
+
+**Use commit messages to communicate with the reviewer.** The reviewer reads your commit history to understand not just *what* you changed but *why*. Every commit should reference which batch item is being addressed. When you make a design choice that isn't obvious — choosing one approach over another, hardcoding a value, deviating from a pattern — explain your reasoning in the commit message body. This is the communication channel between you and the reviewer. Without it, the reviewer flags something, you silently change it back, the reviewer flags it again, and you burn cycles arguing through code. With it, the reviewer reads your justification first and only flags things where the reasoning is actually wrong.
+
+**Before writing new code, read the surrounding code.** Understand the patterns, conventions, and abstractions already in use. Search for existing utilities before creating new ones. Follow the Code Quality Philosophy: root cause over band-aids, centralize over duplicate, extend over create, architecture first. The fastest way to generate technical debt overnight is to write code that ignores what already exists.
 
 Write tests for the code you write. Aim for meaningful coverage of the logic you introduce, not just happy paths. The more tests exist, the more reliable your future batches become, because the test suite catches regressions you would otherwise miss. If the project doesn't have a test infrastructure yet, consider setting one up as part of the first batch. It pays for itself immediately.
 
-### 4. Validate
+**During long implementation stretches, periodically update the execution log with progress notes** — even before validation is complete. If compaction happens mid-implementation, the execution log is your lifeline. A stale log forces the next context to guess what you were doing. A current log lets it pick up exactly where you left off.
+
+### 6. Validate
 
 **The goal is zero accumulated debt.** Every batch must be production-ready before you move to the next one. You're working overnight with no one watching. The tests are the watch.
 
 Validation has two stages: **local** (lint, typecheck, build, test, E2E) then **preview** (deploy and smoke-test if configured). Don't advance until both pass.
 
+**Browser-driven verification is strongly recommended for any project with a UI.** Unit tests verify logic; browser automation verifies the app actually works as a user would experience it. Without it, agents routinely produce code that compiles and passes unit tests but doesn't function end-to-end. If the project doesn't have Playwright or Cypress set up, consider adding it in the first batch — it catches an entire class of bugs that other gates miss. Use Playwright, Cypress, or similar browser automation to click through the running application like a user: test UI interactions, verify API responses, check database state. See `references/verification-patterns.md` for patterns.
+
+Validate against the **batch contract** from step 4. Every acceptance criterion should have a corresponding gate result. If an acceptance criterion can't be verified by the existing gates, that's a gap — add a test or verification step before moving on.
+
 See `references/validation-guide.md` for the complete validation system including auto-discovery tables, preview deployment configuration, and detailed gate explanations.
 
-Every gate must pass. If a gate fails, fix it and re-run from that gate. Don't skip a gate. Debt only grows.
+Every gate must pass. If a gate fails, apply the **bug-fix protocol**: diagnose the category of failure, write a test that catches the category (not just this instance), run it to find related failures, fix them all, then re-run from the failing gate. Don't skip a gate. Debt only grows.
 
-### 5. Review
+### 7. Review
 
 **This is where the Ralph Loop does its real work.** You built something (implement). You checked it (validate). Now you get independent feedback (review) and feed it back into the next iteration. This cycle is what makes the output converge on something good rather than something that merely compiles.
 
+The review has three jobs: **find bugs**, **verify the batch matches its contract**, and **enforce the Code Quality Philosophy.** A batch that is bug-free but only implements half the contract isn't done. A batch that implements the full contract but has a security hole isn't done. A batch that works perfectly but introduces duplicated utilities, ignores existing patterns, or band-aids over root causes isn't done either — it makes every future batch harder.
+
 The built-in review works out of the box with zero configuration:
 
-1. **Read all PR comments** (bot reviews, CI results, any human feedback) via `gh api`.
-2. **Spawn a review subagent** (if supported) to read the comments, the diff, and the plan, then produce a structured assessment: what's blocking, what's a warning, what's fine. If subagents aren't available, do this analysis directly.
-3. **Fix blocking issues:** real bugs, security problems, correctness failures. These must be fixed before moving on.
-4. **Push fixes, then re-read comments.** New pushes may trigger new bot reviews. Read those too.
-5. **Repeat until the batch is clean.** No unresolved blockers. The loop continues until the review step has nothing left to find.
+1. **Read all PR feedback.** Fetch review threads, issue comments, and CI check runs via `gh api`. Every comment from every source — human reviewers, bot reviewers (CodeRabbit, Copilot, SonarCloud, etc.), and CI — must be read. Don't sample. Read all of them.
+2. **Read the commit history for the batch.** The coding agent communicates through commit messages — not just what changed but *why*. Before flagging something, check whether the commit message already justifies the choice. A hardcoded value with a documented justification in the commit body is an intentional design decision, not a finding. A deviation from pattern with a clear rationale is not a violation. The commit messages are the coding agent's side of the conversation. Read them.
+3. **Spawn a review subagent** (if supported) to read the comments, the diff, the commit history, the plan, **and the batch contract from step 4.** Tell the subagent today's date and instruct it to **trust the codebase as the source of truth** — the coding agent can search in real time and may be using libraries, APIs, or model versions that are newer than the reviewer's training data. The subagent produces a structured assessment covering: what's blocking, what's a warning, what's fine, and whether every contract item was delivered. If subagents aren't available, do this analysis directly.
+4. **Check contract completeness.** Walk through each behavior and acceptance criterion from the contract. Is it implemented? Is it tested? If something is missing, go back to Implement (step 5) and finish it before continuing the review loop. A batch that passes all gates but skips a contract item is incomplete, not clean.
+5. **Fix blocking issues** using the **bug-fix protocol:** When a bug is found — whether by the reviewer, a bot, CI, or your own analysis — don't just fix the specific instance. Follow this sequence:
 
-If the same non-actionable finding persists for 3 cycles, log your assessment and move on. Don't make unnecessary code changes to appease a finding you believe is wrong.
+   **a. Diagnose the category.** What kind of bug is this? Off-by-one? Missing null check? Unvalidated input? Race condition? Incorrect type coercion? The specific bug is a symptom. The category is the disease.
+
+   **b. Write a test that catches the category, not just the instance.** If the bug is a missing null check on user input, don't write a test for that one field — write a test that exercises null/undefined/empty inputs across the relevant interface. If it's an off-by-one in pagination, test boundary conditions for all paginated endpoints. The test should be precise enough to catch this bug and every sibling bug of the same type.
+
+   **c. Run the test immediately.** Before fixing anything, run the new test against the current code. It should fail for the reported bug — if it doesn't, the test isn't catching what you think it's catching. It may also fail for related bugs you haven't seen yet. Good. You've just found them before the user did.
+
+   **d. Fix all failures, not just the reported one.** Fix the original bug and every related failure the category test surfaced. This is the root-cause principle applied to bugs: if one endpoint has a missing null check, the odds are good that others do too. Fix them all now.
+
+   **e. Re-run and confirm green.** All category tests pass. All existing tests still pass. No regressions.
+
+   This is more work per bug, but it means the same category of bug never appears twice in the run. Without this protocol, agents play whack-a-mole: fix the reported bug, move on, get flagged for the same bug in a different place next batch. The category test prevents that.
+6. **Resolve addressed comments on GitHub.** After fixing an issue raised in a review thread, resolve that thread via the API so it's marked as handled. For issue comments that can't be resolved as threads, reply with a short disposition (e.g., "Fixed in abc1234" or "Dismissed: false positive, see execution log"). This is how you track what's been dealt with — unresolved threads and unreplied comments are your remaining work queue.
+7. **Record dispositions in `.elves-session.json`.** For each comment you address, log its ID, source, disposition, and the review cycle it was handled in. This survives compaction and lets the next context skip already-handled comments without re-reading and re-evaluating them. See the schema in **Structured Session Data**.
+8. **Push fixes, then re-read comments.** Use commit messages to explain your fixes and justify any decisions — the reviewer reads them on the next cycle. Only read **new and unresolved** comments — resolved threads and replied-to comments from previous cycles are done. Don't re-litigate settled findings.
+9. **Repeat until the batch is clean.** No unresolved threads, no unreplied bot comments, no missing contract items. The loop continues until there is nothing left to address.
+10. **Verify documentation is current.** Before exiting the review loop, check that any user-facing behavior changed by this batch is reflected in the project's documentation. This includes README files, API docs, inline doc comments, config references, migration guides, and changelogs — whatever the project uses. If docs are stale, update them now. Don't defer this to a later batch. Stale documentation is silent debt: the code is correct but the user doesn't know how to use it correctly. A batch with good code and wrong docs is not shippable.
+
+**Triage every review finding into one of three categories:**
+- **Genuine issue:** a real bug, security problem, quality violation, or missing contract item. Fix it.
+- **Intentional design:** the reviewer flagged something that is correct and deliberate. Resolve/reply with a justification explaining why it's intentional. Don't change the code.
+- **False positive:** the reviewer (usually a bot) flagged something that isn't actually an issue — a hallucination, a misunderstanding of the context, or an outdated rule. Resolve/reply with your reasoning and move on.
+
+Never make unnecessary code changes just to appease a finding. If the finding is wrong, say so and document why. If the same non-actionable finding persists for 3 cycles, resolve it with your assessment — you've given it a fair hearing. (The 3-cycle threshold is a default; override in the survival guide under `## Run Control`.)
 
 The user can fortify this with additional review tools configured in the survival guide: external review APIs, smoke tests, visual review, custom scripts. See `references/tool-config-examples.md`. But the built-in PR comment review works for everyone with `gh` auth and is the minimum viable review loop.
 
-### 6. Document
+### 8. Document
 
 Update the execution log with a timestamped entry covering: batch name, timing breakdown, what changed, commands run, test results, review findings, decisions made, commit SHA, rollback tag, and next steps.
 
+**Close the loop on the contract.** Mark each acceptance criterion from step 4 as met or note exceptions. If a criterion wasn't met, explain why and whether it's deferred or dropped. The contract is write-only if you don't check it off.
+
+Also update `.elves-session.json` — set the current batch status to `"complete"`, record the commit SHA and completion timestamp. This keeps the JSON in sync with the execution log so either can be used for recovery.
+
 Keep entries concise. If the log exceeds ~50 entries, archive older ones under `## Completed Archive`.
 
-### 7. Update the Survival Guide
+### 9. Update the Survival Guide
 
 Update "Current Phase" and "Next Exact Batch" to reflect the new state. A stale survival guide sends the next session down the wrong path.
 
-### 8. Commit and Push
+### 10. Commit and Push
 
 Stage specific files (not `git add -A`), commit with a clear message that includes batch progress, push.
 
-Commit message format: `[Batch N/Total] <description>`
+**Every commit must follow this format. No exceptions.** The commit subject line is a progress report. Anyone watching the branch — the human, the reviewer, a dashboard, `git log --oneline` — should be able to see exactly where the run stands without opening any other file.
+
+Commit subject format: `[<branch> · Batch N/Total] <what you are doing>`
+
+The subject has three parts:
+1. **Branch name** — which feature branch this is on
+2. **Batch progress** — which batch out of how many
+3. **What you are doing** — concise description of the change
+
+The body tells the reader *why*. Use the body to communicate design decisions, justifications for non-obvious choices, and context the reviewer needs to evaluate the change fairly.
+
+**This format applies to every commit during the run:** implementation commits, review fix commits, doc updates, and session setup commits. Not just the final batch commit. The human may check `git log` at 3am to see if you're still making progress. If they see three commits with no batch prefix, they have no idea where you are.
 
 Examples:
-- `[Batch 3/12] Add payment processing endpoints`
-- `[Batch 3/12] Review fixes: input validation, error handling`
-- `[Batch 12/12] Final batch: admin dashboard and docs`
+```
+[feat/payment-system · Batch 3/12] Add charge creation endpoint and webhook handler
+```
 
-This lets anyone watching the commit graph (in GitKraken, `git log`, or GitHub) see exactly where the run stands without opening the execution log.
+```
+[feat/payment-system · Batch 3/12] Use Stripe's idempotency keys instead of our own dedup logic
 
-### 9. Re-read the Survival Guide
+Stripe already handles idempotent retries natively via the Idempotency-Key
+header. Building our own dedup table would duplicate this and add a
+consistency problem. Hardcoded 24h TTL matches Stripe's documented window.
+```
+
+```
+[feat/payment-system · Batch 3/12] Review fixes: input validation, error handling
+
+Fixed: email regex was anchored incorrectly (CodeRabbit #42).
+Dismissed: "extract timeout to constants" — the 30s value is Stripe's
+documented webhook timeout, not a tunable parameter. Justified in code
+comment referencing their docs.
+```
+
+```
+[feat/payment-system · Batch 3/12] Add E2E test for checkout flow
+```
+
+This lets anyone watching the commit graph see where the run stands, which branch it's on, and what's happening right now. It also gives the reviewer the context they need to evaluate your choices without guessing.
+
+### 11. Re-read the Survival Guide
 
 **After every push, re-read the survival guide before doing anything else.** Also verify the plan file hasn't changed since session start.
 
-### 10. Continue or Stop
+### 12. Entropy Check (every 3 batches)
+
+**Every 3 completed batches, do a cross-batch quality scan before starting the next batch.** The per-batch review (step 7) evaluates the batch in isolation. The entropy check evaluates what's accumulated across batches: patterns that drifted, utilities that were duplicated in different batches, naming conventions that diverged, abstractions that grew inconsistent.
+
+This is continuous entropy management — catching the slow drift that individual batch reviews miss. Over a 10-batch overnight run, small inconsistencies compound. An entropy check every 3 batches prevents that from becoming structural debt.
+
+**What to check:**
+- Scan for duplicated utilities or helpers introduced in different batches that do the same thing. Consolidate them.
+- Check for naming inconsistencies that crept in across batches (different conventions in different modules).
+- Look for patterns that diverged: error handling done one way in batch 1 and a different way in batch 4.
+- Verify that the Code Quality Philosophy principles (especially #2 centralize, #5 pattern detection, #6 progressive conditioning) are holding across the cumulative diff, not just within individual batches.
+
+If you find drift, fix it now in a small focused commit: `[<branch> · Entropy check after Batch N] <what you consolidated>`. Don't let it ride. The purpose is garbage collection — small, frequent corrections are cheaper than a large refactor later.
+
+If nothing needs fixing, skip it and move on. This should take minutes, not hours. The 3-batch cadence is a default; override in the survival guide under `## Run Control`.
+
+### 13. Continue or Stop
 
 **Finite mode:** check the clock. If there's enough time for another batch, start it. Otherwise, scout mode or Final Completion. Don't pause. Don't wait for user input.
 
@@ -326,13 +485,16 @@ After any compaction or restart, your conversation history is gone. But your ins
 
 1. Read the survival guide first (marked with `READ THIS FILE FIRST` banners).
 2. **Read the Run Control section.** Confirm the run mode and stop policy. If the **Run mode** is `open-ended`, you are not allowed to stop on your own. This is the most important thing to recover.
-3. Read the plan.
-4. Read the execution log.
-5. Identify the first incomplete batch.
-6. Resume immediately without asking for help.
-7. Don't redo completed work.
+3. Read `.elves-session.json` to quickly determine the current batch, PR number, and what's complete. This is the fastest signal.
+4. Read the plan.
+5. Read the execution log.
+6. Identify the first incomplete batch.
+7. Resume immediately without asking for help.
+8. Don't redo completed work.
 
 Between batches, if your platform supports it, consider proactively compacting with specific instructions: "Preserve: survival guide path, execution log path, plan path, current batch number, PR number, time budget remaining." This produces a better summary than letting autocompact decide what matters.
+
+**Model-tier note:** Frontier models (Opus-class) handle long continuous sessions well and rarely exhibit context anxiety or drift after compaction. The recovery protocol above is still the safety net, but you may find you need it less often. On smaller models, the recovery protocol is critical — follow it rigorously after every compaction event.
 
 ## Completion Contract
 
@@ -342,12 +504,15 @@ A batch isn't done unless:
 2. Build succeeds.
 3. Relevant tests pass with no new failures.
 4. Preview deploys and smoke tests pass (if configured).
-5. Review performed. The review loop ran until no blockers remained.
-6. No accumulated debt: no skipped gates, no "will fix later" items, no known regressions.
-7. You're confident the batch is correct. Not "probably fine," but verified through testing, review, and deployment.
-8. Execution log updated with timestamps, evidence, and commit SHA.
-9. Survival guide updated with next batch.
-10. Changes committed and pushed.
+5. Contract acceptance criteria marked as met (or exceptions documented with reasoning).
+6. Review performed. The review loop ran until no blockers remained. All review threads resolved or replied to.
+7. No accumulated debt: no skipped gates, no "will fix later" items, no known regressions.
+8. **Documentation is up to date.** Any user-facing behavior changed by this batch must be reflected in the relevant docs — README, API docs, inline doc comments, config references, migration guides, changelogs, or whatever the project uses. Stale docs are debt. A user who reads the docs and gets wrong information is worse off than a user with no docs at all.
+9. `.elves-session.json` updated with batch status, commit SHA, completion timestamp, and `review_comments` dispositions.
+10. You're confident the batch is correct. Not "probably fine," but verified through testing, review, and deployment.
+11. Execution log updated with timestamps, evidence, and commit SHA.
+12. Survival guide updated with next batch.
+13. Changes committed and pushed.
 
 Every batch must be tight before you move on. The next batch builds on this one. If this one is shaky, everything after it is shaky. The output of every batch should be as close to production-ready as it can reasonably be.
 
@@ -364,7 +529,7 @@ When all batches are done or time is up:
 5. **Clean up operational artifacts.** Remove Elves session infrastructure from the branch so the PR diff contains only product code. Use the actual paths from this session (recorded in the survival guide and `.elves-session.json`), not hard-coded defaults:
    ```bash
    git rm <survival-guide-path> <execution-log-path> .elves-session.json
-   git commit -m "chore: remove elves session artifacts from PR"
+   git commit -m "[<branch> · Batch N/N] Remove elves session artifacts from PR"
    ```
    These files were needed during the run for compaction recovery, but they're noise in the final PR. The plan file is kept by default since it documents what was built. If the user configured `cleanup.keep_plan: false` in `config.json`, add the plan path to the `git rm` command as well.
    
@@ -429,6 +594,76 @@ Everything else: ambiguous requirements, minor design decisions, unexpected tool
 ## Structured Session Data
 
 Maintain a `.elves-session.json` file with machine-readable session data (session ID, timing, batch status, commits, rollback tags, review findings). This enables future tooling and analytics.
+
+**Batch status tracking belongs in JSON, not just Markdown.** Models are less likely to corrupt structured JSON than free-form Markdown during updates. The `.elves-session.json` file should include a `batches` array that tracks the status of each batch:
+
+```json
+{
+  "session_id": "elves-2026-03-24-auth-system",
+  "pr_number": 42,
+  "batches": [
+    {
+      "id": 1,
+      "name": "Database schema and models",
+      "status": "complete",
+      "commit": "abc1234",
+      "rollback_tag": "elves/pre-batch-1",
+      "started_at": "2026-03-24T22:00:00Z",
+      "completed_at": "2026-03-24T23:15:00Z"
+    },
+    {
+      "id": 2,
+      "name": "Auth endpoints",
+      "status": "in_progress",
+      "commit": null,
+      "rollback_tag": "elves/pre-batch-2",
+      "started_at": "2026-03-24T23:16:00Z",
+      "completed_at": null
+    }
+  ],
+  "review_comments": [
+    {
+      "id": 1234567890,
+      "type": "review_thread",
+      "source": "coderabbit",
+      "batch": 1,
+      "cycle": 1,
+      "summary": "Missing input validation on email field",
+      "disposition": "fixed",
+      "fix_commit": "def5678"
+    },
+    {
+      "id": 1234567891,
+      "type": "issue_comment",
+      "source": "sonarcloud",
+      "batch": 1,
+      "cycle": 2,
+      "summary": "Cognitive complexity of handleAuth() is 18 (threshold 15)",
+      "disposition": "dismissed",
+      "reason": "Function is a straightforward switch; splitting would reduce readability"
+    },
+    {
+      "id": 1234567892,
+      "type": "review_thread",
+      "source": "copilot",
+      "batch": 2,
+      "cycle": 1,
+      "summary": "Consider extracting retry logic into shared utility",
+      "disposition": "deferred",
+      "reason": "Valid but scope is too large for this batch — added to TODO.md [elves-scout]"
+    }
+  ]
+}
+```
+
+The `review_comments` array is the compaction-safe record of every comment handled during the session. After compaction, it tells the next context exactly which comments have been dealt with and how — no need to re-read and re-evaluate hundreds of bot comments.
+
+**Comment types and how to track them:**
+- `review_thread`: Can be resolved on GitHub via the API. Resolve after fixing. Status is authoritative on GitHub; the JSON is backup.
+- `issue_comment`: Cannot be "resolved" on GitHub. Reply with a disposition. The JSON tracks that it was handled.
+- `check_run`: Pass/fail is inherent. No tracking needed — just re-run after fixes.
+
+After compaction, this file is the fastest way to determine exactly where the run stands. Read it before the execution log when recovering state.
 
 ## Persistent Preferences
 
