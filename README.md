@@ -8,7 +8,7 @@ Elves is an open-source Agent Skill for autonomous, multi-batch development. It 
 
 You write the plan and do the final merge. The agent does everything in between.
 
-**This is v0.** The system I use in production at [Aigora](https://aigora.ai) is more elaborate than what you see here. It includes custom review tools, proprietary verification infrastructure, and integration with our internal deployment pipeline. I've extracted the key ideas and patterns into something that works with standard tools (git, GitHub PRs, CI) so it's useful to anyone, not just people with my exact setup. I'll be using this open-source version myself going forward (with my additional tooling bolted on), so it will continue to improve from real production use. But this is scaffolding, not a finished product. It may not work for you out of the box. Your model, your stack, your test infrastructure, and your review setup will all be different from mine. I'm relying on community feedback to make this skill more generalizable. If something doesn't work, [open an issue](https://github.com/aigorahub/elves/issues). Your experience makes this better for everyone.
+**This is still early.** The system I use in production at [Aigora](https://aigora.ai) is more elaborate than what you see here. It includes custom review tools, proprietary verification infrastructure, and integration with our internal deployment pipeline. I've extracted the key ideas and patterns into something that works with standard tools (git, GitHub PRs, CI) so it's useful to anyone, not just people with my exact setup. I'll be using this open-source version myself going forward (with my additional tooling bolted on), so it will continue to improve from real production use. But this is scaffolding, not a finished product. It may not work for you out of the box. Your model, your stack, your test infrastructure, and your review setup will all be different from mine. I'm relying on community feedback to make this skill more generalizable. If something doesn't work, [open an issue](https://github.com/aigorahub/elves/issues). Your experience makes this better for everyone.
 
 ---
 
@@ -35,7 +35,7 @@ Elves is the harness that lets the Ralph Loop run for hours without supervision,
 ## How it works
 
 ```
-Plan → Batch → Implement → Validate → Review → Document → Continue
+Plan → Batch → Implement → Validate → Review → Judge → Document → Continue
 ```
 
 Elves runs a tight loop. For each batch of planned work, the agent implements the changes, runs validation gates, reads PR review comments, fixes any blocking findings, updates the documentation, and pushes a checkpoint, then immediately starts the next batch. No waiting, no prompting, no drift.
@@ -117,6 +117,9 @@ Elves runs preflight checks first: git access, test gates, sleep prevention, not
 - **Two run modes**: finite (deadline-based, default) or open-ended (continue until explicitly stopped). Open-ended mode disables Final Completion and treats every checkpoint as a relaunch point.
 - **Time-aware pacing**: tracks how long each batch takes and uses that to decide whether to start another batch or wrap up cleanly (finite mode)
 - **Slack notifications** (or any custom command): know when your run finishes without watching the terminal
+- **Constitution and legality check**: human-authored deal-breaker behaviors (`docs/constitution.md`) verified by a read-only judge after each batch. Three quality layers: correctness (tests), plan compliance (review), legality (judge). Success criteria the agent didn't author.
+- **PR Loop**: poll PR comments, inline reviews, and check status after every push — not just at batch boundaries
+- **Readiness Gate**: branch-level checklist (proof on current tip, legality check clean, PR comments resolved, git status clean) before declaring review-ready
 - **Structured session data** in `.elves-session.json` for tooling, dashboards, and analytics
 - **Comprehensive preflight checks**: git remote, push access, GitHub CLI auth, test gates, sleep prevention, Slack webhook, stale branch detection
 
@@ -290,7 +293,14 @@ The agent uses the highest tier you have configured. Non-blocking findings are l
 elves/
 ├── SKILL.md                              # Claude Code skill (main instructions)
 ├── AGENTS.md                             # Codex variant
+├── README.md
+├── CHANGELOG.md                          # Version history
+├── TODO.md                               # Project backlog and deferred tasks
+├── LICENSE
 ├── config.json.example                   # Persistent preferences template
+├── assets/
+│   ├── elves-banner.jpeg                 # README banner image
+│   └── elves-social-preview.png          # GitHub social preview
 ├── references/
 │   ├── survival-guide-template.md        # Bootstrap template for new projects
 │   ├── execution-log-template.md         # Log entry template
@@ -300,13 +310,13 @@ elves/
 │   ├── validation-guide.md               # Detailed validation gates and auto-discovery
 │   ├── autonomy-guide.md                 # Non-interactive operation and mid-run protocols
 │   ├── review-subagent.md                # Built-in review protocol and adversarial review
-│   ├── verification-patterns.md           # Headless browser, video recording, state assertions
-│   └── open-ended-guide.md               # Open-ended mode patterns, QA/audit expansion rules
+│   ├── verification-patterns.md          # Headless browser, video recording, state assertions
+│   └── open-ended-guide.md              # Open-ended mode patterns, QA/audit expansion rules
 ├── scripts/
 │   ├── preflight.sh                      # Pre-run checklist
 │   └── notify.sh                         # Notification helper
-├── README.md
-└── LICENSE
+└── .github/
+    └── ISSUE_TEMPLATE/                   # Bug report, feature request, overnight run report
 ```
 
 ---
@@ -336,6 +346,7 @@ elves/
 - **Agent infrastructure is real engineering.** Developers who treat agent infrastructure as a real engineering concern (tight code review systems, organized work trees, failure handling) end up with something that functions like a tireless junior team working every hour they're away from their desk.
 - **Quality is not an afterthought.** Agents naturally spend 80% of batch time implementing and rush through validation and review. Elves treats implement, validate, and review as roughly equal phases. Implementation produces a draft. Validation and review produce something shippable.
 - **The philosophy applies everywhere, not just review.** The nine code quality principles (root cause over band-aids, centralize over duplicate, extend over create, etc.) aren't just a reviewer's checklist. They inform how batches are planned (architecture-aware ordering), how contracts are written (what to build on), how implementation begins (pre-implementation survey), and how review verifies (did you actually use what you found?). A principle enforced only at review time creates rework. Applied from planning onward, it prevents the rework from happening.
+- **The constitution is the law of the app.** Tests check whether code works. The constitution checks whether the app keeps its promises. Agents can write code that passes every test and still miss the point — because the agent authored the tests. The constitution provides success criteria from outside the agent's control: human-written intentions at a level of abstraction that requires genuine understanding to verify. You can game a unit test. You can't game "a failed payment never results in a fulfilled order." See *Here Comes the Judge* for the full framework.
 
 ### Prior art and convergence
 
