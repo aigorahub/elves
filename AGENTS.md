@@ -54,14 +54,24 @@ See `references/open-ended-guide.md` for detailed patterns.
 
 Before any final response: (1) Did the user ask to stop? (2) Is run mode finite? (3) If open-ended, is there a true blocker? If answers don't justify stopping, continue the run.
 
-## Required Inputs
+## Planning
 
-1. **Plan path**: file describing the work.
+Elves starts with planning. There are two modes:
+
+**Interactive planning (default):** The user invokes the skill, and you work together to build the plan. Expect ~30 minutes. Cover: what are we building, survey the architecture (search the codebase for existing patterns and utilities), break into batches (architecture-aware ordering — shared utilities first, pattern-setting batches before pattern-following ones), define sprint size, set non-negotiables, configure tools, set run mode and time budget. See `references/plan-template.md` for plan structure.
+
+**Autonomous planning:** If the user provides a brief prompt (1-4 sentences), expand it into a full spec with batches. Focus on product context and high-level design, not granular implementation details. The user must approve before execution begins.
+
+### Required inputs
+
+By the end of planning, you need:
+
+1. **Plan path**: file describing the work, broken into batches.
 2. **Survival guide path**: standing brief with mission, rules, and next steps.
 3. **Execution log path**: running record of completed work.
 4. **Active branch name**.
 
-If any are missing, ask. If survival guide or execution log don't exist, generate them from `references/survival-guide-template.md` and `references/execution-log-template.md`.
+If any are missing, ask. If survival guide or execution log don't exist, generate them from `references/survival-guide-template.md` and `references/execution-log-template.md`. See `references/kickoff-prompt-template.md` for how users start the session.
 
 ## Preflight
 
@@ -156,7 +166,7 @@ git tag elves/pre-batch-N
 
 ### 4. Contract
 
-**Before writing code, define what "done" looks like for this batch.** Write a short contract in the execution log: the specific behaviors this batch will implement and the concrete, testable acceptance criteria that prove it works.
+**Before writing code, define what "done" looks like for this batch.** Write a contract in the execution log with three required sections: **behaviors** (what this batch implements), **Build on** (existing patterns and utilities to extend), and **acceptance criteria** (concrete, testable conditions).
 
 ```markdown
 ### Batch N: [Name]
@@ -212,7 +222,7 @@ gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" --paginate > /tmp/issue-comm
 gh api "repos/${REPO}/commits/$(git rev-parse HEAD)/check-runs" > /tmp/ci-checks.json
 ```
 
-Parse with python3 (no jq). Categorize each finding as BLOCKING, WARNING, or INFO.
+Parse with python3 (not jq — jq may not be available in all sandbox environments). Categorize each finding as BLOCKING, WARNING, or INFO.
 
 The review has three jobs: **find bugs**, **verify the batch matches its contract**, and **enforce the Code Quality Philosophy.** Walk through each behavior and acceptance criterion from the contract (step 4). Is it implemented? Is it tested? A batch that passes all gates but skips a contract item is incomplete, not clean. If something is missing, go back to Implement (step 5) and finish it.
 
@@ -320,7 +330,7 @@ Skipping this means review feedback piles up silently and the user returns to a 
 
 **What to check:** duplicated utilities introduced in different batches, naming inconsistencies across modules, error handling done differently in different batches, violations of principles #2 (centralize), #5 (pattern detection), #6 (progressive conditioning) across the cumulative diff.
 
-If you find drift, fix it in a small focused commit: `[<branch> · Entropy check after Batch N] <what you consolidated>`. If nothing needs fixing, skip and move on. Should take minutes, not hours. The 3-batch cadence is a default; override in the survival guide under `## Run Control`.
+If you find drift, fix it in a small focused commit: `[<branch> · Entropy check after Batch N] <what you consolidated>`. If nothing needs fixing, skip and move on. Should take minutes, not hours. The 3-batch cadence is a default; override in the survival guide under `## Run Control`. For short plans (4-5 batches), check after batch 2-3. For long plans (15+), every 3 is right. If batches pass review cleanly, stretch to every 4-5.
 
 ### 15. Continue or Stop
 **Finite:** if enough time budget remains, start the next batch. Otherwise, scout mode or Final Completion.
@@ -334,7 +344,9 @@ After all planned batches (and only then), with time remaining, look across code
 - Unlocked opportunities from completed work
 - Documentation and test coverage gaps
 
-Work through `[elves-scout]` items in TODO.md. Implement self-contained items; leave large/ambiguous ones with context for the user. Scout commits follow planned work. Clean boundary in history.
+**Prioritize:** risk-reducing items first (missing tests, edge cases in code you touched), then quality improvements (dead code, stale docs), then leave large/ambiguous items with context notes for the user.
+
+Work through `[elves-scout]` items in TODO.md. Scout work goes through the same validation gates. Use commit format: `[<branch> · Scout] <what you are doing>`. In finite mode, stop when time runs out. In open-ended mode, keep scouting until the user stops you or improvements run dry.
 
 ## Forbidden Commands
 
@@ -347,6 +359,10 @@ Never, under any circumstances:
 - `rm -rf` outside your immediate working scope.
 
 If you think you need one of these, you are wrong. Find another way. If truly stuck, stop and log it. The user will handle it.
+
+## Merge Conflicts
+
+If `git push` fails because the remote branch has diverged, fetch and merge: `git fetch origin && git merge origin/<your-branch>`. Do not rebase. If the merge is clean, push and continue. If there are conflicts, resolve them carefully (prefer the remote version for changes outside your batch scope), run all validation gates, then push. If conflicts are too complex, log as a **Hard Stop**.
 
 ## Test Integrity
 
@@ -369,7 +385,7 @@ After any compaction or restart, conversation history is gone. But instructions 
 6. Read the constitution (`docs/constitution.md` or `CONSTITUTION.md`) if it exists.
 7. Identify the first incomplete batch and resume immediately.
 
-Don't redo completed work. Don't ask for help. If you detect existing documents at startup, you are resuming. Follow this protocol.
+Don't redo completed work. Don't ask for help. If you detect existing documents at startup, you are resuming. Follow this protocol. **If the survival guide is missing** (compaction during Final Completion cleanup), restore from git history: `git show HEAD~1:<survival-guide-path> > <survival-guide-path>`.
 
 Between batches, proactively compact with specific instructions: "Preserve: survival guide path, execution log path, plan path, current batch number, PR number, time budget remaining."
 

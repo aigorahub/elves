@@ -2,6 +2,23 @@
 
 All notable changes to the Elves skill are documented here.
 
+## [1.3.2] - 2026-03-25
+
+### Remaining review suggestions: operational completeness
+
+#### New sections
+- **Merge Conflicts:** What to do when `git push` fails due to a diverged remote (fetch and merge, never rebase, resolve or Hard Stop). Added to both SKILL.md and AGENTS.md.
+
+#### Expanded sections
+- **Scout Mode:** Added prioritization guidance (risk-reducing first, then quality, then leave ambiguous items), validation gate requirement, commit format (`[branch · Scout]`), and when-to-stop rules. Applied to both SKILL.md and AGENTS.md.
+- **Entropy Check:** Added cadence scaling guidance (check after batch 2-3 for short plans, every 3 for long, stretch to 4-5 if reviews are clean).
+- **AGENTS.md Planning phase:** Added full planning section with interactive and autonomous modes, architecture survey, and references to plan-template.md and kickoff-prompt-template.md. Was the biggest content gap between the two files.
+
+#### Precision improvements
+- **Contract step:** "Build on" section explicitly marked as required (was only shown in the example).
+- **Compaction Recovery:** Added note about restoring files from git history if compaction happens during Final Completion cleanup.
+- **AGENTS.md:** Added `python3 (no jq)` explanation, compaction recovery cleanup note, config.json reference already added in v1.3.1.
+
 ## [1.3.1] - 2026-03-25
 
 ### Review fixes: structural consistency and operational gaps

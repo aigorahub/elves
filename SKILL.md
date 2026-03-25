@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "1.3.1"
+  version: "1.3.2"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -303,7 +303,7 @@ Create a rollback safety point: `git tag elves/pre-batch-N`
 
 ### 4. Contract
 
-**Before writing code, define what "done" looks like for this batch.** Write a short contract: the specific behaviors this batch will implement and the concrete, testable acceptance criteria that prove it works. This is inspired by the generator/evaluator pattern — the contract is the agreement between "build it" and "verify it" before either begins.
+**Before writing code, define what "done" looks like for this batch.** Write a contract with three required sections: **behaviors** (what this batch implements), **Build on** (existing patterns and utilities to extend), and **acceptance criteria** (concrete, testable conditions that prove it works). This is inspired by the generator/evaluator pattern — the contract is the agreement between "build it" and "verify it" before either begins.
 
 The contract goes in the execution log under the batch entry:
 
@@ -521,7 +521,7 @@ This is continuous entropy management — catching the slow drift that individua
 
 If you find drift, fix it now in a small focused commit: `[<branch> · Entropy check after Batch N] <what you consolidated>`. Don't let it ride. The purpose is garbage collection — small, frequent corrections are cheaper than a large refactor later.
 
-If nothing needs fixing, skip it and move on. This should take minutes, not hours. The 3-batch cadence is a default; override in the survival guide under `## Run Control`.
+If nothing needs fixing, skip it and move on. This should take minutes, not hours. The 3-batch cadence is a default; override in the survival guide under `## Run Control`. **Scaling guidance:** for short plans (4-5 batches), check after batch 2 or 3 so you catch drift before the final batch. For long plans (15+ batches), every 3 batches is right. If batches are passing review cleanly with minimal findings, consider stretching to every 4-5 batches to save time.
 
 ### 15. Continue or Stop
 
@@ -532,6 +532,12 @@ If nothing needs fixing, skip it and move on. This should take minutes, not hour
 ## Scout Mode
 
 After all planned batches are complete, if time remains, work through `[elves-scout]` items from TODO.md. Look for adjacent improvements, test gaps, documentation holes. This is bonus work with a clean commit boundary. If the user wants to roll it back, planned work is untouched.
+
+**Prioritization:** Start with items that reduce risk for the planned work (missing test coverage, edge cases in code you touched). Then move to quality improvements (dead code, stale docs, naming consistency). Leave large refactors or ambiguous items with context notes for the user.
+
+**Scout work goes through the same quality gates.** Each scout commit must pass validation. If the project has a constitution, scout changes must not introduce FAIL verdicts. Use the same commit format: `[<branch> · Scout] <what you are doing>`.
+
+**When to stop scouting:** In finite mode, stop when the time budget runs out. In open-ended mode, keep scouting until the user stops you or you run out of meaningful improvements. If scout items start requiring significant design decisions, log them and move on — scout mode is for clear wins, not ambiguous tradeoffs.
 
 ## Forbidden Commands
 
@@ -547,6 +553,18 @@ The following commands are **never allowed** under any circumstances. They destr
 If you think you need one of these commands, you're wrong. Find another way. If there truly is no other way, stop and log the situation. The user will handle it when they return.
 
 This rule survives compaction. If you've lost context and aren't sure what is safe, re-read the survival guide. These commands are never safe.
+
+## Merge Conflicts
+
+If `git push` fails because the remote branch has diverged (another process merged main, the user pushed a hotfix, CI auto-merged), handle it as follows:
+
+1. **Fetch and merge** the remote branch: `git fetch origin && git merge origin/<your-branch>`. Do not rebase — rebase on a shared/pushed branch is forbidden.
+2. **If the merge is clean** (no conflicts), push and continue.
+3. **If there are conflicts**, resolve them carefully. Read both sides of each conflict. Prefer the remote version for changes outside your current batch scope. For changes within your batch scope, merge intelligently — don't blindly accept either side.
+4. **After resolving**, run all validation gates to confirm the merge didn't break anything. Then push.
+5. **If the conflicts are too complex** to resolve safely (e.g., large structural changes you don't fully understand), log it as a **Hard Stop**. The user will handle it when they return.
+
+Never use `git push --force` to bypass a diverged branch. Never use `git rebase` on a pushed branch. These are forbidden regardless of the situation.
 
 ## Test Integrity
 
@@ -577,6 +595,8 @@ After any compaction or restart, your conversation history is gone. But your ins
 7. Identify the first incomplete batch.
 8. Resume immediately without asking for help.
 9. Don't redo completed work.
+
+**If the survival guide is missing from the working tree** (compaction happened during Final Completion after the cleanup `git rm`), check `git log --oneline -5` for a cleanup commit. Restore the files from the parent commit: `git show HEAD~1:<survival-guide-path> > <survival-guide-path>`. Then continue the recovery protocol.
 
 Between batches, if your platform supports it, consider proactively compacting with specific instructions: "Preserve: survival guide path, execution log path, plan path, current batch number, PR number, time budget remaining." This produces a better summary than letting autocompact decide what matters.
 
