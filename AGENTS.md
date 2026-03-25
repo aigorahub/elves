@@ -102,7 +102,7 @@ docs/audit/
 ```
 Add any other tool-specific directories. Commit the `.gitignore` update as part of session setup.
 
-Run each configured validation gate once to confirm it works. If a gate fails, warn the user before they leave. Codex runs in a cloud environment, so skip sleep/battery checks. If `ELVES_SLACK_WEBHOOK` is set, send a test notification.
+Run each configured validation gate once to confirm it works. If a gate fails, warn the user before they leave. Codex runs in a cloud environment, so skip sleep/battery checks. If `ELVES_SLACK_WEBHOOK` is set, send a test notification. See `references/autonomy-guide.md` for the full non-interactive operation guide and environment variables.
 
 ## Time Awareness
 
@@ -190,7 +190,7 @@ If you can't write concrete acceptance criteria, the batch scope is too vague �
 
 **Use commit messages to communicate with the reviewer.** The reviewer reads your commit history. Every commit should reference which batch item is being addressed. When you make a non-obvious choice (hardcoded value, pattern deviation, design tradeoff), explain your reasoning in the commit body. This prevents review cycles from devolving into arguments where neither side understands the other.
 
-Build the full batch scope. Push after each meaningful chunk — **every commit must follow the progress format** from step 10: `[<branch> · Batch N/Total] <what you are doing>`. Handle tiny incidental fixes inline and note them in the log. Anything substantial outside scope: add to `TODO.md` tagged `[elves-scout]` and keep moving. All work is done directly. Codex doesn't have built-in subagent support.
+Build the full batch scope. Push after each meaningful chunk — **every commit must follow the progress format** from step 11: `[<branch> · Batch N/Total] <what you are doing>`. Handle tiny incidental fixes inline and note them in the log. Anything substantial outside scope: add to `TODO.md` tagged `[elves-scout]` and keep moving. All work is done directly. Codex doesn't have built-in subagent support.
 
 Write tests for new code. Cover the logic you introduce, not just happy paths. If the project lacks test infrastructure, set it up in the first batch. During long implementation stretches, periodically update the execution log with progress notes to protect against mid-batch compaction.
 
@@ -207,7 +207,7 @@ Run available gates; skip missing ones. User overrides in the survival guide tak
 | Rust | `cargo clippy` | (none) | `cargo build` | `cargo test` |
 | Makefile | `make lint` | `make typecheck` | `make build` | `make test` |
 
-Every gate must pass before proceeding. If a gate fails, apply the **bug-fix protocol**: diagnose the category, write a test that catches the category, find related failures, fix them all, then re-run from the failing gate. See `references/validation-guide.md` for the full two-stage validation system (local + preview deployment).
+Every gate must pass before proceeding. If a gate fails, apply the **bug-fix protocol**: diagnose the category, write a test that catches the category, find related failures, fix them all, then re-run from the failing gate. See `references/validation-guide.md` for the full two-stage validation system (local + preview deployment), `references/tool-config-examples.md` for stack-specific configs, and `references/verification-patterns.md` for browser-driven verification techniques.
 
 ### 7. Review
 
