@@ -48,7 +48,7 @@ All notable changes to the Elves skill are documented here.
 
 #### PR timing and review cadence
 - **"Don't wait to open the PR"** — explicit instruction to open the PR after the first pushed commit, not delay until the branch is nearly done. Keep using the same PR throughout the run.
-- **PR Loop (step 11a):** After every push (including mid-implementation), poll PR comments, inline reviews, and check status before starting new work. Lightweight scan that defers to step 7 for full review cycles.
+- **PR Loop (step 13):** After every push (including mid-implementation), poll PR comments, inline reviews, and check status before starting new work. Lightweight scan that defers to step 7 for full review cycles.
 
 #### Constitution and the legality check
 - **Three quality layers** made explicit: correctness (validation gates), plan compliance (review step), legality (the judge). Each asks a different question.
@@ -66,7 +66,7 @@ All notable changes to the Elves skill are documented here.
 - **Artifact inspection** — inspect actual downloaded output for export/download changes.
 
 #### Triage and operational specificity
-- **Four-category triage** unified across step 7, step 11a, and judge: fix now, defer, intentional design, false positive. Replaces the previous three-category scheme.
+- **Four-category triage** unified across step 7, step 13, and judge: fix now, defer, intentional design, false positive. Replaces the previous three-category scheme.
 - **Subagent capacity:** If pool is full, reuse/close idle agents or do work directly. Never skip review.
 - **Process warnings:** Stop and clean up if session/process-count warnings appear.
 
