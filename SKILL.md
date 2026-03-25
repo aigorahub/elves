@@ -320,9 +320,7 @@ The contract goes in the execution log under the batch entry:
 - [ ] All existing tests still pass
 ```
 
-The **Build on** section is where the Code Quality Philosophy becomes concrete for this batch. It answers: what existing patterns, utilities, and modules should the implementing agent extend rather than reinvent? This gives the implementing agent a target and the reviewer something specific to verify against. Without it, "follow existing patterns" is an aspiration. With it, "extend `src/utils/validation.ts`" is a directive.
-
-To write a good **Build on** section, search the codebase during contract writing. Look for: existing utilities that cover part of the batch's needs, established patterns the batch should follow, modules the batch should extend, and conventions (naming, error handling, response format) the batch must match. If nothing relevant exists, say so — "No existing patterns apply; this batch establishes the pattern for [X]" is a valid entry and signals to later batches what to build on.
+The **Build on** section makes the Code Quality Philosophy concrete for this batch. Search the codebase during contract writing to fill it in: existing utilities, established patterns, modules to extend, conventions to match. If nothing relevant exists, say so — "No existing patterns apply; this batch establishes the pattern for [X]" is a valid entry and signals to later batches what to build on.
 
 The contract keeps implementation focused and gives the validate/review steps clear targets. If you can't write concrete acceptance criteria, the batch scope is too vague — sharpen it before coding.
 
