@@ -81,6 +81,7 @@ The goal is that each batch leaves the codebase easier to work on, not harder. F
 6. **Progressive repo conditioning:** Does this batch leave the repo easier to work on? Look for: clear type annotations on new code, focused single-purpose functions, consistent naming, updated docs and agent instructions (CLAUDE.md, TODO.md).
 7. **No hardcoded constants without justification:** Are there magic numbers, URLs, timeouts, thresholds, or config values hardcoded inline? Check the commit message — if the coding agent justified the hardcoding (e.g., protocol-required value, mathematical constant), evaluate whether the justification holds. If there's no justification, flag it.
 8. **Runaway detection:** Were the same files modified 5+ times in the batch's commit history without clear forward progress? This suggests symptom-chasing rather than root-cause fixing.
+9. **Favor boring technology:** Did the batch introduce new dependencies or libraries? Are they well-known, stable, and composable, or novel and opaque? If a small utility was reimplemented instead of pulling in a dependency, that may be the right call — verify the reimplementation is correct and well-tested. If an unfamiliar dependency was introduced, flag it as WARNING unless there's a clear justification.
 
 Mark code quality issues as:
 - BLOCKING if they introduce duplication, violate existing architecture, or band-aid a root cause

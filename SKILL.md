@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "1.1.0"
+  version: "1.2.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -52,6 +52,8 @@ These principles govern how you write code during implementation and how the rev
 7. **No hardcoded constants without justification.** Extract magic numbers, URLs, timeouts, thresholds, feature flags, and configuration values to a constants file, config object, or environment variable — wherever the project keeps them. If you believe a value should be hardcoded (e.g., a mathematical constant, a protocol-required value, a truly fixed enum), you must justify it in the commit message. The reviewer will flag unjustified hardcoded values, and "it was easier" is not a justification.
 
 8. **Runaway detection.** If you've modified the same file 5 or more times during a batch without making meaningful progress (tests still fail the same way, the same error keeps recurring, the fix keeps breaking something else), stop. You are thrashing. Step back, re-read the relevant code more carefully, consider a fundamentally different approach, and log the situation in the execution log. Thrashing is a signal that you're treating symptoms, not causes. (The 5-modification threshold is a default; override in the survival guide under `## Run Control`.)
+
+9. **Favor boring technology.** When choosing libraries, frameworks, or patterns during implementation, prefer well-known, stable, composable options over novel or clever ones. "Boring" technology tends to have stable APIs, strong documentation, and broad representation in training data, which means agents model it more reliably. In some cases, reimplementing a small utility (a retry helper, a concurrency limiter) is cheaper than pulling in an opaque dependency the agent can't fully reason about. If the codebase already uses a library, use it. But when introducing something new, default to the most boring option that works. This is doubly important overnight: there's no one to debug a surprising interaction with an obscure package at 3am.
 
 **For reviewers:** The current codebase is the source of truth, not your training data. The coding agent can search the web in real time and may be using libraries, APIs, model versions, or SDK methods that are newer than what you know. If the code references `gemini-3.1` and you only know about `gemini-1.5`, don't flag it — the codebase is probably right and you are probably stale. If you genuinely believe something is outdated, state your concern but acknowledge your knowledge may be behind. Always pass today's date to the review subagent so it knows the temporal context.
 
@@ -420,7 +422,23 @@ This lets anyone watching the commit graph see where the run stands, which branc
 
 **After every push, re-read the survival guide before doing anything else.** Also verify the plan file hasn't changed since session start.
 
-### 12. Continue or Stop
+### 12. Entropy Check (every 3 batches)
+
+**Every 3 completed batches, do a cross-batch quality scan before starting the next batch.** The per-batch review (step 7) evaluates the batch in isolation. The entropy check evaluates what's accumulated across batches: patterns that drifted, utilities that were duplicated in different batches, naming conventions that diverged, abstractions that grew inconsistent.
+
+This is continuous entropy management — catching the slow drift that individual batch reviews miss. Over a 10-batch overnight run, small inconsistencies compound. An entropy check every 3 batches prevents that from becoming structural debt.
+
+**What to check:**
+- Scan for duplicated utilities or helpers introduced in different batches that do the same thing. Consolidate them.
+- Check for naming inconsistencies that crept in across batches (different conventions in different modules).
+- Look for patterns that diverged: error handling done one way in batch 1 and a different way in batch 4.
+- Verify that the Code Quality Philosophy principles (especially #2 centralize, #5 pattern detection, #6 progressive conditioning) are holding across the cumulative diff, not just within individual batches.
+
+If you find drift, fix it now in a small focused commit: `[<branch> · Entropy check after Batch N] <what you consolidated>`. Don't let it ride. The purpose is garbage collection — small, frequent corrections are cheaper than a large refactor later.
+
+If nothing needs fixing, skip it and move on. This should take minutes, not hours. The 3-batch cadence is a default; override in the survival guide under `## Run Control`.
+
+### 13. Continue or Stop
 
 **Finite mode:** check the clock. If there's enough time for another batch, start it. Otherwise, scout mode or Final Completion. Don't pause. Don't wait for user input.
 

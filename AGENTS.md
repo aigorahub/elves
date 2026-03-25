@@ -22,6 +22,7 @@ AI agents tend toward spaghetti: quick fixes, duplicated utilities, novel patter
 6. **Progressive repo conditioning.** Leave the repo easier for the next batch: clear type annotations, focused functions, consistent naming, updated docs and agent instructions.
 7. **No hardcoded constants without justification.** Extract magic numbers, URLs, timeouts, thresholds, and config values to a constants file, config object, or env var. If a value must be hardcoded, justify it in the commit message. The reviewer will flag unjustified hardcoded values.
 8. **Runaway detection.** If you've modified the same file 5+ times without meaningful progress, stop. Step back, re-read, try a fundamentally different approach. Log the situation. (The 5-modification threshold is a default; override in the survival guide under `## Run Control`.)
+9. **Favor boring technology.** Prefer well-known, stable, composable libraries over novel or clever ones. "Boring" technology has stable APIs, strong docs, and broad training-data representation — agents model it more reliably. Sometimes reimplementing a small utility is cheaper than pulling in an opaque dependency the agent can't reason about. When introducing something new, default to the most boring option that works.
 
 **For reviewers:** The current codebase is the source of truth, not your training data. The coding agent can search in real time and may use libraries, model versions, or APIs newer than what you know. Don't flag something as wrong just because it doesn't match your training data. Always pass today's date to review subagents.
 
@@ -275,7 +276,15 @@ python3 -c "import hashlib,sys; print(hashlib.md5(open(sys.argv[1],'rb').read())
 # Compare against hash saved at session start
 ```
 
-### 12. Continue or Stop
+### 12. Entropy Check (every 3 batches)
+
+**Every 3 completed batches, do a cross-batch quality scan before starting the next batch.** The per-batch review (step 7) evaluates the batch in isolation. The entropy check evaluates what's accumulated: patterns that drifted, utilities duplicated across batches, naming conventions that diverged, abstractions that grew inconsistent.
+
+**What to check:** duplicated utilities introduced in different batches, naming inconsistencies across modules, error handling done differently in different batches, violations of principles #2 (centralize), #5 (pattern detection), #6 (progressive conditioning) across the cumulative diff.
+
+If you find drift, fix it in a small focused commit: `[<branch> · Entropy check after Batch N] <what you consolidated>`. If nothing needs fixing, skip and move on. Should take minutes, not hours. The 3-batch cadence is a default; override in the survival guide under `## Run Control`.
+
+### 13. Continue or Stop
 **Finite:** if enough time budget remains, start the next batch. Otherwise, scout mode or Final Completion.
 
 **Open-ended:** continue automatically after every checkpoint. Do not stop because the batch is complete, because a PR exists, or because the user is away. Only stop for explicit user stop or a blocker with no recovery path.

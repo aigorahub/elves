@@ -335,6 +335,10 @@ elves/
 - **Rollback before every batch.** `elves/pre-batch-N` tags mean any batch can be cleanly unwound without touching other work.
 - **Agent infrastructure is real engineering.** Developers who treat agent infrastructure as a real engineering concern (tight code review systems, organized work trees, failure handling) end up with something that functions like a tireless junior team working every hour they're away from their desk.
 
+### Prior art and convergence
+
+Elves was developed independently, but its core patterns converge with findings from two major labs working on the same problem. [Anthropic's harness design for long-running applications](https://www.anthropic.com/engineering/harness-design-long-running-apps) describes a three-agent architecture (planner, generator, evaluator) with grading criteria that separate generation from evaluation — the same generator/evaluator split behind Elves' contract step and review loop. Their key insight that harnesses should be *simplified* as models improve (stripping away scaffolding that is no longer necessary) matches Elves' design as configurable scaffolding, not a rigid framework. [OpenAI's harness engineering](https://openai.com/index/harness-engineering/) describes building an entire production system with zero human-written code using Codex agents, and articulates principles Elves independently embodies: progressive disclosure for context (short entry point with pointers to deeper docs), plans as first-class versioned artifacts, the repository as single source of truth, continuous entropy management (cross-batch quality sweeps), and favoring "boring" technology that agents can model reliably. Both teams found the same thing: coding agents become reliable only when you build the right harness around them. Better models make harness engineering *more* important, not less.
+
 ---
 
 ## What can go wrong

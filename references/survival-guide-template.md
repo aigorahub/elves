@@ -178,6 +178,35 @@ notification: pr-comment
 
 ---
 
+## Architectural Boundaries (optional)
+
+> If your project has explicit architectural layers or module boundaries, define them here so the
+> agent respects them during implementation. This is especially valuable for larger codebases where
+> an agent might inadvertently introduce cross-layer dependencies or violate module ownership.
+>
+> If your project doesn't have formal boundaries, skip this section entirely.
+
+```yaml
+# Example: layered architecture with enforced dependency direction
+# layers (dependencies flow downward only):
+#   - ui          # Components, pages, views
+#   - runtime     # App lifecycle, routing, middleware
+#   - service     # Business logic, orchestration
+#   - repo        # Data access, API clients
+#   - config      # Configuration, environment
+#   - types       # Shared types, interfaces, enums
+#
+# enforcement:
+#   - structural-tests: src/__tests__/architecture.test.ts
+#   - lint-rule: no-restricted-imports (configured in eslint)
+#
+# module-ownership:
+#   - auth/: "Do not modify without updating the auth integration tests"
+#   - billing/: "Non-negotiable: never modify billing logic"
+```
+
+---
+
 ## Rollback and Safety Rules
 
 1. **Create a rollback tag before every batch:**

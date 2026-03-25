@@ -2,6 +2,16 @@
 
 All notable changes to the Elves skill are documented here.
 
+## [1.2.0] - 2026-03-25
+
+### Harness Design: Entropy Management and Industry Convergence
+
+- Added **Entropy Check** step (step 12): every 3 batches, the agent performs a cross-batch quality scan to catch accumulated drift — duplicated utilities, naming inconsistencies, diverging patterns — that individual batch reviews miss. Cadence is configurable via survival guide.
+- Added **Principle #9: Favor boring technology.** Agents should prefer well-known, stable, composable libraries over novel ones. "Boring" technology has stable APIs and broad training-data representation, making agents more reliable. Sometimes reimplementing a small utility is cheaper than pulling in an opaque dependency.
+- Added **Architectural Boundaries** section to survival guide template: optional section for defining layered architecture, dependency direction, module ownership, and enforcement mechanisms (structural tests, lint rules). Helps agents respect boundaries in larger codebases.
+- Added **Prior art and convergence** section to README, citing [Anthropic's harness design for long-running applications](https://www.anthropic.com/engineering/harness-design-long-running-apps) and [OpenAI's harness engineering](https://openai.com/index/harness-engineering/). Elves independently converged on the same core patterns: progressive disclosure, plans as first-class artifacts, repository as single source of truth, generator/evaluator separation, and continuous entropy management.
+- Core loop steps renumbered: Continue or Stop is now step 13 (was 12).
+
 ## [1.1.0] - 2026-03-24
 
 ### Harness Design Improvements
