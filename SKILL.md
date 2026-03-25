@@ -191,10 +191,10 @@ Record the time budget in the execution log.
    git commit -m "[<branch> · Batch 0/N] Session setup — survival guide, execution log, batch plan"
    ```
 
-3. **Push and open a PR immediately:**
+3. **Push and open a draft PR immediately:**
    ```bash
    git push -u origin HEAD
-   gh pr create --title "<concise title from plan>" --body "<plan summary with batch list>"
+   gh pr create --draft --title "<concise title from plan>" --body "<plan summary with batch list>"
    ```
 
 4. **Capture the PR number** for later:
@@ -203,6 +203,8 @@ Record the time budget in the execution log.
    ```
 
 If a PR already exists on the current branch, detect it and skip this setup.
+
+**Don't wait to open the PR.** Open a draft PR after the first pushed commit — even if it's just session setup documents. Do not delay until the branch is "nearly done" or until the first implementation batch is complete. The PR is your collaboration surface, your review loop, and your visibility tool. Every hour without a PR is an hour where bots can't review, the user can't check in, and comments can't accumulate. Keep using the same PR throughout the run; do not create new PRs for subsequent batches.
 
 **Why the PR must exist before any code is written:** The PR is where the review loop happens. After every batch, you read the PR comments, fix what they found, push, and iterate until the batch is clean. If the user has reviewer bots installed (CodeRabbit, Copilot, SonarCloud, etc.), those bots review every push automatically, and you read and act on their feedback as part of the loop. The review isn't something that accumulates for the human to read in the morning. The review is part of your loop. You iterate on it until the batch is tight, then move on.
 
@@ -248,6 +250,10 @@ For long runs, delegate heavy work to subagents to preserve context. The coordin
 
 If your environment doesn't support subagents, do all work directly. The core loop is the same regardless.
 
+**If subagent capacity is full**, do not silently skip delegation. Reuse an existing idle subagent, wait for one to complete, or close an idle one before spawning a new one. If none of those options work, do the work directly in the coordinator. "Subagent limit reached" is never an excuse for "no independent review." The review must happen regardless.
+
+**If process-count or session warnings appear**, stop and clean up before continuing. Close idle terminals, reuse existing processes, or consolidate work. Do not let warnings pile up — they degrade performance and eventually cause hard failures.
+
 ## Core Loop
 
 For every batch, execute this full cycle:
@@ -277,7 +283,8 @@ Track time per phase in the execution log (Implement Xm / Validate Xm / Review X
 1. Survival guide
 2. Plan
 3. Execution log
-4. Any project-level TODO or backlog file (if it exists)
+4. `CONSTITUTION.md` (if it exists and this is the first batch)
+5. Any project-level TODO or backlog file (if it exists)
 
 Then identify the first incomplete batch.
 
@@ -469,6 +476,21 @@ This lets anyone watching the commit graph see where the run stands, which branc
 
 **After every push, re-read the survival guide before doing anything else.** Also verify the plan file hasn't changed since session start.
 
+### 11a. PR Loop — Poll After Every Push
+
+**After every push, poll PR comments, inline review comments, and check status before starting any new work.** Don't assume silence means no comments. Bots and CI run asynchronously — new feedback may have arrived since your last check, even if you just pushed seconds ago.
+
+1. **Fetch all PR comments and review threads** via `gh api`. Read everything new since your last poll.
+2. **Check CI/check status.** If checks are failing, diagnose and fix before moving on.
+3. **Triage every comment into one of three categories:**
+   - **Fix now:** genuine issue that must be resolved before continuing. Fix it, push, and re-poll.
+   - **Defer:** valid finding but out of scope for the current batch. Log it in TODO.md with `[elves-scout]` and note the deferral reason in the PR thread reply.
+   - **Ignore with reason:** false positive or non-actionable. Reply with your reasoning and resolve the thread.
+4. **Record dispositions** in `.elves-session.json` as described in step 7.
+5. **Repeat** until no unresolved threads remain and checks are green.
+
+This is not optional. Skipping it means review feedback piles up silently and the user returns to a PR full of unaddressed comments. The PR loop is what makes the difference between "autonomous completion" and "visible collaborative review cadence."
+
 ### 12. Entropy Check (every 3 batches)
 
 **Every 3 completed batches, do a cross-batch quality scan before starting the next batch.** The per-batch review (step 7) evaluates the batch in isolation. The entropy check evaluates what's accumulated across batches: patterns that drifted, utilities that were duplicated in different batches, naming conventions that diverged, abstractions that grew inconsistent.
@@ -562,6 +584,40 @@ A batch isn't done unless:
 13. Changes committed and pushed.
 
 Every batch must be tight before you move on. The next batch builds on this one. If this one is shaky, everything after it is shaky. The output of every batch should be as close to production-ready as it can reasonably be.
+
+## Constitution and Judge Integration
+
+If `CONSTITUTION.md` exists in the repository, read it before the first implementation batch. It defines project-level principles and constraints that override your defaults. Treat it as an extension of the survival guide's non-negotiables.
+
+If a Judge skill or review tool exists (check the skill registry and survival guide), run it after each significant batch and before calling the branch review-ready. Judge findings are treated like reviewer findings: triage into fix/defer/ignore with reason. Do not call a branch review-ready with unresolved judge findings.
+
+## Proof Scope
+
+Not all proof is equal. Distinguish between:
+
+- **Touched-surface proof:** validation focused on the code and behaviors this batch actually changed. This is the minimum required for every batch.
+- **Broad regression proof:** running the full test suite, all E2E scenarios, all viewports, etc. This is valuable but expensive and can be blocked by known issues in unrelated areas.
+
+**Default to touched-surface proof.** Run broad regression proof at entropy check intervals (every 3 batches) and before calling the branch review-ready. If a broad regression run is blocked by an unrelated known issue, record it in the execution log and fall back to narrower touched-surface proof instead of thrashing. Don't waste hours debugging a pre-existing flake in an area you didn't touch.
+
+**Preview proof must be on the exact current runtime tip.** After pushing review fixes, re-deploying, or any commit that changes deployed behavior, re-verify on the current deployed version. Proof from a prior commit does not carry forward after subsequent changes. Don't inherit proof — re-earn it.
+
+**When export or artifact behavior changes, inspect the actual artifact.** Don't just verify that the export succeeded — download and inspect the output file. A successful HTTP 200 on an export endpoint doesn't mean the CSV/PDF/ZIP contains correct data.
+
+## Readiness Gate
+
+Do not call a branch review-ready unless ALL of the following are true:
+
+1. **Execution log is current.** All batches documented with timestamps, evidence, and commit SHAs.
+2. **Local proof is green on the current tip.** All validation gates pass on the latest commit, not on an earlier commit that has since been amended by review fixes.
+3. **Preview proof is green on the current tip** (if deployed behavior was touched). Re-verify after every push that changes deployed code.
+4. **Artifact inspection done** for any export/download behavior changes. The actual output was inspected, not just the success status.
+5. **PR comments and checks have been polled.** No unresolved threads, no unreplied bot comments, no failing checks.
+6. **Judge review is clean** (if a Judge skill or tool is configured). Findings are resolved or explicitly triaged with reasoning.
+7. **Git status is clean.** No uncommitted changes, no untracked files that should be committed.
+8. **Constitution is respected.** If `CONSTITUTION.md` exists, no unresolved violations.
+
+If any gate fails, fix it before declaring readiness. This checklist is the final quality gate between "autonomous run complete" and "ready for human review."
 
 ## Final Completion
 
