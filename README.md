@@ -35,7 +35,8 @@ Elves is the harness that lets the Ralph Loop run for hours without supervision,
 ## How it works
 
 ```
-Plan → Batch → Implement → Validate → Review → Judge → Document → Continue
+Orient → Verify Green → Tag → Contract → Implement → Validate → Review →
+Judge → Document → Update → Push → Re-read → PR Loop → Entropy Check → Continue
 ```
 
 Elves runs a tight loop. For each batch of planned work, the agent implements the changes, runs validation gates, reads PR review comments, fixes any blocking findings, updates the documentation, and pushes a checkpoint, then immediately starts the next batch. No waiting, no prompting, no drift.
@@ -113,13 +114,15 @@ Elves runs preflight checks first: git access, test gates, sleep prevention, not
 - **Pluggable review**: GitHub PR comments by default (zero config), custom review API opt-in, additional custom checks
 - **Subagent delegation** for long runs (Claude Code): coordinator manages the loop, subagents do the deep work
 - **Rollback safety**: `git tag elves/pre-batch-N` before every batch, so any batch can be cleanly unwound
-- **Scout mode**: after all planned work is done, the agent looks for adjacent improvements, test gaps, and documentation holes
+- **Scout mode**: after all planned work is done, the agent looks for adjacent improvements, test gaps, and documentation holes. Prioritizes risk-reducing fixes first, then quality, then leaves ambiguous items. Commits tagged `[branch · Scout]`, with validation gates required and clear stop rules.
+- **Proof scope**: touched-surface proof per batch (only test what you changed), broad regression at entropy checks and before readiness. Re-earn proof after each push — don't inherit from prior commits.
+- **Merge conflict handling**: when `git push` fails due to a diverged remote, the agent fetches and merges (never rebases), resolves conflicts or triggers a Hard Stop
 - **Two run modes**: finite (deadline-based, default) or open-ended (continue until explicitly stopped). Open-ended mode disables Final Completion and treats every checkpoint as a relaunch point.
 - **Time-aware pacing**: tracks how long each batch takes and uses that to decide whether to start another batch or wrap up cleanly (finite mode)
 - **Slack notifications** (or any custom command): know when your run finishes without watching the terminal
 - **Constitution and legality check**: human-authored deal-breaker behaviors (`docs/constitution.md`) verified by a read-only judge after each batch. Three quality layers: correctness (tests), plan compliance (review), legality (judge). Success criteria the agent didn't author.
 - **PR Loop**: poll PR comments, inline reviews, and check status after every push — not just at batch boundaries
-- **Readiness Gate**: branch-level checklist (proof on current tip, legality check clean, PR comments resolved, git status clean) before declaring review-ready
+- **Readiness Gate**: 7-point branch-level checklist before declaring review-ready (local proof on current tip, preview proof on exact runtime tip, artifact inspection, PR comments polled, legality check clean, git status clean, execution log current)
 - **Structured session data** in `.elves-session.json` for tooling, dashboards, and analytics
 - **Comprehensive preflight checks**: git remote, push access, GitHub CLI auth, test gates, sleep prevention, Slack webhook, stale branch detection
 
@@ -376,6 +379,7 @@ Overnight agent runs fail in predictable ways. Knowing the failure modes makes t
 | **Flaky tests block progress** | A test passes locally but fails intermittently. The agent loops trying to fix a non-bug. | The agent logs flaky tests in the execution log and moves on after 3 failed attempts on the same non-deterministic failure. |
 | **Terminal closes (SSH disconnect)** | The SSH connection drops and the session dies. | Use `tmux` or `screen`. Elves mentions this in the pre-run checklist. |
 | **Agent drifts from the plan** | After many batches, the agent starts making changes that weren't in the plan. | The agent re-reads the survival guide after every push and checks the plan hash to detect modifications. The three-document system anchors every decision. |
+| **Merge conflicts on push** | `git push` fails because the remote has diverged. The agent may rebase and lose work, or stall. | Elves instructs the agent to fetch and merge (never rebase on shared branches). If conflicts can't be resolved cleanly, the agent triggers a Hard Stop rather than risking data loss. |
 
 Most of these are prevented by the preflight checks. Run preflight, fix the warnings, and most overnight failures never happen.
 
