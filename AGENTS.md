@@ -14,6 +14,8 @@ But AI agents are stateless. Context compaction erases working memory. The Survi
 
 AI agents tend toward spaghetti: quick fixes, duplicated utilities, novel patterns that ignore existing conventions. Over a multi-batch run, this compounds into massive technical debt. **Each batch must leave the codebase easier to work on, not harder.**
 
+These principles apply across the full lifecycle: planning (batch ordering and dependencies), contracts (what to build on), implementation (what to search for and extend), and review (what to verify). Enforce them early, not just at review time.
+
 1. **Root cause over band-aids.** Fix the underlying problem, not the symptom. A quick fix that hides a bug is worse than no fix.
 2. **Centralize over duplicate.** Search for existing utilities before creating new ones. Never create a second version of something that already exists.
 3. **Extend over create.** Build on existing abstractions and modules. Adding to what exists beats inventing something new.
@@ -130,6 +132,8 @@ Default: **4 developers × 2-week sprint** (~40 person-days). Override in plan/s
 
 Each batch must be independently shippable. Split before writing code if a batch is too large. Record breakdown in execution log before implementation. Create a rollback tag before each batch: `git tag elves/pre-batch-N`.
 
+**Architecture-aware ordering:** Batch order isn't just about feature dependencies — it's about architectural dependencies. If multiple batches need a shared utility, put it in the earliest batch. If a batch introduces a new pattern (error handling, component structure), schedule it before batches that should follow that pattern. Each batch should create the foundation the next batch builds on.
+
 ## Core Loop
 
 ### 1. Orient: Read in order (prevents drift after compaction)
@@ -155,15 +159,20 @@ git tag elves/pre-batch-N
 **Contract:**
 - [Specific behavior 1]
 - [Specific behavior 2]
+**Build on:**
+- [Existing pattern/utility to extend, not reinvent]
+- [Convention to follow — naming, error format, test structure]
 **Acceptance criteria:**
 - [ ] [Testable criterion 1]
 - [ ] [Testable criterion 2]
 ```
 
+The **Build on** section makes the Code Quality Philosophy concrete: what existing patterns, utilities, and modules should this batch extend? Search the codebase during contract writing to fill this in. If nothing relevant exists, note that this batch establishes the pattern.
+
 If you can't write concrete acceptance criteria, the batch scope is too vague — sharpen it before coding. For trivial batches (docs, config), the contract can be a single line.
 
 ### 5. Implement
-**Before writing new code, read the surrounding code.** Understand the patterns, conventions, and abstractions already in use. Search for existing utilities before creating new ones. Follow the Code Quality Philosophy: root cause over band-aids, centralize over duplicate, extend over create, architecture first.
+**Start with a pre-implementation survey.** Before writing any code, read the contract's **Build on** section, then search for relevant utilities, patterns, and conventions. Log what you find in the execution log. This makes principles #2 (centralize), #3 (extend), and #4 (architecture first) actionable — you can't extend what you haven't found. The reviewer checks your implementation against your survey.
 
 **Use commit messages to communicate with the reviewer.** The reviewer reads your commit history. Every commit should reference which batch item is being addressed. When you make a non-obvious choice (hardcoded value, pattern deviation, design tradeoff), explain your reasoning in the commit body. This prevents review cycles from devolving into arguments where neither side understands the other.
 
@@ -203,7 +212,7 @@ Parse with python3 (no jq). Categorize each finding as BLOCKING, WARNING, or INF
 
 The review has three jobs: **find bugs**, **verify the batch matches its contract**, and **enforce the Code Quality Philosophy.** Walk through each behavior and acceptance criterion from the contract (step 4). Is it implemented? Is it tested? A batch that passes all gates but skips a contract item is incomplete, not clean. If something is missing, go back to Implement (step 5) and finish it.
 
-Also review the diff for code quality: does the batch introduce duplicated utilities that already exist in the codebase? Does it ignore established patterns or architecture? Are fixes addressing root causes or patching symptoms? Does the batch leave the repo easier or harder to work on? Duplication and architecture violations are blocking. Band-aids are blocking if they hide bugs. When fixing code quality findings, follow the same philosophy — don't create a bigger band-aid to fix a band-aid.
+Also review the diff for code quality, **using the contract's Build on section and the pre-implementation survey as your baseline**: does the batch extend the utilities and patterns it said it would? Does it introduce duplicated utilities that already exist in the codebase? Does it ignore established patterns or architecture? Are fixes addressing root causes or patching symptoms? Does the batch leave the repo easier or harder to work on? Duplication and architecture violations are blocking. Band-aids are blocking if they hide bugs. When fixing code quality findings, follow the same philosophy — don't create a bigger band-aid to fix a band-aid.
 
 **Fix all blocking issues using the bug-fix protocol.** When a bug is found:
 1. **Diagnose the category** — what kind of bug is this? Missing null check? Unvalidated input? Off-by-one? The specific bug is a symptom; the category is the disease.

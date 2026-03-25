@@ -35,7 +35,7 @@ AI coding agents have a natural tendency toward spaghetti: quick fixes instead o
 
 **The goal is the opposite: each batch should leave the codebase in better shape than it found it.** Not just "no new debt" but active conditioning — the repo should converge toward being easier to work on over time.
 
-These principles govern how you write code during implementation and how the reviewer evaluates your work:
+These principles govern the entire lifecycle — how you **plan** batches (ordering and dependencies), how you **write contracts** (what to build on), how you **implement** (what to search for and extend), and how you **review** (what to verify). A principle that's only enforced at review time is a principle that creates rework. The earlier it's applied, the less it costs:
 
 1. **Root cause over band-aids.** Fix the underlying problem, not the symptom. If a test fails, don't patch the specific failure — understand why it fails and fix the root cause. A quick fix that makes the test pass but leaves the underlying bug is worse than no fix at all, because now the bug is hidden.
 
@@ -110,17 +110,24 @@ The planner output replaces the interactive conversation but produces the same a
 
 1. **What are we building?** Understand the goal. Ask clarifying questions. Help the user think through scope, constraints, and what "done" looks like. If the user has a rough idea, help them sharpen it. If they have a detailed spec, confirm you understand it.
 
-2. **Break it into batches.** Work with the user to decompose the work into sprint-sized batches. Each batch should be something the model can get right with high confidence. Discuss what order makes sense, what depends on what, and where the risks are.
+2. **Survey the architecture.** Before decomposing into batches, understand the codebase you're building on. What patterns exist? What utilities are available? What conventions does the project follow? This isn't optional prep — it directly shapes batch ordering and scope. The Code Quality Philosophy (especially #2 centralize, #3 extend, #4 architecture first) can't be followed at implementation time if the plan was designed without knowing what already exists. A plan that says "build a date formatter in batch 5" when one already exists in `utils/` is a plan that creates debt by design.
 
-3. **Define the sprint size.** Ask the user what batch size works for their model and stack. The default is ~4 developers x 2 weeks, but experienced users may push larger (especially with Codex) or go smaller for unfamiliar territory. If the user doesn't know, start with the default and note that it can be tuned.
+3. **Break it into batches — architecture-aware.** Work with the user to decompose the work into sprint-sized batches. Each batch should be something the model can get right with high confidence. But batch ordering isn't just about feature dependencies — it's about architectural dependencies too:
+   - If multiple batches need a shared utility, put it in the earliest batch so later batches extend rather than duplicate.
+   - If a batch introduces a new pattern (error handling, API response format, component structure), schedule it before batches that should follow that pattern.
+   - If the codebase has existing patterns that apply, note them in the batch description so the implementing agent knows what to follow, not just what to build.
 
-4. **Set non-negotiables.** What must never happen? What must always be true? These go in the survival guide and are the guardrails for the entire run.
+   The goal is a plan where each batch creates the foundation the next batch builds on — not just functionally, but architecturally. Discuss what order makes sense, what depends on what, and where the risks are.
 
-5. **Configure the tools.** What test commands exist? Is there a preview deployment? What review infrastructure is in place (bots, CI, custom APIs)? How should notifications work?
+4. **Define the sprint size.** Ask the user what batch size works for their model and stack. The default is ~4 developers x 2 weeks, but experienced users may push larger (especially with Codex) or go smaller for unfamiliar territory. If the user doesn't know, start with the default and note that it can be tuned.
 
-6. **Set the run mode.** Finite (default) or open-ended? If the user says anything like "keep going until I stop you" or "run indefinitely," set open-ended mode. Persist this in the survival guide under `## Run Control`.
+5. **Set non-negotiables.** What must never happen? What must always be true? These go in the survival guide and are the guardrails for the entire run.
 
-7. **Set the time budget.** When is the user leaving? When will they be back? This determines pacing. (In open-ended mode, the time budget is "until the user stops me.")
+6. **Configure the tools.** What test commands exist? Is there a preview deployment? What review infrastructure is in place (bots, CI, custom APIs)? How should notifications work?
+
+7. **Set the run mode.** Finite (default) or open-ended? If the user says anything like "keep going until I stop you" or "run indefinitely," set open-ended mode. Persist this in the survival guide under `## Run Control`.
+
+8. **Set the time budget.** When is the user leaving? When will they be back? This determines pacing. (In open-ended mode, the time budget is "until the user stops me.")
 
 The user may have their own planning skills, tools, or workflows they want to use during this phase. That's great. Use whatever produces the best plan. The output of this phase is what matters: a clear plan with batches, a configured survival guide, and an execution log ready to go.
 
@@ -282,6 +289,12 @@ The contract goes in the execution log under the batch entry:
 - Webhook endpoint validates signatures and updates order status
 - E2E: user can complete checkout flow and see confirmation page
 
+**Build on:**
+- Existing request handler pattern in `src/api/handlers/` (follow the same middleware chain, error response format, and test structure)
+- Extend `src/utils/validation.ts` for payment input validation — do not create a new validator
+- Use the existing `ApiError` class for error responses — do not introduce a new error type
+- Webhook handler should follow the same pattern as the existing `github-webhook.ts` handler
+
 **Acceptance criteria:**
 - [ ] Unit tests for charge creation (success + failure paths)
 - [ ] Integration test for webhook signature validation
@@ -289,17 +302,35 @@ The contract goes in the execution log under the batch entry:
 - [ ] All existing tests still pass
 ```
 
+The **Build on** section is where the Code Quality Philosophy becomes concrete for this batch. It answers: what existing patterns, utilities, and modules should the implementing agent extend rather than reinvent? This gives the implementing agent a target and the reviewer something specific to verify against. Without it, "follow existing patterns" is an aspiration. With it, "extend `src/utils/validation.ts`" is a directive.
+
+To write a good **Build on** section, search the codebase during contract writing. Look for: existing utilities that cover part of the batch's needs, established patterns the batch should follow, modules the batch should extend, and conventions (naming, error handling, response format) the batch must match. If nothing relevant exists, say so — "No existing patterns apply; this batch establishes the pattern for [X]" is a valid entry and signals to later batches what to build on.
+
 The contract keeps implementation focused and gives the validate/review steps clear targets. If you can't write concrete acceptance criteria, the batch scope is too vague — sharpen it before coding.
 
 For trivial batches (documentation-only, config changes, dependency bumps), the contract can be a single line: "Update README with API examples. Acceptance: README contains curl examples for all endpoints." Don't let the contract become bureaucracy for obvious work.
 
 ### 5. Implement
 
+**Start with a pre-implementation survey.** Before writing any code, read the contract's **Build on** section and verify it against the current codebase. Then search for anything else relevant: utilities you might need, patterns you should follow, conventions you must match. Document what you find in a brief note in the execution log:
+
+```markdown
+**Pre-implementation survey:**
+- Found `formatCurrency()` in `src/utils/format.ts` — will use for payment display
+- Existing handlers in `src/api/handlers/` use `withAuth` middleware → will follow same pattern
+- Error responses use `{ error: string, code: string }` format throughout → will match
+- No existing webhook handler pattern — this batch establishes it
+```
+
+This takes minutes and prevents hours of review churn. The survey makes principles #2 (centralize), #3 (extend), and #4 (architecture first) actionable: you can't extend what you haven't found, and you can't centralize if you don't know what already exists. The reviewer will check your implementation against your survey — if you documented an existing utility and then created a duplicate anyway, that's a clear finding.
+
+If the contract's **Build on** section is stale or incomplete (the codebase changed since the contract was written), update it before coding.
+
 Build the batch scope fully. Push after each meaningful chunk — and **every commit must follow the progress report format** from step 10: `[<branch> · Batch N/Total] <what you are doing>`. This applies to mid-implementation commits too, not just batch-end commits. Tag incidental findings as `[elves-scout]` in TODO.md for later.
 
 **Use commit messages to communicate with the reviewer.** The reviewer reads your commit history to understand not just *what* you changed but *why*. Every commit should reference which batch item is being addressed. When you make a design choice that isn't obvious — choosing one approach over another, hardcoding a value, deviating from a pattern — explain your reasoning in the commit message body. This is the communication channel between you and the reviewer. Without it, the reviewer flags something, you silently change it back, the reviewer flags it again, and you burn cycles arguing through code. With it, the reviewer reads your justification first and only flags things where the reasoning is actually wrong.
 
-**Before writing new code, read the surrounding code.** Understand the patterns, conventions, and abstractions already in use. Search for existing utilities before creating new ones. Follow the Code Quality Philosophy: root cause over band-aids, centralize over duplicate, extend over create, architecture first. The fastest way to generate technical debt overnight is to write code that ignores what already exists.
+**Follow the patterns you surveyed.** The pre-implementation survey identified what exists. Now use it. Extend existing utilities instead of creating new ones. Follow established patterns instead of inventing alternatives. Match conventions exactly. The fastest way to generate technical debt overnight is to write code that ignores what already exists — and after the survey, you can't claim you didn't know.
 
 Write tests for the code you write. Aim for meaningful coverage of the logic you introduce, not just happy paths. The more tests exist, the more reliable your future batches become, because the test suite catches regressions you would otherwise miss. If the project doesn't have a test infrastructure yet, consider setting one up as part of the first batch. It pays for itself immediately.
 
@@ -329,7 +360,7 @@ The built-in review works out of the box with zero configuration:
 
 1. **Read all PR feedback.** Fetch review threads, issue comments, and CI check runs via `gh api`. Every comment from every source — human reviewers, bot reviewers (CodeRabbit, Copilot, SonarCloud, etc.), and CI — must be read. Don't sample. Read all of them.
 2. **Read the commit history for the batch.** The coding agent communicates through commit messages — not just what changed but *why*. Before flagging something, check whether the commit message already justifies the choice. A hardcoded value with a documented justification in the commit body is an intentional design decision, not a finding. A deviation from pattern with a clear rationale is not a violation. The commit messages are the coding agent's side of the conversation. Read them.
-3. **Spawn a review subagent** (if supported) to read the comments, the diff, the commit history, the plan, **and the batch contract from step 4.** Tell the subagent today's date and instruct it to **trust the codebase as the source of truth** — the coding agent can search in real time and may be using libraries, APIs, or model versions that are newer than the reviewer's training data. The subagent produces a structured assessment covering: what's blocking, what's a warning, what's fine, and whether every contract item was delivered. If subagents aren't available, do this analysis directly.
+3. **Spawn a review subagent** (if supported) to read the comments, the diff, the commit history, the plan, **the batch contract from step 4 (including the Build on section), and the pre-implementation survey from step 5.** Tell the subagent today's date and instruct it to **trust the codebase as the source of truth** — the coding agent can search in real time and may be using libraries, APIs, or model versions that are newer than the reviewer's training data. The subagent produces a structured assessment covering: what's blocking, what's a warning, what's fine, whether every contract item was delivered, and whether the implementation followed the patterns and utilities identified in the Build on section and survey. If the survey identified an existing utility and the implementation created a duplicate instead of extending it, that's a blocking finding. If subagents aren't available, do this analysis directly.
 4. **Check contract completeness.** Walk through each behavior and acceptance criterion from the contract. Is it implemented? Is it tested? If something is missing, go back to Implement (step 5) and finish it before continuing the review loop. A batch that passes all gates but skips a contract item is incomplete, not clean.
 5. **Fix blocking issues** using the **bug-fix protocol:** When a bug is found — whether by the reviewer, a bot, CI, or your own analysis — don't just fix the specific instance. Follow this sequence:
 
