@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "1.2.0"
+  version: "1.3.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -283,7 +283,7 @@ Track time per phase in the execution log (Implement Xm / Validate Xm / Review X
 1. Survival guide
 2. Plan
 3. Execution log
-4. `CONSTITUTION.md` (if it exists)
+4. Constitution (`docs/constitution.md` or `CONSTITUTION.md`, if it exists)
 5. Any project-level TODO or backlog file (if it exists)
 
 Then identify the first incomplete batch.
@@ -556,7 +556,7 @@ After any compaction or restart, your conversation history is gone. But your ins
 3. Read `.elves-session.json` to quickly determine the current batch, PR number, and what's complete. This is the fastest signal.
 4. Read the plan.
 5. Read the execution log.
-6. Read `CONSTITUTION.md` if it exists.
+6. Read the constitution (`docs/constitution.md` or `CONSTITUTION.md`) if it exists.
 7. Identify the first incomplete batch.
 8. Resume immediately without asking for help.
 9. Don't redo completed work.
@@ -585,11 +585,64 @@ A batch isn't done unless:
 
 Every batch must be tight before you move on. The next batch builds on this one. If this one is shaky, everything after it is shaky. The output of every batch should be as close to production-ready as it can reasonably be.
 
-## Constitution and Judge Integration
+## Constitution and the Legality Check
 
-If `CONSTITUTION.md` exists in the repository, read it during every Orient step (step 1). It defines project-level principles and constraints that override your defaults. Treat it as an extension of the survival guide's non-negotiables.
+The elves loop has three quality layers, each asking a different question:
 
-If a Judge skill or review tool exists (check the skill registry and survival guide), run it after each significant batch and before calling the branch review-ready (see **Readiness Gate** below). Judge findings are treated like reviewer findings: triage using the same four categories from step 7. Do not call a branch review-ready with unresolved judge findings.
+1. **Correctness** (validation gates): Is this code valid and well-written? Syntax, types, style, tests. This is what linters, type checkers, and test suites do.
+2. **Plan compliance** (the review step): Does this code do what the plan said to do? The reviewer reads the plan alongside the diff and checks whether the batch matches its contract.
+3. **Legality** (the judge): Does the app still keep all its promises? Not just "does this batch look right?" but "is the whole app still sound?"
+
+Levels 2 and 3 require input from the human. The tool can't infer the plan by looking at the code. The tool can't infer the app's promises by looking at the app. The plan provides level 2. The constitution provides level 3.
+
+### The gaming problem
+
+Agents can write code that passes every deterministic test layer and still miss the point. When the agent writes both the code and the tests, it can satisfy them in the narrowest possible way. It tests the letter of the law, not the spirit. When a test fails, the agent's instinct is to make it pass by the shortest path — narrowing the test, weakening an assertion, adding a special case — rather than fixing the underlying problem.
+
+The constitution breaks through this ceiling by providing success criteria the agent didn't author. Intentions are written by humans in natural language at a level of abstraction that requires genuine understanding to verify. You can game a unit test. You can't game "a failed payment never results in a fulfilled order."
+
+### The constitution
+
+If `docs/constitution.md` (or `CONSTITUTION.md`) exists in the repository, read it during every Orient step (step 1) and during compaction recovery. It contains the app's deal-breaker behaviors — the things that, if broken, would make the user revert the entire PR without reading further.
+
+Each intention in the constitution should be:
+- **Specific enough to verify.** "A failed payment never results in a fulfilled order." Not "the payment system works correctly."
+- **Abstract enough to survive refactoring.** "A user can reset their password via email." Not "the resetPassword function in auth.service.ts sends an email via SendGrid."
+- **Stated as behaviors, not implementation details.** "No API endpoint exposes another user's private data." Not "we use row-level security in PostgreSQL."
+
+The constitution contains three kinds of intentions:
+- **Flows.** User flows, data flows, auth flows, payment flows. Mermaid diagrams make these unambiguous in a way prose alone can't.
+- **Business logic.** Pricing calculations, eligibility checks, approval workflows, notification triggers, statistical formulas and their conditions.
+- **Invariants.** Things that must always be true regardless of what else changes. "An unauthenticated user can never access a protected route." "A deleted record is never returned by the API."
+
+What doesn't go in the constitution: implementation details, specific UI layouts, test cases with exact values, features that are experimental, nice-to-haves that wouldn't be deal-breakers if they broke.
+
+### The judge
+
+The legality check is its own stage in the loop, separate from validation gates and code review. After each batch passes validation and review, the judge runs.
+
+The judge is a **read-only subagent**. It doesn't modify code. It reads the constitution, identifies which intentions could be affected by the current batch, and traces the flows and invariants through the code. It produces a structured verdict for each intention:
+
+- **PASS:** the intention is satisfied.
+- **WARN:** the intention appears satisfied but something is ambiguous or fragile.
+- **FAIL:** the intention is broken.
+- **UNCHANGED:** the batch doesn't affect this intention.
+
+**All PASS or UNCHANGED:** batch continues. **Any WARN:** review it and either fix the issue or document why it's a false positive. **Any FAIL:** the batch is blocked until the issue is fixed.
+
+If a Judge skill exists in the skill registry, use it. If not, spawn a read-only review subagent with the constitution and the current diff. If subagents aren't available, do the legality check directly. The check must happen regardless of tooling.
+
+Judge findings are triaged using the same four categories from step 7 (fix now / defer / intentional design / false positive). Do not call a branch review-ready with unresolved judge FAIL findings (see **Readiness Gate** below).
+
+### The flywheel
+
+The constitution grows over time:
+
+- **During planning:** when reading a new plan, propose new intentions. "This plan introduces payment handling. Should we add: a failed payment never results in a fulfilled order?" The human approves, edits, or declines.
+- **After mistakes:** when the human comes back and says "you broke X," propose adding it to the constitution. Every mistake becomes a permanent safeguard.
+- **After incidents:** when something breaks in production, ask "should there have been an intention that prevented this?" If yes, add it.
+
+The agent can draft intentions. **The human must own them.** If the agent generates intentions and the human rubber-stamps them, you've recreated the problem — the AI is both writing the code and defining the success criteria.
 
 ## Proof Scope
 
@@ -606,7 +659,7 @@ Not all proof is equal. Distinguish between:
 
 ## Readiness Gate
 
-The **Completion Contract** governs individual batches — each batch must pass it before you move on. The **Readiness Gate** governs the branch as a whole before declaring it review-ready for the human. It includes everything in the Completion Contract plus branch-level concerns (constitution, judge, cumulative proof).
+The **Completion Contract** governs individual batches — each batch must pass it before you move on. The **Readiness Gate** governs the branch as a whole before declaring it review-ready for the human. It includes everything in the Completion Contract plus branch-level concerns (legality check, cumulative proof).
 
 Do not call a branch review-ready unless ALL of the following are true:
 
@@ -615,9 +668,8 @@ Do not call a branch review-ready unless ALL of the following are true:
 3. **Preview proof is green on the current tip** (if deployed behavior was touched). Re-verify after every push that changes deployed code.
 4. **Artifact inspection done** for any export/download behavior changes. The actual output was inspected, not just the success status.
 5. **PR comments and checks have been polled.** No unresolved threads, no unreplied bot comments, no failing checks.
-6. **Judge review is clean** (if a Judge skill or tool is configured). Findings are resolved or explicitly triaged with reasoning.
+6. **Legality check is clean.** If a constitution exists, the judge has run on the final tip with no unresolved FAIL verdicts. WARN findings are documented with reasoning.
 7. **Git status is clean.** No uncommitted changes, no untracked files that should be committed.
-8. **Constitution is respected.** If `CONSTITUTION.md` exists, no unresolved violations.
 
 If any gate fails, fix it before declaring readiness. This checklist is the final quality gate between "autonomous run complete" and "ready for human review."
 
