@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "1.3.2"
+  version: "1.4.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -297,13 +297,15 @@ This catches edge cases where the previous batch passed gates but a subsequent p
 
 If this is the first batch and no code exists yet, run a minimal smoke test instead: confirm the dev server starts, the test runner works, and dependencies are installed. If dependencies are missing (fresh clone or sandbox), install them first (`npm install`, `pip install -r requirements.txt`, etc.).
 
+**Capture the test baseline.** After Verify Green passes, record the test count (total, passing, skipped) in `.elves-session.json` under `test_baseline: { passed: N, total: M, skipped: K }`. This is your reference point for the entire run. At the end of each batch, compare current counts against this baseline. The total should only go up (new tests) or stay flat, never down. A decrease means tests were deleted, commented out, or disabled, which violates test integrity. If the skipped count climbs, investigate.
+
 ### 3. Tag
 
 Create a rollback safety point: `git tag elves/pre-batch-N`
 
 ### 4. Contract
 
-**Before writing code, define what "done" looks like for this batch.** Write a contract with three required sections: **behaviors** (what this batch implements), **Build on** (existing patterns and utilities to extend), and **acceptance criteria** (concrete, testable conditions that prove it works). This is inspired by the generator/evaluator pattern — the contract is the agreement between "build it" and "verify it" before either begins.
+**Before writing code, define what "done" looks like for this batch.** Write a contract with four required sections: **behaviors** (what this batch implements), **Build on** (existing patterns and utilities to extend), **acceptance criteria** (concrete, testable conditions that prove it works), and **blast radius** (what shared code this batch modifies and the risk level). This is inspired by the generator/evaluator pattern — the contract is the agreement between "build it" and "verify it" before either begins.
 
 The contract goes in the execution log under the batch entry:
 
@@ -326,7 +328,14 @@ The contract goes in the execution log under the batch entry:
 - [ ] Integration test for webhook signature validation
 - [ ] E2E test: full checkout flow via browser automation
 - [ ] All existing tests still pass
+
+**Blast radius:**
+- Modifying `src/utils/validation.ts` (imported by 12 files), additions only, no signature changes
+- Adding new `PaymentError` subclass of existing `ApiError`, no changes to base class
+- Risk: low, all changes are additive, no existing interfaces modified
 ```
+
+The **Blast radius** section forces you to think about regression risk before writing code. List every shared file this batch will modify, count its consumers (`grep -r "import.*from.*filename"`), describe the nature of the change (additive, modified, or breaking), and assess the risk. A high-risk blast radius isn't a reason to skip the work. It's a signal to write more careful tests and verify consumers during review.
 
 The **Build on** section makes the Code Quality Philosophy concrete for this batch. Search the codebase during contract writing to fill it in: existing utilities, established patterns, modules to extend, conventions to match. If nothing relevant exists, say so — "No existing patterns apply; this batch establishes the pattern for [X]" is a valid entry and signals to later batches what to build on.
 
@@ -431,9 +440,16 @@ If no constitution exists, skip this step.
 
 ### 9. Document
 
-Update the execution log with a timestamped entry covering: batch name, timing breakdown, what changed, commands run, test results, review findings, decisions made, commit SHA, rollback tag, and next steps.
+Update the execution log with a timestamped entry covering: batch name, timing breakdown, what changed, commands run, test results, review findings, decisions made, regression attestation, commit SHA, rollback tag, and next steps.
 
 **Close the loop on the contract.** Mark each acceptance criterion from step 4 as met or note exceptions. If a criterion wasn't met, explain why and whether it's deferred or dropped. The contract is write-only if you don't check it off.
+
+**Write the regression attestation.** This isn't a checkbox. It's a forcing function that makes you reason about safety. Before the batch can be marked complete, include a structured regression attestation in the execution log entry:
+
+1. **Cumulative diff review:** run `git diff main...HEAD --stat` and review the total delta from main. List any files changed outside the batch scope and explain why they were touched. Flag any unexpected deletions.
+2. **Shared surfaces:** identify any shared code modified in this batch (utilities, types, interfaces, configs, middleware, or anything imported by code outside the batch scope). For each, grep for consumers and verify the change is backward-compatible. Report the consumer count and nature of change (additive / modified / breaking).
+3. **Test baseline comparison:** compare the current test count against the baseline captured during Verify Green (step 2). Report the delta. Total tests should only go up or stay flat, never decrease. If the skipped count increased, explain why.
+4. **Confidence and reasoning:** state HIGH, MEDIUM, or LOW and explain *why*. "All tests pass" is necessary but not sufficient. Explain what you checked beyond tests and why you believe existing functionality is preserved. If you modified shared surfaces, explain why consumers aren't affected. If MEDIUM or LOW, describe the specific risk and what additional verification would raise confidence.
 
 Also update `.elves-session.json` — set the current batch status to `"complete"`, record the commit SHA and completion timestamp. This keeps the JSON in sync with the execution log so either can be used for recovery.
 
@@ -487,6 +503,20 @@ comment referencing their docs.
 ```
 
 This lets anyone watching the commit graph see where the run stands, which branch it's on, and what's happening right now. It also gives the reviewer the context they need to evaluate your choices without guessing.
+
+**When a commit touches shared code (utilities, types, interfaces, configs, middleware, or anything imported outside the current batch), include a `Safe because:` line in the commit body.** This forces you to verify consumers at commit time instead of hoping the reviewer catches it later:
+
+```
+[feat/payment-system · Batch 3/12] Extend validation utility with payment rules
+
+Added payment-specific validators to src/utils/validation.ts.
+
+Safe because: only added new exported functions (validateAmount,
+validateCurrency). Existing exports (validateEmail, validatePhone)
+are unchanged. grep shows 12 importers, none affected.
+```
+
+This creates an audit trail. The reviewer can verify your claim instead of rediscovering the consumer analysis from scratch.
 
 ### 12. Re-read the Survival Guide
 
@@ -614,12 +644,13 @@ A batch isn't done unless:
 6. Review performed. The review loop ran until no blockers remained. All review threads resolved or replied to.
 7. Legality check passed (if a constitution exists). No unresolved FAIL verdicts.
 8. No accumulated debt: no skipped gates, no "will fix later" items, no known regressions.
-9. **Documentation is up to date.** Any user-facing behavior changed by this batch must be reflected in the relevant docs — README, API docs, inline doc comments, config references, migration guides, changelogs, or whatever the project uses. Stale docs are debt. A user who reads the docs and gets wrong information is worse off than a user with no docs at all.
-10. `.elves-session.json` updated with batch status, commit SHA, completion timestamp, and `review_comments` dispositions.
-11. You're confident the batch is correct. Not "probably fine," but verified through testing, review, and deployment.
-12. Execution log updated with timestamps, evidence, and commit SHA.
-13. Survival guide updated with next batch.
-14. Changes committed and pushed.
+9. **Regression attestation written.** The execution log entry for this batch includes: cumulative diff review (`git diff main...HEAD --stat`), shared surfaces identified with consumers verified, test baseline comparison (total tests never decreased), and a confidence level with reasoning. See step 9.
+10. **Documentation is up to date.** Any user-facing behavior changed by this batch must be reflected in the relevant docs: README, API docs, inline doc comments, config references, migration guides, changelogs, or whatever the project uses. Stale docs are debt. A user who reads the docs and gets wrong information is worse off than a user with no docs at all.
+11. `.elves-session.json` updated with batch status, commit SHA, completion timestamp, and `review_comments` dispositions.
+12. You're confident the batch is correct. Not "probably fine," but verified through testing, review, and deployment.
+13. Execution log updated with timestamps, evidence, and commit SHA.
+14. Survival guide updated with next batch.
+15. Changes committed and pushed.
 
 Every batch must be tight before you move on. The next batch builds on this one. If this one is shaky, everything after it is shaky. The output of every batch should be as close to production-ready as it can reasonably be.
 

@@ -80,6 +80,14 @@
   handlers. Reduces future drift, no API surface change."]
 - [Decision + reasoning]
 
+**Regression attestation:**
+- Cumulative diff: `git diff main...HEAD --stat` shows [N] files changed, [+X/-Y] lines
+- Files outside batch scope: [none / list with explanation]
+- Shared surfaces modified: [list shared utilities/types/interfaces/configs touched, with consumer count]
+- Consumers verified: [for each shared surface, how callers were checked, e.g., "grep shows 12 importers of validation.ts, all unchanged"]
+- Test baseline: [X passed at session start, Y passed now, delta: +Z new tests, 0 removed, 0 newly skipped]
+- Confidence: [HIGH / MEDIUM / LOW], [1-2 sentence explanation. Not "all tests pass." Explain what you checked and why existing functionality is preserved. E.g., "HIGH, all changes are additive (new functions, new tests). No existing function signatures, types, or interfaces were modified. 12 consumers of validation.ts verified unchanged."]
+
 **Commit:** `[abc1234]`
 **Rollback tag:** `elves/pre-batch-[N]`
 

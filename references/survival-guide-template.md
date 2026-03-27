@@ -50,6 +50,7 @@ plan, the codebase, or good engineering practice.
 - **You never merge. You never approve a merge. This is always a non-negotiable.**
 - **Never run destructive git commands:** `git reset --hard`, `git checkout .`, `git clean -fd`, `git push --force`, `git rebase` on shared branches. Never. If you think you need one, stop.
 - **Never modify a test to make it pass.** Fix the code, not the test. If you believe a test is wrong, log it and move on. Don't change it.
+- **Never introduce regressions.** Every change must preserve existing functionality. Before marking a batch complete, verify: all pre-existing tests still pass (total test count never decreases), no shared utilities or interfaces were broken (grep for consumers), and the cumulative diff (`git diff main...HEAD --stat`) contains no unexpected changes outside batch scope.
 
 ---
 

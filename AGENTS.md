@@ -1,5 +1,5 @@
 ---
-version: "1.3.2"
+version: "1.4.0"
 ---
 
 # Elves: Autonomous Development Agent (Codex)
@@ -161,7 +161,9 @@ Identify the first incomplete batch.
 
 ### 2. Verify Green
 
-**Before starting new work, confirm the project is in a working state.** Run all validation gates (lint, typecheck, build, test). If anything is broken, fix it first — don't start a new batch on a cracked foundation. If dependencies are missing (fresh clone or Codex sandbox), install them first (`npm install`, `pip install -r requirements.txt`, etc.). On the first batch with no existing code, run a minimal smoke test instead: confirm the dev server starts and the test runner works.
+**Before starting new work, confirm the project is in a working state.** Run all validation gates (lint, typecheck, build, test). If anything is broken, fix it first. Don't start a new batch on a cracked foundation. If dependencies are missing (fresh clone or Codex sandbox), install them first (`npm install`, `pip install -r requirements.txt`, etc.). On the first batch with no existing code, run a minimal smoke test instead: confirm the dev server starts and the test runner works.
+
+**Capture the test baseline.** Record the test count (passed, total, skipped) in `.elves-session.json` under `test_baseline`. This is your reference for the run. Total tests should only go up or stay flat, never decrease. A decrease means tests were removed or disabled, violating test integrity.
 
 ### 3. Tag
 ```bash
@@ -170,7 +172,7 @@ git tag elves/pre-batch-N
 
 ### 4. Contract
 
-**Before writing code, define what "done" looks like for this batch.** Write a contract in the execution log with three required sections: **behaviors** (what this batch implements), **Build on** (existing patterns and utilities to extend), and **acceptance criteria** (concrete, testable conditions).
+**Before writing code, define what "done" looks like for this batch.** Write a contract in the execution log with four required sections: **behaviors** (what this batch implements), **Build on** (existing patterns and utilities to extend), **acceptance criteria** (concrete, testable conditions), and **blast radius** (what shared code this batch modifies and the risk level).
 
 ```markdown
 ### Batch N: [Name]
@@ -183,7 +185,13 @@ git tag elves/pre-batch-N
 **Acceptance criteria:**
 - [ ] [Testable criterion 1]
 - [ ] [Testable criterion 2]
+
+**Blast radius:**
+- [Shared file modified] ([N] consumers), [additive / modified / breaking]
+- Risk: [low / medium / high], [one-line explanation]
 ```
+
+The **Blast radius** section identifies shared code at risk. List modified shared files, count consumers, describe the nature of change, and assess the risk level. This shifts regression thinking into the contract where it's cheapest to address.
 
 The **Build on** section makes the Code Quality Philosophy concrete: what existing patterns, utilities, and modules should this batch extend? Search the codebase during contract writing to fill this in. If nothing relevant exists, note that this batch establishes the pattern.
 
@@ -230,7 +238,9 @@ Parse with python3 (not jq — jq may not be available in all sandbox environmen
 
 The review has three jobs: **find bugs**, **verify the batch matches its contract**, and **enforce the Code Quality Philosophy.** Walk through each behavior and acceptance criterion from the contract (step 4). Is it implemented? Is it tested? A batch that passes all gates but skips a contract item is incomplete, not clean. If something is missing, go back to Implement (step 5) and finish it.
 
-Also review the diff for code quality, **using the contract's Build on section and the pre-implementation survey as your baseline**: does the batch extend the utilities and patterns it said it would? Does it introduce duplicated utilities that already exist in the codebase? Does it ignore established patterns or architecture? Are fixes addressing root causes or patching symptoms? Does the batch leave the repo easier or harder to work on? Duplication and architecture violations are blocking. Band-aids are blocking if they hide bugs. When fixing code quality findings, follow the same philosophy — don't create a bigger band-aid to fix a band-aid.
+Also review the diff for code quality, **using the contract's Build on section and the pre-implementation survey as your baseline**: does the batch extend the utilities and patterns it said it would? Does it introduce duplicated utilities that already exist in the codebase? Does it ignore established patterns or architecture? Are fixes addressing root causes or patching symptoms? Does the batch leave the repo easier or harder to work on? Duplication and architecture violations are blocking. Band-aids are blocking if they hide bugs. When fixing code quality findings, follow the same philosophy: don't create a bigger band-aid to fix a band-aid.
+
+**Check shared surfaces for regression risk.** For any modified file that's imported or used by code outside the batch scope: grep for consumers, verify backward compatibility, confirm no function signatures or interfaces changed without updating all callers. Mark BLOCKING if a shared surface was modified without verifying consumers.
 
 **Fix all blocking issues using the bug-fix protocol.** When a bug is found:
 1. **Diagnose the category** — what kind of bug is this? Missing null check? Unvalidated input? Off-by-one? The specific bug is a symptom; the category is the disease.
@@ -276,12 +286,15 @@ Append to execution log:
 **Test results:** [PASS/FAIL]
 **Review findings:** [Severity] [Title] → [Resolved/Dismissed + reason]
 **Decisions made:** [every judgment call made without user input]
+**Regression attestation:** Cumulative diff: [N files, +X/-Y lines]. Shared surfaces: [list or "none"]. Test baseline: [start to now, delta]. Confidence: [HIGH/MEDIUM/LOW], [why]
 **Commit:** [SHA] | **Rollback tag:** elves/pre-batch-N
 
 **Next:** 1. [next task]  2. [task after]
 ```
 
-Also update `.elves-session.json` — set the batch status to `"complete"`, record commit SHA and timestamp.
+**Write the regression attestation.** Review `git diff main...HEAD --stat` for the cumulative delta. Identify shared surfaces modified, verify consumers, compare test count against the baseline from step 2, and state a confidence level with reasoning.
+
+Also update `.elves-session.json`. Set the batch status to `"complete"`, record commit SHA and timestamp.
 
 If the log exceeds ~50 entries, move completed entries to a `## Completed Archive` section.
 
@@ -297,7 +310,7 @@ git push
 
 **Every commit must follow this format. No exceptions.** The subject line is a progress report — branch name, batch progress, and what you're doing. Anyone checking `git log` at 3am should see exactly where the run stands.
 
-The body tells the reader *why* — design decisions, justifications for hardcoded values, rationale for dismissed findings. This is how you communicate with the reviewer.
+The body tells the reader *why*: design decisions, justifications for hardcoded values, rationale for dismissed findings. This is how you communicate with the reviewer. **When a commit touches shared code (utilities, types, interfaces, configs), include a `Safe because:` line** explaining why consumers aren't broken.
 
 This applies to **every commit during the run**: implementation, review fixes, doc updates, session setup. Not just batch-end commits.
 
@@ -397,18 +410,19 @@ Between batches, proactively compact with specific instructions: "Preserve: surv
 
 ## Completion Contract
 
-Don't report "done" unless all are true for the current batch. This is a condensed checklist; see `SKILL.md` **Completion Contract** for the full 14-item version.
+Don't report "done" unless all are true for the current batch. This is a condensed checklist; see `SKILL.md` **Completion Contract** for the full 15-item version.
 
 1. Touched-surface validation gates passed (lint, typecheck, build, test, preview if configured). Broad regression runs at entropy checks and before the Readiness Gate.
 2. No accumulated debt: no skipped gates, no "will fix later" items, no known regressions.
-3. Contract acceptance criteria marked as met (or exceptions documented).
-4. PR comments read; findings triaged. Review loop ran until no blockers remained. All review threads resolved or replied to.
-5. Legality check passed (if a constitution exists). No unresolved FAIL verdicts.
-6. **Documentation is up to date.** Any user-facing behavior changed by this batch is reflected in the relevant docs (README, API docs, inline doc comments, config references, changelogs). Stale docs are debt.
-7. `.elves-session.json` updated with batch status, commit SHA, completion timestamp, and `review_comments` dispositions. The schema includes a `batches` array (id, name, status, commit, rollback_tag, started_at, completed_at) and a `review_comments` array (id, type, source, batch, cycle, summary, disposition, fix_commit/reason). See `SKILL.md` **Structured Session Data** for the full schema.
-8. Execution log updated with timestamps, evidence, and commit SHA.
-9. Survival guide updated with next batch.
-10. Changes committed and pushed.
+3. **Regression attestation written.** Execution log entry includes: cumulative diff review, shared surfaces with consumers verified, test baseline comparison, and confidence level with reasoning. See step 9.
+4. Contract acceptance criteria marked as met (or exceptions documented).
+5. PR comments read; findings triaged. Review loop ran until no blockers remained. All review threads resolved or replied to.
+6. Legality check passed (if a constitution exists). No unresolved FAIL verdicts.
+7. **Documentation is up to date.** Any user-facing behavior changed by this batch is reflected in the relevant docs (README, API docs, inline doc comments, config references, changelogs). Stale docs are debt.
+8. `.elves-session.json` updated with batch status, commit SHA, completion timestamp, and `review_comments` dispositions. The schema includes a `batches` array (id, name, status, commit, rollback_tag, started_at, completed_at) and a `review_comments` array (id, type, source, batch, cycle, summary, disposition, fix_commit/reason). See `SKILL.md` **Structured Session Data** for the full schema.
+9. Execution log updated with timestamps, evidence, and commit SHA.
+10. Survival guide updated with next batch.
+11. Changes committed and pushed.
 
 ## Constitution and the Legality Check
 

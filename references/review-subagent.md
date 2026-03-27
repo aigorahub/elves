@@ -94,6 +94,19 @@ If this review cycle includes fixes for previously reported bugs, verify:
 - Did the category test surface and fix **related bugs**, or was only the reported instance patched?
 - If a bug was fixed with no category test, or with a test that only covers the exact reported instance, mark it BLOCKING: "Bug fix for [issue] needs a category test — see bug-fix protocol."
 
+## Shared-surface regression check:
+
+For any file in the diff that's imported, used, or depended on by code outside this batch's scope:
+1. **Identify the shared surface.** Is this file a utility, type definition, interface, config, middleware, or any code imported by multiple modules?
+2. **Grep for consumers.** Search for imports/requires of the modified file. List the count and note which are inside vs. outside the batch scope.
+3. **Verify backward compatibility.** Did any function signatures, exported types, interfaces, or public APIs change? Are changes purely additive (new exports, new optional parameters), or do they modify existing contracts?
+4. **Check callers.** For any changed signature or interface, verify all callers were updated. If callers exist outside the batch scope and weren't updated, mark BLOCKING.
+5. **Report.** For each shared surface: file path, consumer count, nature of change (additive / modified / breaking), and whether consumers were verified.
+
+If no shared surfaces were modified, state: "No shared surfaces modified in this batch."
+
+Mark BLOCKING if: a shared surface was modified without verifying consumers, a function signature changed without updating all callers, or a type/interface was modified in a way that could break downstream code.
+
 ## Also review the diff for:
 - Obvious bugs, security issues, or missing error handling
 - Changes outside the batch scope that shouldn't be there
