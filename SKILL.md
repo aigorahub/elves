@@ -335,7 +335,7 @@ The contract goes in the execution log under the batch entry:
 - Risk: low, all changes are additive, no existing interfaces modified
 ```
 
-The **Blast radius** section forces you to think about regression risk before writing code. List every shared file this batch will modify, count its consumers (`grep -r "import.*from.*filename"`), describe the nature of the change (additive, modified, or breaking), and assess the risk. A high-risk blast radius isn't a reason to skip the work. It's a signal to write more careful tests and verify consumers during review.
+The **Blast radius** section forces you to think about regression risk before writing code. List every shared file this batch will modify, count its consumers (search for imports, requires, or references to the file using whatever pattern fits your stack), describe the nature of the change (additive, modified, or breaking), and assess the risk. A high-risk blast radius isn't a reason to skip the work. It's a signal to write more careful tests and verify consumers during review.
 
 The **Build on** section makes the Code Quality Philosophy concrete for this batch. Search the codebase during contract writing to fill it in: existing utilities, established patterns, modules to extend, conventions to match. If nothing relevant exists, say so — "No existing patterns apply; this batch establishes the pattern for [X]" is a valid entry and signals to later batches what to build on.
 
@@ -413,6 +413,8 @@ The built-in review works out of the box with zero configuration:
 8. **Push fixes, then re-read comments.** Use commit messages to explain your fixes and justify any decisions — the reviewer reads them on the next cycle. Only read **new and unresolved** comments — resolved threads and replied-to comments from previous cycles are done. Don't re-litigate settled findings.
 9. **Repeat until the batch is clean.** No unresolved threads, no unreplied bot comments, no missing contract items. The loop continues until there is nothing left to address.
 10. **Verify documentation is current.** Before exiting the review loop, check that any user-facing behavior changed by this batch is reflected in the project's documentation. This includes README files, API docs, inline doc comments, config references, migration guides, and changelogs — whatever the project uses. If docs are stale, update them now. Don't defer this to a later batch. Stale documentation is silent debt: the code is correct but the user doesn't know how to use it correctly. A batch with good code and wrong docs is not shippable.
+
+**Check shared surfaces for regression risk.** For any modified file that's imported or used by code outside the batch scope: grep for consumers, verify backward compatibility, confirm no function signatures or interfaces changed without updating all callers. Mark BLOCKING if a shared surface was modified without verifying consumers. The review subagent includes this check (see `references/review-subagent.md`), but if you're doing the review directly, don't skip it.
 
 **Triage every review finding into one of four categories:**
 - **Fix now:** a real bug, security problem, quality violation, or missing contract item. Fix it before continuing.
@@ -827,6 +829,11 @@ Maintain a `.elves-session.json` file with machine-readable session data (sessio
 {
   "session_id": "elves-2026-03-24-auth-system",
   "pr_number": 42,
+  "test_baseline": {
+    "passed": 847,
+    "total": 850,
+    "skipped": 3
+  },
   "batches": [
     {
       "id": 1,
