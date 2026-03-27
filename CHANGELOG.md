@@ -2,6 +2,39 @@
 
 All notable changes to the Elves skill are documented here.
 
+## [1.4.0] - 2026-03-27
+
+### Regression Prevention: Blast Radius, Attestation, Test Baselines, and Shared-Surface Analysis
+
+#### Regression attestation (new)
+- **Regression attestation step added to Document (step 9).** Forces the agent to reason about safety before marking a batch complete. Four required components: cumulative diff review (`git diff main...HEAD --stat`), shared-surface analysis with consumer verification, test baseline comparison, and confidence level with reasoning. "All tests pass" isn't sufficient. The agent must explain *what* it checked and *why* it believes existing functionality is preserved.
+- **Regression attestation added to Completion Contract** (now 15 items). A batch can't be marked done without the attestation.
+- **Execution log template updated** with structured regression attestation section.
+
+#### Test baseline (new)
+- **Test baseline capture in Verify Green (step 2).** Agent records test count (passed, total, skipped) in `.elves-session.json` at session start. At the end of each batch, total tests must only go up or stay flat. A decrease means tests were removed or disabled, violating test integrity.
+
+#### Blast radius (new)
+- **Blast radius section added to Contract (step 4).** Contract now has four required sections (was three): behaviors, Build on, acceptance criteria, and blast radius. Agent must list shared files being modified, count consumers, and assess risk before writing code. Shifts regression thinking into the contract where it's cheapest to address.
+
+#### Shared-surface regression check (new)
+- **Shared-surface analysis added to review subagent.** For any modified file imported by code outside the batch scope, the reviewer must grep for consumers, verify backward compatibility, and check that all callers were updated. Unverified shared-surface changes are BLOCKING.
+
+#### Commit-level regression tracing (new)
+- **`Safe because:` line in commit messages.** When a commit touches shared code (utilities, types, interfaces, configs), the commit body must include a `Safe because:` line explaining why consumers aren't broken. Creates an audit trail the reviewer can verify.
+
+#### Regression non-negotiable (new)
+- **Survival guide template updated** with a new non-negotiable: "Never introduce regressions." Spells out the verification steps (test count, consumer grep, cumulative diff check).
+
+#### Cross-file sync
+- All changes applied to both SKILL.md (Claude Code) and AGENTS.md (Codex).
+- AGENTS.md Completion Contract updated to 11 items (referencing full 15-item version in SKILL.md).
+
+#### Backlog additions (TODO.md)
+- Regression-specific review cycle for high-risk batches
+- Public API surface snapshot
+- Regression test as first-class acceptance criterion
+
 ## [1.3.2] - 2026-03-25
 
 ### Remaining review suggestions: operational completeness
