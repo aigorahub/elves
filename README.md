@@ -73,13 +73,14 @@ This is the leverage that makes the setup cost worth it. A half hour of planning
 
 ### Riding along
 
-You don't have to leave. You can watch the agent work, check in, give it additional context, or adjust priorities on the fly. Prefix your message with **`[ride-along]`** and the agent will handle your input and keep going without stopping.
+You don't have to leave. You can watch the agent work, check in, give it additional context, or adjust priorities on the fly. Prefix your message with **`ra:`** or **`[ride-along]`** and the agent will handle your input and keep going without stopping.
 
-The `[ride-along]` tag is the simplest way to interact during a run. Think of it as a walkie-talkie: press the button, say your piece, release — the agent keeps working. It responds in 1-3 sentences and resumes immediately. No follow-up questions, no pause.
+`ra:` is the quick everyday shorthand. `[ride-along]` and `ride-along:` also work if you want something more explicit. Think of it as a walkie-talkie: press the button, say your piece, release — the agent keeps working. It responds in 1-3 sentences and resumes immediately. No follow-up questions, no pause.
 
 Good: `[ride-along] The payment tests are expected to fail. Ignore them.`
 Good: `[ride-along] Quick question: did you update the migration?`
 Good: `[ride-along] Skip batch 4, do batch 6 next.`
+Good: `ra: skip batch 4, do batch 6 next.`
 Bad: "What do you think we should do about the database schema?" (no tag, agent may pause)
 Bad: "Looks good so far." (no tag, no instruction to continue)
 
@@ -127,7 +128,7 @@ Elves runs preflight checks first: git access, test gates, sleep prevention, not
 - **PR Loop**: poll PR comments, inline reviews, and check status after every push — not just at batch boundaries
 - **Readiness Gate**: 7-point branch-level checklist before declaring review-ready (local proof on current tip, preview proof on exact runtime tip, artifact inspection, PR comments polled, legality check clean, git status clean, execution log current)
 - **Structured session data** in `.elves-session.json` for tooling, dashboards, and analytics
-- **Ride-along protocol**: prefix messages with `[ride-along]` to interact during a run without stopping the agent. The agent responds in 1-3 sentences and resumes immediately.
+- **Ride-along protocol**: prefix messages with `ra:`, `ride-along:`, or `[ride-along]` to interact during a run without stopping the agent. The agent responds in 1-3 sentences and resumes immediately.
 - **Comprehensive preflight checks**: git remote, push access, GitHub CLI auth, test gates, sleep prevention, Slack webhook, stale branch detection
 
 ---

@@ -7,8 +7,8 @@ All notable changes to the Elves skill are documented here.
 ### Quality of Life: Ride-Along Protocol and Commit Message Discipline
 
 #### Ride-along protocol (new)
-- **`[ride-along]` tag for mid-run user messages.** Users prefix messages with `[ride-along]` to signal "handle this and keep going." The agent responds in 1-3 sentences, incorporates any info or adjustments, and resumes the loop immediately. No follow-up questions, no pause, no summaries. Replaces the verbose "say do not stop in every message" pattern with a clean, unambiguous signal.
-- **Synonym:** `ride-along:` at the start of a message triggers the same behavior. `[ride-along]` remains the preferred form because it is the least ambiguous.
+- **Ride-along prefixes for mid-run user messages.** Users can prefix messages with `ra:`, `ride-along:`, or `[ride-along]` to signal "handle this and keep going." The agent responds in 1-3 sentences, incorporates any info or adjustments, and resumes the loop immediately. No follow-up questions, no pause, no summaries.
+- **`ra:` shorthand added.** `ra:` is now the fastest supported form for ride-along messages, while `ride-along:` and `[ride-along]` remain valid explicit forms.
 - **Full section in SKILL.md** with agent behavior rules, examples, and anti-patterns. Concise version in AGENTS.md.
 - **README updated** with the new ride-along pattern in the "Riding along" section.
 

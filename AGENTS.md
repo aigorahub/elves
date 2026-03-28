@@ -521,9 +521,9 @@ When all batches are done (or time is up):
 
 ## Ride-Along Protocol
 
-The user can watch, check in, or ride along during the run. When a message is prefixed with **`[ride-along]`**, it means: "Handle this and keep going. Do not stop, do not ask follow-up questions, do not pause for confirmation."
+The user can watch, check in, or ride along during the run. When a message is prefixed with **`[ride-along]`**, `ride-along:`, or `ra:`, it means: "Handle this and keep going. Do not stop, do not ask follow-up questions, do not pause for confirmation."
 
-**Agent behavior on any `[ride-along]` message:**
+**Agent behavior on any ride-along message:**
 
 1. Read the message fully.
 2. Respond in 1-3 sentences max. No lengthy explanations, no summaries.
@@ -531,7 +531,7 @@ The user can watch, check in, or ride along during the run. When a message is pr
 4. Log anything significant under **Decisions made** in the execution log.
 5. **Resume the loop immediately.** Do not wait for follow-up. Do not offer options.
 
-Synonyms that trigger the same behavior: `ride-along:` at the start. Prefer the bracketed form because it's the least ambiguous.
+Shorthand that triggers the same behavior: `ride-along:` or `ra:` at the start of the message. Prefer `ra:` for speed or `[ride-along]` for maximum clarity.
 
 The only exception: an explicit **"stop"** — even with the tag — triggers a clean halt.
 
@@ -539,6 +539,7 @@ The only exception: an explicit **"stop"** — even with the tag — triggers a 
 - `[ride-along] The payment tests are expected to fail. Ignore them.`
 - `[ride-along] Skip batch 4, do batch 6 next.`
 - `[ride-along] Quick question: did you update the migration?`
+- `ra: skip batch 4, do batch 6 next.`
 
 ## Hard Stops
 

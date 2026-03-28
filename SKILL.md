@@ -811,11 +811,11 @@ See `references/autonomy-guide.md` for the complete guide including environment 
 
 The user doesn't have to leave. They can watch, check in, or ride along for the whole run. The challenge is that any user message can cause the agent to pause, ask follow-up questions, or lose momentum. The ride-along protocol prevents this.
 
-### The `[ride-along]` tag
+### The ride-along prefix
 
-When the user prefixes a message with **`[ride-along]`**, it means: "Handle this and keep going. Do not stop, do not ask follow-up questions, do not pause for confirmation." The tag is an unambiguous non-stop signal.
+When the user prefixes a message with **`[ride-along]`**, `ride-along:`, or `ra:`, it means: "Handle this and keep going. Do not stop, do not ask follow-up questions, do not pause for confirmation." These prefixes are unambiguous non-stop signals.
 
-**Agent behavior on any `[ride-along]` message:**
+**Agent behavior on any ride-along message:**
 
 1. Read the message fully.
 2. Respond in 1-3 sentences max. No lengthy explanations, no summaries of what you've been doing.
@@ -826,13 +826,14 @@ When the user prefixes a message with **`[ride-along]`**, it means: "Handle this
 7. Log anything significant under **Decisions made** in the execution log.
 8. **Resume the loop immediately.** Do not wait for follow-up. Do not ask "does that make sense?" Do not offer options. Just keep going.
 
-The only exception: if the message explicitly says **"stop"** — even with the `[ride-along]` tag — perform a clean halt.
+The only exception: if the message explicitly says **"stop"** — even with a ride-along prefix — perform a clean halt.
 
 ### Synonyms
 
-Any of these are equivalent to the `[ride-along]` tag and trigger the same behavior:
+Any of these are equivalent and trigger the same behavior:
 - `[ride-along]` (preferred)
 - `ride-along:` at the start of the message
+- `ra:` at the start of the message
 
 ### Examples
 
@@ -842,13 +843,14 @@ Good:
 - `[ride-along] Quick question: did you update the migration?`
 - `[ride-along] Looks good so far, keep it up.`
 - `[ride-along] I changed the DB schema manually. Re-read src/db/schema.ts before your next batch.`
+- `ra: did you update the migration?`
 
 Bad (no tag, no "do not stop" — agent may pause):
 - "What do you think we should do about the schema?" (open-ended, invites pause)
 - "Walk me through what you've done." (long answer, breaks flow)
 - "Looks good so far." (no instruction to continue — agent may pause waiting for more)
 
-**For users:** the `[ride-along]` tag is the simplest way to interact during a run. Prefix every message with it and you never have to worry about accidentally stopping the agent. Think of it as a walkie-talkie: press the button, say your piece, release — the agent keeps working.
+**For users:** `ra:` is the fastest way to interact during a run. Use `[ride-along]` if you want maximum clarity, but `ra:` is the everyday shorthand.
 
 ## Hard Stops
 
