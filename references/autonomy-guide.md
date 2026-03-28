@@ -70,6 +70,8 @@ The user checking in isn't an invitation to pause and have a conversation. It's 
 
 The pattern is always the same: **handle the input, document it, resume the loop.**
 
+Users should prefix mid-run messages with **`[ride-along]`** — this is the unambiguous signal that means "handle this and keep going." See **The `[ride-along]` Tag** section below for details and examples.
+
 ---
 
 ### Scenario 1: They Ask a Question
@@ -107,18 +109,22 @@ Use your best judgment about what they want, do it, document your interpretation
 
 ---
 
-### Good and Bad Check-In Messages (for users)
+### The `[ride-along]` Tag (for users)
 
-When you check in on a running Elves session, frame your messages as instructions rather than open-ended questions. End with something like "keep going" or "don't stop" to reinforce that you're not expecting a back-and-forth conversation.
+The simplest way to interact during a run is to prefix your message with **`[ride-along]`**. This tells the agent: "Handle this and keep going. Do not stop." The agent responds in 1-3 sentences and resumes immediately — no follow-up questions, no pause, no lengthy summaries.
+
+Equivalent shorthand: `ride-along:` at the start of the message. Prefer `[ride-along]` because it is the clearest, least ambiguous signal.
 
 **Good:**
-- "Batch 3 looks good. The payment tests are expected to fail, so ignore them. Keep going."
-- "Change of plans: skip the email templates batch. Move straight to the API migration. Don't stop."
-- "Quick question: did you update the migration file? Either way, keep going."
+- `[ride-along] The payment tests are expected to fail. Ignore them.`
+- `[ride-along] Skip the email templates batch. Do the API migration next.`
+- `[ride-along] Quick question: did you update the migration file?`
+- `[ride-along] Looks good so far, keep it up.`
 
-**Avoid:**
+**Avoid (no tag — agent may pause):**
 - "What do you think we should do about the database schema?" (open-ended, invites a pause)
 - "Can you walk me through what you've done so far?" (long answer, breaks flow)
+- "Looks good so far." (no instruction to continue)
 
 ---
 

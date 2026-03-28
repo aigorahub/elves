@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "1.4.0"
+  version: "1.5.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -359,7 +359,7 @@ This takes minutes and prevents hours of review churn. The survey makes principl
 
 If the contract's **Build on** section is stale or incomplete (the codebase changed since the contract was written), update it before coding.
 
-Build the batch scope fully. Push after each meaningful chunk — and **every commit must follow the progress report format** from step 11: `[<branch> · Batch N/Total] <what you are doing>`. This applies to mid-implementation commits too, not just batch-end commits. Tag incidental findings as `[elves-scout]` in TODO.md for later.
+Build the batch scope fully. Push after each meaningful chunk — and **every commit must follow the progress report format** from step 11: `[<branch> · Batch N/Total] <verb> <what changed>`. Self-check every subject line before committing. This applies to mid-implementation commits too, not just batch-end commits. Tag incidental findings as `[elves-scout]` in TODO.md for later.
 
 **Use commit messages to communicate with the reviewer.** The reviewer reads your commit history to understand not just *what* you changed but *why*. Every commit should reference which batch item is being addressed. When you make a design choice that isn't obvious — choosing one approach over another, hardcoding a value, deviating from a pattern — explain your reasoning in the commit message body. This is the communication channel between you and the reviewer. Without it, the reviewer flags something, you silently change it back, the reviewer flags it again, and you burn cycles arguing through code. With it, the reviewer reads your justification first and only flags things where the reasoning is actually wrong.
 
@@ -465,26 +465,55 @@ Update "Current Phase" and "Next Exact Batch" to reflect the new state. A stale 
 
 Stage specific files (not `git add -A`), commit with a clear message that includes batch progress, push.
 
-**Every commit must follow this format. No exceptions.** The commit subject line is a progress report. Anyone watching the branch — the human, the reviewer, a dashboard, `git log --oneline` — should be able to see exactly where the run stands without opening any other file.
+**Self-check before every commit:** verify your subject line matches the format below. If it doesn't, rewrite it before committing. This is non-negotiable.
 
-Commit subject format: `[<branch> · Batch N/Total] <what you are doing>`
-
-The subject has three parts:
-1. **Branch name** — which feature branch this is on
-2. **Batch progress** — which batch out of how many
-3. **What you are doing** — concise description of the change
-
-The body tells the reader *why*. Use the body to communicate design decisions, justifications for non-obvious choices, and context the reviewer needs to evaluate the change fairly.
-
-**This format applies to every commit during the run:** implementation commits, review fix commits, doc updates, and session setup commits. Not just the final batch commit. The human may check `git log` at 3am to see if you're still making progress. If they see three commits with no batch prefix, they have no idea where you are.
-
-Examples:
-```
-[feat/payment-system · Batch 3/12] Add charge creation endpoint and webhook handler
-```
+#### Commit subject format
 
 ```
-[feat/payment-system · Batch 3/12] Use Stripe's idempotency keys instead of our own dedup logic
+[<branch> · Batch N/Total] <verb> <what changed>
+```
+
+Three parts, always present, always in this order:
+1. **`[<branch> · Batch N/Total]`** — the progress prefix. Branch name, batch number, total batches. Exact format: square brackets, space-dot-space between branch and batch, forward slash between N and Total.
+2. **A verb** — starts with an action word: Add, Fix, Update, Remove, Implement, Extend, Refactor. Not a noun phrase. Not a gerund.
+3. **What changed** — specific enough that `git log --oneline` reads as a progress report.
+
+Variant prefixes for non-batch commits:
+- `[<branch> · Scout]` — scout mode work
+- `[<branch> · Entropy check after Batch N]` — entropy check fixes
+- `[<branch> · Batch 0/N]` — session setup
+
+**This format applies to every commit during the run.** Implementation commits, review fix commits, doc updates, session setup commits. No exceptions. The human may check `git log` at 3am to see if you're still making progress. If they see commits without the progress prefix, they have no idea where you are.
+
+#### Anti-patterns (never do these)
+
+```
+# BAD: no progress prefix
+Add payment endpoint
+
+# BAD: prefix exists but vague description
+[feat/payments · Batch 3/12] Updates
+
+# BAD: prefix exists but description is about the process, not the change
+[feat/payments · Batch 3/12] Working on batch 3
+[feat/payments · Batch 3/12] Continue implementation
+[feat/payments · Batch 3/12] More changes
+
+# BAD: description starts with a noun instead of a verb
+[feat/payments · Batch 3/12] Payment endpoint and webhook handler
+
+# BAD: too long — this wraps awkwardly in common git views
+[feat/payments · Batch 3/12] Add the charge creation endpoint with Stripe integration and also the webhook handler for processing async payment events
+```
+
+#### Good examples
+
+```
+[feat/payment-system · Batch 3/12] Add charge endpoint and webhook handler
+```
+
+```
+[feat/payment-system · Batch 3/12] Use Stripe idempotency keys for retries
 
 Stripe already handles idempotent retries natively via the Idempotency-Key
 header. Building our own dedup table would duplicate this and add a
@@ -492,7 +521,7 @@ consistency problem. Hardcoded 24h TTL matches Stripe's documented window.
 ```
 
 ```
-[feat/payment-system · Batch 3/12] Review fixes: input validation, error handling
+[feat/payment-system · Batch 3/12] Fix validation and error handling per review
 
 Fixed: email regex was anchored incorrectly (CodeRabbit #42).
 Dismissed: "extract timeout to constants" — the 30s value is Stripe's
@@ -504,7 +533,7 @@ comment referencing their docs.
 [feat/payment-system · Batch 3/12] Add E2E test for checkout flow
 ```
 
-This lets anyone watching the commit graph see where the run stands, which branch it's on, and what's happening right now. It also gives the reviewer the context they need to evaluate your choices without guessing.
+**The commit log is a progress report.** Anyone watching `git log --oneline` should see a clear narrative: what batch is in progress, what's being done, and how far along the run is. If your commit log doesn't read like a timeline of the work, your messages aren't specific enough.
 
 **When a commit touches shared code (utilities, types, interfaces, configs, middleware, or anything imported outside the current batch), include a `Safe because:` line in the commit body.** This forces you to verify consumers at commit time instead of hoping the reviewer catches it later:
 
@@ -551,7 +580,7 @@ This is continuous entropy management — catching the slow drift that individua
 - Look for patterns that diverged: error handling done one way in batch 1 and a different way in batch 4.
 - Verify that the Code Quality Philosophy principles (especially #2 centralize, #5 pattern detection, #6 progressive conditioning) are holding across the cumulative diff, not just within individual batches.
 
-If you find drift, fix it now in a small focused commit: `[<branch> · Entropy check after Batch N] <what you consolidated>`. Don't let it ride. The purpose is garbage collection — small, frequent corrections are cheaper than a large refactor later.
+If you find drift, fix it now in a small focused commit: `[<branch> · Entropy check after Batch N] Consolidate <what changed>`. Don't let it ride. The purpose is garbage collection — small, frequent corrections are cheaper than a large refactor later.
 
 If nothing needs fixing, skip it and move on. This should take minutes, not hours. The 3-batch cadence is a default; override in the survival guide under `## Run Control`. **Scaling guidance:** for short plans (4-5 batches), check after batch 2 or 3 so you catch drift before the final batch. For long plans (15+ batches), every 3 batches is right. If batches are passing review cleanly with minimal findings, consider stretching to every 4-5 batches to save time.
 
@@ -567,7 +596,7 @@ After all planned batches are complete, if time remains, work through `[elves-sc
 
 **Prioritization:** Start with items that reduce risk for the planned work (missing test coverage, edge cases in code you touched). Then move to quality improvements (dead code, stale docs, naming consistency). Leave large refactors or ambiguous items with context notes for the user.
 
-**Scout work goes through the same quality gates.** Each scout commit must pass validation. If the project has a constitution, scout changes must not introduce FAIL verdicts. Use the same commit format: `[<branch> · Scout] <what you are doing>`.
+**Scout work goes through the same quality gates.** Each scout commit must pass validation. If the project has a constitution, scout changes must not introduce FAIL verdicts. Use the same commit format: `[<branch> · Scout] <verb> <what changed>`.
 
 **When to stop scouting:** In finite mode, stop when the time budget runs out. In open-ended mode, keep scouting until the user stops you or you run out of meaningful improvements. If scout items start requiring significant design decisions, log them and move on — scout mode is for clear wins, not ambiguous tradeoffs.
 
@@ -778,34 +807,48 @@ Key rules:
 
 See `references/autonomy-guide.md` for the complete guide including environment variables and technical details.
 
-## When the User Is Along for the Ride
+## Ride-Along Protocol
 
-The user doesn't have to leave. They can watch, check in, or ride along for the whole run. But there is one rule they must follow:
+The user doesn't have to leave. They can watch, check in, or ride along for the whole run. The challenge is that any user message can cause the agent to pause, ask follow-up questions, or lose momentum. The ride-along protocol prevents this.
 
-**Every message to you during an active run must end with a clear instruction to keep going.** If the user sends a message without this, you may interpret it as a request to pause and discuss, which kills the momentum.
+### The `[ride-along]` tag
 
-When the user sends a message during an active run:
+When the user prefixes a message with **`[ride-along]`**, it means: "Handle this and keep going. Do not stop, do not ask follow-up questions, do not pause for confirmation." The tag is an unambiguous non-stop signal.
 
-1. **Question:** answer concisely, then resume immediately. Don't wait for follow-up.
-2. **New information:** acknowledge, incorporate, note in the execution log, keep going.
-3. **Priority change:** update the survival guide, log it, continue with the new plan.
-4. **"Stop":** the one exception. Clean halt, update docs, commit, push.
-5. **Ambiguous:** best judgment, document your interpretation, keep going.
+**Agent behavior on any `[ride-along]` message:**
 
-The pattern is always: **handle the input, document it, resume the loop.**
+1. Read the message fully.
+2. Respond in 1-3 sentences max. No lengthy explanations, no summaries of what you've been doing.
+3. If it's a question, answer it directly.
+4. If it's new information, acknowledge and incorporate it.
+5. If it's a priority change, update the survival guide and execution log.
+6. If it contains an adjustment or correction, apply it immediately.
+7. Log anything significant under **Decisions made** in the execution log.
+8. **Resume the loop immediately.** Do not wait for follow-up. Do not ask "does that make sense?" Do not offer options. Just keep going.
 
-**For users:** be explicit and repetitive. Say "do not stop" in every message. This isn't overkill. It makes a measurable difference in agent behavior. Frame your messages as instructions, not open-ended questions.
+The only exception: if the message explicitly says **"stop"** — even with the `[ride-along]` tag — perform a clean halt.
+
+### Synonyms
+
+Any of these are equivalent to the `[ride-along]` tag and trigger the same behavior:
+- `[ride-along]` (preferred)
+- `ride-along:` at the start of the message
+
+### Examples
 
 Good:
-- "Batch 3 looks good. The payment tests are expected to fail — ignore them. Do not stop. Keep going."
-- "Change of plans: skip batch 4, do batch 6 next. Answer acknowledged, do not stop."
-- "Quick question: did you update the migration? Do not stop. Answer my question and keep going, but do not stop."
-- "I see the auth tests are failing. Ignore them for now, they're flaky. Do not stop."
+- `[ride-along] The payment tests are expected to fail. Ignore them.`
+- `[ride-along] Skip batch 4, do batch 6 next.`
+- `[ride-along] Quick question: did you update the migration?`
+- `[ride-along] Looks good so far, keep it up.`
+- `[ride-along] I changed the DB schema manually. Re-read src/db/schema.ts before your next batch.`
 
-Bad:
+Bad (no tag, no "do not stop" — agent may pause):
 - "What do you think we should do about the schema?" (open-ended, invites pause)
 - "Walk me through what you've done." (long answer, breaks flow)
 - "Looks good so far." (no instruction to continue — agent may pause waiting for more)
+
+**For users:** the `[ride-along]` tag is the simplest way to interact during a run. Prefix every message with it and you never have to worry about accidentally stopping the agent. Think of it as a walkie-talkie: press the button, say your piece, release — the agent keeps working.
 
 ## Hard Stops
 

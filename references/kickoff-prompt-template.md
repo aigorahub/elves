@@ -117,6 +117,13 @@ If you want it to stop after the plan is done, say so.
 The default behavior is to stop with a detailed blocker description in the execution log.
 If you want it to skip a batch and try the next one, say so.
 
+**Check in with `[ride-along]`**
+You don't have to leave. If you want to check in, give context, or adjust priorities during
+the run, prefix your message with `[ride-along]`. The agent will respond in 1-3 sentences
+and keep going without stopping. Think of it as a walkie-talkie: press the button, say your
+piece, release. Examples: `[ride-along] The auth tests are flaky, ignore them.` or
+`[ride-along] Skip batch 4, do batch 6 next.`
+
 **Don't over-specify**
 The agent will read your plan. You don't need to repeat the whole plan in the prompt.
 The prompt is for framing, rules, and anything the plan doesn't cover.

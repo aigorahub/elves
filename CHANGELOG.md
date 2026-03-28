@@ -2,6 +2,27 @@
 
 All notable changes to the Elves skill are documented here.
 
+## [1.5.0] - 2026-03-28
+
+### Quality of Life: Ride-Along Protocol and Commit Message Discipline
+
+#### Ride-along protocol (new)
+- **`[ride-along]` tag for mid-run user messages.** Users prefix messages with `[ride-along]` to signal "handle this and keep going." The agent responds in 1-3 sentences, incorporates any info or adjustments, and resumes the loop immediately. No follow-up questions, no pause, no summaries. Replaces the verbose "say do not stop in every message" pattern with a clean, unambiguous signal.
+- **Synonym:** `ride-along:` at the start of a message triggers the same behavior. `[ride-along]` remains the preferred form because it is the least ambiguous.
+- **Full section in SKILL.md** with agent behavior rules, examples, and anti-patterns. Concise version in AGENTS.md.
+- **README updated** with the new ride-along pattern in the "Riding along" section.
+
+#### Commit message discipline (tightened)
+- **Self-check rule added.** Before every `git commit`, the agent must verify the subject line matches the format. Non-negotiable.
+- **Explicit anti-patterns added.** Five concrete examples of bad commit messages (missing prefix, vague descriptions, process-not-change descriptions, noun phrases without verbs) so the agent knows what NOT to do.
+- **Verb-first requirement.** Subject must start with an action verb after the progress prefix: Add, Fix, Update, Remove, Implement, Extend, Refactor. Not a noun phrase, not a gerund.
+- **Short subject guidance** made explicit. Commit subjects should stay concise enough to read cleanly in common `git log` views; the examples now aim for roughly 100 characters or less instead of a brittle hard cap.
+- **"Progress report" framing reinforced.** `git log --oneline` should read as a timeline of the work. If it doesn't, the messages aren't specific enough.
+- Applied to both SKILL.md and AGENTS.md.
+
+#### Cross-file sync
+- All changes applied to SKILL.md, AGENTS.md, and README.md.
+
 ## [1.4.0] - 2026-03-27
 
 ### Regression Prevention: Blast Radius, Attestation, Test Baselines, and Shared-Surface Analysis

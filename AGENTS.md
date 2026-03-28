@@ -1,5 +1,5 @@
 ---
-version: "1.4.0"
+version: "1.5.0"
 ---
 
 # Elves: Autonomous Development Agent (Codex)
@@ -202,7 +202,7 @@ If you can't write concrete acceptance criteria, the batch scope is too vague �
 
 **Use commit messages to communicate with the reviewer.** The reviewer reads your commit history. Every commit should reference which batch item is being addressed. When you make a non-obvious choice (hardcoded value, pattern deviation, design tradeoff), explain your reasoning in the commit body. This prevents review cycles from devolving into arguments where neither side understands the other.
 
-Build the full batch scope. Push after each meaningful chunk — **every commit must follow the progress format** from step 11: `[<branch> · Batch N/Total] <what you are doing>`. Handle tiny incidental fixes inline and note them in the log. Anything substantial outside scope: add to `TODO.md` tagged `[elves-scout]` and keep moving. All work is done directly. Codex doesn't have built-in subagent support.
+Build the full batch scope. Push after each meaningful chunk — **every commit must follow the progress format** from step 11: `[<branch> · Batch N/Total] <verb> <what changed>`. Self-check every subject line before committing. Handle tiny incidental fixes inline and note them in the log. Anything substantial outside scope: add to `TODO.md` tagged `[elves-scout]` and keep moving. All work is done directly. Codex doesn't have built-in subagent support.
 
 Write tests for new code. Cover the logic you introduce, not just happy paths. If the project lacks test infrastructure, set it up in the first batch. During long implementation stretches, periodically update the execution log with progress notes to protect against mid-batch compaction.
 
@@ -304,19 +304,33 @@ Update "Current Phase" and "Next Exact Batch". A stale survival guide sends the 
 ### 11. Commit and Push
 ```bash
 git add <specific-files>   # never git add -A
-git commit -m "[<branch> · Batch N/Total] <what you are doing>"
+git commit -m "[<branch> · Batch N/Total] <verb> <what changed>"
 git push
 ```
 
-**Every commit must follow this format. No exceptions.** The subject line is a progress report — branch name, batch progress, and what you're doing. Anyone checking `git log` at 3am should see exactly where the run stands.
+**Self-check before every commit:** verify your subject line matches the format. If it doesn't, rewrite it. Non-negotiable.
 
-The body tells the reader *why*: design decisions, justifications for hardcoded values, rationale for dismissed findings. This is how you communicate with the reviewer. **When a commit touches shared code (utilities, types, interfaces, configs), include a `Safe because:` line** explaining why consumers aren't broken.
+**Format:** `[<branch> · Batch N/Total] <verb> <what changed>`
+
+- The progress prefix `[branch · Batch N/Total]` is always present. Variants: `[branch · Scout]`, `[branch · Entropy check after Batch N]`, `[branch · Batch 0/N]` for setup.
+- Starts with a verb: Add, Fix, Update, Remove, Implement, Extend, Refactor. Not a noun. Not a gerund.
+- Specific enough that `git log --oneline` reads as a progress report.
+- Keep the subject concise enough to fit comfortably in common `git log` views. Aim for about 100 characters or less.
+
+The body tells the reader *why*: design decisions, justifications for hardcoded values, rationale for dismissed findings. **When a commit touches shared code, include a `Safe because:` line** explaining why consumers aren't broken.
 
 This applies to **every commit during the run**: implementation, review fixes, doc updates, session setup. Not just batch-end commits.
 
-Examples:
+**Anti-patterns (never do these):**
+- `Add payment endpoint` — missing progress prefix
+- `[feat/auth · Batch 3/12] Updates` — vague, says nothing
+- `[feat/auth · Batch 3/12] Working on batch 3` — describes the process, not the change
+- `[feat/auth · Batch 3/12] More changes` — meaningless
+- `[feat/auth · Batch 3/12] Payment endpoint` — noun phrase, no verb
+
+**Good examples:**
 - `[feat/auth · Batch 3/12] Add payment processing endpoints`
-- `[feat/auth · Batch 3/12] Review fixes: input validation, error handling` (body explains what was fixed/dismissed and why)
+- `[feat/auth · Batch 3/12] Fix input validation per review findings`
 - `[feat/auth · Batch 3/12] Add E2E test for checkout flow`
 
 ### 12. Re-read the Survival Guide
@@ -347,7 +361,7 @@ Skipping this means review feedback piles up silently and the user returns to a 
 
 **What to check:** duplicated utilities introduced in different batches, naming inconsistencies across modules, error handling done differently in different batches, violations of principles #2 (centralize), #5 (pattern detection), #6 (progressive conditioning) across the cumulative diff.
 
-If you find drift, fix it in a small focused commit: `[<branch> · Entropy check after Batch N] <what you consolidated>`. If nothing needs fixing, skip and move on. Should take minutes, not hours. The 3-batch cadence is a default; override in the survival guide under `## Run Control`. For short plans (4-5 batches), check after batch 2-3. For long plans (15+), every 3 is right. If batches pass review cleanly, stretch to every 4-5.
+If you find drift, fix it in a small focused commit: `[<branch> · Entropy check after Batch N] Consolidate <what changed>`. If nothing needs fixing, skip and move on. Should take minutes, not hours. The 3-batch cadence is a default; override in the survival guide under `## Run Control`. For short plans (4-5 batches), check after batch 2-3. For long plans (15+), every 3 is right. If batches pass review cleanly, stretch to every 4-5.
 
 ### 15. Continue or Stop
 **Finite:** if enough time budget remains, start the next batch. Otherwise, scout mode or Final Completion.
@@ -363,7 +377,7 @@ After all planned batches (and only then), with time remaining, look across code
 
 **Prioritize:** risk-reducing items first (missing tests, edge cases in code you touched), then quality improvements (dead code, stale docs), then leave large/ambiguous items with context notes for the user.
 
-Work through `[elves-scout]` items in TODO.md. Scout work goes through the same validation gates. Use commit format: `[<branch> · Scout] <what you are doing>`. In finite mode, stop when time runs out. In open-ended mode, keep scouting until the user stops you or improvements run dry.
+Work through `[elves-scout]` items in TODO.md. Scout work goes through the same validation gates. Use commit format: `[<branch> · Scout] <verb> <what changed>`. In finite mode, stop when time runs out. In open-ended mode, keep scouting until the user stops you or improvements run dry.
 
 ## Forbidden Commands
 
@@ -500,6 +514,31 @@ When all batches are done (or time is up):
    ```
 
 **You do not merge.**
+
+## Staying Unattended
+
+**The user isn't there.** Any pause, prompt, or confirmation dialog will stall the run with no one to respond. Never ask questions after the session starts. Make decisions, document them. Use non-interactive flags on every command (`--yes`, `--force`, `CI=true`). Suppress surveys, update prompts, and telemetry dialogs. See `references/autonomy-guide.md` for the full guide.
+
+## Ride-Along Protocol
+
+The user can watch, check in, or ride along during the run. When a message is prefixed with **`[ride-along]`**, it means: "Handle this and keep going. Do not stop, do not ask follow-up questions, do not pause for confirmation."
+
+**Agent behavior on any `[ride-along]` message:**
+
+1. Read the message fully.
+2. Respond in 1-3 sentences max. No lengthy explanations, no summaries.
+3. If it's a question, answer directly. If it's new info, acknowledge and incorporate. If it's a priority change, update the survival guide and execution log.
+4. Log anything significant under **Decisions made** in the execution log.
+5. **Resume the loop immediately.** Do not wait for follow-up. Do not offer options.
+
+Synonyms that trigger the same behavior: `ride-along:` at the start. Prefer the bracketed form because it's the least ambiguous.
+
+The only exception: an explicit **"stop"** — even with the tag — triggers a clean halt.
+
+**Examples:**
+- `[ride-along] The payment tests are expected to fail. Ignore them.`
+- `[ride-along] Skip batch 4, do batch 6 next.`
+- `[ride-along] Quick question: did you update the migration?`
 
 ## Hard Stops
 
