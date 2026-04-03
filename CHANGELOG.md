@@ -2,6 +2,26 @@
 
 All notable changes to the Elves skill are documented here.
 
+## [1.6.0] - 2026-04-02
+
+### Operator flow: stage first, launch second
+
+#### New staging model
+- **Two-call handoff is now explicit.** Elves now distinguishes between staging the run and launching the unattended execution. Planning/setup churn belongs in the staging call. The overnight run begins only after a fresh short launch command.
+- **Prompt-overload guardrail added.** If a user pastes a large plan and also says "run now," the agent should slow the interaction down, stage the run, and wait for a final launch command instead of half-starting the implementation.
+- **Launch readiness checklist added.** The skill now requires a cleaned plan, current survival guide and execution log, active branch, PR, preflight, recorded run controls, and a short launch prompt before unattended execution begins.
+
+#### Prompt and template updates
+- **Kickoff prompt template rewritten** around `Stage` and `Hard Launch` prompts instead of a single combined kickoff message.
+- **Survival guide template updated** with run status and a launch-readiness checklist.
+- **Execution log template updated** with a session setup / staging entry so the handoff between preparation and execution is visible on disk.
+- **Plan template clarified** that the plan is not the launch prompt and should not be re-pasted into the launch command.
+
+#### Cross-file sync
+- **SKILL.md updated** with explicit Phase 2 staging and Phase 3 launch behavior for Claude Code.
+- **AGENTS.md updated** with the same guardrails for Codex.
+- **README updated** to explain the new stage-then-launch workflow, common launch failures, and the revised quick-start sequence.
+
 ## [1.5.0] - 2026-03-28
 
 ### Quality of Life: Ride-Along Protocol and Commit Message Discipline

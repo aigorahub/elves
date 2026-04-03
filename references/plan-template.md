@@ -11,6 +11,10 @@
 > This template shows you how to write a good plan. Replace all `[brackets]` with your content.
 > Remove sections that don't apply. The example at the bottom shows a real-ish plan you can use
 > as a reference.
+>
+> The plan is not the launch prompt. Commit this file, point the agent at it by path, and keep
+> the later launch prompt short. If you find yourself re-pasting the whole plan into the launch
+> prompt, you're overloading the run right when it should be building momentum.
 
 ---
 

@@ -1,5 +1,5 @@
 ---
-version: "1.5.0"
+version: "1.6.0"
 ---
 
 # Elves: Autonomous Development Agent (Codex)
@@ -66,6 +66,8 @@ Elves starts with planning. There are two modes:
 
 **Autonomous planning:** If the user provides a brief prompt (1-4 sentences), expand it into a full spec with batches. Focus on product context and high-level design, not granular implementation details. The user must approve before execution begins.
 
+**If the user pastes a big plan and also says "run now," do not launch in that same call.** Slow it down. Say some version of: "Hang on, we need to get this right. I'm going to stage the run and wait for your final launch command." Then clean the plan, prepare the docs, line up the branch and PR, run preflight, and stop once the run is launch-ready.
+
 ### Required inputs
 
 By the end of planning, you need:
@@ -76,6 +78,20 @@ By the end of planning, you need:
 4. **Active branch name**.
 
 If any are missing, ask. If survival guide or execution log don't exist, generate them from `references/survival-guide-template.md` and `references/execution-log-template.md`. See `references/kickoff-prompt-template.md` for how users start the session.
+
+## Staging
+
+Staging is the wind-up before unattended execution. If the plan is still being edited or the session docs and PR are still being prepared, you are staging, not launching.
+
+Launch only when all of these are true:
+1. The plan is cleaned up enough to survive compaction without the conversation.
+2. The survival guide and execution log exist and reflect the current plan.
+3. The branch is created or confirmed and the PR exists, or the existing PR is recorded.
+4. Preflight has run and critical failures are cleared.
+5. Run mode, return time, and non-negotiables are recorded.
+6. You can start from a short launch prompt without re-pasting the whole plan.
+
+If any item is false, keep staging. Execution starts only from a fresh short launch prompt in the next call.
 
 ## Preflight
 
@@ -112,9 +128,9 @@ Run each configured validation gate once to confirm it works. If a gate fails, w
 
 Record session start. If the user hasn't given a return time, ask once; default to 8 hours. Track phase duration (implement/validate/review) per batch. Before each new batch, check the clock. If within 30 minutes of deadline, go straight to Final Completion. (In open-ended mode, there is no deadline. Keep going.)
 
-## Setup: Branch, Plan, PR
+## Stage the Run: Branch, Plan, PR
 
-**Before writing any code**, set up the working environment:
+**Before writing any code**, set up the working environment. This is still staging, not implementation:
 
 1. Create a feature branch if not on one.
 2. Generate survival guide and execution log from templates (if they don't exist). Decompose the plan into batches. Record batch breakdown in the execution log.
@@ -129,11 +145,15 @@ gh pr create --title "<title>" --body "<plan summary with batch list>"
 PR_NUMBER=$(gh pr view --json number -q .number)
 ```
 
+4. Prepare the short launch prompt for the next call. Keep it behavior-heavy: don't stop unless genuinely blocked, use judgment, work in small batches, commit frequently, run all relevant validation including E2E where sensible, read PR comments/checks after every push, and watch for regressions.
+
 If a PR already exists on the branch, detect it and skip.
 
 **Don't wait to open the PR.** Open it after the first pushed commit — even if it's just session setup documents. Do not delay until the branch is "nearly done" or until the first implementation batch is complete. The PR is your collaboration surface, your review loop, and your visibility tool. Every hour without a PR is an hour where bots can't review, the user can't check in, and comments can't accumulate. Keep using the same PR throughout the run; do not create new PRs for subsequent batches.
 
 **The PR isn't the deliverable. The deliverable is work that is ready to review.** You never merge.
+
+When staging is complete, stop and hand the user the launch prompt. The unattended run begins in the next call.
 
 ## Batch Decomposition
 

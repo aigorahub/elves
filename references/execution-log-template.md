@@ -39,6 +39,39 @@
 ---
 
 <!-- ================================================================
+     SESSION SETUP / STAGING ENTRY: copy this block once the run is
+     staged and launch-ready. This is the handoff between preparation
+     and unattended execution.
+     ================================================================ -->
+
+## Session Setup: [YYYY-MM-DD HH:MM timezone]
+
+**Phase:** [Staging complete / Launch started]
+**Plan:** `[path/to/plan.md]`
+**Survival guide:** `[path/to/survival-guide.md]`
+**Branch:** `[feat/branch-name]`
+**PR:** [#N / "not created yet"]
+**Run mode:** [finite / open-ended] | **User returns:** [time / "never"]
+
+**Batch breakdown:**
+1. [Batch 1 name] — [one-line scope]
+2. [Batch 2 name] — [one-line scope]
+3. [Batch 3 name] — [one-line scope]
+
+**Preflight:**
+- Git remote / push / `gh` auth: [PASS / WARN / FAIL]
+- Validation gate dry run: [PASS / WARN / FAIL]
+- Environment / sleep / notification checks: [PASS / WARN / N/A]
+- Notes: [anything the next call needs to know before launch]
+
+**Launch readiness:** [READY / BLOCKED]
+
+**Launch prompt:**
+> [Paste the short launch prompt handed to the user for the next call.]
+
+---
+
+<!-- ================================================================
      BATCH ENTRY TEMPLATE: copy this block for each completed batch.
      Fill in all fields. Do not leave fields blank. Use "N/A" if not applicable.
      ================================================================ -->

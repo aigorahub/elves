@@ -24,6 +24,7 @@ session-cookie approach. All existing auth tests must pass. The public API surfa
 
 - **Run mode:** [finite | open-ended]
 - **Stop policy:** [deadline | explicit-user-stop | blocker-only]
+- **Run status:** [planning | staged | launched]
 - **User intent:** [copy the exact controlling instruction here, e.g., "I'll be back at 8am" or "Keep going until I stop you."]
 - **Final-response policy:** [allowed | disallowed until stop]
 
@@ -54,9 +55,25 @@ plan, the codebase, or good engineering practice.
 
 ---
 
+## Launch Readiness
+
+> Staging is complete only when every box below is checked. If this section is incomplete, you
+> are still preparing the run. Do not start unattended execution yet.
+
+- [ ] Plan cleaned and saved to disk
+- [ ] Survival guide updated from the current plan
+- [ ] Execution log initialized with batch breakdown and preflight notes
+- [ ] Branch created or confirmed
+- [ ] PR opened or existing PR recorded
+- [ ] Preflight run and critical failures cleared
+- [ ] Run mode, return time, and non-negotiables recorded
+- [ ] Launch prompt prepared for the next call
+
+---
+
 ## Current Phase
 
-**Status:** [In progress / All batches complete / Scout mode / Blocked]
+**Status:** [Staging / Launch-ready / In progress / All batches complete / Scout mode / Blocked]
 
 **Active batch:** [Batch N: Name]
 

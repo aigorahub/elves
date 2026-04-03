@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "1.5.0"
+  version: "1.6.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -96,6 +96,14 @@ Elves starts with planning. The user invokes the skill, and you work together to
 
 There are two ways to plan: **interactive** (default) and **autonomous**.
 
+### Planning failure mode: too much at once
+
+If the user pastes a giant plan and tries to launch the unattended run in the same message, slow the interaction down on purpose. Say some version of:
+
+> Hang on, we need to get this right. I'm going to stage the run and wait for your final launch command.
+
+Then do staging only. Clean the plan, prepare the session artifacts, line up the branch and PR, run preflight, and stop once the run is launch-ready. **Do not start unattended implementation in the same call that is still changing the plan, the branch, or the session documents.**
+
 ### Interactive planning (default)
 
 **Expect this to take about 30 minutes.** This isn't magic. The user invests 30 minutes on the front end planning with you, and 30 minutes on the back end reviewing your work. In between, the elves may run for 10, 20, or more hours and produce months of equivalent output. The return is enormous, but it requires a real planning conversation, not a one-line prompt.
@@ -139,14 +147,48 @@ By the end of the planning conversation, you should have:
 2. **Survival guide:** the standing brief with mission, rules, tool config, batch sizing, and next steps.
 3. **Execution log:** initialized and ready for the first entry.
 4. **Active branch name:** agreed with the user.
+5. **Launch prompt:** a short prompt for the next call that starts the unattended run without re-pasting the whole plan.
 
 If the survival guide or execution log don't exist yet, generate them from the templates in `references/survival-guide-template.md` and `references/execution-log-template.md`, filling in details from the planning conversation. See `references/plan-template.md` for plan structure guidance and `references/kickoff-prompt-template.md` for how users start the session.
 
-Once the plan is solid and the user says go, move to Phase 2.
+Once the plan is solid, move to Phase 2: staging. The unattended run itself begins only in Phase 3, after a fresh launch command.
 
-## Preflight
+## Phase 2: Stage the Run
 
-Before the user walks away, verify everything will work. Don't skip this. Run these checks:
+Staging is the wind-up. This is where you line everything up so the launch call can start with momentum instead of trying to carry the entire plan in working memory.
+
+**The rule:** if the plan is still being edited, clarified, or turned into session artifacts, you are staging, not launching.
+
+### Launch readiness checklist
+
+Before unattended execution may begin, all of these must be true:
+
+1. The plan is cleaned up enough to survive compaction without the conversation.
+2. The survival guide and execution log exist and reflect the current plan.
+3. The branch is created or confirmed and the PR exists (or the existing PR is recorded).
+4. Preflight has run and any critical failures are cleared or explicitly accepted.
+5. Run mode, return time, non-negotiables, and batch sizing are recorded.
+6. There are no unresolved planning questions that would obviously stall the overnight run.
+7. You can express the launch in a short behavior-heavy prompt without re-pasting the whole plan.
+
+If any item is false, you are still staging. Fix it before launch.
+
+## Phase 3: Launch
+
+Execution starts only from a fresh launch call after staging is complete. The launch prompt should be short on purpose. It should point at the prepared files and reinforce how to behave:
+
+- Do not stop unless genuinely blocked.
+- Use judgment and keep moving.
+- Work in small batches and commit frequently.
+- Make commit subjects read like progress reports.
+- Run every relevant validation gate, including E2E or browser checks where they make sense.
+- After every push, read PR comments and checks, fix blockers, and re-check for regressions against earlier verified work.
+
+On launch, re-read the survival guide, execution log, and plan, confirm the run state, and then enter the core loop immediately.
+
+## Preflight (staging)
+
+Before the user walks away, verify everything will work. This is part of staging, not mid-run work. Don't skip it. Run these checks:
 
 1. **Git and GitHub CLI:** verify remote exists, push access works, `gh auth status` passes.
 2. **Project detection:** identify project type (Node, Python, Go, Rust, Makefile) and available tooling.
@@ -176,9 +218,9 @@ Record the session start time. Ask the user when they'll be back (or assume 8 ho
 
 Record the time budget in the execution log.
 
-## Setup: Branch, Plan, PR
+## Stage the Run: Branch, Plan, PR
 
-**Before writing any code**, set up the working environment. This happens once at the start of the session.
+**Before writing any code**, set up the working environment. This is still staging. Do not start batch implementation in this phase.
 
 1. **Create a feature branch** if not already on one:
    ```bash
@@ -202,6 +244,8 @@ Record the time budget in the execution log.
    gh pr view --json number -q .number
    ```
 
+5. **Prepare the launch prompt** for the next call. Keep it short and behavior-heavy. It should point at the survival guide, execution log, and plan by path instead of re-pasting the plan.
+
 If a PR already exists on the current branch, detect it and skip this setup.
 
 **Don't wait to open the PR.** Open it after the first pushed commit — even if it's just session setup documents. Do not delay until the branch is "nearly done" or until the first implementation batch is complete. The PR is your collaboration surface, your review loop, and your visibility tool. Every hour without a PR is an hour where bots can't review, the user can't check in, and comments can't accumulate. Keep using the same PR throughout the run; do not create new PRs for subsequent batches.
@@ -211,6 +255,8 @@ If a PR already exists on the current branch, detect it and skip this setup.
 **The PR isn't the deliverable. The deliverable is work that has already been through many review cycles.** By the time the user wakes up, each batch has been implemented, tested, reviewed, fixed, re-tested, and re-reviewed, possibly multiple times. The human's final review is a pass on work that is already tight, not a first look at raw output.
 
 **You never merge. The user merges when they return.**
+
+When staging is complete, stop and hand the user the launch prompt. The unattended run begins in the next call.
 
 ### Batch Decomposition
 

@@ -53,6 +53,35 @@ AI agents are stateless. Context compaction erases working memory. Elves solves 
 
 After any compaction or restart, the agent reads these three files in order and resumes without losing its place. The survival guide is marked `# READ THIS FILE FIRST AFTER ANY COMPACTION OR RESTART` so the agent can't miss it.
 
+### Stage, then launch
+
+Most "the elves stopped" failures come from one mistake: combining a giant plan and the launch
+instructions into a single overloaded message. The plan already lives on disk. The launch prompt
+should not try to carry the whole project again.
+
+Elves works best as a two-call handoff:
+
+1. **Stage the run.** Clean up the plan, refresh the survival guide and execution log, open the
+   branch and PR, run preflight, and stop only when the run is launch-ready.
+2. **Launch the run.** In a fresh call, send a short hard prompt that points at the prepared docs
+   and reinforces behavior: don't stop unless genuinely blocked, use judgment, work in small
+   batches, commit frequently, validate aggressively, read PR comments after every push, and watch
+   for regressions.
+
+Think of staging as winding the spring. The launch call should feel small because the energy is
+already loaded into the repo artifacts.
+
+### Common launch failures to head off
+
+- **Big plan plus "run now" in one message:** the agent should stage first and wait for a final
+  launch command instead of starting implementation immediately.
+- **Plan still changing during launch:** keep staging. Do not launch from unstable docs.
+- **No branch, PR, or preflight yet:** still staging. Get the runway clear first.
+- **Launch prompt repeats the whole plan:** trim it. The plan lives on disk; the launch prompt
+  should mostly reinforce behavior.
+- **No return time given:** Elves defaults to an 8-hour window unless the run is explicitly
+  open-ended.
+
 ### The human sandwich
 
 The shape of productive work is changing. The human operates on both ends: specifying problems and reviewing output, while the agent runs loops in the middle.
@@ -100,19 +129,24 @@ See [Installation](#installation) below for full details. The short version:
 
 Use [`references/plan-template.md`](references/plan-template.md) as your starting point. The plan describes what needs to be built, broken into logical batches. Commit it to your repo (e.g., `docs/plans/my-feature.md`).
 
-**3. Start the session**
+**3. Stage the run**
 
-Use [`references/kickoff-prompt-template.md`](references/kickoff-prompt-template.md) to start the agent. It tells the agent where your plan, survival guide, and execution log live, and what branch to work on. If the survival guide and execution log don't exist yet, the agent generates them from the templates.
+Use [`references/kickoff-prompt-template.md`](references/kickoff-prompt-template.md) to stage the run first. This call cleans the plan up, generates or refreshes the survival guide and execution log, opens or updates the branch and PR, runs preflight, and leaves you with a short launch prompt for the next call.
 
-**4. Walk away**
+**4. Launch in a new call**
 
-Elves runs preflight checks first: git access, test gates, sleep prevention, notifications. Once preflight passes, the agent starts executing batches and won't stop until the plan is complete or time runs out.
+Use the launch template from the same reference file in a fresh call. The launch prompt should be short and behavior-heavy, not a second copy of the plan.
+
+**5. Walk away**
+
+The launch prompt starts unattended execution. Elves re-reads the prepared docs, confirms the run state, and enters the batch loop. From there it won't stop until the plan is complete, the user stops it, or it hits a genuine blocker.
 
 ---
 
 ## Features
 
 - **Multi-batch execution** with configurable batch sizing (default: 4 developers × 2-week sprint)
+- **Two-step operator flow**: stage the run first, then launch it in a fresh short call so the agent starts with momentum instead of a giant overloaded prompt
 - **Context compaction survival** via the three-document system: reads survival guide, plan, and execution log after every compaction
 - **Auto-discovered validation gates** for Node.js, Python, Go, Rust, and Makefile projects. No configuration required.
 - **Pluggable review**: GitHub PR comments by default (zero config), custom review API opt-in, additional custom checks
@@ -313,7 +347,7 @@ elves/
 │   ├── survival-guide-template.md        # Bootstrap template for new projects
 │   ├── execution-log-template.md         # Log entry template
 │   ├── plan-template.md                  # How to write a good plan
-│   ├── kickoff-prompt-template.md        # Copy-paste prompts for starting a run
+│   ├── kickoff-prompt-template.md        # Copy-paste prompts for staging and launching a run
 │   ├── tool-config-examples.md           # Configs for Node, Python, Go, Rust, etc.
 │   ├── validation-guide.md               # Detailed validation gates and auto-discovery
 │   ├── autonomy-guide.md                 # Non-interactive operation and mid-run protocols

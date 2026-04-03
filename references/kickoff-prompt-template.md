@@ -1,79 +1,69 @@
 # Kickoff Prompt Template
 
-> This is the message you paste into Claude Code, Codex, or your AI coding agent to start an
-> Elves run. Copy one of the templates below, fill in the brackets, and send it before you go
-> offline.
+> Elves works best as a two-call handoff:
 >
-> The agent will read your plan, generate the survival guide and execution log if they don't
-> exist, run preflight checks, and start executing immediately.
+> 1. **Stage the run**
+> 2. **Launch the run**
 >
-> **The Daily Briefing.** Block time at the end of your workday (even 30 minutes) to brief
-> your agents. Load them with enough well-defined work to keep them running through the night.
-> Friday afternoons deserve more deliberate treatment: the weekend is roughly 60 hours of
+> Most "the elves stopped" failures come from combining a giant plan and the launch instructions
+> into one overloaded message. The plan already lives on disk. The launch prompt should stay short.
+>
+> Think of staging as winding the spring: clean the docs, line up the branch and PR, run
+> preflight, and stop only when the runway is clear. Then use a fresh launch call to start the
+> unattended run with momentum.
+>
+> **The Daily Briefing.** Block time at the end of your workday (even 30 minutes) to brief your
+> agents. Friday afternoons deserve more deliberate treatment: the weekend is roughly 60 hours of
 > potential agent runtime. A two-hour planning session on Friday can produce a week's worth of
 > output before Monday morning.
 
 ---
 
-## Minimal Template
+## Step 1: Stage Template
 
-> Use this when your plan is self-contained and you don't have special instructions.
-> 3–5 lines is enough.
-
-```
-I'm going offline for [N hours / until ~HH:MM timezone].
-Run the plan at [path/to/plan.md] on branch [branch-name].
-Non-negotiables: [your top 1–2 rules, or "see the plan"].
-```
-
-**Example:**
+> Use this first. The goal is to get everything lined up and then stop. Do not let the agent start
+> implementation in the same call that is still cleaning up the plan or initializing the run.
 
 ```
-I'm going offline until 8am ET tomorrow.
-Run the plan at docs/plans/auth-refactor.md on branch feat/jwt-auth.
-Non-negotiables: don't touch the OAuth routes, don't modify public API response shapes.
-```
-
----
-
-## Full Template
-
-> Use this when you want to be explicit about paths, rules, and any edge cases the agent
-> should know before you walk away.
-
-```
-I'm going offline [until WHEN / for HOW LONG]. Please run the plan autonomously.
+Stage this Elves run. Do not start implementing the batches in this call.
 
 **Plan:** [path/to/plan.md]
 **Branch:** [feat/branch-name]
 **Survival guide:** [path/to/survival-guide.md]  (or: "generate from template")
 **Execution log:** [path/to/execution-log.md]    (or: "generate from template")
 
+**Your job in this call:**
+- Tighten the plan if needed so it can survive compaction without the conversation
+- Generate or refresh the survival guide and execution log
+- Create or switch to the branch, open or update the PR, and record the PR number
+- Run preflight and log any warnings or blockers
+- Prepare a short launch prompt for the next call
+
 **Non-negotiables:**
 - [Hard rule 1]
 - [Hard rule 2]
 - [Hard rule 3]
 
-**Special instructions:**
-- [Anything the agent should know that isn't in the plan. Environment quirks, known issues,
-  things to watch for, preferred approaches]
-- [E.g., "Redis might be slow to start. Give it 10 seconds before running integration tests."]
-- [E.g., "The PR already exists at #42. Don't create a new one."]
-- [E.g., "If Batch 3 turns out to be too risky, stop after Batch 2 and note it in the log"]
-
-**When I return I expect to see:**
-- [What a successful run looks like to you. E.g., "All batches complete, tests passing, ready for my review."]
+**Stop condition for this call:**
+- Stop only after the run is launch-ready and you have handed me the launch prompt for the next call
 ```
 
-**Example (filled in):**
+**Example:**
 
 ```
-I'm going offline until 7:30am ET. Please run the plan autonomously.
+Stage this Elves run. Do not start implementing the batches in this call.
 
 **Plan:** docs/plans/auth-refactor.md
 **Branch:** feat/jwt-auth
 **Survival guide:** docs/elves/survival-guide.md  (generate from template if missing)
 **Execution log:** docs/elves/execution-log.md    (generate from template if missing)
+
+**Your job in this call:**
+- Tighten the plan if needed so it can survive compaction without the conversation
+- Generate or refresh the survival guide and execution log
+- Create or switch to the branch, open or update the PR, and record the PR number
+- Run preflight and log any warnings or blockers
+- Prepare a short launch prompt for the next call
 
 **Non-negotiables:**
 - Never modify public /api/* response shapes
@@ -81,55 +71,72 @@ I'm going offline until 7:30am ET. Please run the plan autonomously.
 - Do not touch the OAuth routes or password reset flow
 - You never merge. The PR is for me to review.
 
-**Special instructions:**
-- Redis can be slow to spin up in the test environment. If integration tests fail on
-  first run, wait 10 seconds and retry once before marking as failed
-- The PR already exists at #84. Don't create a new one.
-- If you finish all 3 batches with time to spare, do a scout pass on the files you touched
-  and look for missing test coverage
-
-**When I return I expect to see:**
-- PR #84 updated with all 3 batches committed
-- All 142 auth tests passing
-- Execution log showing timing for each batch and any decisions made
+**Stop condition for this call:**
+- Stop only after the run is launch-ready and you have handed me the launch prompt for the next call
 ```
 
 ---
 
-## Tips for Writing a Good Kickoff
+## Step 2: Hard Launch Template
 
-**Be specific about "when you return"**
-The agent uses this to pace work. "Tomorrow morning" is less useful than "8am ET Wednesday".
-If you don't specify, the agent assumes an 8-hour window.
+> Use this in a fresh call after staging is done. Keep it short. The plan already carries the
+> project detail; the launch prompt should reinforce behavior and momentum.
 
-**Non-negotiables belong in the plan AND the prompt**
-The plan is the source of truth, but repeating the most critical rules in the prompt ensures
-the agent captures them before it starts reading files.
+```
+The run is staged. Start now.
+Read [path/to/survival-guide.md] first, then [path/to/execution-log.md], then [path/to/plan.md].
+I am going offline until [WHEN].
+Do not stop unless you hit a genuine blocker with no reasonable workaround.
+Use your judgment. Work in small batches and commit frequently.
+Make the commit subjects read like progress reports.
+Run every relevant validation gate, including E2E or browser checks wherever they make sense.
+After every push, read PR comments and checks, fix blockers, and re-check for regressions against earlier verified work.
+Keep going until the plan is done, I stop you, or you hit a true blocker.
+```
 
-**Mention the existing PR if there is one**
-If a PR already exists on the branch, tell the agent so it doesn't create a duplicate.
+**Example:**
 
-**Tell the agent what to do if it finishes early**
-Without guidance, it enters scout mode by default (looking for adjacent improvements).
-If you want it to stop after the plan is done, say so.
+```
+The run is staged. Start now.
+Read docs/elves/survival-guide.md first, then docs/elves/execution-log.md, then docs/plans/auth-refactor.md.
+I am going offline until 7:30am ET.
+Do not stop unless you hit a genuine blocker with no reasonable workaround.
+Use your judgment. Work in small batches and commit frequently.
+Make the commit subjects read like progress reports.
+Run every relevant validation gate, including E2E or browser checks wherever they make sense.
+After every push, read PR comments and checks, fix blockers, and re-check for regressions against earlier verified work.
+Keep going until the plan is done, I stop you, or you hit a true blocker.
+```
 
-**Tell the agent what to do if it gets stuck**
-The default behavior is to stop with a detailed blocker description in the execution log.
-If you want it to skip a batch and try the next one, say so.
+---
+
+## Tips
+
+**Stage and launch in separate calls**
+The split is the point. Staging should absorb plan cleanup and setup churn. Launch should begin
+with a short, behavior-heavy prompt.
+
+**If you only send one message, the agent should stage first**
+If you paste a large plan and also say "run now," the agent should treat that message as a staging
+request, not a launch request.
+
+**The agent should push back explicitly**
+When the prompt is overloaded, the agent should say some version of: "Hang on, we need to get
+this right. I'm going to stage the run and wait for your final launch command."
+
+**Don't repeat the whole plan in the launch prompt**
+Point to the plan by path. If the launch prompt starts looking like a second plan file, it is too
+long.
+
+**Make the launch prompt behavior-heavy**
+The launch prompt should remind the agent how to behave: don't stop, use judgment, work in small
+batches, commit frequently, validate aggressively, review PR feedback, and watch for regressions.
 
 **Check in with `ra:`**
-You don't have to leave. If you want to check in, give context, or adjust priorities during
-the run, prefix your message with `ra:`. `ride-along:` and `[ride-along]` also work. The
-agent will respond in 1-3 sentences and keep going without stopping. Think of it as a
-walkie-talkie: press the button, say your piece, release. Examples: `ra: the auth tests
-are flaky, ignore them.` or `ra: skip batch 4, do batch 6 next.`
+You don't have to disappear completely. If you want to give context or change priorities during
+the run, prefix your message with `ra:`. `ride-along:` and `[ride-along]` also work. The agent
+will respond briefly and keep going without stopping.
 
-**Don't over-specify**
-The agent will read your plan. You don't need to repeat the whole plan in the prompt.
-The prompt is for framing, rules, and anything the plan doesn't cover.
-
-**Friday kickoffs are special**
-The weekend is ~60 hours of potential runtime. If you have a big feature plan, Friday afternoon
-is the time to queue it. Spend 1-2 hours writing a thorough plan, configuring the survival
-guide, and running preflight. Then walk away and let the agent work through Saturday and Sunday.
-You may return Monday to a week's worth of output waiting for review.
+**Friday staging is leverage**
+Use Friday afternoon to build a clear plan, stage the run, and make sure preflight is green. Then
+launch in a clean second call and let the agent work through the weekend.
