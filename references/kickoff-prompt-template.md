@@ -84,7 +84,7 @@ Stage this Elves run. Do not start implementing the batches in this call.
 
 ```
 The run is staged. Start now.
-Read [path/to/survival-guide.md] first, then [path/to/execution-log.md], then [path/to/plan.md].
+Read [path/to/survival-guide.md] first, then `.elves-session.json` if it exists, then [path/to/plan.md], then [path/to/execution-log.md].
 I am going offline until [WHEN].
 Do not stop unless you hit a genuine blocker with no reasonable workaround.
 Use your judgment. Work in small batches and commit frequently.
@@ -98,7 +98,7 @@ Keep going until the plan is done, I stop you, or you hit a true blocker.
 
 ```
 The run is staged. Start now.
-Read docs/elves/survival-guide.md first, then docs/elves/execution-log.md, then docs/plans/auth-refactor.md.
+Read docs/elves/survival-guide.md first, then `.elves-session.json` if it exists, then docs/plans/auth-refactor.md, then docs/elves/execution-log.md.
 I am going offline until 7:30am ET.
 Do not stop unless you hit a genuine blocker with no reasonable workaround.
 Use your judgment. Work in small batches and commit frequently.

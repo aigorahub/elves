@@ -89,7 +89,8 @@ Launch only when all of these are true:
 3. The branch is created or confirmed and the PR exists, or the existing PR is recorded.
 4. Preflight has run and critical failures are cleared.
 5. Run mode, return time, and non-negotiables are recorded.
-6. You can start from a short launch prompt without re-pasting the whole plan.
+6. There are no unresolved planning questions that would obviously stall the overnight run.
+7. You can start from a short launch prompt without re-pasting the whole plan.
 
 If any item is false, keep staging. Execution starts only from a fresh short launch prompt in the next call.
 

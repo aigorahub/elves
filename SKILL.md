@@ -184,7 +184,7 @@ Execution starts only from a fresh launch call after staging is complete. The la
 - Run every relevant validation gate, including E2E or browser checks where they make sense.
 - After every push, read PR comments and checks, fix blockers, and re-check for regressions against earlier verified work.
 
-On launch, re-read the survival guide, execution log, and plan, confirm the run state, and then enter the core loop immediately.
+On launch, start with the same read order used in Orient: survival guide, `.elves-session.json` if it exists, plan, then execution log. Confirm the run state and then enter the core loop immediately.
 
 ## Preflight (staging)
 

@@ -24,7 +24,6 @@ session-cookie approach. All existing auth tests must pass. The public API surfa
 
 - **Run mode:** [finite | open-ended]
 - **Stop policy:** [deadline | explicit-user-stop | blocker-only]
-- **Run status:** [planning | staged | launched]
 - **User intent:** [copy the exact controlling instruction here, e.g., "I'll be back at 8am" or "Keep going until I stop you."]
 - **Final-response policy:** [allowed | disallowed until stop]
 
