@@ -2,6 +2,15 @@
 
 All notable changes to the Elves skill are documented here.
 
+## [1.6.1] - 2026-04-02
+
+### Review follow-up: internal consistency fixes
+
+- **Launch read order aligned.** The launch instructions now match the core `Orient` step: survival guide, `.elves-session.json` if present, plan, then execution log.
+- **Codex launch-readiness checklist completed.** `AGENTS.md` now includes the missing guardrail for unresolved planning questions that would obviously stall the run.
+- **Survival guide redundancy removed.** The temporary `Run status` field was removed so `## Current Phase` remains the single source of truth for run state.
+- **Kickoff template examples corrected.** The hard-launch prompt examples now match the documented recovery and read order.
+
 ## [1.6.0] - 2026-04-02
 
 ### Operator flow: stage first, launch second
