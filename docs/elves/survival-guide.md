@@ -31,8 +31,8 @@ CHANGELOG all tell the same story and the PR is clean enough for the user to mer
 - **Started:** 2026-04-11 22:42 EDT
 - **User returns:** never (open-ended until user stops)
 - **Time budget:** unlimited
-- **Average batch time so far:** n/a
-- **Batches remaining:** 3 of 3
+- **Average batch time so far:** ~10m
+- **Batches remaining:** 2 of 3
 
 ## Non-Negotiables
 
@@ -64,34 +64,34 @@ CHANGELOG all tell the same story and the PR is clean enough for the user to mer
 
 **Status:** In progress
 
-**Active batch:** Batch 1: Durable Memory and Agent Docs Architecture
+**Active batch:** Batch 2: Skill and Review Workflow Upgrade
 
-**What was just finished:** Batch 0 completed: the run-memory docs were committed, the branch was
-pushed, and PR #18 was opened for the unattended overnight run.
+**What was just finished:** Batch 1 completed: the durable memory templates landed, `.ai-docs/*`
+was added for the repo, and the first PR feedback on session-artifact structure was addressed.
 
-**Immediate next action:** Create the Batch 1 rollback tag, update the durable docs architecture,
-and then align the templates around the new memory stack.
+**Immediate next action:** Create the Batch 2 rollback tag and align `SKILL.md`, `AGENTS.md`, and
+the review/autonomy references on the new docs-in-the-loop model.
 
 ## Next Exact Batch
 
-**Batch:** 1: Durable Memory and Agent Docs Architecture
+**Batch:** 2: Skill and Review Workflow Upgrade
 
 **Scope:**
 
-- Finalize the learnings layer and its promotion rules.
-- Add `.ai-docs/manifest.md`, `.ai-docs/architecture.md`, `.ai-docs/conventions.md`, and
-  `.ai-docs/gotchas.md`.
-- Update the templates so the new memory stack and docs workflow are natural to use.
+- Update `SKILL.md` and `AGENTS.md` to `1.7.0`.
+- Add docs-in-the-loop workflow rules, documentation triggers, and AI-friendly repo conditioning.
+- Align review guidance and structured session-data expectations with the live session artifacts.
 
 **Acceptance criteria:**
 
-- [ ] Learnings is first-class in the read/update order across the repo.
-- [ ] `.ai-docs/*` exists with clear, non-overlapping responsibilities.
-- [ ] The templates define `execution log -> learnings -> curated durable docs` without ambiguity.
+- [ ] `SKILL.md` and `AGENTS.md` both describe the same durable-doc architecture and session schema.
+- [ ] Review guidance distinguishes fix-now blockers from `PENDING-DOCS` or deferred follow-up.
+- [ ] Structured session-data expectations in the docs match the live `.elves-session.json`.
 
-**Risk:** The docs can become redundant if the durable file responsibilities are not crisp.
+**Risk:** The biggest risk is fixing one skill surface while leaving the other or the review docs
+slightly stale, which would recreate the same drift this release is trying to remove.
 
-**Rollback tag:** `elves/pre-batch-1`
+**Rollback tag:** `elves/pre-batch-2`
 
 ## Acceptance Checks
 
@@ -117,6 +117,19 @@ smoke: ""
 review: github-pr-comments
 notification: pr-comment
 ```
+
+## Plan and Log Paths
+
+- **Plan:** `docs/plans/v1.7.0-ai-friendly-docs.md`
+- **Learnings:** `docs/elves/learnings.md`
+- **Execution log:** `docs/elves/execution-log.md`
+- **Durable docs manifest:** `.ai-docs/manifest.md`
+- **Architecture doc:** `.ai-docs/architecture.md`
+- **Conventions doc:** `.ai-docs/conventions.md`
+- **Gotchas doc:** `.ai-docs/gotchas.md`
+- **Branch:** `codex/elves-v1.7-ai-friendly-docs`
+- **PR number:** `18`
+- **Plan hash at session start:** `ade1c815c589e6d7a498e34065cd458d`
 
 ## Rollback and Safety Rules
 

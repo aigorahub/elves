@@ -1,4 +1,5 @@
 {
+  "session_id": "elves-2026-04-11-v1-7-ai-friendly-docs",
   "version": "1.7.0",
   "status": "in_progress",
   "run_mode": "open-ended",
@@ -20,28 +21,91 @@
   },
   "setup_commit": "b06b3da",
   "test_baseline": {
+    "passed": null,
+    "total": null,
+    "skipped": null,
     "status": "not_applicable",
     "reason": "Documentation repo; no project test runner detected during preflight"
   },
-  "review_comments": [],
+  "review_comments": [
+    {
+      "id": 3068879891,
+      "type": "review_comment",
+      "source": "gemini-code-assist[bot]",
+      "batch": 1,
+      "cycle": 1,
+      "summary": "Add session_id to .elves-session.json",
+      "disposition": "fixed",
+      "fix_commit": "pending"
+    },
+    {
+      "id": 3068879892,
+      "type": "review_comment",
+      "source": "gemini-code-assist[bot]",
+      "batch": 1,
+      "cycle": 1,
+      "summary": "Add Plan and Log Paths section to the live survival guide",
+      "disposition": "fixed",
+      "fix_commit": "pending"
+    },
+    {
+      "id": 3068881538,
+      "type": "review_comment",
+      "source": "Copilot",
+      "batch": 1,
+      "cycle": 1,
+      "summary": "Keep .elves-session.json schema aligned with skill docs in this PR",
+      "disposition": "deferred",
+      "reason": "Handled in Batch 2 alongside the SKILL.md and AGENTS.md sync"
+    },
+    {
+      "id": 3068881545,
+      "type": "review_comment",
+      "source": "Copilot",
+      "batch": 1,
+      "cycle": 1,
+      "summary": "Represent test_baseline with numeric fields even when not applicable",
+      "disposition": "fixed",
+      "fix_commit": "pending"
+    },
+    {
+      "id": 3068881555,
+      "type": "review_comment",
+      "source": "Copilot",
+      "batch": 1,
+      "cycle": 1,
+      "summary": "Add commit/started_at/completed_at keys to batch entries",
+      "disposition": "fixed",
+      "fix_commit": "pending"
+    }
+  ],
   "batches": [
     {
       "id": 1,
       "name": "Durable Memory and Agent Docs Architecture",
-      "status": "in_progress",
-      "rollback_tag": "elves/pre-batch-1"
+      "status": "complete",
+      "commit": "ee4da3a",
+      "rollback_tag": "elves/pre-batch-1",
+      "started_at": "2026-04-11T22:47:00-04:00",
+      "completed_at": "2026-04-11T22:52:00-04:00"
     },
     {
       "id": 2,
       "name": "Skill and Review Workflow Upgrade",
-      "status": "pending",
-      "rollback_tag": "elves/pre-batch-2"
+      "status": "in_progress",
+      "commit": null,
+      "rollback_tag": "elves/pre-batch-2",
+      "started_at": "2026-04-11T22:52:00-04:00",
+      "completed_at": null
     },
     {
       "id": 3,
       "name": "Human Docs, Release Notes, and Consistency Pass",
       "status": "pending",
-      "rollback_tag": "elves/pre-batch-3"
+      "commit": null,
+      "rollback_tag": "elves/pre-batch-3",
+      "started_at": null,
+      "completed_at": null
     }
   ]
 }

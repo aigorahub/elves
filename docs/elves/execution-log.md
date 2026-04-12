@@ -5,6 +5,104 @@
 
 ---
 
+## Run Digest
+
+- **Last updated:** 2026-04-11 22:52 EDT
+- **Current phase:** In progress
+- **Active batch:** 2: Skill and Review Workflow Upgrade
+- **Last completed batch:** 1: Durable Memory and Agent Docs Architecture
+- **Next exact batch:** 2: Skill and Review Workflow Upgrade
+- **Active PR:** #18
+- **Docs promoted this run:** `.ai-docs/manifest.md`, `.ai-docs/architecture.md`,
+  `.ai-docs/conventions.md`, `.ai-docs/gotchas.md`
+
+---
+
+## 2026-04-11 22:52 EDT
+
+**Batch:** 1: Durable Memory and Agent Docs Architecture
+**Contract status:** all criteria met
+
+**Timing:**
+- Implement: 7m | Validate: 2m | Review: 1m | Total: 10m
+- Session elapsed: 0h 10m | Budget remaining: unlimited
+
+**What changed:**
+- `references/learnings-template.md`: added promotion destinations from learnings into
+  `.ai-docs/architecture.md`, `.ai-docs/conventions.md`, and `.ai-docs/gotchas.md`.
+- `references/survival-guide-template.md`: added memory-surface roles, documentation triggers,
+  learnings paths, and the richer compaction read order.
+- `references/execution-log-template.md`: added a run digest block, a batch contract template, and
+  explicit docs impact fields.
+- `references/plan-template.md` and `references/kickoff-prompt-template.md`: added learnings and
+  durable-doc expectations to planning and launch prompts.
+- `.ai-docs/*.md`: added the repo-level durable docs for manifest, architecture, conventions, and
+  gotchas.
+- `.elves-session.json` and `docs/elves/survival-guide.md`: aligned the live run artifacts with the
+  documented recovery model after initial PR feedback.
+
+**Commands run:**
+- `rg -n "three-document|learnings|\\.ai-docs|Docs impacted|Docs updated|Docs deferred|Docs promoted|PENDING-DOCS|run digest" .`
+  -> found the remaining old three-document assumptions and missing durable-doc fields.
+- `test -f .ai-docs/manifest.md && test -f .ai-docs/architecture.md && test -f .ai-docs/conventions.md && test -f .ai-docs/gotchas.md`
+  -> PASS
+- `rg -n "learnings|\\.ai-docs/manifest.md|execution log -> learnings|Docs:|Docs promoted this run|Documentation Triggers" ...`
+  -> PASS
+- `gh api "repos/${REPO}/pulls/18/comments" --paginate`
+  -> 5 bot review comments; session-artifact structure fixes applied, skill-doc schema sync queued for Batch 2
+
+**Test results:**
+- Lint: N/A
+- Typecheck: N/A
+- Build: N/A
+- Tests: N/A
+- E2E: N/A
+- Smoke: N/A
+
+**Review findings:**
+- [WARNING] Missing `session_id` and batch metadata in `.elves-session.json` -> Resolved in the
+  live session artifact before starting Batch 2.
+- [WARNING] Survival guide missing the `Plan and Log Paths` summary -> Resolved in the live session
+  artifact before starting Batch 2.
+- [WARNING] Session schema and skill-doc wording need to stay aligned in the same PR -> Deferred to
+  Batch 2 because that batch updates `SKILL.md`, `AGENTS.md`, and review guidance together.
+
+**Decisions made:**
+- Kept the durable promotion inbox at `docs/elves/learnings.md` and used `.ai-docs/*` as the
+  curated layer so run memory and durable repo docs stay distinct.
+- Treated the session-artifact bot feedback as useful review input instead of noise because it
+  directly protects compaction recovery.
+
+**Docs:**
+- Impacted: `references/learnings-template.md`, `references/survival-guide-template.md`,
+  `references/execution-log-template.md`, `references/plan-template.md`,
+  `references/kickoff-prompt-template.md`, `.ai-docs/*`, live session artifacts
+- Updated: all of the above
+- Promoted: `.ai-docs/manifest.md`, `.ai-docs/architecture.md`, `.ai-docs/conventions.md`,
+  `.ai-docs/gotchas.md`
+- Deferred: skill-doc and review-doc schema alignment, which is the explicit scope of Batch 2
+
+**Regression attestation:**
+- Cumulative diff: Batch 0 + Batch 1 are documentation-only and additive. No scripts or packaged
+  runtime code changed.
+- Files outside batch scope: none
+- Shared surfaces modified: run templates in `references/*` and live session artifacts in
+  `docs/elves/*`
+- Consumers verified: the updated launch/recovery terms were checked across the templates and the
+  live run artifacts with targeted `rg` searches
+- Test baseline: not applicable for this docs-focused repo; no project test runner exists
+- Confidence: HIGH, because the changes are additive documentation architecture and template updates
+  with no code-path changes, and the first PR review already surfaced the main structural gaps worth fixing.
+
+**Commit:** `ee4da3a`
+**Rollback tag:** `elves/pre-batch-1`
+
+**Next:**
+1. Update `SKILL.md`, `AGENTS.md`, and review guidance to `1.7.0`.
+2. Re-poll PR comments after the next push and clear any remaining schema/alignment findings.
+
+---
+
 ## Batch 1 Contract: 2026-04-11 22:52 EDT
 
 **Behaviors:**
