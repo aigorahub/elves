@@ -43,6 +43,8 @@ All notable changes to the Elves skill are documented here.
 - **Repo consistency checker added.** `scripts/check_repo_consistency.py` now verifies the
   canonical version, recovery-order wording, `PENDING-DOCS` coverage, and durable doc surfaces so
   cross-file drift is caught locally before PR bots have to flag it.
+- **Repo consistency workflow added.** `.github/workflows/repo-consistency.yml` runs the checker
+  and Python syntax validation on PRs so drift gets caught automatically during review.
 
 ## [1.6.1] - 2026-04-02
 
