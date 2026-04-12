@@ -5,6 +5,46 @@
 
 ---
 
+## Session Setup: 2026-04-11 22:47 EDT
+
+**Phase:** Launch started
+**Plan:** `docs/plans/v1.7.0-ai-friendly-docs.md`
+**Survival guide:** `docs/elves/survival-guide.md`
+**Learnings:** `docs/elves/learnings.md`
+**Execution log:** `docs/elves/execution-log.md`
+**Branch:** `codex/elves-v1.7-ai-friendly-docs`
+**PR:** #18
+**Run mode:** open-ended | **User returns:** never
+
+**Batch breakdown:**
+1. Durable Memory and Agent Docs Architecture — add the learnings layer, `.ai-docs`, and
+   template-level document roles.
+2. Skill and Review Workflow Upgrade — align `SKILL.md`, `AGENTS.md`, and review references on the
+   new docs-in-the-loop model.
+3. Human Docs, Release Notes, and Consistency Pass — update README, TODO, CHANGELOG, and repo-wide
+   references for the `1.7.0` release.
+
+**Preflight:**
+- Git remote / push / `gh` auth: PASS
+- Validation gate dry run: WARN (`./scripts/preflight.sh` reports no project test runner, which is
+  expected for this docs-heavy repo)
+- Environment / sleep / notification checks: WARN (local power-state warnings only; no repo-side
+  remediation available during the unattended run)
+- Notes: PR now exists, so every subsequent push must be followed by PR comment/check polling.
+
+**Launch readiness:** READY
+
+**Launch prompt:**
+> The run is staged. Start now. Read `docs/elves/survival-guide.md` first, then
+> `.elves-session.json`, then `docs/elves/learnings.md`, then
+> `docs/plans/v1.7.0-ai-friendly-docs.md`, then `docs/elves/execution-log.md`. The user is
+> offline. Do not stop unless you hit a genuine blocker with no reasonable workaround. Use your
+> judgment. Work in small batches and commit frequently. Make commit subjects read like progress
+> reports. Run the relevant consistency checks for this docs-focused repo. After every push, read
+> PR comments and checks, fix blockers, and keep going until the plan is complete.
+
+---
+
 ## 2026-04-11 22:42 EDT
 
 **Batch:** 0: Session setup

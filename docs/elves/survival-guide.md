@@ -55,22 +55,22 @@ CHANGELOG all tell the same story and the PR is clean enough for the user to mer
 - [x] Learnings file initialized
 - [x] Execution log initialized with batch breakdown and preflight notes
 - [x] Branch created or confirmed
-- [ ] PR opened or existing PR recorded
+- [x] PR opened or existing PR recorded
 - [x] Preflight run and critical failures reviewed
 - [x] Run mode, return time, and non-negotiables recorded
-- [ ] Launch prompt prepared and recorded in the execution log
+- [x] Launch prompt prepared and recorded in the execution log
 
 ## Current Phase
 
-**Status:** Staging
+**Status:** In progress
 
-**Active batch:** Batch 0: Session setup
+**Active batch:** Batch 1: Durable Memory and Agent Docs Architecture
 
-**What was just finished:** Preflight completed, the `v1.7.0` plan and run-memory docs were
-written, and the remaining setup work is to push the branch and open the PR.
+**What was just finished:** Batch 0 completed: the run-memory docs were committed, the branch was
+pushed, and PR #18 was opened for the unattended overnight run.
 
-**Immediate next action:** Commit the session setup docs, push `codex/elves-v1.7-ai-friendly-docs`,
-open the PR, record the PR number, and start Batch 1.
+**Immediate next action:** Create the Batch 1 rollback tag, update the durable docs architecture,
+and then align the templates around the new memory stack.
 
 ## Next Exact Batch
 
