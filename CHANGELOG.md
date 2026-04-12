@@ -34,6 +34,9 @@ All notable changes to the Elves skill are documented here.
   `references/autonomy-guide.md` use the same terminology as the main skill files.
 - **README, TODO, and run templates refreshed** to reflect the new layered-memory architecture and
   human-facing workflow.
+- **Installed skill sync helper added.** `scripts/sync_installed_skills.py` can now check and
+  mirror the canonical bundle into `~/.claude/skills/elves/` and `~/.codex/skills/elves/` so the
+  local runtime copies do not drift behind the repo release.
 
 ## [1.6.1] - 2026-04-02
 

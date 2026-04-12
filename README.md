@@ -566,6 +566,17 @@ Watch for releases to get notified when the skill is updated:
 gh api repos/aigorahub/elves/subscription --method PUT --field subscribed=true
 ```
 
+If you keep a local checkout of this repo and want your installed Claude/Codex copies to match it,
+use the built-in sync helper:
+```bash
+python3 scripts/sync_installed_skills.py --check
+python3 scripts/sync_installed_skills.py --apply
+```
+
+This mirrors the managed skill bundle files from the repo into `~/.claude/skills/elves/` and
+`~/.codex/skills/elves/`. If you maintain hand-edited local customizations, prefer the manual diff
+workflow below instead of blindly applying the sync.
+
 ---
 
 ## Making it your own
@@ -601,7 +612,15 @@ This is normal. After each run, read the execution log (especially the **Decisio
 
 If you installed globally, your customized skill lives at `~/.claude/skills/elves/SKILL.md` (Claude Code) or `~/.codex/skills/elves/SKILL.md` (Codex). Edit these files directly. Add your own defaults, remove sections that don't apply to your work, add project-type-specific guidance. This is your copy. Make it yours.
 
-When you want to update from upstream (new features, fixes), pull the latest and merge manually:
+When you want to update from upstream (new features, fixes), you have two options:
+
+1. Mirror this checkout directly into your installed copies:
+```bash
+python3 scripts/sync_installed_skills.py --check
+python3 scripts/sync_installed_skills.py --apply
+```
+
+2. If you keep local customizations, pull the latest and merge manually:
 ```bash
 git clone https://github.com/aigorahub/elves.git /tmp/elves-update
 diff ~/.claude/skills/elves/SKILL.md /tmp/elves-update/SKILL.md

@@ -19,10 +19,9 @@ This release fixed multiple cases of documentation drift across `SKILL.md`, `AGE
 `.elves-session.json`, and README. A tiny consistency script or lint-like checker could catch those
 before PR bots do.
 
-### Local installed skill sync
-The `v1.7.0` PR intentionally updates only the canonical repo skill surfaces. It may still be worth
-adding a release helper or checklist for syncing installed local copies under `.claude/` and
-`.codex/` after a repo release lands.
+- [x] Add a local installed-skill sync helper for `.claude/` and `.codex/` copies.
+  `scripts/sync_installed_skills.py` now checks and mirrors the managed bundle from this checkout
+  into `~/.claude/skills/elves/` and `~/.codex/skills/elves/`.
 
 ### Multi-model routing for subagents
 Different phases of the loop have different cost/quality tradeoffs. Implementation needs the strongest model; validation could run on a cheaper one; review benefits from a fresh perspective (different model = different blind spots). The subagent strategy already creates natural seams for this. Add optional model configuration per phase in the survival guide, e.g. `implement-model: opus`, `validate-model: sonnet`, `review-model: opus`. The user already controls which model runs — this would make it explicit and tunable.
