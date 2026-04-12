@@ -164,6 +164,9 @@ The launch prompt starts unattended execution. Elves re-reads the prepared docs,
 - **Rollback safety**: `git tag elves/pre-batch-N` before every batch, so any batch can be cleanly unwound
 - **Scout mode**: after all planned work is done, the agent looks for adjacent improvements, test gaps, and documentation holes. Prioritizes risk-reducing fixes first, then quality, then leaves ambiguous items. Commits tagged `[branch · Scout]`, with validation gates required and clear stop rules.
 - **Proof scope**: touched-surface proof per batch (only test what you changed), broad regression at entropy checks and before readiness. Re-earn proof after each push — don't inherit from prior commits.
+- **High-risk regression pass**: batches with medium/high blast radius can trigger a second,
+  regression-only review pass that traces changed shared surfaces to their consumers and asks only
+  "what could this break?"
 - **Merge conflict handling**: when `git push` fails due to a diverged remote, the agent fetches and merges (never rebases), resolves conflicts or triggers a Hard Stop
 - **Two run modes**: finite (deadline-based, default) or open-ended (continue until explicitly stopped). Open-ended mode disables Final Completion and treats every checkpoint as a relaunch point.
 - **Time-aware pacing**: tracks how long each batch takes and uses that to decide whether to start another batch or wrap up cleanly (finite mode)

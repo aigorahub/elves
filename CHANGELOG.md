@@ -28,6 +28,9 @@ All notable changes to the Elves skill are documented here.
 - **Regression preservation moved into the contract.** Plans and contracts now require at least
   one acceptance criterion that proves existing behavior still works whenever a batch changes
   existing surfaces.
+- **High-risk regression review pass added.** Medium/high blast-radius batches can now run a
+  narrow second review pass that ignores style and new ideas, traces changed shared surfaces to
+  their consumers, and focuses only on what existing behavior could break.
 
 ### Cross-file sync
 

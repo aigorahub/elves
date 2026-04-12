@@ -405,7 +405,7 @@ The contract goes in the execution log under the batch entry:
 - Risk: low, all changes are additive, no existing interfaces modified
 ```
 
-The **Blast radius** section forces you to think about regression risk before writing code. List every shared file this batch will modify, count its consumers (search for imports, requires, or references to the file using whatever pattern fits your stack), describe the nature of the change (additive, modified, or breaking), and assess the risk. A high-risk blast radius isn't a reason to skip the work. It's a signal to write more careful tests and verify consumers during review.
+The **Blast radius** section forces you to think about regression risk before writing code. List every shared file this batch will modify, count its consumers (search for imports, requires, or references to the file using whatever pattern fits your stack), describe the nature of the change (additive, modified, or breaking), and assess the risk. A high-risk blast radius isn't a reason to skip the work. It's a signal to write more careful tests, verify consumers during review, and usually run the optional regression-focused review pass described in step 7.
 
 The **Build on** section makes the Code Quality Philosophy concrete for this batch. Search the codebase during contract writing to fill it in: existing utilities, established patterns, modules to extend, conventions to match. If nothing relevant exists, say so — "No existing patterns apply; this batch establishes the pattern for [X]" is a valid entry and signals to later batches what to build on.
 
@@ -492,6 +492,8 @@ for reusable lessons, `.ai-docs/*` for stable repo truths, and README/CHANGELOG/
 human-facing behavior.
 
 **Check shared surfaces for regression risk.** For any modified file that's imported or used by code outside the batch scope: grep for consumers, verify backward compatibility, confirm no function signatures or interfaces changed without updating all callers. Mark BLOCKING if a shared surface was modified without verifying consumers. The review subagent includes this check (see `references/review-subagent.md`), but if you're doing the review directly, don't skip it.
+
+**Run a regression-focused review pass for high-risk batches.** If the contract's blast radius is medium or high, or the batch touches auth, billing, data models, shared utilities, public interfaces, or other widely-consumed surfaces, add one more narrow review pass after the standard review is otherwise clean. This pass is intentionally constrained: read the cumulative diff, the plan, the batch contract (especially blast radius), and the consumer evidence. Ignore style, architecture improvements, and new feature ideas. Ask only: "What existing behavior could this break?" For each changed shared surface, trace callers or dependents and name the concrete failure mode. Treat confirmed breakage as BLOCKING. Treat plausible but unproven regression risk as WARNING until you either add verification or justify why the surface is safe in the execution log and commit message.
 
 **Triage every review finding into one of five categories:**
 - **Fix now:** a real bug, security problem, quality violation, or missing contract item. Fix it before continuing.

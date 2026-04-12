@@ -271,6 +271,53 @@ The coordinator fixes any blocking findings from the adversarial review, then ru
 
 This pattern is most valuable for security-sensitive code, data integrity logic, and anything where a subtle bug would be expensive. It adds time to each batch, so use it selectively.
 
+## High-Risk Regression Review Pattern
+
+Use this narrower pass when the batch contract's blast radius is **medium** or **high**, or when
+the batch touches auth, billing, data models, shared utilities, public interfaces, or any surface
+with many callers.
+
+This is not a second full review. It is a focused regression check that asks only:
+
+- What existing behavior could this break?
+- Which callers, routes, jobs, or dependents would feel the break first?
+- What proof do we have that those consumers still work?
+
+Read only:
+
+1. The cumulative diff for the branch or batch
+2. The plan at `[PLAN_PATH]`
+3. The batch contract in `[EXECUTION_LOG_PATH]`, especially **Acceptance criteria** and
+   **Blast radius**
+4. Any consumer evidence the implementer gathered (`rg` output, importer counts, route lists,
+   interface snapshots, or targeted regression tests)
+
+Ignore:
+
+- style or readability suggestions
+- architecture cleanups unrelated to breakage
+- new feature ideas
+- docs freshness unless the stale doc itself would mislead an existing consumer
+
+Return a tight report:
+
+### Blocking
+- [Confirmed regression or concrete breakage risk that is not yet proven safe]
+
+### Warnings
+- [Plausible regression risk that needs more proof, a targeted test, or an explicit safety note]
+
+### Info
+- [Changed shared surfaces that were traced and appear safe]
+
+### Consumer Trace
+- `[surface]` -> [callers/dependents checked] -> [why safe / what could break]
+
+### Missing Proof
+- [Any consumer or behavior that still needs direct verification]
+
+If nothing is risky, say so in one line and stop.
+
 ## Why This Matters
 
 Without review, the agent is grading its own homework. The validate step (tests, lint, build) catches mechanical failures, but it doesn't catch logical errors, missing requirements, security issues, or code that compiles correctly but does the wrong thing.

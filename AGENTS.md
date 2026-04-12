@@ -234,7 +234,7 @@ git tag elves/pre-batch-N
 - Risk: [low / medium / high], [one-line explanation]
 ```
 
-The **Blast radius** section identifies shared code at risk. List modified shared files, count consumers, describe the nature of change, and assess the risk level. This shifts regression thinking into the contract where it's cheapest to address.
+The **Blast radius** section identifies shared code at risk. List modified shared files, count consumers, describe the nature of change, and assess the risk level. This shifts regression thinking into the contract where it's cheapest to address. Medium- and high-risk batches should usually trigger the optional regression-focused review pass in step 7.
 
 The **Build on** section makes the Code Quality Philosophy concrete: what existing patterns, utilities, and modules should this batch extend? Search the codebase during contract writing to fill this in. If nothing relevant exists, note that this batch establishes the pattern.
 
@@ -284,6 +284,8 @@ The review has three jobs: **find bugs**, **verify the batch matches its contrac
 Also review the diff for code quality, **using the contract's Build on section and the pre-implementation survey as your baseline**: does the batch extend the utilities and patterns it said it would? Does it introduce duplicated utilities that already exist in the codebase? Does it ignore established patterns or architecture? Are fixes addressing root causes or patching symptoms? Does the batch leave the repo easier or harder to work on? Duplication and architecture violations are blocking. Band-aids are blocking if they hide bugs. When fixing code quality findings, follow the same philosophy: don't create a bigger band-aid to fix a band-aid.
 
 **Check shared surfaces for regression risk.** For any modified file that's imported or used by code outside the batch scope: grep for consumers, verify backward compatibility, confirm no function signatures or interfaces changed without updating all callers. Mark BLOCKING if a shared surface was modified without verifying consumers.
+
+**For medium/high blast radius batches, run one more regression-focused pass.** If the contract marks the blast radius as medium or high, or the batch touches auth, billing, data models, shared utilities, public interfaces, or other widely-consumed surfaces, do a narrow second pass after the standard review is otherwise clean. Read the cumulative diff, the plan, the batch contract (especially blast radius), and the consumer evidence. Ignore style, architecture improvements, and new feature ideas. Ask only: "What existing behavior could this break?" Trace each changed shared surface to its callers or dependents and name the concrete failure mode. Treat confirmed breakage as BLOCKING. Treat plausible but unproven regression risk as WARNING until you either add verification or justify why the surface is safe in the execution log and commit message. Codex doesn't have built-in subagents, so do this pass directly unless the user explicitly provided another reviewer workflow.
 
 **Fix all blocking issues using the bug-fix protocol.** When a bug is found:
 1. **Diagnose the category** — what kind of bug is this? Missing null check? Unvalidated input? Off-by-one? The specific bug is a symptom; the category is the disease.
