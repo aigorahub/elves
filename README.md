@@ -585,6 +585,10 @@ python3 scripts/sync_installed_skills.py --check
 python3 scripts/sync_installed_skills.py --apply
 ```
 
+By default, `--target all` syncs or checks only the installed copies it actually finds. Use
+`--target claude` or `--target codex` if you want to inspect or create a specific platform install
+explicitly.
+
 This mirrors the managed skill bundle files from the repo into `~/.claude/skills/elves/` and
 `~/.codex/skills/elves/`. It intentionally ships the installable bundle only: `SKILL.md`,
 `AGENTS.md` (Codex), `references/`, and the runtime scripts `scripts/preflight.sh`,

@@ -45,7 +45,9 @@ All notable changes to the Elves skill are documented here.
   human-facing workflow.
 - **Installed skill sync helper added.** `scripts/sync_installed_skills.py` can now check and
   mirror the canonical bundle into `~/.claude/skills/elves/` and `~/.codex/skills/elves/` so the
-  local runtime copies do not drift behind the repo release.
+  local runtime copies do not drift behind the repo release. The default `--target all` behavior
+  now scopes itself to installed copies that actually exist, so one-platform setups do not get
+  false drift reports for the other platform.
 - **Install doctor added.** `scripts/install_doctor.py` now gives startup-time update notices and
   explains when a project-local install differs from the global copy, so users can see which
   version is actually active before assuming an upgrade failed.

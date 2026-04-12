@@ -8,7 +8,8 @@ Usage:
 
 `--check` reports drift between this repo checkout and the local installed copies.
 `--apply` overwrites the managed files/directories in the installed copies so they match
-this checkout exactly.
+this checkout exactly. When `--target all` is used, the script only operates on installed
+targets it actually finds.
 """
 
 from __future__ import annotations
@@ -74,7 +75,7 @@ def parse_args() -> argparse.Namespace:
 
 def selected_targets(target_name: str) -> list[str]:
     if target_name == "all":
-        return ["claude", "codex"]
+        return [name for name, config in TARGETS.items() if config["root"].exists()]
     return [target_name]
 
 
@@ -200,6 +201,11 @@ def main() -> int:
     repo_version = read_version(REPO_ROOT / "SKILL.md") or "unknown"
     targets = selected_targets(args.target)
     had_drift = False
+
+    if not targets:
+        print("No installed Elves skill copies were detected.")
+        print("Use `--target claude` or `--target codex` with `--apply` to create one explicitly.")
+        return 1
 
     for name in targets:
         root = TARGETS[name]["root"]
