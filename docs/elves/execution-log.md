@@ -5,18 +5,110 @@
 
 ---
 
+## Session Summary
+
+- **Started:** 2026-04-11 22:42 EDT
+- **Review-ready:** 2026-04-11 23:15 EDT
+- **Planned batches completed:** 3 of 3
+- **Batch timing:** Batch 0 setup 8m, Batch 1 10m, Batch 2 13m, Batch 3 10m
+- **Status:** Planned work complete. All known review threads are resolved, current checks are
+  green, and the branch is ready for user review after session-artifact cleanup.
+
 ## Run Digest
 
-- **Last updated:** 2026-04-11 23:05 EDT
-- **Current phase:** In progress
-- **Active batch:** 3: Human Docs, Release Notes, and Consistency Pass
-- **Last completed batch:** 2: Skill and Review Workflow Upgrade
-- **Next exact batch:** 3: Human Docs, Release Notes, and Consistency Pass
+- **Last updated:** 2026-04-11 23:15 EDT
+- **Current phase:** Planned work complete
+- **Active batch:** none
+- **Last completed batch:** 3: Human Docs, Release Notes, and Consistency Pass
+- **Next exact batch:** Final cleanup and user handoff
 - **Active PR:** #18
 - **Docs promoted this run:** `.ai-docs/manifest.md`, `.ai-docs/architecture.md`,
   `.ai-docs/conventions.md`, `.ai-docs/gotchas.md`, `docs/elves/learnings.md`
 
 ---
+
+## 2026-04-11 23:15 EDT
+
+**Batch:** 3: Human Docs, Release Notes, and Consistency Pass
+**Contract status:** all criteria met
+
+**Timing:**
+- Implement: 7m | Validate: 2m | Review: 1m | Total: 10m
+- Session elapsed: 0h 33m | Budget remaining: unlimited
+
+**What changed:**
+- `README.md`: rewrote the workflow and installation guidance around the `1.7.0` layered memory
+  model, durable docs, and correct Codex skill paths.
+- `CHANGELOG.md`: added the `1.7.0` release entry for learnings, `.ai-docs`, docs-in-the-loop,
+  and review upgrades.
+- `TODO.md`: refreshed the follow-up list to match the new documentation architecture.
+- `scripts/preflight.sh`: fixed the trailing-slash `.gitignore` probe so `.playwright-mcp/` and
+  `docs/audit/` no longer false-warn when they are already ignored.
+
+**Commands run:**
+- `rg -n '1\.6\.1|three-document|three document|\.agents/skills|~/.codex/skills/elves/AGENTS\.md|copy \`AGENTS\.md\`' .`
+  -> PASS; stale public-facing wording and path drift were cleared.
+- `./scripts/preflight.sh`
+  -> PASS for repo-controlled checks; only expected local-environment warnings remain for missing
+     battery/sleep controls and optional non-interactive env vars.
+- `git diff --check`
+  -> PASS
+- `gh api "repos/${REPO}/pulls/18/comments" --paginate`
+  -> PASS; no new inline review findings on the latest docs/preflight commit.
+- `gh api "repos/${REPO}/issues/18/comments" --paginate`
+  -> PASS; no issue comments on the PR.
+- `gh api "repos/${REPO}/commits/$(git rev-parse HEAD)/check-runs"`
+  -> PASS; current tip `bbba9c2` has a green `Socket Security: Project Report` check.
+- GraphQL review-thread query against PR `18`
+  -> PASS; all review threads are resolved.
+
+**Test results:**
+- Lint: N/A
+- Typecheck: N/A
+- Build: N/A
+- Tests: N/A
+- E2E: N/A
+- Smoke: N/A
+- PR checks: PASS (`Socket Security: Project Report`)
+
+**Review findings:**
+- [WARNING] Human-facing docs still described the old three-document model and outdated Codex
+  install/edit paths -> Resolved in `bbba9c2`.
+- [WARNING] `scripts/preflight.sh` still warned about missing ephemeral ignores even when the
+  entries were present -> Resolved in `bbba9c2`.
+- [INFO] No new issue comments, no unresolved review threads, and current PR checks are green on
+  the latest tip.
+
+**Decisions made:**
+- Kept the older "three-document overnight harness" phrasing only where it reads as historical
+  framing inside repo history, not in the user-facing release docs.
+- Fixed the preflight false positive in the script itself instead of documenting around it, because
+  repo-conditioning is part of the release goal.
+
+**Docs:**
+- Impacted: `README.md`, `CHANGELOG.md`, `TODO.md`, `scripts/preflight.sh`
+- Updated: all of the above
+- Promoted: none
+- Deferred: none
+
+**Regression attestation:**
+- Cumulative diff: docs and one narrow preflight-script fix only. No runtime code, dependencies, or
+  package-managed workflows changed.
+- Files outside batch scope: none
+- Shared surfaces modified: `README.md`, `CHANGELOG.md`, `TODO.md`, `scripts/preflight.sh`
+- Consumers verified: human install/edit paths were checked against the installed Codex/Claude
+  skill locations, preflight was rerun successfully, and PR review/check surfaces were polled on
+  the current tip.
+- Test baseline: not applicable for this docs-focused repo; no project test runner exists.
+- Confidence: HIGH, because the batch is a narrow consistency release pass plus a targeted
+  preflight bug fix with successful rerun and clean PR state.
+
+**Commit:** `bbba9c2`
+**Rollback tag:** `elves/pre-batch-3`
+
+**Next:**
+1. Remove operational session artifacts from the PR while preserving them in branch history.
+2. Re-poll PR comments and checks on the cleanup commit before handing the branch back to the user.
 
 ## 2026-04-11 23:05 EDT
 
@@ -123,13 +215,13 @@
   one-off checklist.
 
 **Acceptance criteria:**
-- [ ] `README.md`, `CHANGELOG.md`, and `TODO.md` reflect the `1.7.0` model without contradicting
+- [x] `README.md`, `CHANGELOG.md`, and `TODO.md` reflect the `1.7.0` model without contradicting
       `SKILL.md` or `AGENTS.md`.
-- [ ] No stale human-facing references remain to the old three-document model or outdated Codex
+- [x] No stale human-facing references remain to the old three-document model or outdated Codex
       install paths.
-- [ ] `./scripts/preflight.sh` no longer raises a false warning for `.playwright-mcp/` or
+- [x] `./scripts/preflight.sh` no longer raises a false warning for `.playwright-mcp/` or
       `docs/audit/` when those ignore entries are present.
-- [ ] Current PR comments/checks are polled on the latest tip before calling the branch ready.
+- [x] Current PR comments/checks are polled on the latest tip before calling the branch ready.
 
 **Blast radius:**
 - `README.md`, `CHANGELOG.md`, `TODO.md` (user-facing and contributor-facing docs), modified

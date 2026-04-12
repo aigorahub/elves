@@ -1,7 +1,7 @@
 {
   "session_id": "elves-2026-04-11-v1-7-ai-friendly-docs",
   "version": "1.7.0",
-  "status": "in_progress",
+  "status": "planned_work_complete",
   "run_mode": "open-ended",
   "stop_policy": "blocker-only",
   "started_at": "2026-04-11T22:42:00-04:00",
@@ -14,11 +14,7 @@
   "pr_number": 18,
   "pr_url": "https://github.com/aigorahub/elves/pull/18",
   "launch_prompt": "The run is staged. Start now. Read docs/elves/survival-guide.md first, then .elves-session.json, then docs/elves/learnings.md, then docs/plans/v1.7.0-ai-friendly-docs.md, then docs/elves/execution-log.md. The user is offline. Do not stop unless you hit a genuine blocker with no reasonable workaround. Use your judgment. Work in small batches and commit frequently. Make commit subjects read like progress reports. Run the relevant consistency checks for this docs-focused repo. After every push, read PR comments and checks, fix blockers, and keep going until the plan is complete.",
-  "current_batch": {
-    "id": 3,
-    "name": "Human Docs, Release Notes, and Consistency Pass",
-    "status": "in_progress"
-  },
+  "current_batch": null,
   "setup_commit": "b06b3da",
   "test_baseline": {
     "passed": null,
@@ -121,11 +117,11 @@
     {
       "id": 3,
       "name": "Human Docs, Release Notes, and Consistency Pass",
-      "status": "in_progress",
-      "commit": null,
+      "status": "complete",
+      "commit": "bbba9c2",
       "rollback_tag": "elves/pre-batch-3",
       "started_at": "2026-04-11T23:05:00-04:00",
-      "completed_at": null
+      "completed_at": "2026-04-11T23:15:00-04:00"
     }
   ]
 }

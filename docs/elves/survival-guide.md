@@ -32,7 +32,7 @@ CHANGELOG all tell the same story and the PR is clean enough for the user to mer
 - **User returns:** never (open-ended until user stops)
 - **Time budget:** unlimited
 - **Average batch time so far:** ~12m
-- **Batches remaining:** 1 of 3
+- **Batches remaining:** 0 of 3
 
 ## Non-Negotiables
 
@@ -62,38 +62,37 @@ CHANGELOG all tell the same story and the PR is clean enough for the user to mer
 
 ## Current Phase
 
-**Status:** In progress
+**Status:** Planned work complete
 
-**Active batch:** Batch 3: Human Docs, Release Notes, and Consistency Pass
+**Active batch:** None
 
-**What was just finished:** Batch 2 completed: the Claude/Codex skill docs, review references, and
-live session-state schema were aligned, and the `.elves-session.json` / `.gitignore`
-contradiction was cleared.
+**What was just finished:** Batch 3 completed: the README, CHANGELOG, TODO, and preflight script
+were brought in line with the `1.7.0` memory/docs architecture, and the latest PR tip was checked
+for comments and green status.
 
-**Immediate next action:** Rewrite `README.md`, `CHANGELOG.md`, and `TODO.md`, then do the final
-repo-wide consistency and review-ready sweep.
+**Immediate next action:** Remove the operational session artifacts from the PR, then do one final
+comments/checks sweep on the cleanup commit.
 
 ## Next Exact Batch
 
-**Batch:** 3: Human Docs, Release Notes, and Consistency Pass
+**Batch:** None - planned work complete
 
 **Scope:**
 
-- Rewrite the README workflow sections around the `1.7.0` memory and docs architecture.
-- Add the `1.7.0` changelog entry, retire or refresh TODO items, and sweep version strings.
-- Do the final consistency pass across file paths, wording, and PR-review cleanliness.
+- Remove the temporary survival guide, execution log, and session JSON from the PR while keeping
+  durable docs and the plan intact in repo history.
+- Re-poll PR comments, review threads, and checks on the cleanup commit.
+- Leave the branch review-ready for the user to merge when they return.
 
 **Acceptance criteria:**
 
-- [ ] `README.md`, `CHANGELOG.md`, and `TODO.md` all reflect the `1.7.0` model without
-      contradicting the skill files.
-- [ ] No stale version strings, old three-document wording, or contradictory path references remain
-      in the repo.
-- [ ] PR comments/checks are re-polled on the current tip and the branch is ready for the user to
-      review and merge.
+- [ ] `docs/elves/survival-guide.md`, `docs/elves/execution-log.md`, and `.elves-session.json`
+      are removed from the PR after their final state is committed to history.
+- [ ] PR comments/checks are re-polled on the cleanup commit.
+- [ ] The branch is left review-ready for the user to merge.
 
-**Risk:** README drift is the biggest risk now because it restates the workflow in a more human
-voice and can lag behind the skill files even when the repo internals are already correct.
+**Risk:** Low. The remaining work is cleanup and proof, but it still touches the user's review
+surface, so do the final poll after pushing.
 
 **Rollback tag:** `elves/pre-batch-3`
 
@@ -101,8 +100,8 @@ voice and can lag behind the skill files even when the repo internals are alread
 
 - [ ] All relevant validation commands for this docs-only repo have been run and recorded.
 - [ ] PR review performed, all blocking findings resolved or explicitly dismissed with reasoning.
-- [ ] Execution log updated with commands run, decisions made, and commit SHA.
-- [ ] Survival guide updated with current phase and next exact batch.
+- [x] Execution log updated with commands run, decisions made, and commit SHA.
+- [x] Survival guide updated with current phase and next exact batch.
 - [ ] Changes committed and pushed to the active branch.
 - [ ] Rollback tag created before each implementation batch starts.
 
