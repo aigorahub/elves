@@ -107,6 +107,47 @@
 1. Rewrite `README.md`, `CHANGELOG.md`, and `TODO.md` for the `1.7.0` release.
 2. Run a repo-wide wording/version sweep, then re-poll PR feedback before calling the branch ready.
 
+## Batch 3 Contract: 2026-04-11 23:11 EDT
+
+**Behaviors:**
+- Rewrite the human-facing docs so README, CHANGELOG, and TODO all describe the `1.7.0` layered
+  memory model instead of the old three-document framing.
+- Fix any remaining repo-consistency issues discovered during the final sweep, including release
+  tooling or scripts that still contradict the documented workflow.
+- Finish with a merge-ready branch: current docs, green checks, and no stale PR review noise.
+
+**Build on:**
+- Batch 2's aligned skill surfaces and run-state docs instead of inventing a second explanation for
+  the same `1.7.0` behavior model.
+- The existing `scripts/preflight.sh` proof path; repair its false positive instead of adding a new
+  one-off checklist.
+
+**Acceptance criteria:**
+- [ ] `README.md`, `CHANGELOG.md`, and `TODO.md` reflect the `1.7.0` model without contradicting
+      `SKILL.md` or `AGENTS.md`.
+- [ ] No stale human-facing references remain to the old three-document model or outdated Codex
+      install paths.
+- [ ] `./scripts/preflight.sh` no longer raises a false warning for `.playwright-mcp/` or
+      `docs/audit/` when those ignore entries are present.
+- [ ] Current PR comments/checks are polled on the latest tip before calling the branch ready.
+
+**Blast radius:**
+- `README.md`, `CHANGELOG.md`, `TODO.md` (user-facing and contributor-facing docs), modified
+- `scripts/preflight.sh` (operator-facing release proof), modified
+- Risk: medium, because README and installation guidance are the first thing new users see, and a
+  misleading final proof script would undercut the release's credibility.
+
+**Pre-implementation survey:**
+- `rg -n '1\\.6\\.1|three-document|three document|\\.agents/skills|~/.codex/skills/elves/AGENTS\\.md|copy \`AGENTS\\.md\`' .`
+  -> README still described the old three-document model and outdated Codex installation paths; no
+     `1.7.0` changelog entry existed.
+- `sed -n '484,610p' README.md`
+  -> global/per-project Codex installation guidance still pointed at `AGENTS.md` and
+     `.agents/skills/...` instead of the installed `SKILL.md` surface.
+- `./scripts/preflight.sh`
+  -> reported `.playwright-mcp/` and `docs/audit/` as missing from `.gitignore` even though the
+     entries were present; direct `git check-ignore` confirmed a trailing-slash probe mismatch.
+
 ## Batch 2 Contract: 2026-04-11 23:02 EDT
 
 **Behaviors:**

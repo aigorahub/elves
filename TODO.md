@@ -10,7 +10,19 @@ Project backlog and deferred tasks.
 ## Future Ideas
 
 ### Process self-improvement across sessions
-Elves improves the *repo* progressively (principle #6) but doesn't improve *itself*. The survival guide carries forward, but the process doesn't auto-tune. Could the entropy check also evaluate whether the Elves process itself needs adjustment? For example: if review keeps flagging the same category of issue, should the contract template add a check for it? If validation times are growing, should batch sizing shrink? Factory AI calls this "Signals" — a closed-loop system that detects friction and implements fixes to its own process. Worth exploring as a lightweight version: a "process retro" step every N batches that proposes survival guide amendments based on patterns in the execution log.
+`v1.7.0` added learnings and docs-in-the-loop upkeep, so Elves now preserves lessons better than it did originally. But the process still doesn't truly auto-tune itself. Could the entropy check also evaluate whether the Elves process itself needs adjustment? For example: if review keeps flagging the same category of issue, should the contract template add a check for it? If validation times are growing, should batch sizing shrink? Factory AI calls this "Signals" — a closed-loop system that detects friction and implements fixes to its own process. Worth exploring as a lightweight version: a "process retro" step every N batches that proposes survival guide amendments based on patterns in the execution log.
+
+## Follow-ups from v1.7.0
+
+### Repo consistency checker
+This release fixed multiple cases of documentation drift across `SKILL.md`, `AGENTS.md`,
+`.elves-session.json`, and README. A tiny consistency script or lint-like checker could catch those
+before PR bots do.
+
+### Local installed skill sync
+The `v1.7.0` PR intentionally updates only the canonical repo skill surfaces. It may still be worth
+adding a release helper or checklist for syncing installed local copies under `.claude/` and
+`.codex/` after a repo release lands.
 
 ### Multi-model routing for subagents
 Different phases of the loop have different cost/quality tradeoffs. Implementation needs the strongest model; validation could run on a cheaper one; review benefits from a fresh perspective (different model = different blind spots). The subagent strategy already creates natural seams for this. Add optional model configuration per phase in the survival guide, e.g. `implement-model: opus`, `validate-model: sonnet`, `review-model: opus`. The user already controls which model runs — this would make it explicit and tunable.

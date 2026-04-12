@@ -26,7 +26,7 @@ Elves is the mechanism. It converts idle hours into shipped code.
 
 The core pattern is the Ralph Loop: try, check, feed back, repeat. An AI doesn't return correct or incorrect answers. It returns drafts. Judging AI on its first attempt is like judging a tree by its first day of growth. The people who get extraordinary results aren't writing better prompts. They are running better loops.
 
-Elves is the harness that lets the Ralph Loop run for hours without supervision, with a Survival Guide so the agent knows what it's doing, an Execution Log so it can recover after a restart, and test gates so it knows whether its work is actually correct before it moves on.
+Elves is the harness that lets the Ralph Loop run for hours without supervision, with a Survival Guide so the agent knows what it's doing, a Learnings file so reusable lessons survive the night, an Execution Log so it can recover after a restart, and test gates so it knows whether its work is actually correct before it moves on.
 
 *Part of a series by John Ennis: [The Shoemaker's Elves](https://x.com/johnennis/status/2025904571311141215) (the 14-hour resource), [The Survival Guide](https://x.com/johnennis/status/2028960113646604794) (keeping agents on track), and [Water the Tree](https://x.com/johnennis/status/2034300044212351114) (the Ralph Loop).*
 
@@ -41,17 +41,25 @@ Judge → Document → Update → Push → Re-read → PR Loop → Entropy Check
 
 Elves runs a tight loop. For each batch of planned work, the agent implements the changes, runs validation gates, reads PR review comments, fixes any blocking findings, updates the documentation, and pushes a checkpoint, then immediately starts the next batch. No waiting, no prompting, no drift.
 
-### The three-document system
+### The layered memory system
 
-AI agents are stateless. Context compaction erases working memory. Elves solves this with three persistent documents that act as the agent's memory across compactions, restarts, and long multi-hour runs:
+AI agents are stateless. Context compaction erases working memory. Elves solves this with a small
+stack of persistent documents instead of one giant scratchpad:
 
 | Document | Purpose |
 |---|---|
 | **Plan** | What needs to be built (the authoritative scope) |
 | **Survival Guide** | Standing brief: mission, rules, tool config, current phase, next batch |
+| **Learnings** | Durable, reusable lessons that should survive this run and future runs |
 | **Execution Log** | Running record of every batch completed, every decision made, every commit pushed |
+| **`.ai-docs/*` (optional)** | Curated durable docs for architecture, conventions, and gotchas once a learning becomes a stable repo truth |
 
-After any compaction or restart, the agent reads these three files in order and resumes without losing its place. The survival guide is marked `# READ THIS FILE FIRST AFTER ANY COMPACTION OR RESTART` so the agent can't miss it.
+The promotion flow is `execution log -> learnings -> .ai-docs`.
+
+After any compaction or restart, the agent reads the stack in order and resumes without losing its
+place: survival guide, `.elves-session.json`, learnings, plan, execution log, then
+`.ai-docs/manifest.md` if it exists. The survival guide is marked
+`# READ THIS FILE FIRST AFTER ANY COMPACTION OR RESTART` so the agent can't miss it.
 
 ### Stage, then launch
 
@@ -61,7 +69,7 @@ should not try to carry the whole project again.
 
 Elves works best as a two-call handoff:
 
-1. **Stage the run.** Clean up the plan, refresh the survival guide and execution log, open the
+1. **Stage the run.** Clean up the plan, refresh the survival guide, learnings file, and execution log, open the
    branch and PR, run preflight, and stop only when the run is launch-ready.
 2. **Launch the run.** In a fresh call, send a short hard prompt that points at the prepared docs
    and reinforces behavior: don't stop unless genuinely blocked, use judgment, work in small
@@ -122,7 +130,8 @@ Bad: "Looks good so far." (no tag, no instruction to continue)
 See [Installation](#installation) below for full details. The short version:
 
 - **Claude Code:** copy the `elves/` directory into `.claude/skills/elves/` in your repo
-- **Codex:** copy `AGENTS.md` into `.agents/skills/elves/AGENTS.md`
+- **Codex:** copy the skill bundle into `~/.codex/skills/elves/` (at minimum `SKILL.md`,
+  `references/`, and `scripts/`)
 - **Claude.ai:** zip the `elves/` directory and upload via Settings > Features > Skills
 
 **2. Write a plan**
@@ -131,7 +140,7 @@ Use [`references/plan-template.md`](references/plan-template.md) as your startin
 
 **3. Stage the run**
 
-Use [`references/kickoff-prompt-template.md`](references/kickoff-prompt-template.md) to stage the run first. This call cleans the plan up, generates or refreshes the survival guide and execution log, opens or updates the branch and PR, runs preflight, and leaves you with a short launch prompt for the next call.
+Use [`references/kickoff-prompt-template.md`](references/kickoff-prompt-template.md) to stage the run first. This call cleans the plan up, generates or refreshes the survival guide, learnings file, and execution log, opens or updates the branch and PR, runs preflight, and leaves you with a short launch prompt for the next call.
 
 **4. Launch in a new call**
 
@@ -147,7 +156,8 @@ The launch prompt starts unattended execution. Elves re-reads the prepared docs,
 
 - **Multi-batch execution** with configurable batch sizing (default: 4 developers × 2-week sprint)
 - **Two-step operator flow**: stage the run first, then launch it in a fresh short call so the agent starts with momentum instead of a giant overloaded prompt
-- **Context compaction survival** via the three-document system: reads survival guide, plan, and execution log after every compaction
+- **Layered memory system**: reads survival guide, `.elves-session.json`, learnings, plan, execution log, and `.ai-docs/manifest.md` (if present) after compaction
+- **Documentation freshness in the loop**: review can raise `PENDING-DOCS`, learnings promote reusable lessons, and stable truths can move into `.ai-docs/*`
 - **Auto-discovered validation gates** for Node.js, Python, Go, Rust, and Makefile projects. No configuration required.
 - **Pluggable review**: GitHub PR comments by default (zero config), custom review API opt-in, additional custom checks
 - **Subagent delegation** for long runs (Claude Code): coordinator manages the loop, subagents do the deep work
@@ -333,8 +343,8 @@ The agent uses the highest tier you have configured. Non-blocking findings are l
 
 ```
 elves/
-├── SKILL.md                              # Claude Code skill (main instructions)
-├── AGENTS.md                             # Codex variant
+├── SKILL.md                              # Portable skill instructions (Claude Code, Codex, Claude.ai)
+├── AGENTS.md                             # Codex-facing repo-local instructions for working on Elves itself
 ├── README.md
 ├── CHANGELOG.md                          # Version history
 ├── TODO.md                               # Project backlog and deferred tasks
@@ -368,7 +378,7 @@ elves/
 | Platform | File | Subagents | Notes |
 |---|---|---|---|
 | Claude Code | SKILL.md | Yes | Full feature set |
-| Codex | AGENTS.md | No | All work done directly |
+| Codex | SKILL.md | No | Installed Codex skill surface; `AGENTS.md` remains the repo-local Codex companion |
 | Claude.ai | SKILL.md (zip upload) | No | Upload as skill |
 | Any Agent Skills compatible | SKILL.md | Varies | Open standard |
 
@@ -413,11 +423,11 @@ Overnight agent runs fail in predictable ways. Knowing the failure modes makes t
 | **Machine sleeps** | Session stops silently. You wake up to 45 minutes of work instead of 8 hours. | `caffeinate` (macOS), `systemd-inhibit` (Linux), or run in cloud. Elves preflight warns you. |
 | **Agent runs destructive git commands** | `git reset --hard` wipes hours of uncommitted work. This has happened to real users. | Elves explicitly forbids `git reset --hard`, `git checkout .`, `git push --force`, and `git clean -fd`. The survival guide template includes these as non-negotiables. |
 | **Agent disables or weakens tests** | Agent comments out failing tests, weakens assertions, or shortens timeouts to make the gate pass. You wake up to code that "passes" but is broken. | Elves has a Test Integrity rule: never modify a test to make it pass. Fix the code, not the test. If the agent thinks a test is wrong, it logs the issue and moves on without changing it. |
-| **Context compaction loses instructions** | Long sessions hit memory limits. The agent's conversation gets summarized, and safety instructions disappear. | Elves stores all instructions in files on disk (survival guide, plan, execution log), not in conversation memory. The agent re-reads the survival guide after every push. Compaction can't erase files. |
+| **Context compaction loses instructions** | Long sessions hit memory limits. The agent's conversation gets summarized, and safety instructions disappear. | Elves stores its run memory on disk (survival guide, `.elves-session.json`, learnings, plan, execution log, and optionally `.ai-docs/*`), not in conversation memory. The agent re-reads the survival guide after every push. Compaction can't erase files. |
 | **Interactive prompt stalls the session** | A tool asks for confirmation, a survey pops up, or `npm install` wants input. Nobody is there to click yes. | Elves surfaces the recommended non-interactive env vars during preflight, and the skill requires `--yes` flags plus tool-level survey suppression before unattended runs. |
 | **Flaky tests block progress** | A test passes locally but fails intermittently. The agent loops trying to fix a non-bug. | The agent logs flaky tests in the execution log and moves on after 3 failed attempts on the same non-deterministic failure. |
 | **Terminal closes (SSH disconnect)** | The SSH connection drops and the session dies. | Use `tmux` or `screen`. Elves mentions this in the pre-run checklist. |
-| **Agent drifts from the plan** | After many batches, the agent starts making changes that weren't in the plan. | The agent re-reads the survival guide after every push and checks the plan hash to detect modifications. The three-document system anchors every decision. |
+| **Agent drifts from the plan** | After many batches, the agent starts making changes that weren't in the plan. | The agent re-reads the survival guide after every push, checks the plan hash to detect modifications, and keeps durable lessons in `learnings.md` so the same confusion doesn't have to be rediscovered. The layered memory system anchors every decision. |
 | **Merge conflicts on push** | `git push` fails because the remote has diverged. The agent may rebase and lose work, or stall. | Elves instructs the agent to fetch and merge (never rebase on shared branches). If conflicts can't be resolved cleanly, the agent triggers a Hard Stop rather than risking data loss. |
 
 Most of these are prevented by the preflight checks. Run preflight, fix the warnings, and most overnight failures never happen.
@@ -504,7 +514,7 @@ rm -rf /tmp/elves
 ```bash
 mkdir -p ~/.codex/skills/elves
 git clone https://github.com/aigorahub/elves.git /tmp/elves
-cp /tmp/elves/AGENTS.md ~/.codex/skills/elves/
+cp /tmp/elves/SKILL.md /tmp/elves/AGENTS.md ~/.codex/skills/elves/
 cp -r /tmp/elves/references /tmp/elves/scripts ~/.codex/skills/elves/
 rm -rf /tmp/elves
 ```
@@ -521,11 +531,11 @@ git clone https://github.com/aigorahub/elves.git .claude/skills/elves
 rm -rf .claude/skills/elves/.git  # remove the nested git repo
 ```
 
-**Codex:**
+**Codex** (if your setup supports project-local skills):
 ```bash
-mkdir -p .agents/skills
-git clone https://github.com/aigorahub/elves.git .agents/skills/elves
-rm -rf .agents/skills/elves/.git
+mkdir -p .codex/skills
+git clone https://github.com/aigorahub/elves.git .codex/skills/elves
+rm -rf .codex/skills/elves/.git
 ```
 
 ### Claude.ai (upload)
@@ -589,7 +599,7 @@ This is normal. After each run, read the execution log (especially the **Decisio
 
 ### Editing your global installation
 
-If you installed globally, your customized skill lives at `~/.claude/skills/elves/SKILL.md` (Claude Code) or `~/.codex/skills/elves/AGENTS.md` (Codex). Edit these files directly. Add your own defaults, remove sections that don't apply to your work, add project-type-specific guidance. This is your copy. Make it yours.
+If you installed globally, your customized skill lives at `~/.claude/skills/elves/SKILL.md` (Claude Code) or `~/.codex/skills/elves/SKILL.md` (Codex). Edit these files directly. Add your own defaults, remove sections that don't apply to your work, add project-type-specific guidance. This is your copy. Make it yours.
 
 When you want to update from upstream (new features, fixes), pull the latest and merge manually:
 ```bash
@@ -598,9 +608,13 @@ diff ~/.claude/skills/elves/SKILL.md /tmp/elves-update/SKILL.md
 # Review the diff, merge what you want, skip what you don't
 ```
 
+For Codex, compare `~/.codex/skills/elves/SKILL.md` against `/tmp/elves-update/SKILL.md`.
+
 ### Per-project overrides
 
-If you have a global installation but one project needs different behavior, put a project-level copy in `.claude/skills/elves/` inside that repo. The project-level skill takes precedence over the global one.
+If you have a global installation but one project needs different behavior, put a project-level
+copy in `.claude/skills/elves/` (Claude Code) or `.codex/skills/elves/` (Codex, if supported by
+your setup) inside that repo. The project-level skill takes precedence over the global one.
 
 This is useful when:
 - One project uses Python while your default is Node

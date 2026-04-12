@@ -156,7 +156,7 @@ EPHEMERAL_DIRS=(.playwright-mcp docs/audit)
 MISSING_IGNORES=0
 
 for DIR in "${EPHEMERAL_DIRS[@]}"; do
-  if git check-ignore -q "$DIR" 2>/dev/null; then
+  if git check-ignore -q "${DIR}/" 2>/dev/null; then
     pass "${DIR}/ is gitignored"
   else
     MISSING_IGNORES=1

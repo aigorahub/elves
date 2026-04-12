@@ -2,6 +2,39 @@
 
 All notable changes to the Elves skill are documented here.
 
+## [1.7.0] - 2026-04-11
+
+### Durable memory and AI-friendly docs
+
+- **Learnings is now a first-class memory surface.** Elves formally distinguishes plan, survival
+  guide, learnings, and execution log, with `learnings.md` acting as durable reusable memory across
+  runs instead of forcing every lesson to live in chronological batch notes.
+- **Lightweight `.ai-docs/` architecture added.** The repo now includes `.ai-docs/manifest.md`,
+  `.ai-docs/architecture.md`, `.ai-docs/conventions.md`, and `.ai-docs/gotchas.md` as the curated
+  durable layer for stable repo truths.
+- **Promotion flow is explicit.** The documentation system now defines `execution log -> learnings
+  -> .ai-docs`, which keeps transient status, reusable lessons, and stable architecture knowledge
+  in separate places.
+
+### Docs in the loop
+
+- **Documentation freshness is part of done.** Batches now track docs impacted, updated, promoted,
+  and deferred instead of treating docs as end-of-run cleanup.
+- **`PENDING-DOCS` added to review vocabulary.** Elves can now distinguish code bugs from
+  documentation debt that still blocks a batch from being truly clean.
+- **Compaction recovery order upgraded.** Recovery and launch guidance now consistently read:
+  survival guide -> `.elves-session.json` -> learnings -> plan -> execution log ->
+  `.ai-docs/manifest.md` (if present).
+
+### Cross-file sync
+
+- **`SKILL.md` and `AGENTS.md` updated together** to describe the same `1.7.0` memory model,
+  review loop, and `.elves-session.json` expectations.
+- **Review and autonomy references updated** so `references/review-subagent.md` and
+  `references/autonomy-guide.md` use the same terminology as the main skill files.
+- **README, TODO, and run templates refreshed** to reflect the new layered-memory architecture and
+  human-facing workflow.
+
 ## [1.6.1] - 2026-04-02
 
 ### Review follow-up: internal consistency fixes
