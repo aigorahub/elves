@@ -34,6 +34,9 @@ TARGETS = {
     },
 }
 
+IGNORED_NAMES = {"__pycache__", ".DS_Store"}
+IGNORED_SUFFIXES = {".pyc"}
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -85,6 +88,10 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def should_ignore(path: Path) -> bool:
+    return any(part in IGNORED_NAMES for part in path.parts) or path.suffix in IGNORED_SUFFIXES
+
+
 def compare_file(src: Path, dst: Path, rel_path: str) -> list[str]:
     if not dst.exists():
         return [f"missing file: {rel_path}"]
@@ -101,12 +108,12 @@ def compare_dir(src_dir: Path, dst_dir: Path, rel_path: str) -> list[str]:
     src_files = {
         path.relative_to(src_dir).as_posix()
         for path in src_dir.rglob("*")
-        if path.is_file()
+        if path.is_file() and not should_ignore(path.relative_to(src_dir))
     }
     dst_files = {
         path.relative_to(dst_dir).as_posix()
         for path in dst_dir.rglob("*")
-        if path.is_file()
+        if path.is_file() and not should_ignore(path.relative_to(dst_dir))
     }
 
     for relative in sorted(src_files - dst_files):
@@ -145,7 +152,11 @@ def sync_path(src: Path, dst: Path) -> None:
     if src.is_dir():
         if dst.exists():
             shutil.rmtree(dst)
-        shutil.copytree(src, dst)
+        shutil.copytree(
+            src,
+            dst,
+            ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".DS_Store"),
+        )
     else:
         shutil.copy2(src, dst)
 
