@@ -2,6 +2,10 @@
 .elves-session.json
 config.json
 
+# Elves ephemeral artifacts
+.playwright-mcp/
+docs/audit/
+
 # OS files
 .DS_Store
 Thumbs.db

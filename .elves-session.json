@@ -1,0 +1,45 @@
+{
+  "version": "1.7.0",
+  "status": "staging",
+  "run_mode": "open-ended",
+  "stop_policy": "blocker-only",
+  "started_at": "2026-04-11T22:42:00-04:00",
+  "branch": "codex/elves-v1.7-ai-friendly-docs",
+  "plan_path": "docs/plans/v1.7.0-ai-friendly-docs.md",
+  "plan_hash": "ade1c815c589e6d7a498e34065cd458d",
+  "survival_guide_path": "docs/elves/survival-guide.md",
+  "learnings_path": "docs/elves/learnings.md",
+  "execution_log_path": "docs/elves/execution-log.md",
+  "pr_number": null,
+  "launch_prompt": "",
+  "current_batch": {
+    "id": 0,
+    "name": "Session setup",
+    "status": "in_progress"
+  },
+  "test_baseline": {
+    "status": "not_applicable",
+    "reason": "Documentation repo; no project test runner detected during preflight"
+  },
+  "review_comments": [],
+  "batches": [
+    {
+      "id": 1,
+      "name": "Durable Memory and Agent Docs Architecture",
+      "status": "pending",
+      "rollback_tag": "elves/pre-batch-1"
+    },
+    {
+      "id": 2,
+      "name": "Skill and Review Workflow Upgrade",
+      "status": "pending",
+      "rollback_tag": "elves/pre-batch-2"
+    },
+    {
+      "id": 3,
+      "name": "Human Docs, Release Notes, and Consistency Pass",
+      "status": "pending",
+      "rollback_tag": "elves/pre-batch-3"
+    }
+  ]
+}
