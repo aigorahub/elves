@@ -5,15 +5,35 @@
 > newest first). Don't delete or modify past entries.
 >
 > After a context compaction, this file tells you what is already done so you don't repeat work.
-> The survival guide tells you what to do next. Together they are your complete memory. These files
-> live on disk. Context compaction can't erase them. That's the entire point.
+> The survival guide tells you what to do next. The learnings file and `.ai-docs/*` hold the
+> durable knowledge that should survive beyond a single run. These files live on disk. Context
+> compaction can't erase them. That's the entire point.
 >
 > Each entry records one iteration of the Ralph Loop: what you tried, what the tests said, what
 > the review found, what you fixed, and what comes next. The user will read this log when they
 > return to understand exactly what happened while they were away.
 >
+> Keep raw chronology here. Reusable lessons should be promoted to the learnings file. Stable repo
+> truths should eventually be curated into `.ai-docs/architecture.md`, `.ai-docs/conventions.md`,
+> or `.ai-docs/gotchas.md`.
+>
 > If this file exceeds ~50 entries, move older completed entries under a `## Completed Archive`
 > heading at the bottom.
+
+---
+
+## Run Digest
+
+> Refresh this small summary after every batch so a fresh session can get bearings quickly without
+> rereading the full log.
+
+- **Last updated:** [YYYY-MM-DD HH:MM timezone]
+- **Current phase:** [Staging / In progress / Scout mode / Blocked / Complete]
+- **Active batch:** [Batch N: Name]
+- **Last completed batch:** [Batch N: Name / "none yet"]
+- **Next exact batch:** [Batch N: Name]
+- **Active PR:** [#N / "not created yet"]
+- **Docs promoted this run:** [list / "none yet"]
 
 ---
 
@@ -49,6 +69,9 @@
 **Phase:** [Staging complete / Launch started]
 **Plan:** `[path/to/plan.md]`
 **Survival guide:** `[path/to/survival-guide.md]`
+**Learnings:** `[path/to/learnings.md]`
+**Execution log:** `[path/to/execution-log.md]`
+**Durable docs manifest (optional):** `[.ai-docs/manifest.md]`
 **Branch:** `[feat/branch-name]`
 **PR:** [#N / "not created yet"]
 **Run mode:** [finite / open-ended] | **User returns:** [time / "never"]
@@ -72,6 +95,35 @@
 ---
 
 <!-- ================================================================
+     BATCH CONTRACT TEMPLATE: add this before implementation starts.
+     It records what "done" means before code or docs change.
+     ================================================================ -->
+
+## Batch [N] Contract: [YYYY-MM-DD HH:MM timezone]
+
+**Behaviors:**
+- [Specific behavior 1]
+- [Specific behavior 2]
+
+**Build on:**
+- [Existing pattern, utility, or document structure to extend]
+- [Existing convention to follow]
+
+**Acceptance criteria:**
+- [ ] [Criterion 1]
+- [ ] [Criterion 2]
+
+**Blast radius:**
+- `[shared/file/or/doc]` ([N] consumers), [additive / modified / breaking]
+- Risk: [low / medium / high], [one-line explanation]
+
+**Pre-implementation survey:**
+- `[command]` -> [what you found]
+- `[command]` -> [what you found]
+
+---
+
+<!-- ================================================================
      BATCH ENTRY TEMPLATE: copy this block for each completed batch.
      Fill in all fields. Do not leave fields blank. Use "N/A" if not applicable.
      ================================================================ -->
@@ -79,6 +131,7 @@
 ## [YYYY-MM-DD HH:MM timezone]
 
 **Batch:** [N: Batch Name]
+**Contract status:** [all criteria met / exceptions: ...]
 
 **Timing:**
 - Implement: [Xm] | Validate: [Xm] | Review: [Xm] | Total: [Xm]
@@ -112,6 +165,16 @@
   "Chose to extract shared validator into /lib/validators.ts rather than duplicating across
   handlers. Reduces future drift, no API surface change."]
 - [Decision + reasoning]
+
+**Process adjustments:**
+- [Any entropy-check or retro adjustment made to the Elves process itself, e.g., "Added a
+  regression-preservation acceptance criterion after repeated review findings" / "none"]
+
+**Docs:**
+- Impacted: [list / "none"]
+- Updated: [list / "none"]
+- Promoted: [learnings or `.ai-docs/*` updates / "none"]
+- Deferred: [explicit doc debt left for later / "none"]
 
 **Regression attestation:**
 - Cumulative diff: `git diff main...HEAD --stat` shows [N] files changed, [+X/-Y] lines

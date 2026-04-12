@@ -15,6 +15,9 @@
 > The plan is not the launch prompt. Commit this file, point the agent at it by path, and keep
 > the later launch prompt short. If you find yourself re-pasting the whole plan into the launch
 > prompt, you're overloading the run right when it should be building momentum.
+>
+> If documentation freshness matters for the project, call it out in the batches. Elves works best
+> when the plan makes durable doc upkeep explicit instead of leaving it as invisible cleanup.
 
 ---
 
@@ -52,6 +55,7 @@ Example:
 > Each batch must be independently shippable: code, tests, docs, and passing review.
 > Default batch size: what a team of 4 developers would accomplish in a 2-week sprint.
 > If a batch feels too large, split it. The agent will also split batches that are too large.
+> If a batch is likely to update README, config docs, learnings, or durable agent docs, say so.
 
 ### Batch 1: [Name]
 
@@ -64,6 +68,10 @@ Example:
 - [ ] [Verifiable criterion. Should be checkable by running a command or reading a file.]
 - [ ] [Verifiable criterion]
 - [ ] [Verifiable criterion]
+- [ ] [If this batch changes existing behavior, include one criterion that proves old behavior still works]
+
+**Docs likely touched:**
+- [README / config docs / learnings / `.ai-docs/*` / "none expected"]
 
 **Risk:** [One sentence. What is most likely to go wrong, or what has the highest uncertainty?]
 
@@ -78,6 +86,10 @@ Example:
 **Acceptance criteria:**
 - [ ] [Verifiable criterion]
 - [ ] [Verifiable criterion]
+- [ ] [If this batch changes existing behavior, include one regression-preservation check]
+
+**Docs likely touched:**
+- [README / config docs / learnings / `.ai-docs/*` / "none expected"]
 
 **Risk:** [One sentence]
 
@@ -92,6 +104,10 @@ Example:
 **Acceptance criteria:**
 - [ ] [Verifiable criterion]
 - [ ] [Verifiable criterion]
+- [ ] [If this batch changes existing behavior, include one regression-preservation check]
+
+**Docs likely touched:**
+- [README / config docs / learnings / `.ai-docs/*` / "none expected"]
 
 **Risk:** [One sentence]
 
@@ -126,6 +142,7 @@ Example:
 - **E2E (if applicable):** [e.g., "Playwright: `npx playwright test`"]
 - **Minimum coverage threshold (if applicable):** [e.g., "Must not decrease coverage below 80%"]
 - **Known flaky tests (skip or ignore):** [e.g., "`tests/integration/email.test.ts` (mocks SMTP, unreliable in CI)"]
+- **Durable doc expectations (if applicable):** [e.g., "Promote reusable lessons to learnings; update `.ai-docs/gotchas.md` when a hidden dependency is discovered"]
 
 ---
 
@@ -148,6 +165,7 @@ sprint-length: [N weeks]
 - [Note 1]
 - [Note 2]
 - [Note 3]
+- [If the repo should become more AI-friendly during the run, say what "better context" means here]
 
 ---
 ---

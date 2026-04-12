@@ -2,6 +2,64 @@
 
 All notable changes to the Elves skill are documented here.
 
+## [1.7.0] - 2026-04-11
+
+### Durable memory and AI-friendly docs
+
+- **Learnings is now a first-class memory surface.** Elves formally distinguishes plan, survival
+  guide, learnings, and execution log, with `learnings.md` acting as durable reusable memory across
+  runs instead of forcing every lesson to live in chronological batch notes.
+- **Lightweight `.ai-docs/` architecture added.** The repo now includes `.ai-docs/manifest.md`,
+  `.ai-docs/architecture.md`, `.ai-docs/conventions.md`, and `.ai-docs/gotchas.md` as the curated
+  durable layer for stable repo truths.
+- **Promotion flow is explicit.** The documentation system now defines `execution log -> learnings
+  -> .ai-docs`, which keeps transient status, reusable lessons, and stable architecture knowledge
+  in separate places.
+
+### Docs in the loop
+
+- **Documentation freshness is part of done.** Batches now track docs impacted, updated, promoted,
+  and deferred instead of treating docs as end-of-run cleanup.
+- **`PENDING-DOCS` added to review vocabulary.** Elves can now distinguish code bugs from
+  documentation debt that still blocks a batch from being truly clean.
+- **Compaction recovery order upgraded.** Recovery and launch guidance now consistently read:
+  survival guide -> `.elves-session.json` -> learnings -> plan -> execution log ->
+  `.ai-docs/manifest.md` (if present).
+- **Regression preservation moved into the contract.** Plans and contracts now require at least
+  one acceptance criterion that proves existing behavior still works whenever a batch changes
+  existing surfaces.
+- **High-risk regression review pass added.** Medium/high blast-radius batches can now run a
+  narrow second review pass that ignores style and new ideas, traces changed shared surfaces to
+  their consumers, and focuses only on what existing behavior could break.
+- **Entropy checks can now tune the process itself.** Elves now does a lightweight process retro
+  during entropy checks and records any survival-guide/template/tooling adjustment when the same
+  friction repeats across batches.
+
+### Cross-file sync
+
+- **`SKILL.md` and `AGENTS.md` updated together** to describe the same `1.7.0` memory model,
+  review loop, and `.elves-session.json` expectations.
+- **Review and autonomy references updated** so `references/review-subagent.md` and
+  `references/autonomy-guide.md` use the same terminology as the main skill files.
+- **README, TODO, and run templates refreshed** to reflect the new layered-memory architecture and
+  human-facing workflow.
+- **Installed skill sync helper added.** `scripts/sync_installed_skills.py` can now check and
+  mirror the canonical bundle into `~/.claude/skills/elves/` and `~/.codex/skills/elves/` so the
+  local runtime copies do not drift behind the repo release. The default `--target all` behavior
+  now scopes itself to installed copies that actually exist, so one-platform setups do not get
+  false drift reports for the other platform.
+- **Install doctor added.** `scripts/install_doctor.py` now gives startup-time update notices and
+  explains when a project-local install differs from the global copy, so users can see which
+  version is actually active before assuming an upgrade failed.
+- **Installed runtime bundle clarified.** Installed copies now ship only the runtime scripts
+  (`preflight.sh`, `notify.sh`, and `install_doctor.py`) while repo-only maintenance helpers stay
+  in the checkout.
+- **Repo consistency checker added.** `scripts/check_repo_consistency.py` now verifies the
+  canonical version, recovery-order wording, `PENDING-DOCS` coverage, and durable doc surfaces so
+  cross-file drift is caught locally before PR bots have to flag it.
+- **Repo consistency workflow added.** `.github/workflows/repo-consistency.yml` runs the checker
+  and Python syntax validation on PRs so drift gets caught automatically during review.
+
 ## [1.6.1] - 2026-04-02
 
 ### Review follow-up: internal consistency fixes

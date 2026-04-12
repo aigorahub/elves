@@ -1,0 +1,48 @@
+name: Repo Consistency
+
+on:
+  pull_request:
+    paths:
+      - "SKILL.md"
+      - "AGENTS.md"
+      - "README.md"
+      - "CHANGELOG.md"
+      - "TODO.md"
+      - "references/**"
+      - ".ai-docs/**"
+      - "docs/elves/learnings.md"
+      - "scripts/check_repo_consistency.py"
+      - "scripts/sync_installed_skills.py"
+  push:
+    branches:
+      - main
+    paths:
+      - "SKILL.md"
+      - "AGENTS.md"
+      - "README.md"
+      - "CHANGELOG.md"
+      - "TODO.md"
+      - "references/**"
+      - ".ai-docs/**"
+      - "docs/elves/learnings.md"
+      - "scripts/check_repo_consistency.py"
+      - "scripts/sync_installed_skills.py"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate helper scripts
+        run: python3 -m py_compile scripts/check_repo_consistency.py scripts/sync_installed_skills.py
+
+      - name: Run repo consistency checker
+        run: python3 scripts/check_repo_consistency.py

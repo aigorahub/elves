@@ -53,7 +53,7 @@ gh api "repos/OWNER/REPO/commits/HEAD/check-runs"
 **Skip comments already recorded as handled in `.elves-session.json`.** Only evaluate new and unresolved findings. This prevents re-litigating settled issues across review cycles.
 
 ## For each NEW or UNRESOLVED comment or finding:
-- Categorize as: BLOCKING (must fix), WARNING (should fix), INFO (note only)
+- Categorize as: BLOCKING (must fix), WARNING (should fix), INFO (note only), or PENDING-DOCS (implementation is acceptable but supporting docs are stale)
 - Identify the source: human reviewer, bot (name which bot), CI check
 - Summarize what the issue is and what file/line it references
 - Note the comment ID so the coordinator can resolve/reply to it after fixing
@@ -107,6 +107,16 @@ If no shared surfaces were modified, state: "No shared surfaces modified in this
 
 Mark BLOCKING if: a shared surface was modified without verifying consumers, a function signature changed without updating all callers, or a type/interface was modified in a way that could break downstream code.
 
+## Documentation freshness check:
+
+Before calling the batch clean, verify that the relevant docs moved with the code:
+- run-state drift -> survival guide or execution log
+- reusable lesson -> `learnings.md`
+- stable repo truth -> `.ai-docs/architecture.md`, `.ai-docs/conventions.md`, or `.ai-docs/gotchas.md`
+- human-facing behavior -> README / CHANGELOG / config docs
+
+If the implementation is sound but the required docs are stale, mark the finding `PENDING-DOCS`.
+
 ## Also review the diff for:
 - Obvious bugs, security issues, or missing error handling
 - Changes outside the batch scope that shouldn't be there
@@ -121,6 +131,9 @@ Mark BLOCKING if: a shared surface was modified without verifying consumers, a f
 - [finding]
 
 ### Info (no action needed)
+- [finding]
+
+### Pending Docs (must clear before calling the batch clean)
 - [finding]
 
 ### Contract Completeness
@@ -152,7 +165,8 @@ If all clear, state: "No code quality issues. Batch follows existing patterns an
 4. **Code quality findings**: Duplication and architecture violations are blocking — fix them now, not later. Remove the duplicate and use the existing utility. Refactor to follow the established pattern. Root-cause band-aids are blocking if they hide a bug, warning if they're just suboptimal. Pattern consistency issues are warnings.
 5. **Warnings**: Fix easy ones inline. Defer complex ones to TODO.md tagged `[elves-scout]`.
 6. **Info**: Log in execution log, no action.
-7. **New issues**: Treat as blocking if they're bugs or security; treat as warnings otherwise.
+7. **PENDING-DOCS**: Update the docs in the same batch when possible. If the doc debt must slip, carry it into the immediate next batch and record that explicitly in the execution log and `.elves-session.json`.
+8. **New issues**: Treat as blocking if they're bugs or security; treat as warnings otherwise.
 
 **Critical: fixes must follow the same Code Quality Philosophy.** When the reviewer flags duplication and you go back to fix it, don't create a *third* copy to "consolidate" the first two — actually find the existing utility and use it. When the reviewer flags a band-aid, don't add a bigger band-aid — fix the root cause. The review-fix cycle is where agents are most tempted to take shortcuts because the pressure to "just make it pass" is highest. The reviewer will check the fix too.
 
@@ -177,16 +191,17 @@ gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" -f body="Fixed in $(git rev-
 
 Or for dismissals: "Dismissed: false positive. Function is a straightforward switch statement; splitting would reduce readability. See execution log batch 1, cycle 2."
 
-**Record every disposition** in `.elves-session.json` under `review_comments` with: comment ID, type (`review_thread` or `issue_comment`), source (which bot or reviewer), batch number, review cycle, one-line summary, disposition (`fixed`, `dismissed`, `deferred`), and fix commit or reason.
+**Record every disposition** in `.elves-session.json` under `review_comments` with: comment ID, type (`review_comment`, `review_thread`, or `issue_comment`), source (which bot or reviewer), batch number, review cycle, one-line summary, disposition (`fixed`, `dismissed`, `deferred`, `pending_docs`), and fix commit or reason.
 
 ### The Work Queue
 
 After resolution, the work queue for the next review cycle is simply:
 - Unresolved review threads (GitHub is the source of truth)
 - Issue comments with no reply from the agent
+- Any `PENDING-DOCS` items not yet cleared
 - New comments triggered by the latest push
 
-If the queue is empty and the contract is fully ✅, the batch is clean.
+If the queue is empty, `PENDING-DOCS` is clear, and the contract is fully ✅, the batch is clean.
 
 After fixing, the coordinator pushes and runs the review subagent again. The loop repeats until the report comes back with zero blocking items, every contract item is ✅, and the work queue is empty.
 
@@ -255,6 +270,53 @@ Do not be polite. Do not pad with compliments. If the code is correct and the co
 The coordinator fixes any blocking findings from the adversarial review, then runs it again. The loop continues until the adversarial reviewer has nothing left to find.
 
 This pattern is most valuable for security-sensitive code, data integrity logic, and anything where a subtle bug would be expensive. It adds time to each batch, so use it selectively.
+
+## High-Risk Regression Review Pattern
+
+Use this narrower pass when the batch contract's blast radius is **medium** or **high**, or when
+the batch touches auth, billing, data models, shared utilities, public interfaces, or any surface
+with many callers.
+
+This is not a second full review. It is a focused regression check that asks only:
+
+- What existing behavior could this break?
+- Which callers, routes, jobs, or dependents would feel the break first?
+- What proof do we have that those consumers still work?
+
+Read only:
+
+1. The cumulative diff for the branch or batch
+2. The plan at `[PLAN_PATH]`
+3. The batch contract in `[EXECUTION_LOG_PATH]`, especially **Acceptance criteria** and
+   **Blast radius**
+4. Any consumer evidence the implementer gathered (`rg` output, importer counts, route lists,
+   interface snapshots, or targeted regression tests)
+
+Ignore:
+
+- style or readability suggestions
+- architecture cleanups unrelated to breakage
+- new feature ideas
+- docs freshness unless the stale doc itself would mislead an existing consumer
+
+Return a tight report:
+
+### Blocking
+- [Confirmed regression or concrete breakage risk that is not yet proven safe]
+
+### Warnings
+- [Plausible regression risk that needs more proof, a targeted test, or an explicit safety note]
+
+### Info
+- [Changed shared surfaces that were traced and appear safe]
+
+### Consumer Trace
+- `[surface]` -> [callers/dependents checked] -> [why safe / what could break]
+
+### Missing Proof
+- [Any consumer or behavior that still needs direct verification]
+
+If nothing is risky, say so in one line and stop.
 
 ## Why This Matters
 
