@@ -397,6 +397,7 @@ The contract goes in the execution log under the batch entry:
 - [ ] Integration test for webhook signature validation
 - [ ] E2E test: full checkout flow via browser automation
 - [ ] All existing tests still pass
+- [ ] Existing non-payment checkout flows still behave the same way
 
 **Blast radius:**
 - Modifying `src/utils/validation.ts` (imported by 12 files), additions only, no signature changes
@@ -408,7 +409,7 @@ The **Blast radius** section forces you to think about regression risk before wr
 
 The **Build on** section makes the Code Quality Philosophy concrete for this batch. Search the codebase during contract writing to fill it in: existing utilities, established patterns, modules to extend, conventions to match. If nothing relevant exists, say so — "No existing patterns apply; this batch establishes the pattern for [X]" is a valid entry and signals to later batches what to build on.
 
-The contract keeps implementation focused and gives the validate/review steps clear targets. If you can't write concrete acceptance criteria, the batch scope is too vague — sharpen it before coding.
+The contract keeps implementation focused and gives the validate/review steps clear targets. If you can't write concrete acceptance criteria, the batch scope is too vague — sharpen it before coding. For any batch that modifies existing behavior instead of only adding new surfaces, require at least one acceptance criterion that explicitly proves existing behavior is preserved.
 
 For trivial batches (documentation-only, config changes, dependency bumps), the contract can be a single line: "Update README with API examples. Acceptance: README contains curl examples for all endpoints." Don't let the contract become bureaucracy for obvious work.
 

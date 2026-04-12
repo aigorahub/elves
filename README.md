@@ -594,7 +594,7 @@ workflow below instead of blindly applying the sync.
 
 **The validation gates** will be different for every project. A Python data pipeline has different gates than a React web app. Edit the survival guide's `## Tool Configuration` section to match your stack. See [`references/tool-config-examples.md`](references/tool-config-examples.md) for examples across Node, Python, Go, Rust, and monorepos.
 
-**The plan template** is a starting point. Some teams want more structure (acceptance criteria per batch, risk statements). Others want less (just a task list). Make the plan format work for how you think, not how the template thinks.
+**The plan template** is a starting point. Some teams want more structure (acceptance criteria per batch, risk statements). Others want less (just a task list). Make the plan format work for how you think, not how the template thinks. One thing worth keeping even in lighter plans: if a batch changes existing behavior, include at least one acceptance criterion that proves old behavior still works.
 
 ### What you'll learn by doing
 

@@ -25,6 +25,9 @@ All notable changes to the Elves skill are documented here.
 - **Compaction recovery order upgraded.** Recovery and launch guidance now consistently read:
   survival guide -> `.elves-session.json` -> learnings -> plan -> execution log ->
   `.ai-docs/manifest.md` (if present).
+- **Regression preservation moved into the contract.** Plans and contracts now require at least
+  one acceptance criterion that proves existing behavior still works whenever a batch changes
+  existing surfaces.
 
 ### Cross-file sync
 

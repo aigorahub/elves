@@ -227,6 +227,7 @@ git tag elves/pre-batch-N
 **Acceptance criteria:**
 - [ ] [Testable criterion 1]
 - [ ] [Testable criterion 2]
+- [ ] [Existing behavior still verified if this batch changes a shared surface]
 
 **Blast radius:**
 - [Shared file modified] ([N] consumers), [additive / modified / breaking]
@@ -237,7 +238,7 @@ The **Blast radius** section identifies shared code at risk. List modified share
 
 The **Build on** section makes the Code Quality Philosophy concrete: what existing patterns, utilities, and modules should this batch extend? Search the codebase during contract writing to fill this in. If nothing relevant exists, note that this batch establishes the pattern.
 
-If you can't write concrete acceptance criteria, the batch scope is too vague — sharpen it before coding. For trivial batches (docs, config), the contract can be a single line.
+If you can't write concrete acceptance criteria, the batch scope is too vague — sharpen it before coding. For any batch that modifies existing behavior instead of only adding new surfaces, require at least one acceptance criterion that explicitly proves existing behavior is preserved. For trivial batches (docs, config), the contract can be a single line.
 
 ### 5. Implement
 **Start with a pre-implementation survey.** Before writing any code, read the contract's **Build on** section, then search for relevant utilities, patterns, and conventions. Log what you find in the execution log. This makes principles #2 (centralize), #3 (extend), and #4 (architecture first) actionable — you can't extend what you haven't found. The reviewer checks your implementation against your survey.

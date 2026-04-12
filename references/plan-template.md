@@ -68,6 +68,7 @@ Example:
 - [ ] [Verifiable criterion. Should be checkable by running a command or reading a file.]
 - [ ] [Verifiable criterion]
 - [ ] [Verifiable criterion]
+- [ ] [If this batch changes existing behavior, include one criterion that proves old behavior still works]
 
 **Docs likely touched:**
 - [README / config docs / learnings / `.ai-docs/*` / "none expected"]
@@ -85,6 +86,7 @@ Example:
 **Acceptance criteria:**
 - [ ] [Verifiable criterion]
 - [ ] [Verifiable criterion]
+- [ ] [If this batch changes existing behavior, include one regression-preservation check]
 
 **Docs likely touched:**
 - [README / config docs / learnings / `.ai-docs/*` / "none expected"]
@@ -102,6 +104,7 @@ Example:
 **Acceptance criteria:**
 - [ ] [Verifiable criterion]
 - [ ] [Verifiable criterion]
+- [ ] [If this batch changes existing behavior, include one regression-preservation check]
 
 **Docs likely touched:**
 - [README / config docs / learnings / `.ai-docs/*` / "none expected"]

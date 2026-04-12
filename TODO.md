@@ -37,5 +37,6 @@ For batches that touch shared surfaces or are flagged as high-risk in the contra
 ### Public API surface snapshot
 For projects with APIs (REST, GraphQL, exported library interfaces), capture the API surface at session start: route list, response shapes, exported types and functions. At the end of each batch, diff the snapshot against the current state. Any unintended change to the public API surface is a finding. This complements the test baseline (which catches removed tests) and the regression attestation (which catches shared-surface changes). It catches changes that pass all tests but alter the contract with consumers.
 
-### Regression test as first-class acceptance criterion
-For any batch that modifies existing code (not just adds new code), require at least one acceptance criterion that explicitly verifies existing behavior is preserved. For example: "All existing validation tests still pass unchanged" or "GET /api/users still returns the same response shape." This shifts regression thinking into the contract phase (step 4) where it's cheapest to enforce, instead of waiting for the review or attestation to catch it.
+- [x] Make regression preservation an explicit acceptance-criteria rule.
+  `SKILL.md`, `AGENTS.md`, `README.md`, and `references/plan-template.md` now require at least one
+  acceptance criterion that proves old behavior still works when a batch changes existing surfaces.
