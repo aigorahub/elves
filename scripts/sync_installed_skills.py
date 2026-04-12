@@ -22,15 +22,19 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+RUNTIME_SCRIPT_PATHS = ["scripts/preflight.sh", "scripts/notify.sh"]
+REPO_ONLY_SCRIPT_PATHS = ["scripts/check_repo_consistency.py", "scripts/sync_installed_skills.py"]
 
 TARGETS = {
     "claude": {
         "root": Path.home() / ".claude" / "skills" / "elves",
-        "managed_paths": ["SKILL.md", "references", "scripts"],
+        "managed_paths": ["SKILL.md", "references", *RUNTIME_SCRIPT_PATHS],
+        "cleanup_paths": REPO_ONLY_SCRIPT_PATHS,
     },
     "codex": {
         "root": Path.home() / ".codex" / "skills" / "elves",
-        "managed_paths": ["SKILL.md", "AGENTS.md", "references", "scripts"],
+        "managed_paths": ["SKILL.md", "AGENTS.md", "references", *RUNTIME_SCRIPT_PATHS],
+        "cleanup_paths": REPO_ONLY_SCRIPT_PATHS,
     },
 }
 
@@ -93,6 +97,8 @@ def should_ignore(path: Path) -> bool:
 
 
 def compare_file(src: Path, dst: Path, rel_path: str) -> list[str]:
+    if not src.exists():
+        return [f"missing source file: {rel_path}"]
     if not dst.exists():
         return [f"missing file: {rel_path}"]
     if sha256(src) != sha256(dst):
@@ -102,6 +108,8 @@ def compare_file(src: Path, dst: Path, rel_path: str) -> list[str]:
 
 def compare_dir(src_dir: Path, dst_dir: Path, rel_path: str) -> list[str]:
     problems: list[str] = []
+    if not src_dir.exists():
+        return [f"missing source directory: {rel_path}/"]
     if not dst_dir.exists():
         return [f"missing directory: {rel_path}/"]
 
@@ -144,6 +152,10 @@ def check_target(name: str) -> tuple[bool, list[str]]:
         else:
             problems.extend(compare_file(src, dst, relative))
 
+    for relative in TARGETS[name]["cleanup_paths"]:
+        if (root / relative).exists():
+            problems.append(f"unexpected repo-only helper: {relative}")
+
     return not problems, problems
 
 
@@ -161,11 +173,22 @@ def sync_path(src: Path, dst: Path) -> None:
         shutil.copy2(src, dst)
 
 
+def remove_path(path: Path) -> None:
+    if not path.exists():
+        return
+    if path.is_dir():
+        shutil.rmtree(path)
+    else:
+        path.unlink()
+
+
 def apply_target(name: str) -> None:
     root = TARGETS[name]["root"]
     root.mkdir(parents=True, exist_ok=True)
     for relative in TARGETS[name]["managed_paths"]:
         sync_path(REPO_ROOT / relative, root / relative)
+    for relative in TARGETS[name]["cleanup_paths"]:
+        remove_path(root / relative)
 
 
 def main() -> int:

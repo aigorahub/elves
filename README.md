@@ -131,7 +131,7 @@ See [Installation](#installation) below for full details. The short version:
 
 - **Claude Code:** copy the `elves/` directory into `.claude/skills/elves/` in your repo
 - **Codex:** copy the skill bundle into `~/.codex/skills/elves/` (at minimum `SKILL.md`,
-  `references/`, and `scripts/`)
+  `references/`, and the runtime scripts `scripts/preflight.sh` and `scripts/notify.sh`)
 - **Claude.ai:** zip the `elves/` directory and upload via Settings > Features > Skills
 
 **2. Write a plan**
@@ -508,20 +508,22 @@ Global installation means the skill is always available, no matter which project
 **Claude Code:**
 ```bash
 # Create the global skills directory if it doesn't exist
-mkdir -p ~/.claude/skills/elves
+mkdir -p ~/.claude/skills/elves/scripts
 
 # Clone and copy
 git clone https://github.com/aigorahub/elves.git /tmp/elves
-cp -r /tmp/elves/SKILL.md /tmp/elves/references /tmp/elves/scripts ~/.claude/skills/elves/
+cp -r /tmp/elves/SKILL.md /tmp/elves/references ~/.claude/skills/elves/
+cp /tmp/elves/scripts/preflight.sh /tmp/elves/scripts/notify.sh ~/.claude/skills/elves/scripts/
 rm -rf /tmp/elves
 ```
 
 **Codex:**
 ```bash
-mkdir -p ~/.codex/skills/elves
+mkdir -p ~/.codex/skills/elves/scripts
 git clone https://github.com/aigorahub/elves.git /tmp/elves
 cp /tmp/elves/SKILL.md /tmp/elves/AGENTS.md ~/.codex/skills/elves/
-cp -r /tmp/elves/references /tmp/elves/scripts ~/.codex/skills/elves/
+cp -r /tmp/elves/references ~/.codex/skills/elves/
+cp /tmp/elves/scripts/preflight.sh /tmp/elves/scripts/notify.sh ~/.codex/skills/elves/scripts/
 rm -rf /tmp/elves
 ```
 
@@ -580,8 +582,11 @@ python3 scripts/sync_installed_skills.py --apply
 ```
 
 This mirrors the managed skill bundle files from the repo into `~/.claude/skills/elves/` and
-`~/.codex/skills/elves/`. If you maintain hand-edited local customizations, prefer the manual diff
-workflow below instead of blindly applying the sync.
+`~/.codex/skills/elves/`. It intentionally ships the installable bundle only: `SKILL.md`,
+`AGENTS.md` (Codex), `references/`, and the runtime scripts `scripts/preflight.sh` and
+`scripts/notify.sh`. Repo-only maintenance helpers such as
+`scripts/check_repo_consistency.py` stay in the checkout. If you maintain hand-edited local
+customizations, prefer the manual diff workflow below instead of blindly applying the sync.
 
 ---
 

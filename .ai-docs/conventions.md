@@ -6,6 +6,9 @@
 - Template updates in `references/*` should reflect the same model as the skill files.
 - A release version bump is incomplete until the skill metadata, `AGENTS.md`, and
   `CHANGELOG.md` all agree.
+- Installed Claude/Codex skill bundles should ship only the installable runtime surface:
+  `SKILL.md`, `AGENTS.md` (Codex), `references/`, `scripts/preflight.sh`, and `scripts/notify.sh`.
+  Repo-only maintenance helpers stay in the checkout.
 
 ## Documentation as part of done
 
