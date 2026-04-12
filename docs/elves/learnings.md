@@ -36,6 +36,8 @@ silently deleting it.
 - [2026-04-11] For this repo, the most common regression risk is documentation drift across
   `SKILL.md`, `AGENTS.md`, templates, and README. Review should verify conceptual alignment, not
   just prose quality.
+- [2026-04-11] Treat stale docs as `PENDING-DOCS`, not as a vague warning. If recovery docs,
+  durable docs, or human docs lag behind a behavior change, the batch is not clean yet.
 
 ## Product and Domain Invariants
 
@@ -49,6 +51,9 @@ silently deleting it.
 
 - [2026-04-11] Repo-level changes can look complete after updating one skill file, but `SKILL.md`,
   `AGENTS.md`, templates, README, and CHANGELOG often drift unless they are reviewed as a set.
+- [2026-04-11] If `.elves-session.json` is intentionally committed during a live Elves run, do not
+  also ignore it in `.gitignore`; reviewers will correctly read that as contradictory workflow
+  guidance.
 
 ## Retired Learnings
 

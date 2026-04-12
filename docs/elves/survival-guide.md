@@ -31,8 +31,8 @@ CHANGELOG all tell the same story and the PR is clean enough for the user to mer
 - **Started:** 2026-04-11 22:42 EDT
 - **User returns:** never (open-ended until user stops)
 - **Time budget:** unlimited
-- **Average batch time so far:** ~10m
-- **Batches remaining:** 2 of 3
+- **Average batch time so far:** ~12m
+- **Batches remaining:** 1 of 3
 
 ## Non-Negotiables
 
@@ -64,34 +64,38 @@ CHANGELOG all tell the same story and the PR is clean enough for the user to mer
 
 **Status:** In progress
 
-**Active batch:** Batch 2: Skill and Review Workflow Upgrade
+**Active batch:** Batch 3: Human Docs, Release Notes, and Consistency Pass
 
-**What was just finished:** Batch 1 completed: the durable memory templates landed, `.ai-docs/*`
-was added for the repo, and the first PR feedback on session-artifact structure was addressed.
+**What was just finished:** Batch 2 completed: the Claude/Codex skill docs, review references, and
+live session-state schema were aligned, and the `.elves-session.json` / `.gitignore`
+contradiction was cleared.
 
-**Immediate next action:** Create the Batch 2 rollback tag and align `SKILL.md`, `AGENTS.md`, and
-the review/autonomy references on the new docs-in-the-loop model.
+**Immediate next action:** Rewrite `README.md`, `CHANGELOG.md`, and `TODO.md`, then do the final
+repo-wide consistency and review-ready sweep.
 
 ## Next Exact Batch
 
-**Batch:** 2: Skill and Review Workflow Upgrade
+**Batch:** 3: Human Docs, Release Notes, and Consistency Pass
 
 **Scope:**
 
-- Update `SKILL.md` and `AGENTS.md` to `1.7.0`.
-- Add docs-in-the-loop workflow rules, documentation triggers, and AI-friendly repo conditioning.
-- Align review guidance and structured session-data expectations with the live session artifacts.
+- Rewrite the README workflow sections around the `1.7.0` memory and docs architecture.
+- Add the `1.7.0` changelog entry, retire or refresh TODO items, and sweep version strings.
+- Do the final consistency pass across file paths, wording, and PR-review cleanliness.
 
 **Acceptance criteria:**
 
-- [ ] `SKILL.md` and `AGENTS.md` both describe the same durable-doc architecture and session schema.
-- [ ] Review guidance distinguishes fix-now blockers from `PENDING-DOCS` or deferred follow-up.
-- [ ] Structured session-data expectations in the docs match the live `.elves-session.json`.
+- [ ] `README.md`, `CHANGELOG.md`, and `TODO.md` all reflect the `1.7.0` model without
+      contradicting the skill files.
+- [ ] No stale version strings, old three-document wording, or contradictory path references remain
+      in the repo.
+- [ ] PR comments/checks are re-polled on the current tip and the branch is ready for the user to
+      review and merge.
 
-**Risk:** The biggest risk is fixing one skill surface while leaving the other or the review docs
-slightly stale, which would recreate the same drift this release is trying to remove.
+**Risk:** README drift is the biggest risk now because it restates the workflow in a more human
+voice and can lag behind the skill files even when the repo internals are already correct.
 
-**Rollback tag:** `elves/pre-batch-2`
+**Rollback tag:** `elves/pre-batch-3`
 
 ## Acceptance Checks
 

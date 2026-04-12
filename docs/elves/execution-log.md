@@ -7,16 +7,105 @@
 
 ## Run Digest
 
-- **Last updated:** 2026-04-11 22:52 EDT
+- **Last updated:** 2026-04-11 23:05 EDT
 - **Current phase:** In progress
-- **Active batch:** 2: Skill and Review Workflow Upgrade
-- **Last completed batch:** 1: Durable Memory and Agent Docs Architecture
-- **Next exact batch:** 2: Skill and Review Workflow Upgrade
+- **Active batch:** 3: Human Docs, Release Notes, and Consistency Pass
+- **Last completed batch:** 2: Skill and Review Workflow Upgrade
+- **Next exact batch:** 3: Human Docs, Release Notes, and Consistency Pass
 - **Active PR:** #18
 - **Docs promoted this run:** `.ai-docs/manifest.md`, `.ai-docs/architecture.md`,
-  `.ai-docs/conventions.md`, `.ai-docs/gotchas.md`
+  `.ai-docs/conventions.md`, `.ai-docs/gotchas.md`, `docs/elves/learnings.md`
 
 ---
+
+## 2026-04-11 23:05 EDT
+
+**Batch:** 2: Skill and Review Workflow Upgrade
+**Contract status:** all criteria met
+
+**Timing:**
+- Implement: 8m | Validate: 3m | Review: 2m | Total: 13m
+- Session elapsed: 0h 23m | Budget remaining: unlimited
+
+**What changed:**
+- `SKILL.md` and `AGENTS.md`: synced both skill surfaces to the `1.7.0` memory model, durable-doc
+  promotion flow, richer compaction read order, and `PENDING-DOCS` review language.
+- `references/review-subagent.md` and `references/autonomy-guide.md`: aligned review/autonomy
+  guidance with durable docs, documentation freshness, and `review_comment`-based session
+  dispositions.
+- `.gitignore`: removed `.elves-session.json` from ignored artifacts so the repo's documented live
+  run flow matches git behavior.
+- `.elves-session.json`, `docs/elves/execution-log.md`, `docs/elves/survival-guide.md`, and
+  `docs/elves/learnings.md`: updated the live run state, added the Batch 2 contract, and captured
+  durable review lessons for future runs.
+
+**Commands run:**
+- `git diff --check`
+  -> PASS
+- `python3 -c "import json; json.load(open('.elves-session.json')); print('JSON OK')"`
+  -> PASS
+- `rg -n 'Documentation Surfaces|PENDING-DOCS|current_batch|review_comment|\\.ai-docs/manifest\\.md|learnings\\.md' ...`
+  -> PASS; skill docs, review references, survival guide, and live session state all use the new
+     terms consistently.
+- `gh api "repos/${REPO}/pulls/18/comments" --paginate && gh api "repos/${REPO}/pulls/18/reviews" --paginate`
+  -> reviewed every inline bot finding and confirmed the remaining open threads all point to
+     already-fixed earlier commits.
+- `gh api "repos/${REPO}/commits/$(git rev-parse HEAD)/check-runs"`
+  -> PASS; both Socket Security checks succeeded on `8ea17be`.
+- `git check-ignore -v .elves-session.json || true`
+  -> no output after removing the contradictory ignore rule.
+
+**Test results:**
+- Lint: N/A
+- Typecheck: N/A
+- Build: N/A
+- Tests: N/A
+- E2E: N/A
+- Smoke: N/A
+- PR checks: PASS (`Socket Security: Pull Request Alerts`, `Socket Security: Project Report`)
+
+**Review findings:**
+- [WARNING] Canonical read order / schema docs were drifting from the live run artifacts
+  (`3068881526`, `3068881538`) -> Resolved in `fe6823d`.
+- [WARNING] `.elves-session.json` was both committed and ignored (`3068881531`) -> Resolved in
+  `8ea17be`.
+- [INFO] Earlier Gemini/Copilot comments about `session_id`, plan/log paths, numeric test baseline,
+  and batch metadata remain visible as stale open threads, but the fixes are already present in the
+  branch and recorded in `.elves-session.json`.
+
+**Decisions made:**
+- Kept `learnings.md` ahead of the plan in the recovery/read order and updated the canonical skill
+  surfaces to match, rather than backing the durable-memory layer out of the run flow.
+- Treated the `.gitignore` complaint as a real repo-conditioning issue because AI-friendly repos
+  should not ask agents and reviewers to reason about contradictory git behavior.
+
+**Docs:**
+- Impacted: `SKILL.md`, `AGENTS.md`, `references/review-subagent.md`,
+  `references/autonomy-guide.md`, `.gitignore`, `.elves-session.json`, `docs/elves/*`
+- Updated: all of the above
+- Promoted: `docs/elves/learnings.md` gained durable lessons about `PENDING-DOCS` and
+  `.elves-session.json` tracking
+- Deferred: none
+
+**Regression attestation:**
+- Cumulative diff: still documentation-only plus live run-state files. No runtime code, scripts, or
+  dependencies changed.
+- Files outside batch scope: `.gitignore`, touched only to remove the contradictory
+  `.elves-session.json` ignore rule raised in review.
+- Shared surfaces modified: `SKILL.md`, `AGENTS.md`, `references/review-subagent.md`,
+  `references/autonomy-guide.md`, `.gitignore`
+- Consumers verified: future Elves runs, reviewers, and manual operators were checked via targeted
+  `rg` searches, JSON validation, and PR review polling on the current tip.
+- Test baseline: not applicable for this docs-focused repo; no package-managed test runner exists.
+- Confidence: HIGH, because the batch is pure documentation/process conditioning, the review-driven
+  inconsistency in `.gitignore` was fixed, and the current tip has green PR checks.
+
+**Commit:** `fe6823d` (review fix: `8ea17be`)
+**Rollback tag:** `elves/pre-batch-2`
+
+**Next:**
+1. Rewrite `README.md`, `CHANGELOG.md`, and `TODO.md` for the `1.7.0` release.
+2. Run a repo-wide wording/version sweep, then re-poll PR feedback before calling the branch ready.
 
 ## Batch 2 Contract: 2026-04-11 23:02 EDT
 
@@ -34,13 +123,13 @@
   `references/review-subagent.md`.
 
 **Acceptance criteria:**
-- [ ] `SKILL.md` and `AGENTS.md` describe the same four-layer memory model and durable-doc
+- [x] `SKILL.md` and `AGENTS.md` describe the same four-layer memory model and durable-doc
       architecture.
-- [ ] The review workflow distinguishes real blockers from `PENDING-DOCS` and explains how to
+- [x] The review workflow distinguishes real blockers from `PENDING-DOCS` and explains how to
       close the loop.
-- [ ] Structured session-data expectations match the live `.elves-session.json`, including
+- [x] Structured session-data expectations match the live `.elves-session.json`, including
       `current_batch`, path fields, and `review_comment` dispositions.
-- [ ] `references/review-subagent.md` and `references/autonomy-guide.md` use the same durable-doc
+- [x] `references/review-subagent.md` and `references/autonomy-guide.md` use the same durable-doc
       terminology as the skill files.
 
 **Blast radius:**
@@ -160,12 +249,12 @@
 - The current staging/launch model already documented in the kickoff and survival-guide templates.
 
 **Acceptance criteria:**
-- [ ] `references/learnings-template.md` defines promotion from learnings into `.ai-docs/*`.
-- [ ] `references/survival-guide-template.md` and `references/execution-log-template.md` both
+- [x] `references/learnings-template.md` defines promotion from learnings into `.ai-docs/*`.
+- [x] `references/survival-guide-template.md` and `references/execution-log-template.md` both
       describe the four-layer memory model and documentation triggers.
-- [ ] `.ai-docs/manifest.md`, `.ai-docs/architecture.md`, `.ai-docs/conventions.md`, and
+- [x] `.ai-docs/manifest.md`, `.ai-docs/architecture.md`, `.ai-docs/conventions.md`, and
       `.ai-docs/gotchas.md` exist for this repo.
-- [ ] The plan and kickoff templates mention learnings and durable docs where appropriate.
+- [x] The plan and kickoff templates mention learnings and durable docs where appropriate.
 
 **Blast radius:**
 - `references/survival-guide-template.md` (all future Elves runs), modified
