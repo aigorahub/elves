@@ -211,6 +211,10 @@ On launch, start with the same read order used in Orient: survival guide, `.elve
 
 Before the user walks away, verify everything will work. This is part of staging, not mid-run work. Don't skip it. Run these checks:
 
+0. **Install/update advisory:** if `scripts/install_doctor.py` exists beside the active skill
+   bundle, run `python3 scripts/install_doctor.py --startup` once at the start of staging. If it
+   reports a newer published Elves release or a conflicting local/global install, tell the user in
+   1-2 sentences and continue. This is advisory only: never block the run or auto-update the skill.
 1. **Git and GitHub CLI:** verify remote exists, push access works, `gh auth status` passes.
 2. **Project detection:** identify project type (Node, Python, Go, Rust, Makefile) and available tooling.
 3. **Gitignore ephemeral artifacts:** append tool working directories to `.gitignore` so they never get committed. These are ephemeral files that have no place in the PR:

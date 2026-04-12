@@ -131,7 +131,8 @@ See [Installation](#installation) below for full details. The short version:
 
 - **Claude Code:** copy the `elves/` directory into `.claude/skills/elves/` in your repo
 - **Codex:** copy the skill bundle into `~/.codex/skills/elves/` (at minimum `SKILL.md`,
-  `references/`, and the runtime scripts `scripts/preflight.sh` and `scripts/notify.sh`)
+  `references/`, and the runtime scripts `scripts/preflight.sh`, `scripts/notify.sh`, and
+  `scripts/install_doctor.py`)
 - **Claude.ai:** zip the `elves/` directory and upload via Settings > Features > Skills
 
 **2. Write a plan**
@@ -178,6 +179,8 @@ The launch prompt starts unattended execution. Elves re-reads the prepared docs,
 - **PR Loop**: poll PR comments, inline reviews, and check status after every push — not just at batch boundaries
 - **Readiness Gate**: 7-point branch-level checklist before declaring review-ready (local proof on current tip, preview proof on exact runtime tip, artifact inspection, PR comments polled, legality check clean, git status clean, execution log current)
 - **Structured session data** in `.elves-session.json` for tooling, dashboards, and analytics
+- **Install doctor and update advisory**: startup can flag newer published releases and explain
+  when a project-local install differs from the global one that you thought you were using
 - **Ride-along protocol**: prefix messages with `ra:`, `ride-along:`, or `[ride-along]` to interact during a run without stopping the agent. The agent responds in 1-3 sentences and resumes immediately.
 - **Comprehensive preflight checks**: git remote, push access, GitHub CLI auth, test gates, sleep prevention, Slack webhook, stale branch detection
 
@@ -371,6 +374,7 @@ elves/
 │   ├── verification-patterns.md          # Headless browser, video recording, state assertions
 │   └── open-ended-guide.md              # Open-ended mode patterns, QA/audit expansion rules
 ├── scripts/
+│   ├── install_doctor.py                 # Update + installation-precedence advisory
 │   ├── preflight.sh                      # Pre-run checklist
 │   └── notify.sh                         # Notification helper
 └── .github/
@@ -513,7 +517,7 @@ mkdir -p ~/.claude/skills/elves/scripts
 # Clone and copy
 git clone https://github.com/aigorahub/elves.git /tmp/elves
 cp -r /tmp/elves/SKILL.md /tmp/elves/references ~/.claude/skills/elves/
-cp /tmp/elves/scripts/preflight.sh /tmp/elves/scripts/notify.sh ~/.claude/skills/elves/scripts/
+cp /tmp/elves/scripts/preflight.sh /tmp/elves/scripts/notify.sh /tmp/elves/scripts/install_doctor.py ~/.claude/skills/elves/scripts/
 rm -rf /tmp/elves
 ```
 
@@ -523,7 +527,7 @@ mkdir -p ~/.codex/skills/elves/scripts
 git clone https://github.com/aigorahub/elves.git /tmp/elves
 cp /tmp/elves/SKILL.md /tmp/elves/AGENTS.md ~/.codex/skills/elves/
 cp -r /tmp/elves/references ~/.codex/skills/elves/
-cp /tmp/elves/scripts/preflight.sh /tmp/elves/scripts/notify.sh ~/.codex/skills/elves/scripts/
+cp /tmp/elves/scripts/preflight.sh /tmp/elves/scripts/notify.sh /tmp/elves/scripts/install_doctor.py ~/.codex/skills/elves/scripts/
 rm -rf /tmp/elves
 ```
 
@@ -583,10 +587,20 @@ python3 scripts/sync_installed_skills.py --apply
 
 This mirrors the managed skill bundle files from the repo into `~/.claude/skills/elves/` and
 `~/.codex/skills/elves/`. It intentionally ships the installable bundle only: `SKILL.md`,
-`AGENTS.md` (Codex), `references/`, and the runtime scripts `scripts/preflight.sh` and
-`scripts/notify.sh`. Repo-only maintenance helpers such as
+`AGENTS.md` (Codex), `references/`, and the runtime scripts `scripts/preflight.sh`,
+`scripts/notify.sh`, and `scripts/install_doctor.py`. Repo-only maintenance helpers such as
 `scripts/check_repo_consistency.py` stay in the checkout. If you maintain hand-edited local
 customizations, prefer the manual diff workflow below instead of blindly applying the sync.
+
+To inspect what is actually installed and whether a newer published release exists:
+```bash
+python3 ~/.claude/skills/elves/scripts/install_doctor.py --doctor
+python3 ~/.codex/skills/elves/scripts/install_doctor.py --doctor
+```
+
+The install doctor reports the active version, published release, and any project-local installs
+that differ from the global copies. `scripts/preflight.sh` now runs it in startup mode
+automatically when the helper is present in the bundle.
 
 ---
 
@@ -623,6 +637,13 @@ This is normal. After each run, read the execution log (especially the **Decisio
 
 If you installed globally, your customized skill lives at `~/.claude/skills/elves/SKILL.md` (Claude Code) or `~/.codex/skills/elves/SKILL.md` (Codex). Edit these files directly. Add your own defaults, remove sections that don't apply to your work, add project-type-specific guidance. This is your copy. Make it yours.
 
+If you are not sure which copy is winning, run the install doctor first. It will show the active
+bundle and whether a project-local install is differing from the global one:
+```bash
+python3 ~/.claude/skills/elves/scripts/install_doctor.py --doctor
+python3 ~/.codex/skills/elves/scripts/install_doctor.py --doctor
+```
+
 When you want to update from upstream (new features, fixes), you have two options:
 
 1. Mirror this checkout directly into your installed copies:
@@ -645,6 +666,10 @@ For Codex, compare `~/.codex/skills/elves/SKILL.md` against `/tmp/elves-update/S
 If you have a global installation but one project needs different behavior, put a project-level
 copy in `.claude/skills/elves/` (Claude Code) or `.codex/skills/elves/` (Codex, if supported by
 your setup) inside that repo. The project-level skill takes precedence over the global one.
+
+That flexibility is useful, but it can also be confusing. If a project-local copy drifts from the
+global install, you may think you upgraded Elves and still be running the older local version in
+that repo. The install doctor is meant to catch exactly that situation.
 
 This is useful when:
 - One project uses Python while your default is Node

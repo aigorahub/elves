@@ -7,8 +7,11 @@
 - A release version bump is incomplete until the skill metadata, `AGENTS.md`, and
   `CHANGELOG.md` all agree.
 - Installed Claude/Codex skill bundles should ship only the installable runtime surface:
-  `SKILL.md`, `AGENTS.md` (Codex), `references/`, `scripts/preflight.sh`, and `scripts/notify.sh`.
-  Repo-only maintenance helpers stay in the checkout.
+  `SKILL.md`, `AGENTS.md` (Codex), `references/`, `scripts/preflight.sh`,
+  `scripts/notify.sh`, and `scripts/install_doctor.py`. Repo-only maintenance helpers stay in the
+  checkout.
+- Startup installation/update checks must stay advisory-only. They may alert the user, but they
+  must never block a run or auto-update the installed skill.
 
 ## Documentation as part of done
 

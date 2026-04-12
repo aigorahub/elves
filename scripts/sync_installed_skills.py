@@ -22,7 +22,11 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-RUNTIME_SCRIPT_PATHS = ["scripts/preflight.sh", "scripts/notify.sh"]
+RUNTIME_SCRIPT_PATHS = [
+    "scripts/preflight.sh",
+    "scripts/notify.sh",
+    "scripts/install_doctor.py",
+]
 REPO_ONLY_SCRIPT_PATHS = ["scripts/check_repo_consistency.py", "scripts/sync_installed_skills.py"]
 
 TARGETS = {

@@ -135,6 +135,11 @@ BEHIND=$(git rev-list HEAD..origin/main --count 2>/dev/null || echo 0)
 [ "$BEHIND" -gt 0 ] && echo "⚠ Branch is $BEHIND commits behind main."
 ```
 
+If `scripts/install_doctor.py` exists beside the active skill bundle, run
+`python3 scripts/install_doctor.py --startup` once at the start of staging. If it reports a newer
+published Elves release or a conflicting local/global install, tell the user briefly and keep
+going. This is advisory only: never block the run or auto-update the skill.
+
 **Gitignore ephemeral artifacts:** append tool working directories to `.gitignore` so they never get committed:
 ```
 # Elves ephemeral artifacts

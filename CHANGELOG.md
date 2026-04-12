@@ -46,6 +46,12 @@ All notable changes to the Elves skill are documented here.
 - **Installed skill sync helper added.** `scripts/sync_installed_skills.py` can now check and
   mirror the canonical bundle into `~/.claude/skills/elves/` and `~/.codex/skills/elves/` so the
   local runtime copies do not drift behind the repo release.
+- **Install doctor added.** `scripts/install_doctor.py` now gives startup-time update notices and
+  explains when a project-local install differs from the global copy, so users can see which
+  version is actually active before assuming an upgrade failed.
+- **Installed runtime bundle clarified.** Installed copies now ship only the runtime scripts
+  (`preflight.sh`, `notify.sh`, and `install_doctor.py`) while repo-only maintenance helpers stay
+  in the checkout.
 - **Repo consistency checker added.** `scripts/check_repo_consistency.py` now verifies the
   canonical version, recovery-order wording, `PENDING-DOCS` coverage, and durable doc surfaces so
   cross-file drift is caught locally before PR bots have to flag it.

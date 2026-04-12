@@ -25,6 +25,7 @@ fi
 PASS="${GREEN}✓${RESET}"
 WARN="${YELLOW}⚠${RESET}"
 FAIL="${RED}✗${RESET}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ---------------------------------------------------------------------------
 # Result tracking
@@ -37,6 +38,29 @@ warn()  { echo -e "  ${WARN} $*"; SUMMARY_LINES+=("${YELLOW}⚠${RESET} $*"); }
 fail()  { echo -e "  ${FAIL} $*"; SUMMARY_LINES+=("${RED}✗${RESET} $*"); HARD_FAILURES=$(( HARD_FAILURES + 1 )); }
 info()  { echo -e "    ${CYAN}→${RESET} $*"; }
 header(){ echo; echo -e "${BOLD}── $* ──────────────────────────────────────────${RESET}"; }
+
+# ---------------------------------------------------------------------------
+# 0. Skill installation advisory
+# ---------------------------------------------------------------------------
+header "Skill Installation"
+
+if command -v python3 &>/dev/null && [ -f "${SCRIPT_DIR}/install_doctor.py" ]; then
+  INSTALL_ADVISORY=$(python3 "${SCRIPT_DIR}/install_doctor.py" --startup 2>/dev/null || true)
+  if [ -n "${INSTALL_ADVISORY}" ]; then
+    warn "Elves install advisory"
+    while IFS= read -r LINE; do
+      if [ -n "${LINE}" ]; then
+        CLEAN_LINE="${LINE#- }"
+        info "${CLEAN_LINE}"
+      fi
+    done <<< "${INSTALL_ADVISORY}"
+    info "Full report: python3 ${SCRIPT_DIR}/install_doctor.py --doctor"
+  else
+    pass "No actionable Elves install/update advisory"
+  fi
+else
+  info "Install doctor unavailable (python3 or script missing)"
+fi
 
 # ---------------------------------------------------------------------------
 # Cloud / headless environment detection (skip sleep checks if true)
