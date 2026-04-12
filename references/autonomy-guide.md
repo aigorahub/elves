@@ -84,7 +84,7 @@ Answer concisely with current status, then immediately resume where you left off
 
 *Examples: "by the way, the payment API changed, use v3 not v2", "ignore the failing test in auth.spec.ts, it's a known flake"*
 
-Acknowledge, incorporate the information into your current understanding, note it in the execution log under **Decisions made**, update the survival guide if it affects future batches, and keep going.
+Acknowledge, incorporate the information into your current understanding, note it in the execution log under **Decisions made**, update the survival guide if it affects future batches, and if the information is durable beyond the current batch also update `learnings.md` or the relevant `.ai-docs/*` file. Then keep going.
 
 ### Scenario 3: They Change Priorities
 

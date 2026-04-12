@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "1.6.1"
+  version: "1.7.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -27,7 +27,27 @@ The user operates on both ends of the work: specifying problems on the front end
 
 But AI agents are stateless. Context compaction erases working memory. Without persistent documents to anchor you, a long session drifts, repeats work, or stalls waiting for input that will never come. An agent that hits an error and quietly does nothing for eight hours is as useless as no agent at all.
 
-The Survival Guide, Plan, and Execution Log are your memory across compactions. They aren't overhead. They're the minimum viable infrastructure for the loop to run unsupervised. Read them. Trust them. Update them. They're what make you reliable enough to justify the user walking away.
+The Survival Guide, Plan, and Execution Log are your working memory across compactions. The
+Learnings file is your distilled memory across runs. `.ai-docs/*` is the curated durable layer
+when a lesson becomes a stable repo truth. These files aren't overhead. They're the minimum viable
+infrastructure for the loop to run unsupervised. Read them. Trust them. Update them. They're what
+make you reliable enough to justify the user walking away.
+
+## Documentation Surfaces
+
+Elves works best when the repo's knowledge is layered instead of piled into one giant note:
+
+- **Plan:** authoritative scope and batch structure for the current run
+- **Survival Guide:** run control, next exact batch, and operator constraints
+- **Learnings:** reusable lessons that should survive this run
+- **Execution Log:** chronological proof of what happened
+- **`.ai-docs/*` (if present):** curated durable docs for architecture, conventions, and gotchas
+- **Human-facing docs:** README, CHANGELOG, TODO, API/config docs
+
+Promotion flow: `execution log -> learnings -> .ai-docs`
+
+Documentation freshness is part of done. A batch is not truly complete if the code changed but the
+relevant durable docs, human docs, or recovery docs stayed stale.
 
 ## Code Quality Philosophy
 
@@ -145,11 +165,12 @@ By the end of the planning conversation, you should have:
 
 1. **Plan:** a file describing the work, broken into batches (e.g., `docs/plans/my-plan.md`).
 2. **Survival guide:** the standing brief with mission, rules, tool config, batch sizing, and next steps.
-3. **Execution log:** initialized and ready for the first entry.
-4. **Active branch name:** agreed with the user.
-5. **Launch prompt:** a short prompt for the next call that starts the unattended run without re-pasting the whole plan.
+3. **Learnings file:** initialized durable memory for reusable lessons from this run and future runs.
+4. **Execution log:** initialized and ready for the first entry.
+5. **Active branch name:** agreed with the user.
+6. **Launch prompt:** a short prompt for the next call that starts the unattended run without re-pasting the whole plan.
 
-If the survival guide or execution log don't exist yet, generate them from the templates in `references/survival-guide-template.md` and `references/execution-log-template.md`, filling in details from the planning conversation. See `references/plan-template.md` for plan structure guidance and `references/kickoff-prompt-template.md` for how users start the session.
+If the survival guide, learnings file, or execution log don't exist yet, generate them from the templates in `references/survival-guide-template.md`, `references/learnings-template.md`, and `references/execution-log-template.md`, filling in details from the planning conversation. See `references/plan-template.md` for plan structure guidance and `references/kickoff-prompt-template.md` for how users start the session.
 
 Once the plan is solid, move to Phase 2: staging. The unattended run itself begins only in Phase 3, after a fresh launch command.
 
@@ -164,7 +185,7 @@ Staging is the wind-up. This is where you line everything up so the launch call 
 Before unattended execution may begin, all of these must be true:
 
 1. The plan is cleaned up enough to survive compaction without the conversation.
-2. The survival guide and execution log exist and reflect the current plan.
+2. The survival guide, learnings file, and execution log exist and reflect the current plan.
 3. The branch is created or confirmed and the PR exists (or the existing PR is recorded).
 4. Preflight has run and any critical failures are cleared or explicitly accepted.
 5. Run mode, return time, non-negotiables, and batch sizing are recorded.
@@ -184,7 +205,7 @@ Execution starts only from a fresh launch call after staging is complete. The la
 - Run every relevant validation gate, including E2E or browser checks where they make sense.
 - After every push, read PR comments and checks, fix blockers, and re-check for regressions against earlier verified work.
 
-On launch, start with the same read order used in Orient: survival guide, `.elves-session.json` if it exists, plan, then execution log. Confirm the run state and then enter the core loop immediately.
+On launch, start with the same read order used in Orient: survival guide, `.elves-session.json` if it exists, learnings if it exists, plan, execution log, then `.ai-docs/manifest.md` if present. Confirm the run state and then enter the core loop immediately.
 
 ## Preflight (staging)
 
@@ -227,10 +248,10 @@ Record the time budget in the execution log.
    git checkout -b feat/<name-from-plan>
    ```
 
-2. **Write up the plans.** Generate the survival guide and execution log from templates (if they don't already exist). Read the plan and decompose it into batches. Record the batch breakdown with estimates in the execution log. Commit all planning documents:
+2. **Write up the plans.** Generate the survival guide, learnings file, and execution log from templates (if they don't already exist). Read the plan and decompose it into batches. Record the batch breakdown with estimates in the execution log. Commit all planning documents:
    ```bash
-   git add <survival-guide> <execution-log> <plan-if-new>
-   git commit -m "[<branch> · Batch 0/N] Session setup — survival guide, execution log, batch plan"
+   git add <survival-guide> <learnings> <execution-log> <plan-if-new>
+   git commit -m "[<branch> · Batch 0/N] Session setup — survival guide, learnings, execution log, batch plan"
    ```
 
 3. **Push and open a PR immediately:**
@@ -244,7 +265,7 @@ Record the time budget in the execution log.
    gh pr view --json number -q .number
    ```
 
-5. **Prepare the launch prompt** for the next call. Keep it short and behavior-heavy. It should point at the survival guide, execution log, and plan by path instead of re-pasting the plan.
+5. **Prepare the launch prompt** for the next call. Keep it short and behavior-heavy. It should point at the survival guide, learnings file, execution log, plan, and `.ai-docs/manifest.md` if present instead of re-pasting the plan.
 
 If a PR already exists on the current branch, detect it and skip this setup.
 
@@ -328,10 +349,12 @@ Track time per phase in the execution log (Implement Xm / Validate Xm / Review X
 
 1. Survival guide
 2. `.elves-session.json` (if it exists — fastest signal for current batch, PR number, and handled comments)
-3. Plan
-4. Execution log
-5. Constitution (`docs/constitution.md` or `CONSTITUTION.md`, if it exists)
-6. Any project-level TODO or backlog file (if it exists)
+3. Learnings file (if it exists)
+4. Plan
+5. Execution log
+6. `.ai-docs/manifest.md` (if it exists), then any linked durable docs relevant to the next batch
+7. Constitution (`docs/constitution.md` or `CONSTITUTION.md`, if it exists)
+8. Any project-level TODO or backlog file (if it exists)
 
 Then identify the first incomplete batch.
 
@@ -458,15 +481,23 @@ The built-in review works out of the box with zero configuration:
 7. **Record dispositions in `.elves-session.json`.** For each comment you address, log its ID, source, disposition, and the review cycle it was handled in. This survives compaction and lets the next context skip already-handled comments without re-reading and re-evaluating them. See the schema in **Structured Session Data**.
 8. **Push fixes, then re-read comments.** Use commit messages to explain your fixes and justify any decisions — the reviewer reads them on the next cycle. Only read **new and unresolved** comments — resolved threads and replied-to comments from previous cycles are done. Don't re-litigate settled findings.
 9. **Repeat until the batch is clean.** No unresolved threads, no unreplied bot comments, no missing contract items. The loop continues until there is nothing left to address.
-10. **Verify documentation is current.** Before exiting the review loop, check that any user-facing behavior changed by this batch is reflected in the project's documentation. This includes README files, API docs, inline doc comments, config references, migration guides, and changelogs — whatever the project uses. If docs are stale, update them now. Don't defer this to a later batch. Stale documentation is silent debt: the code is correct but the user doesn't know how to use it correctly. A batch with good code and wrong docs is not shippable.
+10. **Verify documentation is current.** Before exiting the review loop, check that any user-facing behavior changed by this batch is reflected in the project's documentation. This includes README files, API docs, inline doc comments, config references, migration guides, changelogs, `learnings.md`, and `.ai-docs/*` — whatever the project uses. If docs are stale, update them now. Don't defer this to a later batch. Stale documentation is silent debt: the code is correct but the user doesn't know how to use it correctly. A batch with good code and wrong docs is not shippable.
+
+If the code is acceptable but the surrounding docs are stale, label the finding `PENDING-DOCS`.
+This is distinct from a code bug: the implementation may be correct, but the batch is not review-ready
+until the relevant docs are updated or an immediate follow-up batch is explicitly carrying the debt.
+Typical destinations are the survival guide and execution log for run-state drift, `learnings.md`
+for reusable lessons, `.ai-docs/*` for stable repo truths, and README/CHANGELOG/config docs for
+human-facing behavior.
 
 **Check shared surfaces for regression risk.** For any modified file that's imported or used by code outside the batch scope: grep for consumers, verify backward compatibility, confirm no function signatures or interfaces changed without updating all callers. Mark BLOCKING if a shared surface was modified without verifying consumers. The review subagent includes this check (see `references/review-subagent.md`), but if you're doing the review directly, don't skip it.
 
-**Triage every review finding into one of four categories:**
+**Triage every review finding into one of five categories:**
 - **Fix now:** a real bug, security problem, quality violation, or missing contract item. Fix it before continuing.
 - **Defer:** valid finding but out of scope for the current batch. Log it in TODO.md with `[elves-scout]`, reply with the deferral reason, and move on.
 - **Intentional design:** the reviewer flagged something that is correct and deliberate. Resolve/reply with a justification explaining why it's intentional. Don't change the code.
 - **False positive:** the reviewer (usually a bot) flagged something that isn't actually an issue — a hallucination, a misunderstanding of the context, or an outdated rule. Resolve/reply with your reasoning and move on.
+- **PENDING-DOCS:** the code is acceptable, but supporting docs are stale. Update the docs before calling the batch clean, or carry the debt into the immediate next batch with an explicit note in the execution log and `.elves-session.json`.
 
 Never make unnecessary code changes just to appease a finding. If the finding is wrong, say so and document why. If the same non-actionable finding persists for 3 cycles, resolve it with your assessment — you've given it a fair hearing. (The 3-cycle threshold is a default; override in the survival guide under `## Run Control`.)
 
@@ -488,7 +519,7 @@ If no constitution exists, skip this step.
 
 ### 9. Document
 
-Update the execution log with a timestamped entry covering: batch name, timing breakdown, what changed, commands run, test results, review findings, decisions made, regression attestation, commit SHA, rollback tag, and next steps.
+Update the execution log with a timestamped entry covering: batch name, timing breakdown, what changed, commands run, test results, review findings, decisions made, docs impacted, docs updated, docs promoted, docs deferred, regression attestation, commit SHA, rollback tag, and next steps.
 
 **Close the loop on the contract.** Mark each acceptance criterion from step 4 as met or note exceptions. If a criterion wasn't met, explain why and whether it's deferred or dropped. The contract is write-only if you don't check it off.
 
@@ -499,13 +530,18 @@ Update the execution log with a timestamped entry covering: batch name, timing b
 3. **Test baseline comparison:** compare the current test count against the baseline captured during Verify Green (step 2). Report the delta. Total tests should only go up or stay flat, never decrease. If the skipped count increased, explain why.
 4. **Confidence and reasoning:** state HIGH, MEDIUM, or LOW and explain *why*. "All tests pass" is necessary but not sufficient. Explain what you checked beyond tests and why you believe existing functionality is preserved. If you modified shared surfaces, explain why consumers aren't affected. If MEDIUM or LOW, describe the specific risk and what additional verification would raise confidence.
 
-Also update `.elves-session.json` — set the current batch status to `"complete"`, record the commit SHA and completion timestamp. This keeps the JSON in sync with the execution log so either can be used for recovery.
+Also update `.elves-session.json` — set the current batch status to `"complete"`, record the commit SHA and completion timestamp, and capture any resolved, deferred, or dismissed review-comment dispositions. This keeps the JSON in sync with the execution log so either can be used for recovery.
+
+Promote durable lessons deliberately:
+- keep transient notes and one-off debugging trails in the execution log
+- add reusable, stable lessons to `learnings.md`
+- promote stable repo truths from learnings into `.ai-docs/architecture.md`, `.ai-docs/conventions.md`, or `.ai-docs/gotchas.md`
 
 Keep entries concise. If the log exceeds ~50 entries, archive older ones under `## Completed Archive`.
 
 ### 10. Update the Survival Guide
 
-Update "Current Phase" and "Next Exact Batch" to reflect the new state. A stale survival guide sends the next session down the wrong path.
+Update "Current Phase" and "Next Exact Batch" to reflect the new state. If a promoted learning changes how the next batch should be approached, reflect that here too. A stale survival guide sends the next session down the wrong path.
 
 ### 11. Commit and Push
 
@@ -691,17 +727,19 @@ The tests are the user's insurance policy. You don't get to modify the insurance
 
 ## Compaction Recovery
 
-After any compaction or restart, your conversation history is gone. But your instructions aren't. They live in files on disk, not in memory. Context compaction can't erase what lives in the survival guide, plan, and execution log. This is why those documents exist.
+After any compaction or restart, your conversation history is gone. But your instructions aren't. They live in files on disk, not in memory. Context compaction can't erase what lives in the survival guide, learnings file, plan, execution log, and durable `.ai-docs` docs. This is why those documents exist.
 
 1. Read the survival guide first (marked with `READ THIS FILE FIRST` banners).
 2. **Read the Run Control section.** Confirm the run mode and stop policy. If the **Run mode** is `open-ended`, you are not allowed to stop on your own. This is the most important thing to recover.
 3. Read `.elves-session.json` to quickly determine the current batch, PR number, and what's complete. This is the fastest signal.
-4. Read the plan.
-5. Read the execution log.
-6. Read the constitution (`docs/constitution.md` or `CONSTITUTION.md`) if it exists.
-7. Identify the first incomplete batch.
-8. Resume immediately without asking for help.
-9. Don't redo completed work.
+4. Read the learnings file if it exists.
+5. Read the plan.
+6. Read the execution log.
+7. Read `.ai-docs/manifest.md` if it exists, then any linked durable docs needed for the next batch.
+8. Read the constitution (`docs/constitution.md` or `CONSTITUTION.md`) if it exists.
+9. Identify the first incomplete batch.
+10. Resume immediately without asking for help.
+11. Don't redo completed work.
 
 **If the survival guide is missing from the working tree** (compaction happened during Final Completion after the cleanup `git rm`), check `git log --oneline -5` for a cleanup commit. Restore the files from the parent commit: `git show HEAD~1:<survival-guide-path> > <survival-guide-path>`. Then continue the recovery protocol.
 
@@ -722,8 +760,8 @@ A batch isn't done unless:
 7. Legality check passed (if a constitution exists). No unresolved FAIL verdicts.
 8. No accumulated debt: no skipped gates, no "will fix later" items, no known regressions.
 9. **Regression attestation written.** The execution log entry for this batch includes: cumulative diff review (`git diff main...HEAD --stat`), shared surfaces identified with consumers verified, test baseline comparison (total tests never decreased), and a confidence level with reasoning. See step 9.
-10. **Documentation is up to date.** Any user-facing behavior changed by this batch must be reflected in the relevant docs: README, API docs, inline doc comments, config references, migration guides, changelogs, or whatever the project uses. Stale docs are debt. A user who reads the docs and gets wrong information is worse off than a user with no docs at all.
-11. `.elves-session.json` updated with batch status, commit SHA, completion timestamp, and `review_comments` dispositions.
+10. **Documentation is up to date.** Any user-facing behavior changed by this batch must be reflected in the relevant docs: README, API docs, inline doc comments, config references, migration guides, changelogs, `learnings.md`, `.ai-docs/*`, or whatever the project uses. Stale docs are debt. A user who reads the docs and gets wrong information is worse off than a user with no docs at all.
+11. `.elves-session.json` updated with batch status, commit SHA, completion timestamp, current batch state, and `review_comments` dispositions.
 12. You're confident the batch is correct. Not "probably fine," but verified through testing, review, and deployment.
 13. Execution log updated with timestamps, evidence, and commit SHA.
 14. Survival guide updated with next batch.
@@ -919,11 +957,25 @@ Maintain a `.elves-session.json` file with machine-readable session data (sessio
 ```json
 {
   "session_id": "elves-2026-03-24-auth-system",
+  "version": "1.7.0",
+  "status": "in_progress",
+  "branch": "feat/auth-system",
+  "plan_path": "docs/plans/auth-system.md",
+  "survival_guide_path": "docs/elves/survival-guide.md",
+  "learnings_path": "docs/elves/learnings.md",
+  "execution_log_path": "docs/elves/execution-log.md",
   "pr_number": 42,
   "test_baseline": {
     "passed": 847,
     "total": 850,
-    "skipped": 3
+    "skipped": 3,
+    "status": "captured",
+    "reason": null
+  },
+  "current_batch": {
+    "id": 2,
+    "name": "Auth endpoints",
+    "status": "in_progress"
   },
   "batches": [
     {
@@ -948,7 +1000,7 @@ Maintain a `.elves-session.json` file with machine-readable session data (sessio
   "review_comments": [
     {
       "id": 1234567890,
-      "type": "review_thread",
+      "type": "review_comment",
       "source": "coderabbit",
       "batch": 1,
       "cycle": 1,
@@ -983,7 +1035,7 @@ Maintain a `.elves-session.json` file with machine-readable session data (sessio
 The `review_comments` array is the compaction-safe record of every comment handled during the session. After compaction, it tells the next context exactly which comments have been dealt with and how — no need to re-read and re-evaluate hundreds of bot comments.
 
 **Comment types and how to track them:**
-- `review_thread`: Can be resolved on GitHub via the API. Resolve after fixing. Status is authoritative on GitHub; the JSON is backup.
+- `review_comment` / `review_thread`: Inline PR review feedback. Resolve the thread on GitHub when thread IDs are available; otherwise reply or record the disposition in JSON so later cycles know it was handled.
 - `issue_comment`: Cannot be "resolved" on GitHub. Reply with a disposition. The JSON tracks that it was handled.
 - `check_run`: Pass/fail is inherent. No tracking needed — just re-run after fixes.
 

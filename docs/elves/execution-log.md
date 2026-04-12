@@ -18,6 +18,49 @@
 
 ---
 
+## Batch 2 Contract: 2026-04-11 23:02 EDT
+
+**Behaviors:**
+- Sync `SKILL.md` and `AGENTS.md` to the `1.7.0` docs-in-the-loop model and four-layer memory
+  stack.
+- Add `PENDING-DOCS`, durable-doc promotion rules, and repo-conditioning language to the review
+  loop and companion references.
+- Align structured session-data expectations with the live `.elves-session.json` recovery shape.
+
+**Build on:**
+- Batch 1's durable doc architecture in `docs/elves/learnings.md`, `.ai-docs/*`, and the updated
+  templates instead of inventing a second documentation model.
+- The existing stage/launch/review split already documented in `SKILL.md`, `AGENTS.md`, and
+  `references/review-subagent.md`.
+
+**Acceptance criteria:**
+- [ ] `SKILL.md` and `AGENTS.md` describe the same four-layer memory model and durable-doc
+      architecture.
+- [ ] The review workflow distinguishes real blockers from `PENDING-DOCS` and explains how to
+      close the loop.
+- [ ] Structured session-data expectations match the live `.elves-session.json`, including
+      `current_batch`, path fields, and `review_comment` dispositions.
+- [ ] `references/review-subagent.md` and `references/autonomy-guide.md` use the same durable-doc
+      terminology as the skill files.
+
+**Blast radius:**
+- `SKILL.md` and `AGENTS.md` (all future runs and model surfaces), modified
+- `references/review-subagent.md` and `references/autonomy-guide.md` (review/autonomy behavior),
+  modified
+- Risk: high, because instruction drift here would recreate the exact recovery and documentation
+  confusion this release is meant to remove.
+
+**Pre-implementation survey:**
+- `git diff -- AGENTS.md`
+  -> found the earlier learnings WIP, but no `.ai-docs` durable-doc map, no `PENDING-DOCS`, and no
+     updated session-schema language.
+- `git diff -- SKILL.md`
+  -> found the start of the `1.7.0` sync, but review/document/compaction/schema sections still
+     needed alignment.
+- `sed -n '1,220p' references/review-subagent.md && sed -n '1,220p' references/autonomy-guide.md`
+  -> review docs still assumed only BLOCKING/WARNING/INFO and had no durable-doc promotion guidance
+     for mid-run updates.
+
 ## 2026-04-11 22:52 EDT
 
 **Batch:** 1: Durable Memory and Agent Docs Architecture
