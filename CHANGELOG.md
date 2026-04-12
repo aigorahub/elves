@@ -31,6 +31,9 @@ All notable changes to the Elves skill are documented here.
 - **High-risk regression review pass added.** Medium/high blast-radius batches can now run a
   narrow second review pass that ignores style and new ideas, traces changed shared surfaces to
   their consumers, and focuses only on what existing behavior could break.
+- **Entropy checks can now tune the process itself.** Elves now does a lightweight process retro
+  during entropy checks and records any survival-guide/template/tooling adjustment when the same
+  friction repeats across batches.
 
 ### Cross-file sync
 

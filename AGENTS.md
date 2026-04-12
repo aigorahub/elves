@@ -422,6 +422,8 @@ Skipping this means review feedback piles up silently and the user returns to a 
 
 **What to check:** duplicated utilities introduced in different batches, naming inconsistencies across modules, error handling done differently in different batches, violations of principles #2 (centralize), #5 (pattern detection), #6 (progressive conditioning) across the cumulative diff.
 
+Also spend 5 minutes on a **process retro**: skim the execution log, review findings, and validation timings for repeated friction. If the same category of issue keeps coming back (for example, the same review warning twice, repeated `PENDING-DOCS`, or validation getting slower each batch), tighten the process itself by updating the survival guide, a template, `learnings.md`, or tool configuration. Keep it lightweight: tune the loop you're already running instead of inventing a new subsystem. Record any real process adjustment in the execution log.
+
 If you find drift, fix it in a small focused commit: `[<branch> · Entropy check after Batch N] Consolidate <what changed>`. If nothing needs fixing, skip and move on. Should take minutes, not hours. The 3-batch cadence is a default; override in the survival guide under `## Run Control`. For short plans (4-5 batches), check after batch 2-3. For long plans (15+), every 3 is right. If batches pass review cleanly, stretch to every 4-5.
 
 ### 15. Continue or Stop

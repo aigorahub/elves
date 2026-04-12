@@ -664,8 +664,11 @@ This is continuous entropy management — catching the slow drift that individua
 - Check for naming inconsistencies that crept in across batches (different conventions in different modules).
 - Look for patterns that diverged: error handling done one way in batch 1 and a different way in batch 4.
 - Verify that the Code Quality Philosophy principles (especially #2 centralize, #5 pattern detection, #6 progressive conditioning) are holding across the cumulative diff, not just within individual batches.
+- Spend 5 minutes on a **process retro**: review the execution log, review findings, and validation timings for repeated friction. If the same category of issue keeps coming back (for example, the same review warning twice, repeated `PENDING-DOCS`, or validation taking longer every batch), tighten the process itself by updating the survival guide, a template, `learnings.md`, or tool configuration. Keep it lightweight: tune the loop you're already running instead of inventing a new subsystem.
 
 If you find drift, fix it now in a small focused commit: `[<branch> · Entropy check after Batch N] Consolidate <what changed>`. Don't let it ride. The purpose is garbage collection — small, frequent corrections are cheaper than a large refactor later.
+
+If the process retro finds a real pattern, record the adjustment explicitly in the execution log (for example, "added a regression-preservation acceptance criterion after repeated regression-only review warnings"). This is how Elves gradually self-tunes across long runs without pretending to be fully autonomous process design.
 
 If nothing needs fixing, skip it and move on. This should take minutes, not hours. The 3-batch cadence is a default; override in the survival guide under `## Run Control`. **Scaling guidance:** for short plans (4-5 batches), check after batch 2 or 3 so you catch drift before the final batch. For long plans (15+ batches), every 3 batches is right. If batches are passing review cleanly with minimal findings, consider stretching to every 4-5 batches to save time.
 

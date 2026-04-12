@@ -166,6 +166,10 @@
   handlers. Reduces future drift, no API surface change."]
 - [Decision + reasoning]
 
+**Process adjustments:**
+- [Any entropy-check or retro adjustment made to the Elves process itself, e.g., "Added a
+  regression-preservation acceptance criterion after repeated review findings" / "none"]
+
 **Docs:**
 - Impacted: [list / "none"]
 - Updated: [list / "none"]

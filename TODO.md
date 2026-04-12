@@ -9,8 +9,10 @@ Project backlog and deferred tasks.
 
 ## Future Ideas
 
-### Process self-improvement across sessions
-`v1.7.0` added learnings and docs-in-the-loop upkeep, so Elves now preserves lessons better than it did originally. But the process still doesn't truly auto-tune itself. Could the entropy check also evaluate whether the Elves process itself needs adjustment? For example: if review keeps flagging the same category of issue, should the contract template add a check for it? If validation times are growing, should batch sizing shrink? Factory AI calls this "Signals" — a closed-loop system that detects friction and implements fixes to its own process. Worth exploring as a lightweight version: a "process retro" step every N batches that proposes survival guide amendments based on patterns in the execution log.
+- [x] Add a lightweight process-retro pass to entropy checks.
+  `SKILL.md`, `AGENTS.md`, `README.md`, and `references/execution-log-template.md` now tell Elves
+  to spend a few minutes on repeated friction during entropy checks and tighten the survival guide,
+  templates, learnings, or tool config when a pattern clearly recurs.
 
 ## Follow-ups from v1.7.0
 
