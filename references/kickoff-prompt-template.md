@@ -30,13 +30,15 @@ Stage this Elves run. Do not start implementing the batches in this call.
 **Plan:** [path/to/plan.md]
 **Branch:** [feat/branch-name]
 **Survival guide:** [path/to/survival-guide.md]  (or: "generate from template")
+**Learnings:** [path/to/learnings.md]            (or: "generate from template")
 **Execution log:** [path/to/execution-log.md]    (or: "generate from template")
 
 **Your job in this call:**
 - Tighten the plan if needed so it can survive compaction without the conversation
-- Generate or refresh the survival guide and execution log
+- Generate or refresh the survival guide, learnings file, and execution log
 - Create or switch to the branch, open or update the PR, and record the PR number
 - Run preflight and log any warnings or blockers
+- Record any durable-doc paths the run should use (`.ai-docs/*`) if the repo keeps them
 - Prepare a short launch prompt for the next call
 
 **Non-negotiables:**
@@ -56,13 +58,15 @@ Stage this Elves run. Do not start implementing the batches in this call.
 **Plan:** docs/plans/auth-refactor.md
 **Branch:** feat/jwt-auth
 **Survival guide:** docs/elves/survival-guide.md  (generate from template if missing)
+**Learnings:** docs/elves/learnings.md            (generate from template if missing)
 **Execution log:** docs/elves/execution-log.md    (generate from template if missing)
 
 **Your job in this call:**
 - Tighten the plan if needed so it can survive compaction without the conversation
-- Generate or refresh the survival guide and execution log
+- Generate or refresh the survival guide, learnings file, and execution log
 - Create or switch to the branch, open or update the PR, and record the PR number
 - Run preflight and log any warnings or blockers
+- Record any durable-doc paths the run should use (`.ai-docs/*`) if the repo keeps them
 - Prepare a short launch prompt for the next call
 
 **Non-negotiables:**
@@ -84,7 +88,7 @@ Stage this Elves run. Do not start implementing the batches in this call.
 
 ```
 The run is staged. Start now.
-Read [path/to/survival-guide.md] first, then `.elves-session.json` if it exists, then [path/to/plan.md], then [path/to/execution-log.md].
+Read [path/to/survival-guide.md] first, then `.elves-session.json` if it exists, then [path/to/learnings.md] if it exists, then [path/to/plan.md], then [path/to/execution-log.md], then `.ai-docs/manifest.md` if it exists.
 I am going offline until [WHEN].
 Do not stop unless you hit a genuine blocker with no reasonable workaround.
 Use your judgment. Work in small batches and commit frequently.
@@ -98,7 +102,7 @@ Keep going until the plan is done, I stop you, or you hit a true blocker.
 
 ```
 The run is staged. Start now.
-Read docs/elves/survival-guide.md first, then `.elves-session.json` if it exists, then docs/plans/auth-refactor.md, then docs/elves/execution-log.md.
+Read docs/elves/survival-guide.md first, then `.elves-session.json` if it exists, then docs/elves/learnings.md if it exists, then docs/plans/auth-refactor.md, then docs/elves/execution-log.md, then `.ai-docs/manifest.md` if it exists.
 I am going offline until 7:30am ET.
 Do not stop unless you hit a genuine blocker with no reasonable workaround.
 Use your judgment. Work in small batches and commit frequently.
@@ -127,6 +131,10 @@ this right. I'm going to stage the run and wait for your final launch command."
 **Don't repeat the whole plan in the launch prompt**
 Point to the plan by path. If the launch prompt starts looking like a second plan file, it is too
 long.
+
+**Point to durable memory too**
+If the run uses a learnings file or `.ai-docs`, include those paths in the launch prompt so the
+agent rehydrates from durable knowledge instead of rediscovering it.
 
 **Make the launch prompt behavior-heavy**
 The launch prompt should remind the agent how to behave: don't stop, use judgment, work in small

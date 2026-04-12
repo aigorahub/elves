@@ -5,6 +5,47 @@
 
 ---
 
+## Batch 1 Contract: 2026-04-11 22:52 EDT
+
+**Behaviors:**
+- Make learnings, execution log, survival guide, and plan distinct memory surfaces in the
+  templates.
+- Add a lightweight `.ai-docs` layer for curated durable docs in this repo.
+- Give the templates explicit places to track documentation impact and durable promotions.
+
+**Build on:**
+- The existing `references/learnings-template.md` draft instead of inventing a second durable-memory
+  format.
+- The current staging/launch model already documented in the kickoff and survival-guide templates.
+
+**Acceptance criteria:**
+- [ ] `references/learnings-template.md` defines promotion from learnings into `.ai-docs/*`.
+- [ ] `references/survival-guide-template.md` and `references/execution-log-template.md` both
+      describe the four-layer memory model and documentation triggers.
+- [ ] `.ai-docs/manifest.md`, `.ai-docs/architecture.md`, `.ai-docs/conventions.md`, and
+      `.ai-docs/gotchas.md` exist for this repo.
+- [ ] The plan and kickoff templates mention learnings and durable docs where appropriate.
+
+**Blast radius:**
+- `references/survival-guide-template.md` (all future Elves runs), modified
+- `references/execution-log-template.md` (all future Elves runs), modified
+- `references/plan-template.md` and `references/kickoff-prompt-template.md` (operator workflow),
+  modified
+- Risk: medium, because changes to templates can create instruction drift across all future runs if
+  the document roles are not crisp.
+
+**Pre-implementation survey:**
+- `rg -n "three-document|learnings|\\.ai-docs|Docs impacted|Docs updated|Docs deferred|Docs promoted|PENDING-DOCS|run digest" .`
+  -> README still assumes the old three-document model; templates lack durable-doc fields.
+- `sed -n '1,260p' references/execution-log-template.md`
+  -> execution log template has no run digest, no batch contract template, and no doc impact fields.
+- `sed -n '1,260p' references/survival-guide-template.md`
+  -> survival guide template has no learnings path, no durable doc map, and old compaction order.
+- `sed -n '1,260p' references/plan-template.md && sed -n '1,260p' references/kickoff-prompt-template.md`
+  -> plan/kickoff templates do not mention learnings or durable docs at all.
+
+---
+
 ## Session Setup: 2026-04-11 22:47 EDT
 
 **Phase:** Launch started

@@ -9,6 +9,9 @@
 > refined through validation and review. The tests are the watch. You are working overnight with
 > no one watching, and the tests are what keep you honest. The user operates on both ends (planning
 > and review). You run the loop in the middle. You never merge.
+>
+> Recommended read order after any compaction: survival guide -> `.elves-session.json` ->
+> learnings -> plan -> execution log -> `.ai-docs/manifest.md` (if present) -> constitution/TODO.
 
 ---
 
@@ -39,6 +42,21 @@ session-cookie approach. All existing auth tests must pass. The public API surfa
 
 ---
 
+## Memory Surfaces
+
+These files do different jobs. Keep them distinct so the agent does not have to guess where
+knowledge belongs.
+
+- **Plan:** authoritative scope, batches, acceptance criteria, and non-negotiables
+- **Survival guide:** active run brief, run controls, and next exact batch
+- **Learnings:** durable reusable lessons that should survive this run
+- **Execution log:** chronological record of work, decisions, commands, and review outcomes
+- **`.ai-docs/*` (if present):** curated durable docs for architecture, conventions, and gotchas
+
+Promotion flow: `execution log -> learnings -> curated durable docs`
+
+---
+
 ## Non-Negotiables
 
 These rules are absolute. They can't be overridden by anything you think you understand about the
@@ -61,6 +79,7 @@ plan, the codebase, or good engineering practice.
 
 - [ ] Plan cleaned and saved to disk
 - [ ] Survival guide updated from the current plan
+- [ ] Learnings file initialized or refreshed
 - [ ] Execution log initialized with batch breakdown and preflight notes
 - [ ] Branch created or confirmed
 - [ ] PR opened or existing PR recorded
@@ -102,6 +121,21 @@ implemented, all 47 tests pass, PR review clean."]
 **Risk:** [One sentence describing the highest-risk aspect of this batch]
 
 **Rollback tag:** `elves/pre-batch-N` _(create this before starting)_
+
+---
+
+## Documentation Triggers
+
+Before closing a batch, explicitly decide which durable docs changed and why:
+
+- **Behavior changed:** update the relevant human-facing docs (`README`, config docs, examples,
+  changelog, inline instructions).
+- **Architecture shifted:** update `.ai-docs/architecture.md`.
+- **New repeatable pattern or policy:** update `.ai-docs/conventions.md`.
+- **New trap or hidden dependency:** update `.ai-docs/gotchas.md`.
+- **Reusable lesson from the run:** update the learnings file.
+
+If none apply, record that no durable doc updates were needed. Do not leave it implicit.
 
 ---
 
@@ -260,7 +294,12 @@ notification: pr-comment
 ## Plan and Log Paths
 
 - **Plan:** `[path/to/plan.md]`
+- **Learnings:** `[path/to/learnings.md]`
 - **Execution log:** `[path/to/execution-log.md]`
+- **Durable docs manifest (optional):** `[.ai-docs/manifest.md]`
+- **Architecture doc (optional):** `[.ai-docs/architecture.md]`
+- **Conventions doc (optional):** `[.ai-docs/conventions.md]`
+- **Gotchas doc (optional):** `[.ai-docs/gotchas.md]`
 - **Branch:** `[feat/branch-name]`
 - **PR number:** [#N] _(fill in after PR is created)_
 - **Plan hash at session start:** `[md5-hash]` _(fill in at session start, used to detect plan edits)_
@@ -273,11 +312,14 @@ When you restart after a compaction, do these steps in order. No shortcuts.
 
 1. Read this file (survival guide). You are doing this now.
 2. **Read the Run Control section above.** Confirm the run mode and stop policy. If open-ended, you are not allowed to stop on your own. This is the most important thing to recover.
-3. Read the plan. Confirm the overall scope hasn't changed (compare hash if recorded above).
-4. Read the execution log. Find the last completed batch and the last **Decisions made** entry.
-5. Identify the first incomplete batch (look at Current Phase and Next Exact Batch above).
-6. Check the clock. How much time budget remains? (If open-ended: unlimited.)
-7. Resume immediately. Don't ask for help. Don't redo completed work.
+3. Read `.elves-session.json` if it exists. Confirm current batch, PR number, and test baseline.
+4. Read the learnings file if one exists.
+5. Read the plan. Confirm the overall scope hasn't changed (compare hash if recorded above).
+6. Read the execution log. Find the last completed batch and the last **Decisions made** entry.
+7. Read `.ai-docs/manifest.md` if it exists and then any linked durable docs that matter to the next batch.
+8. Identify the first incomplete batch (look at Current Phase and Next Exact Batch above).
+9. Check the clock. How much time budget remains? (If open-ended: unlimited.)
+10. Resume immediately. Don't ask for help. Don't redo completed work.
 
 The execution log is your proof of what is done. If something appears in the log as complete, it is
 complete. Don't re-implement it.
