@@ -650,6 +650,10 @@ When submitting a PR:
 - Keep changes focused: one concern per PR.
 - Update the relevant template or reference file if your change affects agent behavior.
 - Test your change with at least one real overnight run if possible.
+- For cross-file skill/doc changes, run:
+  ```bash
+  python3 scripts/check_repo_consistency.py
+  ```
 
 ---
 

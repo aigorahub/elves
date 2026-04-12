@@ -14,10 +14,9 @@ Project backlog and deferred tasks.
 
 ## Follow-ups from v1.7.0
 
-### Repo consistency checker
-This release fixed multiple cases of documentation drift across `SKILL.md`, `AGENTS.md`,
-`.elves-session.json`, and README. A tiny consistency script or lint-like checker could catch those
-before PR bots do.
+- [x] Add a repo consistency checker for the high-value drift classes from `v1.7.0`.
+  `scripts/check_repo_consistency.py` now checks version alignment, recovery-order wording,
+  `PENDING-DOCS` coverage, and the expected durable doc surfaces.
 
 - [x] Add a local installed-skill sync helper for `.claude/` and `.codex/` copies.
   `scripts/sync_installed_skills.py` now checks and mirrors the managed bundle from this checkout

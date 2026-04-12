@@ -37,6 +37,9 @@ All notable changes to the Elves skill are documented here.
 - **Installed skill sync helper added.** `scripts/sync_installed_skills.py` can now check and
   mirror the canonical bundle into `~/.claude/skills/elves/` and `~/.codex/skills/elves/` so the
   local runtime copies do not drift behind the repo release.
+- **Repo consistency checker added.** `scripts/check_repo_consistency.py` now verifies the
+  canonical version, recovery-order wording, `PENDING-DOCS` coverage, and durable doc surfaces so
+  cross-file drift is caught locally before PR bots have to flag it.
 
 ## [1.6.1] - 2026-04-02
 
