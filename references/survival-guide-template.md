@@ -139,6 +139,21 @@ If none apply, record that no durable doc updates were needed. Do not leave it i
 
 ---
 
+## Process Tuning Triggers
+
+During entropy checks, also look for repeated process friction:
+
+- the same review warning or regression note appearing across batches
+- repeated `PENDING-DOCS` findings
+- validation getting slower every batch without a clear reason
+- recurring recovery confusion that points to stale run-state docs or templates
+
+If a pattern clearly repeats, tighten the loop itself: update the survival guide, a template,
+`learnings.md`, or tool configuration, then record the adjustment in the execution log. Keep this
+lightweight. Tune the process you're already using; do not invent a new subsystem mid-run.
+
+---
+
 ## Acceptance Checks
 
 Before marking any batch complete, verify all of the following:
