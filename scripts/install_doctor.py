@@ -31,6 +31,7 @@ ACTIVE_ROOT = Path(__file__).resolve().parent.parent
 CACHE_PATH = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "elves" / "install-doctor.json"
 HTTP_TIMEOUT_SECONDS = 5
 DEFAULT_CACHE_HOURS = 24
+STALE_RELEASE_REVALIDATION_HOURS = 1
 VERSION_RE = re.compile(r'^\s*version:\s*"([^"]+)"\s*$', re.MULTILINE)
 
 
@@ -139,11 +140,16 @@ def load_cache(max_age_hours: int, minimum_version: str | None = None) -> dict[s
     except ValueError:
         return None
 
-    if datetime.now(timezone.utc) - checked > timedelta(hours=max_age_hours):
+    cache_age = datetime.now(timezone.utc) - checked
+    if cache_age > timedelta(hours=max_age_hours):
         return None
+
     cached_version = normalize_version(str(payload.get("latest_version") or ""))
-    if version_is_newer(minimum_version, cached_version):
-        return None
+    if minimum_version and (
+        cached_version is None or version_is_newer(minimum_version, cached_version)
+    ):
+        if cache_age > timedelta(hours=STALE_RELEASE_REVALIDATION_HOURS):
+            return None
     return payload
 
 

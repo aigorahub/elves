@@ -34,7 +34,7 @@ class InstallDoctorCacheTests(unittest.TestCase):
             cache_path.write_text(
                 json.dumps(
                     {
-                        "checked_at": datetime.now(timezone.utc).isoformat(),
+                        "checked_at": datetime(2026, 4, 12, 18, 0, tzinfo=timezone.utc).isoformat(),
                         "latest_version": "1.6.1",
                         "latest_url": "https://example.com/v1.6.1",
                         "source": "gh-release",
@@ -50,7 +50,11 @@ class InstallDoctorCacheTests(unittest.TestCase):
 
             with mock.patch.object(self.install_doctor, "CACHE_PATH", cache_path), mock.patch.object(
                 self.install_doctor, "fetch_json_with_gh", gh_fetch
-            ), mock.patch.object(self.install_doctor, "fetch_json_with_http", return_value=None):
+            ), mock.patch.object(self.install_doctor, "fetch_json_with_http", return_value=None), mock.patch.object(
+                self.install_doctor, "datetime"
+            ) as fake_datetime:
+                fake_datetime.now.return_value = datetime(2026, 4, 12, 20, 30, tzinfo=timezone.utc)
+                fake_datetime.fromisoformat.side_effect = datetime.fromisoformat
                 latest_release = self.install_doctor.fetch_latest_release(24, minimum_version="1.7.0")
 
             self.assertEqual(latest_release["latest_version"], "1.7.0")
@@ -62,7 +66,7 @@ class InstallDoctorCacheTests(unittest.TestCase):
             cache_path.write_text(
                 json.dumps(
                     {
-                        "checked_at": datetime.now(timezone.utc).isoformat(),
+                        "checked_at": datetime(2026, 4, 12, 18, 0, tzinfo=timezone.utc).isoformat(),
                         "latest_version": "1.7.0",
                         "latest_url": "https://example.com/v1.7.0",
                         "source": "gh-release",
@@ -73,11 +77,74 @@ class InstallDoctorCacheTests(unittest.TestCase):
 
             with mock.patch.object(self.install_doctor, "CACHE_PATH", cache_path), mock.patch.object(
                 self.install_doctor, "fetch_json_with_gh", gh_fetch
-            ), mock.patch.object(self.install_doctor, "fetch_json_with_http", return_value=None):
+            ), mock.patch.object(self.install_doctor, "fetch_json_with_http", return_value=None), mock.patch.object(
+                self.install_doctor, "datetime"
+            ) as fake_datetime:
+                fake_datetime.now.return_value = datetime(2026, 4, 12, 20, 30, tzinfo=timezone.utc)
+                fake_datetime.fromisoformat.side_effect = datetime.fromisoformat
                 latest_release = self.install_doctor.fetch_latest_release(24, minimum_version="1.7.0")
 
             self.assertEqual(latest_release["latest_version"], "1.7.0")
             gh_fetch.assert_not_called()
+
+    def test_fetch_latest_release_reuses_recent_ahead_cache_without_refetching(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cache_path = Path(tmpdir) / "install-doctor.json"
+            cache_path.write_text(
+                json.dumps(
+                    {
+                        "checked_at": datetime(2026, 4, 12, 20, 0, tzinfo=timezone.utc).isoformat(),
+                        "latest_version": "1.6.1",
+                        "latest_url": "https://example.com/v1.6.1",
+                        "source": "gh-release",
+                    }
+                )
+            )
+            gh_fetch = mock.Mock()
+
+            with mock.patch.object(self.install_doctor, "CACHE_PATH", cache_path), mock.patch.object(
+                self.install_doctor, "fetch_json_with_gh", gh_fetch
+            ), mock.patch.object(self.install_doctor, "fetch_json_with_http", return_value=None), mock.patch.object(
+                self.install_doctor, "datetime"
+            ) as fake_datetime:
+                fake_datetime.now.return_value = datetime(2026, 4, 12, 20, 30, tzinfo=timezone.utc)
+                fake_datetime.fromisoformat.side_effect = datetime.fromisoformat
+                latest_release = self.install_doctor.fetch_latest_release(24, minimum_version="1.7.0")
+
+            self.assertEqual(latest_release["latest_version"], "1.6.1")
+            gh_fetch.assert_not_called()
+
+    def test_fetch_latest_release_refreshes_stale_unavailable_cache(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cache_path = Path(tmpdir) / "install-doctor.json"
+            cache_path.write_text(
+                json.dumps(
+                    {
+                        "checked_at": datetime(2026, 4, 12, 18, 0, tzinfo=timezone.utc).isoformat(),
+                        "latest_version": None,
+                        "latest_url": None,
+                        "source": "unavailable",
+                    }
+                )
+            )
+            gh_fetch = mock.Mock(
+                return_value={
+                    "tag_name": "v1.7.0",
+                    "html_url": "https://github.com/aigorahub/elves/releases/tag/v1.7.0",
+                }
+            )
+
+            with mock.patch.object(self.install_doctor, "CACHE_PATH", cache_path), mock.patch.object(
+                self.install_doctor, "fetch_json_with_gh", gh_fetch
+            ), mock.patch.object(self.install_doctor, "fetch_json_with_http", return_value=None), mock.patch.object(
+                self.install_doctor, "datetime"
+            ) as fake_datetime:
+                fake_datetime.now.return_value = datetime(2026, 4, 12, 20, 30, tzinfo=timezone.utc)
+                fake_datetime.fromisoformat.side_effect = datetime.fromisoformat
+                latest_release = self.install_doctor.fetch_latest_release(24, minimum_version="1.7.0")
+
+            self.assertEqual(latest_release["latest_version"], "1.7.0")
+            gh_fetch.assert_called_once_with("repos/aigorahub/elves/releases/latest")
 
 
 if __name__ == "__main__":
