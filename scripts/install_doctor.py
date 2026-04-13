@@ -31,6 +31,7 @@ ACTIVE_ROOT = Path(__file__).resolve().parent.parent
 CACHE_PATH = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "elves" / "install-doctor.json"
 HTTP_TIMEOUT_SECONDS = 5
 DEFAULT_CACHE_HOURS = 24
+STALE_RELEASE_REVALIDATION_HOURS = 1
 VERSION_RE = re.compile(r'^\s*version:\s*"([^"]+)"\s*$', re.MULTILINE)
 
 
@@ -122,7 +123,7 @@ def version_is_newer(candidate: str | None, current: str | None) -> bool:
     return False
 
 
-def load_cache(max_age_hours: int) -> dict[str, Any] | None:
+def load_cache(max_age_hours: int, minimum_version: str | None = None) -> dict[str, Any] | None:
     if not CACHE_PATH.exists():
         return None
     try:
@@ -139,8 +140,16 @@ def load_cache(max_age_hours: int) -> dict[str, Any] | None:
     except ValueError:
         return None
 
-    if datetime.now(timezone.utc) - checked > timedelta(hours=max_age_hours):
+    cache_age = datetime.now(timezone.utc) - checked
+    if cache_age > timedelta(hours=max_age_hours):
         return None
+
+    cached_version = normalize_version(str(payload.get("latest_version") or ""))
+    if minimum_version and (
+        cached_version is None or version_is_newer(minimum_version, cached_version)
+    ):
+        if cache_age > timedelta(hours=STALE_RELEASE_REVALIDATION_HOURS):
+            return None
     return payload
 
 
@@ -181,8 +190,8 @@ def fetch_json_with_http(url: str) -> dict[str, Any] | list[Any] | None:
         return None
 
 
-def fetch_latest_release(max_age_hours: int) -> dict[str, Any]:
-    cached = load_cache(max_age_hours)
+def fetch_latest_release(max_age_hours: int, minimum_version: str | None = None) -> dict[str, Any]:
+    cached = load_cache(max_age_hours, minimum_version)
     if cached is not None:
         return cached
 
@@ -433,7 +442,7 @@ def main() -> int:
     cwd = Path.cwd()
 
     installs, active_install = discover_installs(cwd)
-    latest_release = fetch_latest_release(args.cache_hours)
+    latest_release = fetch_latest_release(args.cache_hours, active_install.version)
     notes = build_recommendations(installs, active_install, latest_release)
 
     report = {
