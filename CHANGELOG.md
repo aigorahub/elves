@@ -4,6 +4,8 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-04-14
+
 ### Run control hardening
 
 - **Checkpoint semantics are now explicit.** Elves now distinguishes between a delivery checkpoint
