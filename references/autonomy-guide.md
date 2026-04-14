@@ -93,8 +93,8 @@ Acknowledge, incorporate the information into your current understanding, note i
 Acknowledge, update the survival guide's "Next Exact Batch" section to reflect the new priority, note the change in the execution log, and continue with the updated plan.
 
 If the message also changes stop behavior or checkpoint meaning — for example, "have something by
-8am but keep going" or "do not stop unless blocked" — rewrite the survival guide's `## Run
-Control` block immediately as part of handling the message.
+8am but keep going" or "do not stop unless blocked" — rewrite the survival guide's `## Run Control`
+block immediately and log the change in the execution log.
 
 ### Scenario 4: They Say "Stop"
 

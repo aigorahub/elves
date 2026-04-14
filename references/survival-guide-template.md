@@ -150,13 +150,10 @@ If not applicable, write: **No active paid or long-running compute.**
 After every commit and push, answer these questions before doing anything else:
 
 1. What is the **single** next highest-value action?
-2. What paid compute or long-running resources are active?
-3. What is each active resource doing right now?
-4. If any resource is idle, stale, or ambiguous, did you shut it down or pause it?
-5. Did the user change stop behavior, priorities, or scope since the last survival-guide rewrite?
-6. Are you actually allowed to stop right now?
-
-If the last answer is anything other than a clear **yes**, continue immediately.
+2. What paid compute or long-running resources are active right now?
+3. What is each active resource doing? If any resource is idle, stale, or ambiguous, shut it down or pause it now.
+4. Did the user change stop behavior, checkpoint meaning, priorities, or scope since the survival guide was last rewritten? If yes, rewrite `## Run Control`, `## Current Phase`, and `## Next Exact Batch` now.
+5. Am I allowed to stop? If not, continue immediately.
 
 ---
 

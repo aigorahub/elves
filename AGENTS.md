@@ -57,7 +57,7 @@ Every session has a run mode. Persist it in the survival guide under `## Run Con
 Run control is live, not planning-only metadata. If a later user instruction changes stop
 behavior, checkpoint meaning, or whether work may continue after a deadline, the latest
 controlling instruction wins. Rewrite the survival guide's `## Run Control` block immediately and
-log the change.
+log the change in the execution log.
 
 **Finite** (default): work toward completion, then Final Completion.
 
@@ -74,14 +74,15 @@ A checkpoint is not completion. A commit is not completion. A PR is not completi
 
 - Final Completion is disabled unless the user explicitly requests stop.
 - After every checkpoint, begin the next highest-value task.
-- A checkpoint or return time is not a stop condition unless the survival guide explicitly says it is a hard stop boundary.
-- Only stop for: explicit user stop, genuine blocker, or hard environment failure.
+- A checkpoint, return time, or delivery target is not a stop condition unless the survival guide explicitly says it is a hard stop boundary.
+- Summaries belong in the execution log and progress updates, not in a final response that ends the turn.
+- Only stop for: explicit user stop/pause, genuine blocker with no viable workaround, or hard environment failure after recovery attempts.
 
 See `references/open-ended-guide.md` for detailed patterns.
 
 ### Pre-Final Guard
 
-Before any final response: (1) Did the user ask to stop? (2) What does the latest controlling user instruction say about continuing past the next checkpoint or deadline? (3) Is run mode finite? (4) If finite, is the current deadline actually a hard stop boundary? (5) If open-ended, is there a true blocker? (6) Is any paid compute or long-running resource still active or ambiguous? If answers don't justify stopping, continue the run.
+Before any final response: (1) Did the user ask to stop? (2) What does the latest controlling user instruction say about continuing past the next checkpoint or deadline? (3) Is run mode finite? (4) If finite, is the current deadline actually a hard stop boundary? (5) If open-ended, is there a true blocker? (6) Is any paid compute, remote job, or long-running resource still active or ambiguous? If answers don't justify stopping, continue the run.
 
 ## Planning
 

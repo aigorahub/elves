@@ -139,7 +139,8 @@ Example for a checkpointed open-ended overnight run:
 ## Rule: Latest Controlling Instruction Wins
 
 Run control is not fixed at planning time. If the user later changes stop behavior, the latest
-controlling instruction wins and the survival guide must be rewritten immediately.
+controlling instruction wins and the survival guide must be rewritten immediately. Log the change
+in the execution log.
 
 ## Compaction Recovery in Open-Ended Mode
 
