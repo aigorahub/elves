@@ -993,7 +993,7 @@ Maintain a `.elves-session.json` file with machine-readable session data (sessio
 ```json
 {
   "session_id": "elves-2026-03-24-auth-system",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "status": "in_progress",
   "branch": "feat/auth-system",
   "plan_path": "docs/plans/auth-system.md",

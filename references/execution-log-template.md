@@ -75,6 +75,8 @@
 **Branch:** `[feat/branch-name]`
 **PR:** [#N / "not created yet"]
 **Run mode:** [finite / open-ended] | **User returns:** [time / "never"]
+**Checkpoint semantics:** [none / delivery checkpoint / hard stop] | **Actual stop conditions:** [list]
+**Active compute at launch:** [none / list]
 
 **Batch breakdown:**
 1. [Batch 1 name] — [one-line scope]

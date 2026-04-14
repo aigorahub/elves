@@ -36,6 +36,7 @@ Stage this Elves run. Do not start implementing the batches in this call.
 **Your job in this call:**
 - Tighten the plan if needed so it can survive compaction without the conversation
 - Generate or refresh the survival guide, learnings file, and execution log
+- Set `## Run Control` explicitly, including run mode, checkpoint semantics, may-continue-after-checkpoint, actual stop conditions, and `Active Compute` if relevant
 - Create or switch to the branch, open or update the PR, and record the PR number
 - Run preflight and log any warnings or blockers
 - Record any durable-doc paths the run should use (`.ai-docs/*`) if the repo keeps them
@@ -64,6 +65,7 @@ Stage this Elves run. Do not start implementing the batches in this call.
 **Your job in this call:**
 - Tighten the plan if needed so it can survive compaction without the conversation
 - Generate or refresh the survival guide, learnings file, and execution log
+- Set `## Run Control` explicitly, including run mode, checkpoint semantics, may-continue-after-checkpoint, actual stop conditions, and `Active Compute` if relevant
 - Create or switch to the branch, open or update the PR, and record the PR number
 - Run preflight and log any warnings or blockers
 - Record any durable-doc paths the run should use (`.ai-docs/*`) if the repo keeps them
@@ -90,11 +92,13 @@ Stage this Elves run. Do not start implementing the batches in this call.
 The run is staged. Start now.
 Read [path/to/survival-guide.md] first, then `.elves-session.json` if it exists, then [path/to/learnings.md] if it exists, then [path/to/plan.md], then the execution log at [path/to/execution-log.md], then `.ai-docs/manifest.md` if it exists.
 I am going offline until [WHEN].
+By [WHEN], I want [CHECKPOINT DELIVERABLE]. This is a [delivery checkpoint / hard stop].
 Do not stop unless you hit a genuine blocker with no reasonable workaround.
 Use your judgment. Work in small batches and commit frequently.
 Make the commit subjects read like progress reports.
 Run every relevant validation gate, including E2E or browser checks wherever they make sense.
 After every push, read PR comments and checks, fix blockers, and re-check for regressions against earlier verified work.
+If the run uses paid compute, remote jobs, or long-lived servers, keep the survival guide's `Active Compute` section current after every push and topology change.
 Keep going until the plan is done, I stop you, or you hit a true blocker.
 ```
 
@@ -104,11 +108,13 @@ Keep going until the plan is done, I stop you, or you hit a true blocker.
 The run is staged. Start now.
 Read docs/elves/survival-guide.md first, then `.elves-session.json` if it exists, then docs/elves/learnings.md if it exists, then docs/plans/auth-refactor.md, then the execution log at docs/elves/execution-log.md, then `.ai-docs/manifest.md` if it exists.
 I am going offline until 7:30am ET.
+By 7:30am ET, I want a review-ready checkpoint with green local validation. This is a delivery checkpoint, not a stop boundary.
 Do not stop unless you hit a genuine blocker with no reasonable workaround.
 Use your judgment. Work in small batches and commit frequently.
 Make the commit subjects read like progress reports.
 Run every relevant validation gate, including E2E or browser checks wherever they make sense.
 After every push, read PR comments and checks, fix blockers, and re-check for regressions against earlier verified work.
+If the run uses paid compute, remote jobs, or long-lived servers, keep the survival guide's `Active Compute` section current after every push and topology change.
 Keep going until the plan is done, I stop you, or you hit a true blocker.
 ```
 
@@ -135,6 +141,13 @@ long.
 **Point to durable memory too**
 If the run uses a learnings file or `.ai-docs`, include those paths in the launch prompt so the
 agent rehydrates from durable knowledge instead of rediscovering it.
+
+**State checkpoint semantics explicitly**
+Don't make the agent guess whether "8am" is a delivery checkpoint or a hard stop. Say which it is.
+
+**Call out paid compute**
+If pods, remote jobs, or long-lived servers are involved, tell the agent and require `Active
+Compute` updates in the survival guide.
 
 **Make the launch prompt behavior-heavy**
 The launch prompt should remind the agent how to behave: don't stop, use judgment, work in small

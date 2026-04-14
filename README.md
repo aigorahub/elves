@@ -172,7 +172,8 @@ The launch prompt starts unattended execution. Elves re-reads the prepared docs,
   repeats, for example by tightening the survival guide, templates, or tool config after repeated
   review findings
 - **Merge conflict handling**: when `git push` fails due to a diverged remote, the agent fetches and merges (never rebases), resolves conflicts or triggers a Hard Stop
-- **Two run modes**: finite (deadline-based, default) or open-ended (continue until explicitly stopped). Open-ended mode also covers "checkpointed continuation" runs like "have something by 8am, then keep going." It disables Final Completion and treats every checkpoint as a relaunch point unless the survival guide says the checkpoint is a hard stop.
+- **Two run modes**: finite (deadline-based, default) or open-ended (continue until explicitly stopped). Open-ended mode also covers "checkpointed continuation" runs like "have something by 8am, then keep going." A morning checkpoint, return time, or delivery target is not a stop condition unless the survival guide explicitly marks it as a hard stop.
+- **Live operator brief**: the survival guide is rewritten in place as the run evolves. `Run Control`, `Current Phase`, `Active Compute`, and `Next Exact Batch` stay current; the execution log carries history.
 - **Time-aware pacing**: tracks how long each batch takes and uses that to decide whether to start another batch or wrap up cleanly (finite mode)
 - **Slack notifications** (or any custom command): know when your run finishes without watching the terminal
 - **Constitution and legality check**: human-authored deal-breaker behaviors (`docs/constitution.md`) verified by a read-only judge after each batch. Three quality layers: correctness (tests), plan compliance (review), legality (judge). Success criteria the agent didn't author.
@@ -624,6 +625,10 @@ automatically when the helper is present in the bundle.
 - Your active compute picture if the run uses paid pods, remote jobs, or long-lived servers
 
 Treat the survival guide as a live operator brief. Rewrite `Run Control`, `Current Phase`, `Active Compute`, and `Next Exact Batch` in place as the run evolves. Do not stack stale "next action updates" there; put history in the execution log instead.
+
+If the run has a morning checkpoint, return time, paid pods, remote jobs, or long-lived servers,
+say so explicitly in the survival guide. The agent should never have to guess whether a time is a
+delivery checkpoint or a hard stop, or whether compute should be shut down, paused, or kept warm.
 
 **The validation gates** will be different for every project. A Python data pipeline has different gates than a React web app. Edit the survival guide's `## Tool Configuration` section to match your stack. See [`references/tool-config-examples.md`](references/tool-config-examples.md) for examples across Node, Python, Go, Rust, and monorepos.
 

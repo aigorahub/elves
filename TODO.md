@@ -44,3 +44,12 @@ For projects with APIs (REST, GraphQL, exported library interfaces), capture the
 - [x] Make regression preservation an explicit acceptance-criteria rule.
   `SKILL.md`, `AGENTS.md`, `README.md`, and `references/plan-template.md` now require at least one
   acceptance criterion that proves old behavior still works when a batch changes existing surfaces.
+
+## Follow-ups from v1.8.0
+
+- [ ] Expand `scripts/check_repo_consistency.py` to cover the operator-facing docs that now mirror
+  run control, including the kickoff prompt template, overnight run report template, and durable
+  `.ai-docs/*` surfaces.
+
+- [ ] Add a lightweight release checklist or helper that sweeps embedded version examples,
+  changelog heading promotion, and newly added human-facing doc surfaces during a minor release.

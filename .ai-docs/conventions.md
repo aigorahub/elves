@@ -6,6 +6,13 @@
 - Template updates in `references/*` should reflect the same model as the skill files.
 - A release version bump is incomplete until the skill metadata, `AGENTS.md`, and
   `CHANGELOG.md` all agree.
+- Run control is live metadata. If stop behavior, checkpoint meaning, or continuation policy
+  changes mid-run, rewrite the survival guide's `Run Control` block immediately and log the change
+  in the execution log.
+- The live survival-guide sections are `Run Control`, `Current Phase`, `Active Compute`, and
+  `Next Exact Batch`. Rewrite them in place; do not stack old updates there.
+- If a run uses paid compute, remote jobs, or long-lived local services, keep `Active Compute`
+  current after every push and after every resource-topology change.
 - Installed Claude/Codex skill bundles should ship only the installable runtime surface:
   `SKILL.md`, `AGENTS.md` (Codex), `references/`, `scripts/preflight.sh`,
   `scripts/notify.sh`, and `scripts/install_doctor.py`. Repo-only maintenance helpers stay in the
@@ -19,6 +26,8 @@
 - Explicitly record docs that were impacted, updated, promoted, or deferred.
 - Prefer promoting durable knowledge into `learnings` or `.ai-docs/*` instead of burying it in the
   execution log.
+- Kickoff prompts, report templates, and other operator-facing forms should mirror the same
+  run-control model as the core skill files.
 
 ## Product direction
 

@@ -17,7 +17,8 @@ templates, and small support scripts:
 Elves now uses distinct layers instead of one giant note pile:
 
 1. `plan`: authoritative scope and batch structure for the current run
-2. `survival guide`: current run control, next exact batch, and operator constraints
+2. `survival guide`: live run control, checkpoint semantics, active compute, next exact batch, and
+   operator constraints
 3. `learnings`: durable reusable lessons that should survive this run
 4. `execution log`: chronological proof of what happened
 5. `.ai-docs/*`: curated durable truths about this repo
@@ -30,6 +31,7 @@ different places so later agents do not need to infer intent from noisy notes.
 This repo now treats documentation as a maintained surface:
 
 - Raw observations belong in the execution log.
+- Live operator state belongs in the survival guide and should be rewritten in place.
 - Reusable lessons belong in the learnings file.
 - Stable architecture, conventions, and traps belong in `.ai-docs/*`.
 - Human-facing explanations and release notes belong in `README.md`, `CHANGELOG.md`, and `TODO.md`.

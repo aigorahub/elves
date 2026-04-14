@@ -18,6 +18,10 @@
 >
 > If documentation freshness matters for the project, call it out in the batches. Elves works best
 > when the plan makes durable doc upkeep explicit instead of leaving it as invisible cleanup.
+>
+> If the run has a morning checkpoint, paid compute, or remote jobs, make sure the survival guide
+> and launch prompt state those semantics explicitly. Do not make the agent infer whether a time is
+> a delivery target or a hard stop.
 
 ---
 
@@ -165,6 +169,7 @@ sprint-length: [N weeks]
 - [Note 1]
 - [Note 2]
 - [Note 3]
+- [If the run uses a checkpoint, pods, remote jobs, or long-lived servers, note that the survival guide must state checkpoint semantics, actual stop conditions, and active compute explicitly]
 - [If the repo should become more AI-friendly during the run, say what "better context" means here]
 
 ---

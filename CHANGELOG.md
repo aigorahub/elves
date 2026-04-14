@@ -25,6 +25,9 @@ All notable changes to the Elves skill are documented here.
 - **README clarified the operating model.** User-facing docs now explain checkpointed open-ended
   runs and encourage rewriting the survival guide in place instead of stacking stale "next action"
   updates.
+- **Templates and durable docs synced.** The kickoff prompt, execution-log template, overnight run
+  report, repo learnings, and `.ai-docs/*` surfaces now mirror the same checkpoint, stop-policy,
+  and active-compute model instead of leaving that knowledge trapped in the main skill files.
 
 ## [1.7.0] - 2026-04-11
 
