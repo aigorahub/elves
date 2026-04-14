@@ -8,6 +8,13 @@ The default Elves workflow is built around finite runs: a plan with batches, a t
 
 Open-ended mode changes the run-control semantics so the agent continues autonomously until the user explicitly stops it or a true blocker is reached.
 
+This includes checkpointed open-ended runs where the user says some version of:
+- "Have something ready by 8am, but keep going after that."
+- "I want concrete results by the morning checkpoint. Do not stop."
+- "Give me a checkpoint update, then continue unless blocked."
+
+In those cases, the checkpoint is a delivery target, not a stop boundary.
+
 ## Behavioral Examples
 
 ### Wrong
@@ -77,6 +84,10 @@ These fields should be persisted in the survival guide under `## Run Control` so
 - **Run mode:** [finite | open-ended]
 - **Stop policy:** [deadline | explicit-user-stop | blocker-only]
 - **User intent:** [copy the exact controlling instruction here]
+- **Checkpoint due by:** [YYYY-MM-DD HH:MM timezone | none]
+- **Checkpoint semantics:** [delivery target only | hard stop boundary | none]
+- **May continue after checkpoint:** [yes | no]
+- **Actual stop conditions:** [one short sentence]
 - **Final-response policy:** [allowed | disallowed until stop]
 ```
 
@@ -88,10 +99,14 @@ Example for an open-ended QA audit:
 - **Run mode:** open-ended
 - **Stop policy:** explicit-user-stop
 - **User intent:** "Keep going until I stop you."
+- **Checkpoint due by:** none
+- **Checkpoint semantics:** none
+- **May continue after checkpoint:** yes
+- **Actual stop conditions:** Explicit user stop or blocker only.
 - **Final-response policy:** disallowed until user stop or blocker
 ```
 
-Example for a standard overnight run:
+Example for a standard finite overnight run:
 
 ```markdown
 ## Run Control
@@ -99,12 +114,36 @@ Example for a standard overnight run:
 - **Run mode:** finite
 - **Stop policy:** deadline
 - **User intent:** "I'll be back at 8am. Get through as many batches as you can."
+- **Checkpoint due by:** 2026-01-15 08:00 local
+- **Checkpoint semantics:** hard stop boundary
+- **May continue after checkpoint:** no
+- **Actual stop conditions:** Deadline, explicit user stop, or blocker.
 - **Final-response policy:** allowed
 ```
 
+Example for a checkpointed open-ended overnight run:
+
+```markdown
+## Run Control
+
+- **Run mode:** open-ended
+- **Stop policy:** explicit-user-stop
+- **User intent:** "Have concrete results by 8am, but keep going after that. Do not stop unless blocked."
+- **Checkpoint due by:** 2026-01-15 08:00 local
+- **Checkpoint semantics:** delivery target only
+- **May continue after checkpoint:** yes
+- **Actual stop conditions:** Explicit user stop or blocker only.
+- **Final-response policy:** disallowed until user stop or blocker
+```
+
+## Rule: Latest Controlling Instruction Wins
+
+Run control is not fixed at planning time. If the user later changes stop behavior, the latest
+controlling instruction wins and the survival guide must be rewritten immediately.
+
 ## Compaction Recovery in Open-Ended Mode
 
-After recovering from compaction, the most important thing to restore is "I am not allowed to stop on my own." Read the Run Control section of the survival guide before anything else. If run mode is open-ended, that constraint overrides any instinct to summarize and close out.
+After recovering from compaction, the most important thing to restore is "I am not allowed to stop on my own." Read the Run Control section of the survival guide before anything else. If run mode is open-ended, that constraint overrides any instinct to summarize and close out. Also check whether the next deadline is a delivery checkpoint or a true stop boundary; they are not the same thing.
 
 ## Testing Open-Ended Mode
 

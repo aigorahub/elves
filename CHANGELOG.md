@@ -2,6 +2,28 @@
 
 All notable changes to the Elves skill are documented here.
 
+## [Unreleased]
+
+### Run control hardening
+
+- **Checkpoint semantics are now explicit.** Elves now distinguishes between a delivery checkpoint
+  and a true stop boundary, so "have results by 8am, then keep going" is modeled as open-ended
+  mode with a checkpoint instead of a silent deadline stop.
+- **Latest controlling instruction wins.** The skill and references now require the survival guide
+  to rewrite `## Run Control` immediately when the user changes stop behavior mid-run.
+- **Post-push operator checklist added.** After every push, the agent must re-read the survival
+  guide, confirm the single next action, inspect active compute/resources, reconcile any idle or
+  ambiguous paid work, and confirm whether stopping is actually allowed.
+- **Survival guide template upgraded.** The template now includes checkpoint fields, an `Active
+  Compute` section, and a dedicated post-checkpoint control loop, reinforcing that the survival
+  guide is a live operator brief rather than an append-only history log.
+- **Open-ended and autonomy references expanded.** `references/open-ended-guide.md` and
+  `references/autonomy-guide.md` now cover checkpointed open-ended runs, mid-run stop-policy
+  changes, and compute-status check-ins more explicitly.
+- **README clarified the operating model.** User-facing docs now explain checkpointed open-ended
+  runs and encourage rewriting the survival guide in place instead of stacking stale "next action"
+  updates.
+
 ## [1.7.0] - 2026-04-11
 
 ### Durable memory and AI-friendly docs

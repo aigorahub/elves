@@ -28,6 +28,10 @@ session-cookie approach. All existing auth tests must pass. The public API surfa
 - **Run mode:** [finite | open-ended]
 - **Stop policy:** [deadline | explicit-user-stop | blocker-only]
 - **User intent:** [copy the exact controlling instruction here, e.g., "I'll be back at 8am" or "Keep going until I stop you."]
+- **Checkpoint due by:** [YYYY-MM-DD HH:MM timezone | none]
+- **Checkpoint semantics:** [delivery target only | hard stop boundary | none]
+- **May continue after checkpoint:** [yes | no]
+- **Actual stop conditions:** [one short sentence]
 - **Final-response policy:** [allowed | disallowed until stop]
 
 ---
@@ -36,6 +40,7 @@ session-cookie approach. All existing auth tests must pass. The public API surfa
 
 - **Started:** [YYYY-MM-DD HH:MM timezone]
 - **User returns:** ~[YYYY-MM-DD HH:MM timezone] _("never" if open-ended)_
+- **Checkpoint expectation:** [what should exist by the checkpoint or next user return]
 - **Time budget:** ~[N] hours _("unlimited" if open-ended)_
 - **Average batch time so far:** [Xm] _(update after each batch)_
 - **Batches remaining:** [N of M]
@@ -91,6 +96,9 @@ plan, the codebase, or good engineering practice.
 
 ## Current Phase
 
+> Rewrite this section in place. Do not stack old updates here. Historical state belongs in the
+> execution log, not in the live operator brief.
+
 **Status:** [Staging / Launch-ready / In progress / All batches complete / Scout mode / Blocked]
 
 **Active batch:** [Batch N: Name]
@@ -98,7 +106,20 @@ plan, the codebase, or good engineering practice.
 **What was just finished:** [One sentence. E.g., "Batch 2 complete: JWT issuance and verification
 implemented, all 47 tests pass, PR review clean."]
 
-**Immediate next action:** [One sentence. E.g., "Start Batch 3: implement refresh token rotation."]
+**Single next action:** [One sentence. E.g., "Start Batch 3: implement refresh token rotation."]
+
+---
+
+## Active Compute
+
+> Include this section whenever the run uses paid compute, remote jobs, dev servers, or any
+> resource whose status matters to stop/go decisions. Rewrite it in place.
+
+| Resource | Purpose | Current status | Last verified | Stop / repurpose trigger |
+| --- | --- | --- | --- | --- |
+| [Pod / job / server] | [Why it exists] | [Running / idle / complete / stopped] | [timestamp] | [When to stop it] |
+
+If not applicable, write: **No active paid or long-running compute.**
 
 ---
 
@@ -121,6 +142,21 @@ implemented, all 47 tests pass, PR review clean."]
 **Risk:** [One sentence describing the highest-risk aspect of this batch]
 
 **Rollback tag:** `elves/pre-batch-N` _(create this before starting)_
+
+---
+
+## Post-Checkpoint Control Loop
+
+After every commit and push, answer these questions before doing anything else:
+
+1. What is the **single** next highest-value action?
+2. What paid compute or long-running resources are active?
+3. What is each active resource doing right now?
+4. If any resource is idle, stale, or ambiguous, did you shut it down or pause it?
+5. Did the user change stop behavior, priorities, or scope since the last survival-guide rewrite?
+6. Are you actually allowed to stop right now?
+
+If the last answer is anything other than a clear **yes**, continue immediately.
 
 ---
 
@@ -162,6 +198,7 @@ Before marking any batch complete, verify all of the following:
 - [ ] PR review performed, all blocking findings resolved
 - [ ] Execution log updated with timestamps, commands run, test results, commit SHA
 - [ ] Survival guide updated with new Current Phase and Next Exact Batch
+- [ ] Active Compute section updated, or explicitly marked as not applicable
 - [ ] Changes committed to branch, pushed to remote
 - [ ] Rollback tag created _before_ the batch started
 
@@ -326,15 +363,16 @@ notification: pr-comment
 When you restart after a compaction, do these steps in order. No shortcuts.
 
 1. Read this file (survival guide). You are doing this now.
-2. **Read the Run Control section above.** Confirm the run mode and stop policy. If open-ended, you are not allowed to stop on your own. This is the most important thing to recover.
+2. **Read the Run Control section above.** Confirm the run mode, stop policy, checkpoint semantics, and actual stop conditions. If open-ended, you are not allowed to stop on your own. This is the most important thing to recover.
 3. Read `.elves-session.json` if it exists. Confirm current batch, PR number, and test baseline.
 4. Read the learnings file if one exists.
 5. Read the plan. Confirm the overall scope hasn't changed (compare hash if recorded above).
 6. Read the execution log. Find the last completed batch and the last **Decisions made** entry.
 7. Read `.ai-docs/manifest.md` if it exists and then any linked durable docs that matter to the next batch.
-8. Identify the first incomplete batch (look at Current Phase and Next Exact Batch above).
-9. Check the clock. How much time budget remains? (If open-ended: unlimited.)
-10. Resume immediately. Don't ask for help. Don't redo completed work.
+8. Read the Active Compute section if present. Know what live resources exist before making any new plan.
+9. Identify the first incomplete batch or the single next action (look at Current Phase and Next Exact Batch above).
+10. Check the clock. How much time budget remains? (If open-ended: unlimited.)
+11. Resume immediately. Don't ask for help. Don't redo completed work.
 
 The execution log is your proof of what is done. If something appears in the log as complete, it is
 complete. Don't re-implement it.

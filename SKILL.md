@@ -83,11 +83,20 @@ These principles apply to **all code changes**, including review fixes. When the
 
 Every session has a run mode. Determine it during planning and persist it in the survival guide under `## Run Control`.
 
+Run control is live, not planning-only metadata. If a later user instruction changes stop
+behavior, checkpoint meaning, or whether work may continue after a deadline, the latest
+controlling instruction wins. Rewrite the survival guide's `## Run Control` block immediately and
+log the change in the execution log.
+
 **Finite mode** (default): work toward completion, then Final Completion. Use when there's a defined scope and a return time.
 
 **Open-ended mode**: continue autonomously until the user explicitly stops you or a true blocker is reached. Final Completion is disabled. There is no natural stopping point.
 
-Trigger open-ended mode when the user says things like: "keep going until I stop you," "do not stop," "keep iterating," "run indefinitely," "keep auditing," "keep amassing findings," or "never stop unless blocked."
+If the user combines a checkpoint with non-stop language — for example, "have results by 8am, but
+keep going after that" or "do not stop unless blocked" — this is open-ended mode with a
+checkpoint, not finite mode. Record the checkpoint separately under `## Session Budget`.
+
+Trigger open-ended mode when the user says things like: "keep going until I stop you," "do not stop," "keep iterating," "run indefinitely," "keep auditing," "keep amassing findings," "never stop unless blocked," or "have something ready by morning but keep going after that."
 
 ### Open-ended rules
 
@@ -95,6 +104,7 @@ A successful checkpoint is not completion. A clean commit is not completion. A p
 
 - Final Completion is disabled. Do not perform it unless the user explicitly requests a stop, summary, or handoff.
 - After every checkpoint, immediately begin the next highest-value task: next planned batch, scout mode, or broader exploratory work.
+- A checkpoint, return time, or delivery target is not a stop condition unless the survival guide explicitly says it is a hard stop boundary.
 - Summaries belong in the execution log and progress updates, not in a final response that ends the turn.
 - Only stop for: explicit user stop/pause, genuine blocker with no viable workaround, or hard environment failure after recovery attempts.
 
@@ -105,8 +115,11 @@ For exploratory work (QA, UX audit, bug hunting, backlog generation), there is n
 Before sending any final response that would end the turn, answer these questions:
 
 1. Did the user explicitly ask to stop, pause, summarize, or hand off?
-2. Is the run mode finite?
-3. If open-ended, is there a true blocker with no workaround?
+2. What does the latest controlling user instruction say about continuing past the next checkpoint or deadline?
+3. Is the run mode finite?
+4. If finite, is the current deadline actually a hard stop boundary, or only a delivery checkpoint recorded in the survival guide?
+5. If open-ended, is there a true blocker with no workaround?
+6. Is any paid compute, remote job, or long-running resource still active or ambiguous?
 
 If the answers don't justify stopping, do not send a final response. Continue the run.
 
@@ -153,7 +166,7 @@ The planner output replaces the interactive conversation but produces the same a
 
 6. **Configure the tools.** What test commands exist? Is there a preview deployment? What review infrastructure is in place (bots, CI, custom APIs)? How should notifications work?
 
-7. **Set the run mode.** Finite (default) or open-ended? If the user says anything like "keep going until I stop you" or "run indefinitely," set open-ended mode. Persist this in the survival guide under `## Run Control`.
+7. **Set the run mode.** Finite (default) or open-ended? If the user says anything like "keep going until I stop you," "run indefinitely," "never stop unless blocked," or gives a checkpoint plus explicit permission to continue after it, set open-ended mode. Persist this in the survival guide under `## Run Control`.
 
 8. **Set the time budget.** When is the user leaving? When will they be back? This determines pacing. (In open-ended mode, the time budget is "until the user stops me.")
 
@@ -203,7 +216,7 @@ Execution starts only from a fresh launch call after staging is complete. The la
 - Work in small batches and commit frequently.
 - Make commit subjects read like progress reports.
 - Run every relevant validation gate, including E2E or browser checks where they make sense.
-- After every push, read PR comments and checks, fix blockers, and re-check for regressions against earlier verified work.
+- After every push, re-read the survival guide, run the post-push operator checklist, then read PR comments and checks, fix blockers, and re-check for regressions against earlier verified work.
 
 On launch, start with the same read order used in Orient: survival guide, `.elves-session.json` if it exists, learnings if it exists, plan, execution log, then `.ai-docs/manifest.md` if present. Confirm the run state and then enter the core loop immediately.
 
@@ -550,6 +563,10 @@ Keep entries concise. If the log exceeds ~50 entries, archive older ones under `
 
 Update "Current Phase" and "Next Exact Batch" to reflect the new state. If a promoted learning changes how the next batch should be approached, reflect that here too. A stale survival guide sends the next session down the wrong path.
 
+Rewrite these sections in place. The survival guide is a live operator brief, not an append-only
+history log. Keep exactly one current status, one current next action, one active compute picture,
+and one next exact batch. Historical updates belong in the execution log.
+
 ### 11. Commit and Push
 
 Stage specific files (not `git add -A`), commit with a clear message that includes batch progress, push.
@@ -641,6 +658,14 @@ This creates an audit trail. The reviewer can verify your claim instead of redis
 ### 12. Re-read the Survival Guide
 
 **After every push, re-read the survival guide before doing anything else.** Also verify the plan file hasn't changed since session start.
+
+Immediately run this post-push operator checklist:
+
+1. What is the **single** next highest-value action?
+2. What paid compute or long-running resources are active right now?
+3. What is each active resource doing? If any resource is idle, stale, or ambiguous, shut it down or pause it now.
+4. Did the user change stop behavior, checkpoint meaning, priorities, or scope since the survival guide was last rewritten? If yes, rewrite `## Run Control`, `## Current Phase`, and `## Next Exact Batch` now.
+5. Am I allowed to stop? If not, continue immediately.
 
 ### 13. PR Loop — Poll After Every Push
 
@@ -740,16 +765,17 @@ The tests are the user's insurance policy. You don't get to modify the insurance
 After any compaction or restart, your conversation history is gone. But your instructions aren't. They live in files on disk, not in memory. Context compaction can't erase what lives in the survival guide, learnings file, plan, execution log, and durable `.ai-docs` docs. This is why those documents exist.
 
 1. Read the survival guide first (marked with `READ THIS FILE FIRST` banners).
-2. **Read the Run Control section.** Confirm the run mode and stop policy. If the **Run mode** is `open-ended`, you are not allowed to stop on your own. This is the most important thing to recover.
+2. **Read the Run Control section.** Confirm the run mode, stop policy, checkpoint semantics, and actual stop conditions. If the **Run mode** is `open-ended`, you are not allowed to stop on your own. This is the most important thing to recover.
 3. Read `.elves-session.json` to quickly determine the current batch, PR number, and what's complete. This is the fastest signal.
 4. Read the learnings file if it exists.
 5. Read the plan.
 6. Read the execution log.
 7. Read `.ai-docs/manifest.md` if it exists, then any linked durable docs needed for the next batch.
 8. Read the constitution (`docs/constitution.md` or `CONSTITUTION.md`) if it exists.
-9. Identify the first incomplete batch.
-10. Resume immediately without asking for help.
-11. Don't redo completed work.
+9. Inspect the active compute picture in the survival guide, if present. Know what live resources exist before making any new decision.
+10. Identify the first incomplete batch or the single next action named in the survival guide.
+11. Resume immediately without asking for help.
+12. Don't redo completed work.
 
 **If the survival guide is missing from the working tree** (compaction happened during Final Completion after the cleanup `git rm`), check `git log --oneline -5` for a cleanup commit. Restore the files from the parent commit: `git show HEAD~1:<survival-guide-path> > <survival-guide-path>`. Then continue the recovery protocol.
 

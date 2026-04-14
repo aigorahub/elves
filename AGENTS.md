@@ -54,11 +54,19 @@ These apply to all code, including review fixes. When fixing a reviewer finding,
 
 Every session has a run mode. Persist it in the survival guide under `## Run Control`.
 
+Run control is live, not planning-only metadata. If a later user instruction changes stop
+behavior, checkpoint meaning, or whether work may continue after a deadline, the latest
+controlling instruction wins. Rewrite the survival guide's `## Run Control` block immediately and
+log the change.
+
 **Finite** (default): work toward completion, then Final Completion.
 
 **Open-ended**: continue until the user explicitly stops you or a true blocker is reached. Final Completion is disabled.
 
-Trigger open-ended when the user says: "keep going until I stop you," "do not stop," "run indefinitely," "keep auditing," "never stop unless blocked."
+If the user combines a checkpoint with non-stop language ("have results by 8am, but keep going"),
+that is open-ended mode with a checkpoint, not finite mode.
+
+Trigger open-ended when the user says: "keep going until I stop you," "do not stop," "run indefinitely," "keep auditing," "never stop unless blocked," or "have something ready by morning but keep going after that."
 
 ### Open-ended rules
 
@@ -66,13 +74,14 @@ A checkpoint is not completion. A commit is not completion. A PR is not completi
 
 - Final Completion is disabled unless the user explicitly requests stop.
 - After every checkpoint, begin the next highest-value task.
+- A checkpoint or return time is not a stop condition unless the survival guide explicitly says it is a hard stop boundary.
 - Only stop for: explicit user stop, genuine blocker, or hard environment failure.
 
 See `references/open-ended-guide.md` for detailed patterns.
 
 ### Pre-Final Guard
 
-Before any final response: (1) Did the user ask to stop? (2) Is run mode finite? (3) If open-ended, is there a true blocker? If answers don't justify stopping, continue the run.
+Before any final response: (1) Did the user ask to stop? (2) What does the latest controlling user instruction say about continuing past the next checkpoint or deadline? (3) Is run mode finite? (4) If finite, is the current deadline actually a hard stop boundary? (5) If open-ended, is there a true blocker? (6) Is any paid compute or long-running resource still active or ambiguous? If answers don't justify stopping, continue the run.
 
 ## Planning
 
@@ -152,7 +161,7 @@ Run each configured validation gate once to confirm it works. If a gate fails, w
 
 ## Time Awareness
 
-Record session start. If the user hasn't given a return time, ask once; default to 8 hours. Track phase duration (implement/validate/review) per batch. Before each new batch, check the clock. If within 30 minutes of deadline, go straight to Final Completion. (In open-ended mode, there is no deadline. Keep going.)
+Record session start. If the user hasn't given a return time, ask once; default to 8 hours. Track phase duration (implement/validate/review) per batch. Before each new batch, check the clock. If within 30 minutes of a finite-mode hard-stop deadline, go straight to Final Completion. If the deadline is only a checkpoint and work may continue after it, keep going.
 
 ## Stage the Run: Branch, Plan, PR
 
@@ -363,9 +372,7 @@ durable doc: `.ai-docs/architecture.md`, `.ai-docs/conventions.md`, or `.ai-docs
 If the log exceeds ~50 entries, move completed entries to a `## Completed Archive` section.
 
 ### 10. Update the Survival Guide
-Update "Current Phase" and "Next Exact Batch". If a promoted learning changes how the next batch
-should be approached, make sure the survival guide reflects it too. A stale survival guide sends
-the next session down the wrong path.
+Update "Current Phase" and "Next Exact Batch". Rewrite them in place; do not stack stale updates in the survival guide. If a promoted learning changes how the next batch should be approached, make sure the survival guide reflects it too. A stale survival guide sends the next session down the wrong path.
 
 ### 11. Commit and Push
 ```bash
@@ -400,7 +407,7 @@ This applies to **every commit during the run**: implementation, review fixes, d
 - `[feat/auth · Batch 3/12] Add E2E test for checkout flow`
 
 ### 12. Re-read the Survival Guide
-**After every push, re-read the survival guide before doing anything else.** Also verify the plan hasn't changed:
+**After every push, re-read the survival guide before doing anything else.** Also verify the plan hasn't changed, then run a quick operator checklist: single next action, active compute/resources, whether any resource is idle or ambiguous, whether run control changed, and whether you are actually allowed to stop.
 ```bash
 python3 -c "import hashlib,sys; print(hashlib.md5(open(sys.argv[1],'rb').read()).hexdigest())" <plan-path>
 # Compare against hash saved at session start
