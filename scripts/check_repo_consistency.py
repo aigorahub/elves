@@ -2,7 +2,7 @@
 """Check high-value consistency rules for the Elves repo.
 
 This is intentionally narrow and opinionated: it only checks the specific cross-file drift that
-already caused review churn in `v1.7.0`.
+already caused review churn in `v1.7.0` and `v1.8.0`.
 """
 
 from __future__ import annotations
@@ -52,6 +52,65 @@ DURABLE_DOCS = [
     REPO_ROOT / ".ai-docs" / "gotchas.md",
     REPO_ROOT / "references" / "learnings-template.md",
 ]
+
+NONSTOP_GUARDRAIL_PHRASES = {
+    "SKILL.md": [
+        "Stop Gate",
+        "continuation_guard",
+        "After every commit and push, re-read the survival guide before doing anything else.",
+        "Do not wait for user acknowledgment",
+    ],
+    "AGENTS.md": [
+        "Stop Gate",
+        "continuation_guard",
+        "After every commit and push, re-read the survival guide before doing anything else.",
+        "Do not wait for user acknowledgment",
+    ],
+    "references/survival-guide-template.md": [
+        "## Stop Gate",
+        "## Forbidden Stop Reasons",
+        "Stop allowed right now",
+        "Every completed batch must end with a commit and push",
+        "continue without waiting for user acknowledgment",
+    ],
+    "references/kickoff-prompt-template.md": [
+        "Every completed batch must end with a commit and push before you start anything else.",
+        "Immediately after every commit and push, re-read the survival guide before any other action.",
+        "Do not send a final response unless the survival guide Stop Gate says stopping is allowed or a true blocker forces it.",
+    ],
+    "references/open-ended-guide.md": [
+        "## Stop Gate Pattern",
+        "## Forbidden Stop Reasons",
+        "continuation_guard.stop_allowed: false",
+    ],
+}
+
+EFFORT_GUARDRAIL_PHRASES = {
+    "SKILL.md": [
+        "## Effort Standard",
+        "Do not be lazy.",
+        "Work as hard as you can for",
+    ],
+    "AGENTS.md": [
+        "## Effort Standard",
+        "Do not be lazy.",
+        "Work as hard as you can for",
+    ],
+    "references/survival-guide-template.md": [
+        "## Effort Standard",
+        "Do not be lazy.",
+        "Work as hard as you can for the full run.",
+    ],
+    "references/kickoff-prompt-template.md": [
+        "Do not be lazy. Work as hard as you can for the entire run.",
+        "Do not coast after the first success, first green check, or first useful checkpoint.",
+    ],
+    "references/open-ended-guide.md": [
+        "## Sustain Effort",
+        "Do not be lazy.",
+        "Work as hard as you can for the full",
+    ],
+}
 
 
 def read_text(path: Path) -> str:
@@ -115,6 +174,20 @@ def main() -> int:
         if not path.exists():
             errors.append(f"missing durable doc: {path.relative_to(REPO_ROOT)}")
 
+    for label, phrases in NONSTOP_GUARDRAIL_PHRASES.items():
+        path = REPO_ROOT / label
+        text = read_text(path)
+        for phrase in phrases:
+            if phrase not in text:
+                errors.append(f"{label}: missing non-stop guardrail phrase `{phrase}`")
+
+    for label, phrases in EFFORT_GUARDRAIL_PHRASES.items():
+        path = REPO_ROOT / label
+        text = read_text(path)
+        for phrase in phrases:
+            if phrase not in text:
+                errors.append(f"{label}: missing effort guardrail phrase `{phrase}`")
+
     if errors:
         print("Repo consistency check FAILED")
         for error in errors:
@@ -126,6 +199,8 @@ def main() -> int:
     print("- Recovery order is aligned across repo docs")
     print("- `PENDING-DOCS` guidance is present where expected")
     print("- Durable docs and learnings surfaces exist")
+    print("- Non-stop guardrails are aligned across runtime and template docs")
+    print("- Effort guardrails are aligned across runtime and template docs")
     return 0
 
 

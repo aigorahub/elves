@@ -92,6 +92,10 @@ Acknowledge, incorporate the information into your current understanding, note i
 
 Acknowledge, update the survival guide's "Next Exact Batch" section to reflect the new priority, note the change in the execution log, and continue with the updated plan.
 
+If the message also changes stop behavior or checkpoint meaning — for example, "have something by
+8am but keep going" or "do not stop unless blocked" — rewrite the survival guide's `## Run Control`
+block immediately and log the change in the execution log.
+
 ### Scenario 4: They Say "Stop"
 
 Stop. This is the one exception to all of the above. An explicit stop command from the user overrides everything.
@@ -106,6 +110,19 @@ Complete whatever atomic operation you're in the middle of. Don't leave a half-w
 ### Scenario 5: Their Message Is Ambiguous
 
 Use your best judgment about what they want, do it, document your interpretation in the execution log, and keep going. Don't ask clarifying questions. If you got it wrong, they'll correct you.
+
+### Scenario 6: They Check In On Cost Or Active Compute
+
+*Examples: "are the pods still running?", "use them or shut them down", "pause anything idle"*
+
+Answer directly, then immediately reconcile the actual compute picture:
+
+1. State what paid or long-running resources are active.
+2. For each, state what it is doing.
+3. If any resource is idle, stale, or ambiguous, pause or stop it now.
+4. Rewrite the survival guide's Active Compute section before resuming work.
+
+Do not answer the question and then drift away without reconciling the compute state.
 
 ---
 

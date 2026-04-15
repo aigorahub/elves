@@ -25,11 +25,23 @@ silently deleting it.
 - [2026-04-11] Elves works best when staging and launch are treated as separate phases even if the
   user asks for a full unattended run in one session; the plan and run-memory docs should be stable
   before implementation batches begin.
+- [2026-04-14] Run control is live metadata, not a planning-time note. If the user changes stop
+  behavior, checkpoint meaning, or whether work may continue after a deadline, rewrite `## Run
+  Control` immediately and log the change in the execution log.
+- [2026-04-14] The survival guide is a live operator brief, not a history log. Rewrite `Run
+  Control`, `Current Phase`, `Active Compute`, and `Next Exact Batch` in place; leave chronology to
+  the execution log.
+- [2026-04-14] Stopping should require positive permission, not inference. The survival guide
+  should carry a `Stop Gate`, and `.elves-session.json` should carry a `continuation_guard`, so a
+  recovered context can tell whether it must keep going without rereading the whole run.
 
 ## Validation and Tooling
 
 - [2026-04-11] `./scripts/preflight.sh` is the repo's best built-in environment check. It is useful
   for git/auth/setup validation even though this repo has no package-managed build/test pipeline.
+- [2026-04-14] If a run uses paid compute, remote jobs, or long-lived local servers, track them in
+  the survival guide's `Active Compute` section and reconcile them after every push or topology
+  change.
 
 ## Review Heuristics
 
@@ -54,6 +66,11 @@ silently deleting it.
 - [2026-04-11] If `.elves-session.json` is intentionally committed during a live Elves run, do not
   also ignore it in `.gitignore`; reviewers will correctly read that as contradictory workflow
   guidance.
+- [2026-04-14] A checkpoint, return time, or delivery target is not automatically a stop
+  condition. If the survival guide does not explicitly call it a hard stop, the agent should treat
+  it as a relaunch point and keep going.
+- [2026-04-14] Clean commits, green CI, summaries, and user silence are all false stop signals.
+  If work remains and the Stop Gate says `no`, the agent should update docs, push, and continue.
 
 ## Retired Learnings
 

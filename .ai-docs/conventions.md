@@ -6,10 +6,21 @@
 - Template updates in `references/*` should reflect the same model as the skill files.
 - A release version bump is incomplete until the skill metadata, `AGENTS.md`, and
   `CHANGELOG.md` all agree.
+- Run control is live metadata. If stop behavior, checkpoint meaning, or continuation policy
+  changes mid-run, rewrite the survival guide's `Run Control` block immediately and log the change
+  in the execution log.
+- The live survival-guide sections are `Run Control`, `Current Phase`, `Active Compute`,
+  `Stop Gate`, and `Next Exact Batch`. Rewrite them in place; do not stack old updates there.
+- If a run uses paid compute, remote jobs, or long-lived local services, keep `Active Compute`
+  current after every push and after every resource-topology change.
+- Every completed batch must end with `update docs -> commit -> push -> re-read survival guide`
+  before later work begins.
+- Stopping should be explicit state, not interpretation. Use the survival guide's `Stop Gate` and
+  `.elves-session.json` `continuation_guard` to record whether stopping is currently allowed.
 - Installed Claude/Codex skill bundles should ship only the installable runtime surface:
   `SKILL.md`, `AGENTS.md` (Codex), `references/`, `scripts/preflight.sh`,
-  `scripts/notify.sh`, and `scripts/install_doctor.py`. Repo-only maintenance helpers stay in the
-  checkout.
+  `scripts/notify.sh`, `scripts/install_doctor.py`, and
+  `scripts/validate_survival_guide.py`. Repo-only maintenance helpers stay in the checkout.
 - Startup installation/update checks must stay advisory-only. They may alert the user, but they
   must never block a run or auto-update the installed skill.
 
@@ -19,6 +30,8 @@
 - Explicitly record docs that were impacted, updated, promoted, or deferred.
 - Prefer promoting durable knowledge into `learnings` or `.ai-docs/*` instead of burying it in the
   execution log.
+- Kickoff prompts, report templates, and other operator-facing forms should mirror the same
+  run-control model as the core skill files.
 
 ## Product direction
 

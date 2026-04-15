@@ -2,6 +2,45 @@
 
 All notable changes to the Elves skill are documented here.
 
+## [Unreleased]
+
+## [1.8.0] - 2026-04-14
+
+### Run control hardening
+
+- **Checkpoint semantics are now explicit.** Elves now distinguishes between a delivery checkpoint
+  and a true stop boundary, so "have results by 8am, then keep going" is modeled as open-ended
+  mode with a checkpoint instead of a silent deadline stop.
+- **Latest controlling instruction wins.** The skill and references now require the survival guide
+  to rewrite `## Run Control` immediately when the user changes stop behavior mid-run.
+- **Post-push operator checklist added.** After every push, the agent must re-read the survival
+  guide, confirm the single next action, inspect active compute/resources, reconcile any idle or
+  ambiguous paid work, and confirm whether stopping is actually allowed.
+- **Survival guide template upgraded.** The template now includes checkpoint fields, an `Active
+  Compute` section, and a dedicated post-checkpoint control loop, reinforcing that the survival
+  guide is a live operator brief rather than an append-only history log.
+- **Open-ended and autonomy references expanded.** `references/open-ended-guide.md` and
+  `references/autonomy-guide.md` now cover checkpointed open-ended runs, mid-run stop-policy
+  changes, and compute-status check-ins more explicitly.
+- **README clarified the operating model.** User-facing docs now explain checkpointed open-ended
+  runs and encourage rewriting the survival guide in place instead of stacking stale "next action"
+  updates.
+- **Templates and durable docs synced.** The kickoff prompt, execution-log template, overnight run
+  report, repo learnings, and `.ai-docs/*` surfaces now mirror the same checkpoint, stop-policy,
+  and active-compute model instead of leaving that knowledge trapped in the main skill files.
+
+### Follow-up hardening
+
+- **Stop permission is now explicit.** The survival guide adds a dedicated `Stop Gate`, the repo
+  records `.elves-session.json` `continuation_guard` state, and both Claude Code and Codex runtime
+  docs now treat stopping as positive permission instead of a judgment call.
+- **Staging gets an advisory survival-guide validator.** `scripts/validate_survival_guide.py` plus
+  a warning-only preflight hook can catch half-filled `Run Control`, `Stop Gate`, and recovery
+  fields before the user goes offline, without blocking launch automatically.
+- **Long runs now enforce sustained effort.** The survival guide, launch prompt, and runtime docs
+  now explicitly tell the model not to be lazy, to work as hard as it can for the entire run, and
+  to avoid coasting after the first green check or useful checkpoint.
+
 ## [1.7.0] - 2026-04-11
 
 ### Durable memory and AI-friendly docs

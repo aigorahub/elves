@@ -10,6 +10,10 @@
 > no one watching, and the tests are what keep you honest. The user operates on both ends (planning
 > and review). You run the loop in the middle. You never merge.
 >
+> Assume the user may be offline for the rest of the run. If work remains and the recorded stop
+> conditions are not met, continue. Do not wait for acknowledgment after commits, checkpoints, or
+> summaries.
+>
 > Recommended read order after any compaction: survival guide -> `.elves-session.json` ->
 > learnings -> plan -> execution log -> `.ai-docs/manifest.md` (if present) -> constitution/TODO.
 
@@ -28,7 +32,15 @@ session-cookie approach. All existing auth tests must pass. The public API surfa
 - **Run mode:** [finite | open-ended]
 - **Stop policy:** [deadline | explicit-user-stop | blocker-only]
 - **User intent:** [copy the exact controlling instruction here, e.g., "I'll be back at 8am" or "Keep going until I stop you."]
+- **Checkpoint due by:** [YYYY-MM-DD HH:MM timezone | none]
+- **Checkpoint semantics:** [delivery target only | hard stop boundary | none]
+- **May continue after checkpoint:** [yes | no]
+- **Actual stop conditions:** [one short sentence]
 - **Final-response policy:** [allowed | disallowed until stop]
+- **Batch completion rule:** Every completed batch ends with `update execution log -> update survival guide -> commit -> push`. A batch is not complete while its finished work exists only in the working tree.
+- **Re-read rule:** Immediately after every commit and push, re-read this survival guide before doing anything else.
+- **Checkpoint rule:** If `Checkpoint semantics` is `delivery target only`, log the checkpoint, push it, and continue immediately. Do not stop at the checkpoint.
+- **Continuation rule:** If work remains and `Actual stop conditions` are not met, continue without waiting for user acknowledgment.
 
 ---
 
@@ -36,9 +48,52 @@ session-cookie approach. All existing auth tests must pass. The public API surfa
 
 - **Started:** [YYYY-MM-DD HH:MM timezone]
 - **User returns:** ~[YYYY-MM-DD HH:MM timezone] _("never" if open-ended)_
+- **Checkpoint expectation:** [what should exist by the checkpoint or next user return]
 - **Time budget:** ~[N] hours _("unlimited" if open-ended)_
 - **Average batch time so far:** [Xm] _(update after each batch)_
 - **Batches remaining:** [N of M]
+
+---
+
+## Stop Gate
+
+> Rewrite this section in place. This is the explicit answer to "may I stop now?" Do not infer it.
+
+- **Planned batches remaining:** [N]
+- **Stop allowed right now:** [yes | no]
+- **Why:** [one short sentence]
+- **Next required action:** [one short sentence]
+
+If `Planned batches remaining` is greater than 0, `Stop allowed right now` should normally be
+`no`. Silence, clean commits, checkpoints, or green CI do not change that.
+
+---
+
+## Effort Standard
+
+> Rewrite this section in place if the user gives a stronger instruction about pace or effort.
+
+- Work as hard as you can for the full run. Do not be lazy.
+- Maintain the same level of effort on the last batch as on the first.
+- Do not settle for the minimum acceptable change, the first green check, or a shallow pass when deeper verification or the next planned task remains.
+- When one task is complete, immediately take the next highest-value action from the plan, review queue, or scout work.
+
+---
+
+## Forbidden Stop Reasons
+
+These are not valid reasons to stop the run while work remains:
+
+- A checkpoint time was reached
+- A commit or push succeeded
+- CI is green
+- A PR exists
+- The user is silent or offline
+- You wrote a useful summary
+- The current batch is complete but later batches remain
+- You feel unsure whether to continue
+
+If one of these happens, update the docs, commit, push, re-read this file, and continue.
 
 ---
 
@@ -85,11 +140,17 @@ plan, the codebase, or good engineering practice.
 - [ ] PR opened or existing PR recorded
 - [ ] Preflight run and critical failures cleared
 - [ ] Run mode, return time, and non-negotiables recorded
+- [ ] Stop Gate initialized with `Stop allowed right now: no` unless a real stop condition already applies
 - [ ] Launch prompt prepared for the next call
 
 ---
 
 ## Current Phase
+
+> Rewrite this section in place. Do not stack old updates here. Historical state belongs in the
+> execution log, not in the live operator brief.
+> When a batch finishes, update this file, commit, push, then re-read this file before any other
+> action. Do not leave completed batch work sitting uncommitted.
 
 **Status:** [Staging / Launch-ready / In progress / All batches complete / Scout mode / Blocked]
 
@@ -98,7 +159,20 @@ plan, the codebase, or good engineering practice.
 **What was just finished:** [One sentence. E.g., "Batch 2 complete: JWT issuance and verification
 implemented, all 47 tests pass, PR review clean."]
 
-**Immediate next action:** [One sentence. E.g., "Start Batch 3: implement refresh token rotation."]
+**Single next action:** [One sentence. E.g., "Start Batch 3: implement refresh token rotation."]
+
+---
+
+## Active Compute
+
+> Include this section whenever the run uses paid compute, remote jobs, dev servers, or any
+> resource whose status matters to stop/go decisions. Rewrite it in place.
+
+| Resource | Purpose | Current status | Last verified | Stop / repurpose trigger |
+| --- | --- | --- | --- | --- |
+| [Pod / job / server] | [Why it exists] | [Running / idle / complete / stopped] | [timestamp] | [When to stop it] |
+
+If not applicable, write: **No active paid or long-running compute.**
 
 ---
 
@@ -106,6 +180,8 @@ implemented, all 47 tests pass, PR review clean."]
 
 > Update this section at the end of every batch. This is the first thing you read after compaction.
 > It tells you exactly what to do next without re-reading the entire plan.
+> If the current batch is finished, do not improvise the next move from memory. Close the batch
+> with a commit and push, re-read this file, then execute the single next batch named here.
 
 **Batch:** [N: Name]
 
@@ -121,6 +197,23 @@ implemented, all 47 tests pass, PR review clean."]
 **Risk:** [One sentence describing the highest-risk aspect of this batch]
 
 **Rollback tag:** `elves/pre-batch-N` _(create this before starting)_
+
+---
+
+## Post-Checkpoint Control Loop
+
+Every completed batch must end with a commit and push. Immediately after every commit and push,
+re-read this survival guide before doing anything else. A pushed checkpoint is proof of progress,
+not permission to stop.
+
+After every commit and push, answer these questions before doing anything else:
+
+1. What unfinished batch or task am I starting right now?
+2. What paid compute or long-running resources are active right now?
+3. What is each active resource doing? If any resource is idle, stale, or ambiguous, shut it down or pause it now.
+4. Did the user change stop behavior, checkpoint meaning, priorities, or scope since the survival guide was last rewritten? If yes, rewrite `## Run Control`, `## Current Phase`, `## Stop Gate`, and `## Next Exact Batch` now.
+5. Does the Stop Gate still say `Stop allowed right now: no`, or does `.elves-session.json` still say `continuation_guard.stop_allowed: false`? If yes, continue immediately.
+6. Am I allowed to stop? If the answer is anything other than a clear hard stop, explicit user stop, or true blocker, continue immediately.
 
 ---
 
@@ -162,7 +255,10 @@ Before marking any batch complete, verify all of the following:
 - [ ] PR review performed, all blocking findings resolved
 - [ ] Execution log updated with timestamps, commands run, test results, commit SHA
 - [ ] Survival guide updated with new Current Phase and Next Exact Batch
-- [ ] Changes committed to branch, pushed to remote
+- [ ] Stop Gate updated with new remaining-batch count and next required action
+- [ ] Active Compute section updated, or explicitly marked as not applicable
+- [ ] Batch closed out with a commit and push before any later work begins
+- [ ] Survival guide re-read immediately after that commit and push
 - [ ] Rollback tag created _before_ the batch started
 
 ---
@@ -326,15 +422,17 @@ notification: pr-comment
 When you restart after a compaction, do these steps in order. No shortcuts.
 
 1. Read this file (survival guide). You are doing this now.
-2. **Read the Run Control section above.** Confirm the run mode and stop policy. If open-ended, you are not allowed to stop on your own. This is the most important thing to recover.
-3. Read `.elves-session.json` if it exists. Confirm current batch, PR number, and test baseline.
+2. **Read the Run Control section and Stop Gate above.** Confirm the run mode, stop policy, checkpoint semantics, actual stop conditions, and whether stopping is currently allowed. If open-ended, you are not allowed to stop on your own. This is the most important thing to recover.
+3. Read `.elves-session.json` if it exists. Confirm current batch, PR number, test baseline, and `continuation_guard`.
 4. Read the learnings file if one exists.
 5. Read the plan. Confirm the overall scope hasn't changed (compare hash if recorded above).
 6. Read the execution log. Find the last completed batch and the last **Decisions made** entry.
 7. Read `.ai-docs/manifest.md` if it exists and then any linked durable docs that matter to the next batch.
-8. Identify the first incomplete batch (look at Current Phase and Next Exact Batch above).
-9. Check the clock. How much time budget remains? (If open-ended: unlimited.)
-10. Resume immediately. Don't ask for help. Don't redo completed work.
+8. Read the Active Compute section if present. Know what live resources exist before making any new plan.
+9. Read the `continuation_guard`. If `stop_allowed` is `false`, continue without re-deciding whether the run should end.
+10. Identify the first incomplete batch or the single next action (look at Current Phase, Stop Gate, `continuation_guard.next_required_action`, and Next Exact Batch above).
+11. Check the clock. How much time budget remains? (If open-ended: unlimited.)
+12. Resume immediately. Don't ask for help. Don't redo completed work.
 
 The execution log is your proof of what is done. If something appears in the log as complete, it is
 complete. Don't re-implement it.

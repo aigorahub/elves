@@ -14,6 +14,9 @@ How did the run go overall? (Great / Mostly good / Mixed / Failed)
 
 - **Platform:** Claude Code / Codex / Other
 - **Project type:** Node / Python / Go / Rust / Other
+- **Run mode:** Finite / Open-ended
+- **Checkpoint semantics:** None / Delivery checkpoint / Hard stop
+- **Active compute:** None / local-only / remote jobs / paid pods / mixed
 - **Session length:** (how many hours)
 - **Batches planned:** (N)
 - **Batches completed:** (N)
@@ -25,6 +28,11 @@ What went right? What surprised you positively?
 ## What went wrong
 
 Any failures, unexpected behavior, or things you had to fix manually after the run?
+
+## Run-control behavior
+
+Did the agent treat checkpoints, stop conditions, and active compute correctly? If not, what
+drifted or had to be corrected manually?
 
 ## What you changed in your setup afterward
 
