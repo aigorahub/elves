@@ -31,6 +31,9 @@ silently deleting it.
 - [2026-04-14] The survival guide is a live operator brief, not a history log. Rewrite `Run
   Control`, `Current Phase`, `Active Compute`, and `Next Exact Batch` in place; leave chronology to
   the execution log.
+- [2026-04-14] Stopping should require positive permission, not inference. The survival guide
+  should carry a `Stop Gate`, and `.elves-session.json` should carry a `continuation_guard`, so a
+  recovered context can tell whether it must keep going without rereading the whole run.
 
 ## Validation and Tooling
 
@@ -66,6 +69,8 @@ silently deleting it.
 - [2026-04-14] A checkpoint, return time, or delivery target is not automatically a stop
   condition. If the survival guide does not explicitly call it a hard stop, the agent should treat
   it as a relaunch point and keep going.
+- [2026-04-14] Clean commits, green CI, summaries, and user silence are all false stop signals.
+  If work remains and the Stop Gate says `no`, the agent should update docs, push, and continue.
 
 ## Retired Learnings
 

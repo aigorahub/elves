@@ -94,6 +94,13 @@ Read [path/to/survival-guide.md] first, then `.elves-session.json` if it exists,
 I am going offline until [WHEN].
 By [WHEN], I want [CHECKPOINT DELIVERABLE]. This is a [delivery checkpoint / hard stop].
 Do not stop unless you hit a genuine blocker with no reasonable workaround.
+Do not be lazy. Work as hard as you can for the entire run.
+Do not coast after the first success, first green check, or first useful checkpoint. Push each batch to a thoroughly verified state, then continue immediately.
+Every completed batch must end with a commit and push before you start anything else.
+Immediately after every commit and push, re-read the survival guide before any other action.
+If this is a delivery checkpoint, log it, push it, and continue immediately. Do not stop at the checkpoint.
+Do not wait for me to acknowledge checkpoints, summaries, or clean commits. If work remains, keep going.
+Do not send a final response unless the survival guide Stop Gate says stopping is allowed or a true blocker forces it.
 Use your judgment. Work in small batches and commit frequently.
 Make the commit subjects read like progress reports.
 Run every relevant validation gate, including E2E or browser checks wherever they make sense.
@@ -110,6 +117,13 @@ Read docs/elves/survival-guide.md first, then `.elves-session.json` if it exists
 I am going offline until 7:30am ET.
 By 7:30am ET, I want a review-ready checkpoint with green local validation. This is a delivery checkpoint, not a stop boundary.
 Do not stop unless you hit a genuine blocker with no reasonable workaround.
+Do not be lazy. Work as hard as you can for the entire run.
+Do not coast after the first success, first green check, or first useful checkpoint. Push each batch to a thoroughly verified state, then continue immediately.
+Every completed batch must end with a commit and push before you start anything else.
+Immediately after every commit and push, re-read the survival guide before any other action.
+This checkpoint is for delivery only. Log it, push it, and continue immediately. Do not stop at 7:30am ET.
+Do not wait for me to acknowledge checkpoints, summaries, or clean commits. If work remains, keep going.
+Do not send a final response unless the survival guide Stop Gate says stopping is allowed or a true blocker forces it.
 Use your judgment. Work in small batches and commit frequently.
 Make the commit subjects read like progress reports.
 Run every relevant validation gate, including E2E or browser checks wherever they make sense.

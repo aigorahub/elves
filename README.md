@@ -173,7 +173,9 @@ The launch prompt starts unattended execution. Elves re-reads the prepared docs,
   review findings
 - **Merge conflict handling**: when `git push` fails due to a diverged remote, the agent fetches and merges (never rebases), resolves conflicts or triggers a Hard Stop
 - **Two run modes**: finite (deadline-based, default) or open-ended (continue until explicitly stopped). Open-ended mode also covers "checkpointed continuation" runs like "have something by 8am, then keep going." A morning checkpoint, return time, or delivery target is not a stop condition unless the survival guide explicitly marks it as a hard stop.
-- **Live operator brief**: the survival guide is rewritten in place as the run evolves. `Run Control`, `Current Phase`, `Active Compute`, and `Next Exact Batch` stay current; the execution log carries history.
+- **Live operator brief**: the survival guide is rewritten in place as the run evolves. `Run Control`, `Current Phase`, `Active Compute`, `Stop Gate`, and `Next Exact Batch` stay current; the execution log carries history.
+- **Explicit Stop Gate**: the survival guide records whether stopping is currently allowed, why, and what the next required action is. Stopping is positive permission, not a guess.
+- **Explicit Effort Standard**: the survival guide and launch prompt tell the model not to be lazy, to work as hard as it can for the full run, and to avoid coasting after the first green check or checkpoint.
 - **Time-aware pacing**: tracks how long each batch takes and uses that to decide whether to start another batch or wrap up cleanly (finite mode)
 - **Slack notifications** (or any custom command): know when your run finishes without watching the terminal
 - **Constitution and legality check**: human-authored deal-breaker behaviors (`docs/constitution.md`) verified by a read-only judge after each batch. Three quality layers: correctness (tests), plan compliance (review), legality (judge). Success criteria the agent didn't author.
@@ -377,7 +379,8 @@ elves/
 ├── scripts/
 │   ├── install_doctor.py                 # Update + installation-precedence advisory
 │   ├── preflight.sh                      # Pre-run checklist
-│   └── notify.sh                         # Notification helper
+│   ├── notify.sh                         # Notification helper
+│   └── validate_survival_guide.py        # Advisory survival-guide completeness check
 └── .github/
     └── ISSUE_TEMPLATE/                   # Bug report, feature request, overnight run report
 ```
@@ -434,11 +437,11 @@ Overnight agent runs fail in predictable ways. Knowing the failure modes makes t
 | **Machine sleeps** | Session stops silently. You wake up to 45 minutes of work instead of 8 hours. | `caffeinate` (macOS), `systemd-inhibit` (Linux), or run in cloud. Elves preflight warns you. |
 | **Agent runs destructive git commands** | `git reset --hard` wipes hours of uncommitted work. This has happened to real users. | Elves explicitly forbids `git reset --hard`, `git checkout .`, `git push --force`, and `git clean -fd`. The survival guide template includes these as non-negotiables. |
 | **Agent disables or weakens tests** | Agent comments out failing tests, weakens assertions, or shortens timeouts to make the gate pass. You wake up to code that "passes" but is broken. | Elves has a Test Integrity rule: never modify a test to make it pass. Fix the code, not the test. If the agent thinks a test is wrong, it logs the issue and moves on without changing it. |
-| **Context compaction loses instructions** | Long sessions hit memory limits. The agent's conversation gets summarized, and safety instructions disappear. | Elves stores its run memory on disk (survival guide, `.elves-session.json`, learnings, plan, execution log, and optionally `.ai-docs/*`), not in conversation memory. The agent re-reads the survival guide after every push. Compaction can't erase files. |
+| **Context compaction loses instructions** | Long sessions hit memory limits. The agent's conversation gets summarized, and safety instructions disappear. | Elves stores its run memory on disk (survival guide, `.elves-session.json`, learnings, plan, execution log, and optionally `.ai-docs/*`), not in conversation memory. The agent re-reads the survival guide after every commit/push, and the Stop Gate plus `continuation_guard` make "keep going or stop?" explicit. Compaction can't erase files. |
 | **Interactive prompt stalls the session** | A tool asks for confirmation, a survey pops up, or `npm install` wants input. Nobody is there to click yes. | Elves surfaces the recommended non-interactive env vars during preflight, and the skill requires `--yes` flags plus tool-level survey suppression before unattended runs. |
 | **Flaky tests block progress** | A test passes locally but fails intermittently. The agent loops trying to fix a non-bug. | The agent logs flaky tests in the execution log and moves on after 3 failed attempts on the same non-deterministic failure. |
 | **Terminal closes (SSH disconnect)** | The SSH connection drops and the session dies. | Use `tmux` or `screen`. Elves mentions this in the pre-run checklist. |
-| **Agent drifts from the plan** | After many batches, the agent starts making changes that weren't in the plan. | The agent re-reads the survival guide after every push, checks the plan hash to detect modifications, and keeps durable lessons in `learnings.md` so the same confusion doesn't have to be rediscovered. The layered memory system anchors every decision. The survival guide should be rewritten in place as a live control surface, not treated as an append-only history log. |
+| **Agent drifts from the plan** | After many batches, the agent starts making changes that weren't in the plan. | The agent re-reads the survival guide after every commit/push, checks the plan hash to detect modifications, and keeps durable lessons in `learnings.md` so the same confusion doesn't have to be rediscovered. The layered memory system anchors every decision. The survival guide should be rewritten in place as a live control surface, not treated as an append-only history log. |
 | **Merge conflicts on push** | `git push` fails because the remote has diverged. The agent may rebase and lose work, or stall. | Elves instructs the agent to fetch and merge (never rebase on shared branches). If conflicts can't be resolved cleanly, the agent triggers a Hard Stop rather than risking data loss. |
 
 Most of these are prevented by the preflight checks. Run preflight, fix the warnings, and most overnight failures never happen.
@@ -518,7 +521,7 @@ mkdir -p ~/.claude/skills/elves/scripts
 # Clone and copy
 git clone https://github.com/aigorahub/elves.git /tmp/elves
 cp -r /tmp/elves/SKILL.md /tmp/elves/references ~/.claude/skills/elves/
-cp /tmp/elves/scripts/preflight.sh /tmp/elves/scripts/notify.sh /tmp/elves/scripts/install_doctor.py ~/.claude/skills/elves/scripts/
+cp /tmp/elves/scripts/preflight.sh /tmp/elves/scripts/notify.sh /tmp/elves/scripts/install_doctor.py /tmp/elves/scripts/validate_survival_guide.py ~/.claude/skills/elves/scripts/
 rm -rf /tmp/elves
 ```
 
@@ -528,7 +531,7 @@ mkdir -p ~/.codex/skills/elves/scripts
 git clone https://github.com/aigorahub/elves.git /tmp/elves
 cp /tmp/elves/SKILL.md /tmp/elves/AGENTS.md ~/.codex/skills/elves/
 cp -r /tmp/elves/references ~/.codex/skills/elves/
-cp /tmp/elves/scripts/preflight.sh /tmp/elves/scripts/notify.sh /tmp/elves/scripts/install_doctor.py ~/.codex/skills/elves/scripts/
+cp /tmp/elves/scripts/preflight.sh /tmp/elves/scripts/notify.sh /tmp/elves/scripts/install_doctor.py /tmp/elves/scripts/validate_survival_guide.py ~/.codex/skills/elves/scripts/
 rm -rf /tmp/elves
 ```
 
@@ -593,7 +596,8 @@ explicitly.
 This mirrors the managed skill bundle files from the repo into `~/.claude/skills/elves/` and
 `~/.codex/skills/elves/`. It intentionally ships the installable bundle only: `SKILL.md`,
 `AGENTS.md` (Codex), `references/`, and the runtime scripts `scripts/preflight.sh`,
-`scripts/notify.sh`, and `scripts/install_doctor.py`. Repo-only maintenance helpers such as
+`scripts/notify.sh`, `scripts/install_doctor.py`, and
+`scripts/validate_survival_guide.py`. Repo-only maintenance helpers such as
 `scripts/check_repo_consistency.py` stay in the checkout. If you maintain hand-edited local
 customizations, prefer the manual diff workflow below instead of blindly applying the sync.
 
@@ -623,12 +627,19 @@ automatically when the helper is present in the bundle.
 - Your batch sizing (maybe your team is 2 people, not 4)
 - Your checkpoint semantics and actual stop conditions
 - Your active compute picture if the run uses paid pods, remote jobs, or long-lived servers
+- Your Stop Gate defaults and the next required action at launch
+- Your Effort Standard if you want to reinforce "do not be lazy / work as hard as you can" behavior for long unattended runs
 
-Treat the survival guide as a live operator brief. Rewrite `Run Control`, `Current Phase`, `Active Compute`, and `Next Exact Batch` in place as the run evolves. Do not stack stale "next action updates" there; put history in the execution log instead.
+Treat the survival guide as a live operator brief. Rewrite `Run Control`, `Current Phase`, `Active Compute`, `Stop Gate`, `Effort Standard`, and `Next Exact Batch` in place as the run evolves. Do not stack stale "next action updates" there; put history in the execution log instead.
 
 If the run has a morning checkpoint, return time, paid pods, remote jobs, or long-lived servers,
 say so explicitly in the survival guide. The agent should never have to guess whether a time is a
 delivery checkpoint or a hard stop, or whether compute should be shut down, paused, or kept warm.
+
+For real runs, I recommend exporting `ELVES_SURVIVAL_GUIDE_PATH` before `./scripts/preflight.sh`.
+Preflight will run `python3 scripts/validate_survival_guide.py "$ELVES_SURVIVAL_GUIDE_PATH"` as a
+warning-only check. It won't block launch, but it will catch half-filled Stop Gate / Run Control
+fields before you go offline.
 
 **The validation gates** will be different for every project. A Python data pipeline has different gates than a React web app. Edit the survival guide's `## Tool Configuration` section to match your stack. See [`references/tool-config-examples.md`](references/tool-config-examples.md) for examples across Node, Python, Go, Rust, and monorepos.
 

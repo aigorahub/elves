@@ -77,6 +77,7 @@
 **Run mode:** [finite / open-ended] | **User returns:** [time / "never"]
 **Checkpoint semantics:** [none / delivery checkpoint / hard stop] | **Actual stop conditions:** [list]
 **Active compute at launch:** [none / list]
+**Continuation guard:** stop_allowed=[yes / no] | remaining_batches=[N] | checkpoint_is_stop=[yes / no] | next_required_action=[one sentence]
 
 **Batch breakdown:**
 1. [Batch 1 name] — [one-line scope]

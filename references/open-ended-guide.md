@@ -15,6 +15,16 @@ This includes checkpointed open-ended runs where the user says some version of:
 
 In those cases, the checkpoint is a delivery target, not a stop boundary.
 
+In open-ended mode, a completed batch must still be closed properly: update the run docs, commit,
+push, re-read the survival guide, and continue. A pushed checkpoint is evidence of progress, not
+permission to stop.
+
+## Sustain Effort
+
+Open-ended mode is not permission to coast. Do not be lazy. Work as hard as you can for the full
+run. Do not settle for shallow progress, the first green check, or repetitive low-value busywork.
+When one line of work is exhausted, broaden coverage and attack the next highest-value area.
+
 ## Behavioral Examples
 
 ### Wrong
@@ -91,6 +101,33 @@ These fields should be persisted in the survival guide under `## Run Control` so
 - **Final-response policy:** [allowed | disallowed until stop]
 ```
 
+## Stop Gate Pattern
+
+Add a dedicated Stop Gate to the survival guide so stopping is a positive permission, not a guess:
+
+```markdown
+## Stop Gate
+
+- **Planned batches remaining:** [N]
+- **Stop allowed right now:** [yes | no]
+- **Why:** [one short sentence]
+- **Next required action:** [one short sentence]
+```
+
+If work remains, `Stop allowed right now` should be `no`.
+
+## Forbidden Stop Reasons
+
+These do not justify stopping an open-ended run:
+
+- reaching a checkpoint
+- pushing a clean commit
+- seeing green CI
+- writing a summary
+- user silence
+- finishing the current batch while later batches remain
+- uncertainty about whether the user wants more progress
+
 Example for an open-ended QA audit:
 
 ```markdown
@@ -145,6 +182,8 @@ in the execution log.
 ## Compaction Recovery in Open-Ended Mode
 
 After recovering from compaction, the most important thing to restore is "I am not allowed to stop on my own." Read the Run Control section of the survival guide before anything else. If run mode is open-ended, that constraint overrides any instinct to summarize and close out. Also check whether the next deadline is a delivery checkpoint or a true stop boundary; they are not the same thing.
+
+If the survival guide has a Stop Gate or `.elves-session.json` has `continuation_guard.stop_allowed: false`, that is an explicit instruction to continue.
 
 ## Testing Open-Ended Mode
 

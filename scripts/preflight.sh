@@ -472,7 +472,33 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 12. Summary
+# 12. Survival guide validation (advisory)
+# ---------------------------------------------------------------------------
+header "Survival Guide (advisory)"
+
+if [ -z "${ELVES_SURVIVAL_GUIDE_PATH:-}" ]; then
+  info "ELVES_SURVIVAL_GUIDE_PATH not set — skipping survival guide validation"
+  info "Recommended during staging: export ELVES_SURVIVAL_GUIDE_PATH=/path/to/survival-guide.md"
+elif [ ! -f "${ELVES_SURVIVAL_GUIDE_PATH}" ]; then
+  warn "Survival guide not found at ${ELVES_SURVIVAL_GUIDE_PATH}"
+  info "This is advisory only — the guide can still be generated during staging"
+elif ! command -v python3 &>/dev/null || [ ! -f "${SCRIPT_DIR}/validate_survival_guide.py" ]; then
+  warn "Survival guide validator unavailable (python3 or script missing)"
+else
+  GUIDE_LOG=$(mktemp "${TMPDIR:-/tmp}/elves-preflight-guide.XXXXXX")
+  if python3 "${SCRIPT_DIR}/validate_survival_guide.py" "${ELVES_SURVIVAL_GUIDE_PATH}" >"${GUIDE_LOG}" 2>&1; then
+    pass "Survival guide validation passed"
+  else
+    warn "Survival guide validation found advisory issues"
+    while IFS= read -r LINE; do
+      [ -n "${LINE}" ] && info "${LINE}"
+    done < "${GUIDE_LOG}"
+  fi
+  rm -f "${GUIDE_LOG}"
+fi
+
+# ---------------------------------------------------------------------------
+# 13. Summary
 # ---------------------------------------------------------------------------
 echo
 echo -e "${BOLD}══════════════════════════════════════════════════${RESET}"

@@ -50,6 +50,18 @@ These principles apply across the full lifecycle: planning (batch ordering and d
 
 These apply to all code, including review fixes. When fixing a reviewer finding, fix the root cause — don't band-aid it.
 
+## Effort Standard
+
+Overnight autonomy only works if you sustain effort. Do not be lazy. Work as hard as you can for
+the full run, including late in the night when the temptation is to coast, summarize early, or
+accept shallow progress.
+
+- Maintain the same level of effort on the last batch as on the first.
+- Do not settle for the minimum acceptable change, the fastest superficial pass, or the first
+  green result when deeper verification or the next planned task remains.
+- When one task is complete, immediately take the next highest-value action from the plan, review
+  queue, or scout work.
+
 ## Run Mode
 
 Every session has a run mode. Persist it in the survival guide under `## Run Control`.
@@ -74,7 +86,11 @@ A checkpoint is not completion. A commit is not completion. A PR is not completi
 
 - Final Completion is disabled unless the user explicitly requests stop.
 - After every checkpoint, begin the next highest-value task.
+- After every completed batch, update the execution log, update the survival guide (including the Stop Gate), commit, push, re-read the survival guide, and continue immediately.
 - A checkpoint, return time, or delivery target is not a stop condition unless the survival guide explicitly says it is a hard stop boundary.
+- Do not wait for user acknowledgment after checkpoints, summaries, or clean commits. If work remains and stop conditions are not met, continue.
+- Do not be lazy as the run progresses. Keep the same effort on the last batch as on the first, and prefer deeper verified progress over the minimum acceptable change.
+- A final response is forbidden while the Stop Gate says `Stop allowed right now: no` or `.elves-session.json` says `continuation_guard.stop_allowed: false`.
 - Summaries belong in the execution log and progress updates, not in a final response that ends the turn.
 - Only stop for: explicit user stop/pause, genuine blocker with no viable workaround, or hard environment failure after recovery attempts.
 
@@ -82,7 +98,7 @@ See `references/open-ended-guide.md` for detailed patterns.
 
 ### Pre-Final Guard
 
-Before any final response: (1) Did the user ask to stop? (2) What does the latest controlling user instruction say about continuing past the next checkpoint or deadline? (3) Is run mode finite? (4) If finite, is the current deadline actually a hard stop boundary? (5) If open-ended, is there a true blocker? (6) Is any paid compute, remote job, or long-running resource still active or ambiguous? If answers don't justify stopping, continue the run.
+Before any final response: (1) Did the user ask to stop? (2) What does the latest controlling user instruction say about continuing past the next checkpoint or deadline? (3) Does the survival guide's **Stop Gate** say `Stop allowed right now: yes`, or does `.elves-session.json` say `continuation_guard.stop_allowed: true`? (4) Is run mode finite? (5) If finite, is the current deadline actually a hard stop boundary? (6) If open-ended, is there a true blocker? (7) Is any paid compute, remote job, or long-running resource still active or ambiguous? If answers don't justify stopping, continue the run.
 
 ## Planning
 
@@ -159,6 +175,12 @@ docs/audit/
 Add any other tool-specific directories. Commit the `.gitignore` update as part of session setup.
 
 Run each configured validation gate once to confirm it works. If a gate fails, warn the user before they leave. Codex runs in a cloud environment, so skip sleep/battery checks. If `ELVES_SLACK_WEBHOOK` is set, send a test notification. See `references/autonomy-guide.md` for the full non-interactive operation guide and environment variables.
+
+If the survival guide already exists during staging, set `ELVES_SURVIVAL_GUIDE_PATH` to that file
+before running `./scripts/preflight.sh`. Preflight will run
+`python3 scripts/validate_survival_guide.py "$ELVES_SURVIVAL_GUIDE_PATH"` as a warning-only
+completeness check. Use it to catch missing Stop Gate and run-control fields early, but do not
+block launch automatically on advisory validator warnings.
 
 ## Time Awareness
 
@@ -373,7 +395,7 @@ durable doc: `.ai-docs/architecture.md`, `.ai-docs/conventions.md`, or `.ai-docs
 If the log exceeds ~50 entries, move completed entries to a `## Completed Archive` section.
 
 ### 10. Update the Survival Guide
-Update "Current Phase" and "Next Exact Batch". Rewrite them in place; do not stack stale updates in the survival guide. If a promoted learning changes how the next batch should be approached, make sure the survival guide reflects it too. A stale survival guide sends the next session down the wrong path.
+Update "Current Phase", "Next Exact Batch", and the **Stop Gate**. Rewrite them in place; do not stack stale updates in the survival guide. If a promoted learning changes how the next batch should be approached, make sure the survival guide reflects it too. A stale survival guide sends the next session down the wrong path.
 
 ### 11. Commit and Push
 ```bash
@@ -381,6 +403,8 @@ git add <specific-files>   # never git add -A
 git commit -m "[<branch> · Batch N/Total] <verb> <what changed>"
 git push
 ```
+
+**At the end of every completed batch, this step is mandatory before any other work begins.** A batch is not complete while its finished work exists only in the working tree or only on the local branch.
 
 **Self-check before every commit:** verify your subject line matches the format. If it doesn't, rewrite it. Non-negotiable.
 
@@ -408,7 +432,7 @@ This applies to **every commit during the run**: implementation, review fixes, d
 - `[feat/auth · Batch 3/12] Add E2E test for checkout flow`
 
 ### 12. Re-read the Survival Guide
-**After every push, re-read the survival guide before doing anything else.** Also verify the plan hasn't changed, then run a quick operator checklist: single next action, active compute/resources, whether any resource is idle or ambiguous, whether run control changed, and whether you are actually allowed to stop.
+**After every commit and push, re-read the survival guide before doing anything else.** Also verify the plan hasn't changed, then run a quick operator checklist: single next action, active compute/resources, whether any resource is idle or ambiguous, whether run control changed, whether the Stop Gate still says continue, and whether you are actually allowed to stop.
 ```bash
 python3 -c "import hashlib,sys; print(hashlib.md5(open(sys.argv[1],'rb').read()).hexdigest())" <plan-path>
 # Compare against hash saved at session start
@@ -487,16 +511,19 @@ in files on disk, not in memory. Context compaction can't erase what is in the s
 learnings file, plan, execution log, and durable `.ai-docs` docs.
 
 1. Read the survival guide first (marked `# READ THIS FILE FIRST AFTER ANY COMPACTION OR RESTART`).
-2. **Read the Run Control section.** If the **Run mode** is `open-ended`, you are not allowed to stop on your own. This is the most important thing to recover.
-3. Read `.elves-session.json` to quickly determine the current batch, PR number, and what's complete.
+2. **Read the Run Control section and Stop Gate.** Confirm the run mode, stop policy, checkpoint semantics, actual stop conditions, and whether stopping is currently allowed. If the **Run mode** is `open-ended`, you are not allowed to stop on your own. This is the most important thing to recover.
+3. Read `.elves-session.json` to quickly determine the current batch, PR number, what's complete, and the `continuation_guard`.
 4. Read the learnings file if one exists.
 5. Read the plan.
 6. Read the execution log.
 7. Read `.ai-docs/manifest.md` if it exists, then any linked durable docs needed for the next batch.
 8. Read the constitution (`docs/constitution.md` or `CONSTITUTION.md`) if it exists.
-9. Identify the first incomplete batch and resume immediately.
+9. Inspect the active compute picture in the survival guide, if present. Know what live resources exist before making any new decision.
+10. Read the `continuation_guard`. If `stop_allowed` is `false`, continue without re-deciding whether the run should end.
+11. Identify the first incomplete batch or the single next action named in the survival guide or `continuation_guard.next_required_action`.
+12. Resume immediately. Don't ask for help. Don't redo completed work.
 
-Don't redo completed work. Don't ask for help. If you detect existing documents at startup, you are resuming. Follow this protocol. **If the survival guide is missing** (compaction during Final Completion cleanup), restore from git history: `git show HEAD~1:<survival-guide-path> > <survival-guide-path>`.
+If you detect existing documents at startup, you are resuming. Follow this protocol. **If the survival guide is missing** (compaction during Final Completion cleanup), restore from git history: `git show HEAD~1:<survival-guide-path> > <survival-guide-path>`.
 
 Between batches, proactively compact with specific instructions: "Preserve: survival guide path, execution log path, plan path, current batch number, PR number, time budget remaining."
 
@@ -513,9 +540,9 @@ Don't report "done" unless all are true for the current batch. This is a condens
 5. PR comments read; findings triaged. Review loop ran until no blockers remained. All review threads resolved or replied to.
 6. Legality check passed (if a constitution exists). No unresolved FAIL verdicts.
 7. **Documentation is up to date.** Any user-facing behavior changed by this batch is reflected in the relevant docs (README, API docs, inline doc comments, config references, changelogs, `learnings.md`, `.ai-docs/*`). Stale docs are debt.
-8. `.elves-session.json` updated with `session_id`, current batch state, batch status, commit SHA, completion timestamp, and `review_comments` dispositions. The schema includes path fields for the plan/survival guide/learnings/execution log, a `batches` array (id, name, status, commit, rollback_tag, started_at, completed_at), and a `review_comments` array (id, type, source, batch, cycle, summary, disposition, fix_commit/reason). See `SKILL.md` **Structured Session Data** for the full schema.
+8. `.elves-session.json` updated with `session_id`, current batch state, batch status, commit SHA, completion timestamp, `continuation_guard`, and `review_comments` dispositions. The schema includes path fields for the plan/survival guide/learnings/execution log, a `batches` array (id, name, status, commit, rollback_tag, started_at, completed_at), a `continuation_guard` object (`remaining_batches`, `stop_allowed`, `checkpoint_is_stop`, `next_required_action`), and a `review_comments` array (id, type, source, batch, cycle, summary, disposition, fix_commit/reason). See `SKILL.md` **Structured Session Data** for the full schema.
 9. Execution log updated with timestamps, evidence, and commit SHA.
-10. Survival guide updated with next batch.
+10. Survival guide updated with next batch and Stop Gate.
 11. Changes committed and pushed.
 
 ## Constitution and the Legality Check

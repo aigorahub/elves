@@ -6,6 +6,8 @@
   the same batch.
 - A morning checkpoint, return time, or delivery target can look like a natural stopping point, but
   it is not a stop condition unless the survival guide explicitly says it is a hard stop.
+- Clean commits, green CI, a good summary, or user silence can also look like permission to stop.
+  They are not. Use the `Stop Gate` and `continuation_guard`, not vibes.
 - The survival guide can silently rot into an append-only history log if updates get stacked at the
   bottom. Rewrite the live sections in place and keep chronology in the execution log.
 - Paid pods, remote jobs, and long-lived local services become invisible quickly unless `Active

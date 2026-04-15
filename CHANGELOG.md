@@ -29,6 +29,18 @@ All notable changes to the Elves skill are documented here.
   report, repo learnings, and `.ai-docs/*` surfaces now mirror the same checkpoint, stop-policy,
   and active-compute model instead of leaving that knowledge trapped in the main skill files.
 
+### Follow-up hardening
+
+- **Stop permission is now explicit.** The survival guide adds a dedicated `Stop Gate`, the repo
+  records `.elves-session.json` `continuation_guard` state, and both Claude Code and Codex runtime
+  docs now treat stopping as positive permission instead of a judgment call.
+- **Staging gets an advisory survival-guide validator.** `scripts/validate_survival_guide.py` plus
+  a warning-only preflight hook can catch half-filled `Run Control`, `Stop Gate`, and recovery
+  fields before the user goes offline, without blocking launch automatically.
+- **Long runs now enforce sustained effort.** The survival guide, launch prompt, and runtime docs
+  now explicitly tell the model not to be lazy, to work as hard as it can for the entire run, and
+  to avoid coasting after the first green check or useful checkpoint.
+
 ## [1.7.0] - 2026-04-11
 
 ### Durable memory and AI-friendly docs
