@@ -32,6 +32,9 @@ on:
       - "scripts/sync_installed_skills.py"
       - "tests/**"
 
+permissions:
+  contents: read
+
 jobs:
   check:
     runs-on: ubuntu-latest
