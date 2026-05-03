@@ -207,10 +207,10 @@ After fixing, the coordinator pushes and runs the review subagent again. The loo
 
 ## Final Readiness Review
 
-Run this once before Final Completion cleanup, after all planned batches are complete and before
-the agent declares the branch review-ready. This is a cumulative performance and merge-readiness
-guard: it catches anything that slipped between per-batch reviews and makes sure the user returns
-to a clean PR and a clean memory workspace.
+Run this once after the final summary and strategic-forgetting pass, before operational-artifact
+cleanup, and before the agent declares the branch review-ready. This is a cumulative performance
+and merge-readiness guard: it catches anything that slipped between per-batch reviews and makes
+sure the user returns to a clean PR and a clean memory workspace.
 
 Spawn a fresh review subagent if the platform supports subagents. If not, do the same analysis
 directly.

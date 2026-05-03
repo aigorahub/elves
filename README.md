@@ -355,7 +355,7 @@ Each batch must be independently shippable: code, tests, docs, and passing revie
 
 | Tier | Method | Configuration |
 |---|---|---|
-| **Tier 1** | GitHub PR comments + built-in review subagent | Default (zero config). Agent spawns a review subagent that reads all PR comments, the diff, and the plan, then produces a structured assessment. Agent fixes blockers and iterates until the batch is clean. |
+| **Tier 1** | GitHub PR comments + built-in review | Default (zero config). Agent uses a review subagent when supported; otherwise it performs the same analysis directly. It reads PR comments, the diff, and the plan, fixes blockers, and iterates until the batch is clean. |
 | **Tier 2** | Custom review API | Set `method: custom-api` and `review-api-url` in survival guide. |
 | **Tier 3** | Additional checks | Smoke tests, screenshot diffs, doc checks, or any custom script returning 0/non-zero. |
 
