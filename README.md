@@ -61,6 +61,13 @@ place: survival guide, `.elves-session.json`, learnings, plan, execution log, th
 `.ai-docs/manifest.md` if it exists. The survival guide is marked
 `# READ THIS FILE FIRST AFTER ANY COMPACTION OR RESTART` so the agent can't miss it.
 
+Elves also practices **strategic forgetting**. Giant chats should not become permanent memory.
+Chats are for execution, handoff docs are for memory, archives are for history, and fresh threads
+are for speed. During long runs, the agent keeps the survival guide concise, archives old
+execution-log entries in place, promotes durable lessons, reconciles idle resources, and leaves a
+reactivation handoff so the next session can start from small durable docs instead of a bloated
+conversation.
+
 ### Stage, then launch
 
 Most "the elves stopped" failures come from one mistake: combining a giant plan and the launch
@@ -158,6 +165,8 @@ The launch prompt starts unattended execution. Elves re-reads the prepared docs,
 - **Multi-batch execution** with configurable batch sizing (default: 4 developers × 2-week sprint)
 - **Two-step operator flow**: stage the run first, then launch it in a fresh short call so the agent starts with momentum instead of a giant overloaded prompt
 - **Layered memory system**: reads survival guide, `.elves-session.json`, learnings, plan, execution log, and `.ai-docs/manifest.md` (if present) after compaction
+- **Strategic forgetting**: keeps active docs and sessions lean during long runs, archives old log
+  history in place, promotes durable knowledge, and leaves reactivation handoffs for fresh threads
 - **Documentation freshness in the loop**: review can raise `PENDING-DOCS`, learnings promote reusable lessons, and stable truths can move into `.ai-docs/*`
 - **Auto-discovered validation gates** for Node.js, Python, Go, Rust, and Makefile projects. No configuration required.
 - **Pluggable review**: GitHub PR comments by default (zero config), custom review API opt-in, additional custom checks
@@ -168,6 +177,9 @@ The launch prompt starts unattended execution. Elves re-reads the prepared docs,
 - **High-risk regression pass**: batches with medium/high blast radius can trigger a second,
   regression-only review pass that traces changed shared surfaces to their consumers and asks only
   "what could this break?"
+- **Final readiness review**: before handoff, the agent runs a fresh cumulative review of
+  `git diff <default-branch>...HEAD`, PR feedback, checks, docs, and memory hygiene so the branch
+  is ready to merge and the workspace is clean to resume
 - **Lightweight process retro**: entropy checks can tune the loop itself when the same friction
   repeats, for example by tightening the survival guide, templates, or tool config after repeated
   review findings
@@ -180,7 +192,7 @@ The launch prompt starts unattended execution. Elves re-reads the prepared docs,
 - **Slack notifications** (or any custom command): know when your run finishes without watching the terminal
 - **Constitution and legality check**: human-authored deal-breaker behaviors (`docs/constitution.md`) verified by a read-only judge after each batch. Three quality layers: correctness (tests), plan compliance (review), legality (judge). Success criteria the agent didn't author.
 - **PR Loop**: poll PR comments, inline reviews, and check status after every push — not just at batch boundaries
-- **Readiness Gate**: 7-point branch-level checklist before declaring review-ready (local proof on current tip, preview proof on exact runtime tip, artifact inspection, PR comments polled, legality check clean, git status clean, execution log current)
+- **Readiness Gate**: branch-level checklist before declaring review-ready (local proof on current tip, preview proof on exact runtime tip, final cumulative review, PR comments polled, legality check clean, strategic forgetting complete, git status clean, execution log current)
 - **Structured session data** in `.elves-session.json` for tooling, dashboards, and analytics
 - **Install doctor and update advisory**: startup can flag newer published releases and explain
   when a project-local install differs from the global one that you thought you were using
@@ -349,6 +361,19 @@ Each batch must be independently shippable: code, tests, docs, and passing revie
 
 The agent uses the highest tier you have configured. Non-blocking findings are logged; persistent false positives (3+ cycles) are assessed and dismissed with a written explanation in the execution log.
 
+### Memory hygiene
+
+Long runs should clean up as they go. The default behavior is conservative: keep live docs concise,
+archive old execution-log entries in place, promote durable lessons, stop idle resources, and write
+a reactivation handoff when a fresh thread would be faster. Elves does **not** delete local app
+state, chat databases, installed skills, plugins, or automations as part of a coding run.
+
+If you want a local Codex/Claude cleanup routine, run it as explicit maintenance: inspect first,
+back up important state, archive rather than delete, close the app before touching local state
+databases, and verify config/state afterward. See
+[`references/autonomy-guide.md`](references/autonomy-guide.md) for the full safe-maintenance
+pattern.
+
 ---
 
 ## File structure
@@ -392,7 +417,7 @@ elves/
 | Platform | File | Subagents | Notes |
 |---|---|---|---|
 | Claude Code | SKILL.md | Yes | Full feature set |
-| Codex | SKILL.md | No | Installed Codex skill surface; `AGENTS.md` remains the repo-local Codex companion |
+| Codex | SKILL.md | Varies | Use review subagents when available; otherwise do the review directly. `AGENTS.md` remains the repo-local Codex companion |
 | Claude.ai | SKILL.md (zip upload) | No | Upload as skill |
 | Any Agent Skills compatible | SKILL.md | Varies | Open standard |
 
@@ -404,6 +429,7 @@ elves/
 - **The Ralph Loop.** Try, check, feed back, repeat. AI returns drafts, not answers. A dumb, stubborn loop beats over-engineered sophistication because AI is non-deterministic. Any single attempt might fail. But if you keep trying, checking, and feeding back, the process converges.
 - **The 14-hour resource.** Every knowledge worker has 12-14 hours per day when they're not working. Elves converts those hours into shipped code. A two-hour planning session on Friday can produce a week's worth of output before you touch your keyboard on Monday.
 - **Three documents are the agent's memory.** Without them, long runs drift and repeat work. With them, a restarted agent picks up exactly where it left off. These aren't overhead: they're the minimum viable infrastructure for the loop to run unsupervised.
+- **Strategic forgetting keeps memory useful.** Permanent memory should be curated, not accumulated. Preserve decisions and reusable knowledge in handoff docs, learnings, and `.ai-docs`; archive raw history; start fresh threads when huge chats become the bottleneck.
 - **Tests are the watch.** An agent working overnight has no one watching. The tests are the watch. Without them, you wake up to code that compiles, passes lint, and does the wrong thing.
 - **Never merge.** The PR is for review, not for merging. That gate stays with the human.
 - **Document every decision.** Anything the agent decides without user input goes in the execution log under *Decisions made*. The human reviews these choices when they return.

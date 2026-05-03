@@ -164,3 +164,61 @@ echo "✓ Non-interactive environment variables set"
 ```
 
 The agent should set these at the start of every session if they are not already present. The user's environment should also be configured during preflight to minimize interactive prompts. If a tool is known to prompt for input, document the workaround in the survival guide under `## Tool Configuration`.
+
+---
+
+## Memory Pressure And Strategic Forgetting
+
+Long-running agent apps can slow down when active chats, terminal logs, worktrees, or local state
+grow without boundaries. Elves should prevent that in two layers:
+
+1. **In-run hygiene** keeps the current autonomous run fast and resumable.
+2. **Local app maintenance** cleans Codex/Claude application state only when explicitly requested
+   and only after inspection and backups.
+
+### In-run hygiene
+
+Do this during entropy checks, after unusually large batches, before a checkpoint handoff, and
+before Final Completion:
+
+- Keep the survival guide live sections concise. Rewrite current state in place.
+- Archive old execution-log entries under `## Completed Archive` when the log gets large.
+- Promote durable lessons to `learnings.md` or `.ai-docs/*`; condense superseded lessons.
+- Rotate or archive oversized project-created command logs when safe.
+- Stop or pause idle dev servers, terminals, paid jobs, and remote resources.
+- If the agent app is becoming sluggish or memory pressure is visible, write a concise handoff and
+  resume from a fresh launch context when the platform allows it.
+
+The goal is a clean memory workspace when the user returns: the branch is ready to review, the PR
+feedback queue is handled, and the next agent can restart from small durable docs instead of a
+giant chat.
+
+### Local app maintenance
+
+Do not perform this as a hidden side effect of a coding run. Only do it when the user asks for
+cleanup or weekly maintenance.
+
+Safe maintenance follows this order:
+
+1. **Inspect first.** Report what is taking space: sessions, archived sessions, worktrees,
+   archived worktrees, logs, config, state databases, skills, plugins, and automations.
+2. **Back up important state.** Back up config, global state, session indexes, state databases,
+   memories, skills, plugins, and automations before changing anything.
+3. **Check whether the app is open.** If Codex or Claude Code is running, only inspect. Apply
+   cleanup after closing it so local databases are not touched by two processes.
+4. **Create handoffs before archiving active chats.** For any active thread that might matter,
+   write a concise reactivation handoff with branch, PR, status, remaining work, validation state,
+   risks, and the prompt to resume.
+5. **Archive, don't delete.** Move old non-pinned chats, stale worktrees, and oversized old logs to
+   archive locations. Do not erase them as part of routine maintenance.
+6. **Prune dead references.** Remove config project paths that no longer exist or point at
+   temporary folders. Normalize platform-specific path variants when needed.
+7. **Review processes, don't auto-kill.** List heavy background processes such as Node/dev servers
+   and close only the ones the user confirms are no longer needed.
+8. **Verify.** Confirm config still parses, state databases open, active session size dropped,
+   archived sessions increased, and no bad paths remain.
+9. **Make it boring.** Weekly maintenance should be repeatable, backup-first, archive-first, and
+   report-driven.
+
+The key distinction: chats are for execution, handoff docs are for memory, archives are for
+history, and fresh threads are for speed.

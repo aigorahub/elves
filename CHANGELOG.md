@@ -4,6 +4,22 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+### Final cleanup and memory performance
+
+- **Final readiness review added.** Before finite-mode handoff, Elves now runs a fresh cumulative
+  review of `git diff <default-branch>...HEAD`, the branch commit history, execution log, PR
+  comments, check runs, docs, and memory hygiene. Supported platforms should use a review subagent;
+  others perform the same review directly, then fix and repeat until clean.
+- **Strategic forgetting added.** Runtime docs now distinguish execution chats, handoff docs,
+  archives, and durable memory so long runs leave a clean memory workspace instead of a bloated
+  active thread.
+- **Long-run hygiene added to entropy checks.** Elves now checks for oversized logs, stale live
+  survival-guide state, superseded lessons, idle resources, and visible memory pressure during
+  long runs, not only at final completion.
+- **Safe local app maintenance documented.** The autonomy guide now describes inspect-first,
+  backup-first, archive-first cleanup for Codex/Claude application state, with explicit warnings
+  not to mutate active app databases during a coding run.
+
 ## [1.8.0] - 2026-04-14
 
 ### Run control hardening

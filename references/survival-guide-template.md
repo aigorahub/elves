@@ -112,6 +112,33 @@ Promotion flow: `execution log -> learnings -> curated durable docs`
 
 ---
 
+## Strategic Forgetting
+
+> Keep active memory light. Preserve what matters, archive what is history, and hand off cleanly
+> when a fresh chat would be faster than dragging a huge one forward.
+
+- **Chats:** execution workspace, not permanent memory
+- **Handoff docs:** concise memory for resuming in a fresh thread
+- **Archives:** history and evidence
+- **Fresh threads:** speed
+
+During long runs, perform safe hygiene at entropy checks and before Final Completion:
+
+- Rewrite live survival-guide sections in place; do not stack stale status updates.
+- Archive older execution-log entries under `## Completed Archive` when the log gets large.
+- Promote durable lessons to `learnings.md` or `.ai-docs/*`; condense or remove superseded lessons.
+- Rotate oversized project-created command logs when safe to archive them.
+- Reconcile idle dev servers, local terminals, paid jobs, and remote resources.
+- If memory pressure or app sluggishness appears, write a reactivation handoff and resume from a
+  fresh launch context when the platform allows it.
+
+Do not delete or mutate Codex/Claude app state, chat databases, installed skills, plugins,
+automations, or active session stores during a coding run unless the user explicitly requested
+maintenance. If maintenance is requested, inspect first, back up important state, archive rather
+than delete, and do not modify active app databases while the app is open.
+
+---
+
 ## Non-Negotiables
 
 These rules are absolute. They can't be overridden by anything you think you understand about the
@@ -123,7 +150,7 @@ plan, the codebase, or good engineering practice.
 - **You never merge. You never approve a merge. This is always a non-negotiable.**
 - **Never run destructive git commands:** `git reset --hard`, `git checkout .`, `git clean -fd`, `git push --force`, `git rebase` on shared branches. Never. If you think you need one, stop.
 - **Never modify a test to make it pass.** Fix the code, not the test. If you believe a test is wrong, log it and move on. Don't change it.
-- **Never introduce regressions.** Every change must preserve existing functionality. Before marking a batch complete, verify: all pre-existing tests still pass (total test count never decreases), no shared utilities or interfaces were broken (grep for consumers), and the cumulative diff (`git diff main...HEAD --stat`) contains no unexpected changes outside batch scope.
+- **Never introduce regressions.** Every change must preserve existing functionality. Before marking a batch complete, verify: all pre-existing tests still pass (total test count never decreases), no shared utilities or interfaces were broken (grep for consumers), and the cumulative diff (`git diff <default-branch>...HEAD --stat`) contains no unexpected changes outside batch scope.
 
 ---
 
@@ -247,6 +274,23 @@ lightweight. Tune the process you're already using; do not invent a new subsyste
 
 ---
 
+## Memory and Resource Hygiene
+
+Run this lightweight cleanup during entropy checks, after unusually large batches, and before
+Final Completion:
+
+- [ ] Survival guide live sections are concise and current
+- [ ] Execution log is readable; old completed entries archived in place if large
+- [ ] Durable lessons promoted; stale or superseded lessons condensed
+- [ ] Oversized project logs rotated or archived if safe
+- [ ] Idle dev servers, terminals, paid jobs, and remote resources reconciled
+- [ ] Reactivation handoff written if a fresh chat should take over
+
+This is performance hygiene for the active run. It does not include deleting local app data or
+editing live Codex/Claude session databases.
+
+---
+
 ## Acceptance Checks
 
 Before marking any batch complete, verify all of the following:
@@ -257,6 +301,7 @@ Before marking any batch complete, verify all of the following:
 - [ ] Survival guide updated with new Current Phase and Next Exact Batch
 - [ ] Stop Gate updated with new remaining-batch count and next required action
 - [ ] Active Compute section updated, or explicitly marked as not applicable
+- [ ] Memory and Resource Hygiene checked for long runs or large batches
 - [ ] Batch closed out with a commit and push before any later work begins
 - [ ] Survival guide re-read immediately after that commit and push
 - [ ] Rollback tag created _before_ the batch started

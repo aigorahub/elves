@@ -112,6 +112,56 @@ EFFORT_GUARDRAIL_PHRASES = {
     ],
 }
 
+FINAL_READINESS_REVIEW_PHRASES = {
+    "SKILL.md": [
+        "Final Readiness Review",
+        "git diff <default-branch>...HEAD",
+        "review subagent",
+    ],
+    "AGENTS.md": [
+        "Final Readiness Review",
+        "git diff <default-branch>...HEAD",
+        "review subagent",
+    ],
+    "README.md": [
+        "Final readiness review",
+        "git diff <default-branch>...HEAD",
+    ],
+    "references/review-subagent.md": [
+        "## Final Readiness Review",
+        "git diff [DEFAULT_BRANCH]...HEAD",
+    ],
+    "references/kickoff-prompt-template.md": [
+        "Require a final readiness review",
+        "git diff <default-branch>...HEAD",
+    ],
+}
+
+MEMORY_HYGIENE_PHRASES = {
+    "SKILL.md": [
+        "## Strategic Forgetting",
+        "chats are for execution",
+        "memory and resource hygiene",
+    ],
+    "AGENTS.md": [
+        "## Strategic Forgetting",
+        "Chats are for execution",
+        "memory and resource hygiene",
+    ],
+    "README.md": [
+        "strategic forgetting",
+        "handoff docs are for memory",
+    ],
+    "references/survival-guide-template.md": [
+        "## Strategic Forgetting",
+        "## Memory and Resource Hygiene",
+    ],
+    "references/autonomy-guide.md": [
+        "## Memory Pressure And Strategic Forgetting",
+        "Local app maintenance",
+    ],
+}
+
 
 def read_text(path: Path) -> str:
     return path.read_text()
@@ -188,6 +238,20 @@ def main() -> int:
             if phrase not in text:
                 errors.append(f"{label}: missing effort guardrail phrase `{phrase}`")
 
+    for label, phrases in FINAL_READINESS_REVIEW_PHRASES.items():
+        path = REPO_ROOT / label
+        text = read_text(path)
+        for phrase in phrases:
+            if phrase not in text:
+                errors.append(f"{label}: missing final-readiness-review phrase `{phrase}`")
+
+    for label, phrases in MEMORY_HYGIENE_PHRASES.items():
+        path = REPO_ROOT / label
+        text = read_text(path)
+        for phrase in phrases:
+            if phrase not in text:
+                errors.append(f"{label}: missing memory-hygiene phrase `{phrase}`")
+
     if errors:
         print("Repo consistency check FAILED")
         for error in errors:
@@ -201,6 +265,8 @@ def main() -> int:
     print("- Durable docs and learnings surfaces exist")
     print("- Non-stop guardrails are aligned across runtime and template docs")
     print("- Effort guardrails are aligned across runtime and template docs")
+    print("- Final readiness review guardrails are aligned")
+    print("- Strategic forgetting and memory hygiene guardrails are aligned")
     return 0
 
 

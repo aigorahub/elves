@@ -205,6 +205,63 @@ If the queue is empty, `PENDING-DOCS` is clear, and the contract is fully ✅, t
 
 After fixing, the coordinator pushes and runs the review subagent again. The loop repeats until the report comes back with zero blocking items, every contract item is ✅, and the work queue is empty.
 
+## Final Readiness Review
+
+Run this once before Final Completion cleanup, after all planned batches are complete and before
+the agent declares the branch review-ready. This is a cumulative performance and merge-readiness
+guard: it catches anything that slipped between per-batch reviews and makes sure the user returns
+to a clean PR and a clean memory workspace.
+
+Spawn a fresh review subagent if the platform supports subagents. If not, do the same analysis
+directly.
+
+Prompt shape:
+
+```
+Review the final state of PR #[NUMBER] for repo [OWNER/REPO].
+
+Today's date is [DATE]. The current codebase is the source of truth.
+
+Read:
+1. The cumulative branch diff: git diff [DEFAULT_BRANCH]...HEAD
+2. The full commit history for the branch
+3. The plan at [PLAN_PATH]
+4. The execution log at [EXECUTION_LOG_PATH]
+5. The survival guide at [SURVIVAL_GUIDE_PATH]
+6. .elves-session.json, especially review_comments and continuation_guard
+7. All unresolved PR review threads, unreplied issue comments, and current check runs
+8. TODO.md and relevant docs touched by the run
+
+Assess:
+- Is the branch ready for the human to review and merge?
+- Are there any unresolved PR comments, failing checks, missing docs, or unhandled TODOs?
+- Does the cumulative diff include unrelated or surprising files?
+- Did any shared surface change without consumer proof?
+- Is the memory workspace clean enough to resume from concise docs instead of this chat?
+
+Return:
+### Blocking
+- [must fix before readiness]
+
+### Warnings
+- [safe to defer only with a clear TODO or handoff note]
+
+### PR Feedback Queue
+- [unresolved threads/comments/checks and required disposition]
+
+### Cumulative Diff Risk
+- [shared surfaces, surprising files, missing proof]
+
+### Memory Workspace
+- [survival guide/log/learnings/handoff cleanup needed before handoff]
+
+If everything is clean, say: "Final readiness review clean."
+```
+
+The coordinator fixes blocking findings, resolves or replies to PR comments, updates
+`.elves-session.json`, reruns relevant validation, pushes, and repeats this final review until it
+is clean. After the operational-artifact cleanup commit, poll comments and checks one last time.
+
 ## When Subagents Aren't Available
 
 If the platform doesn't support subagents (some Codex configurations, Claude.ai), the coordinator does this analysis directly:

@@ -167,6 +167,17 @@ Compute` updates in the survival guide.
 The launch prompt should remind the agent how to behave: don't stop, use judgment, work in small
 batches, commit frequently, validate aggressively, review PR feedback, and watch for regressions.
 
+**Keep memory fast**
+For long runs, tell the agent to perform memory and resource hygiene during entropy checks: keep
+the survival guide concise, archive old execution-log entries in place, promote durable lessons,
+stop idle resources, and write a fresh-thread handoff if the active chat or app becomes sluggish.
+
+**Require a final readiness review**
+Before the final handoff, the agent should run a fresh cumulative review of
+`git diff <default-branch>...HEAD`, all unresolved PR feedback, checks, docs, and memory hygiene.
+Use a review subagent when the platform supports one; otherwise do the review directly. Fix
+blockers and repeat until clean.
+
 **Check in with `ra:`**
 You don't have to disappear completely. If you want to give context or change priorities during
 the run, prefix your message with `ra:`. `ride-along:` and `[ride-along]` also work. The agent

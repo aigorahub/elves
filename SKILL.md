@@ -49,6 +49,34 @@ Promotion flow: `execution log -> learnings -> .ai-docs`
 Documentation freshness is part of done. A batch is not truly complete if the code changed but the
 relevant durable docs, human docs, or recovery docs stayed stale.
 
+## Strategic Forgetting
+
+Durable memory is useful only when it stays curated. Giant chats, append-only scratchpads, and
+multi-megabyte logs are not memory; they are drag. Elves should preserve decisions and reusable
+knowledge while shrinking the active context the next agent has to carry.
+
+Use this rule of thumb: **chats are for execution, handoff docs are for memory, archives are for
+history, fresh threads are for speed.**
+
+- Keep the survival guide short and live. Rewrite `Run Control`, `Current Phase`, `Stop Gate`, and
+  `Next Exact Batch` in place instead of stacking historical updates.
+- Keep raw chronology in the execution log, but archive completed entries under `## Completed
+  Archive` when the log gets long. Preserve evidence; don't force every resumed agent to read it
+  all before acting.
+- Promote only reusable, stable, actionable lessons to `learnings.md`. Promote stable repo truths
+  from `learnings.md` into `.ai-docs/*`. Remove or condense stale lessons when they are superseded.
+- Before ending a long finite run, leave a concise reactivation handoff: current branch/PR, final
+  status, remaining work, validation state, unresolved risks, and the exact prompt needed to resume
+  in a fresh chat.
+- During long runs, perform safe hygiene at entropy checks and after unusually large batches: stop
+  or pause idle dev servers and paid jobs, rotate oversized project-created logs, keep active docs
+  lean, and checkpoint a fresh-thread handoff if memory pressure is visible.
+- Never delete or mutate local app state, chat databases, worktrees, logs, skills, plugins, or
+  automation files as part of a coding run unless the user explicitly requested maintenance. If
+  maintenance is requested, inspect first, back up important state, archive rather than delete, and
+  do not modify active app databases while the app is open. See `references/autonomy-guide.md` for
+  the safe local-maintenance pattern.
+
 ## Code Quality Philosophy
 
 AI coding agents have a natural tendency toward spaghetti: quick fixes instead of root causes, new utilities instead of extending existing ones, novel patterns instead of following established conventions. Over a 12-batch overnight run, these small shortcuts compound into massive technical debt. The codebase gets harder to work on with every batch instead of easier.
@@ -568,7 +596,7 @@ Update the execution log with a timestamped entry covering: batch name, timing b
 
 **Write the regression attestation.** This isn't a checkbox. It's a forcing function that makes you reason about safety. Before the batch can be marked complete, include a structured regression attestation in the execution log entry:
 
-1. **Cumulative diff review:** run `git diff main...HEAD --stat` and review the total delta from main. List any files changed outside the batch scope and explain why they were touched. Flag any unexpected deletions.
+1. **Cumulative diff review:** run `git diff <default-branch>...HEAD --stat` and review the total delta from the default branch. List any files changed outside the batch scope and explain why they were touched. Flag any unexpected deletions.
 2. **Shared surfaces:** identify any shared code modified in this batch (utilities, types, interfaces, configs, middleware, or anything imported by code outside the batch scope). For each, grep for consumers and verify the change is backward-compatible. Report the consumer count and nature of change (additive / modified / breaking).
 3. **Test baseline comparison:** compare the current test count against the baseline captured during Verify Green (step 2). Report the delta. Total tests should only go up or stay flat, never decrease. If the skipped count increased, explain why.
 4. **Confidence and reasoning:** state HIGH, MEDIUM, or LOW and explain *why*. "All tests pass" is necessary but not sufficient. Explain what you checked beyond tests and why you believe existing functionality is preserved. If you modified shared surfaces, explain why consumers aren't affected. If MEDIUM or LOW, describe the specific risk and what additional verification would raise confidence.
@@ -722,6 +750,7 @@ This is continuous entropy management — catching the slow drift that individua
 - Look for patterns that diverged: error handling done one way in batch 1 and a different way in batch 4.
 - Verify that the Code Quality Philosophy principles (especially #2 centralize, #5 pattern detection, #6 progressive conditioning) are holding across the cumulative diff, not just within individual batches.
 - Spend 5 minutes on a **process retro**: review the execution log, review findings, and validation timings for repeated friction. If the same category of issue keeps coming back (for example, the same review warning twice, repeated `PENDING-DOCS`, or validation taking longer every batch), tighten the process itself by updating the survival guide, a template, `learnings.md`, or tool configuration. Keep it lightweight: tune the loop you're already running instead of inventing a new subsystem.
+- Spend 5 minutes on **memory and resource hygiene** during long runs: condense stale survival-guide state, archive old execution-log entries when the log is large, rotate oversized command logs if the project created them, and reconcile idle dev servers, local terminals, paid jobs, or remote resources. If memory pressure or app sluggishness is visible, write a fresh-thread handoff and continue from a new launch context when the platform allows it. Do not mutate Codex/Claude app databases or active session stores mid-run.
 
 If you find drift, fix it now in a small focused commit: `[<branch> · Entropy check after Batch N] Consolidate <what changed>`. Don't let it ride. The purpose is garbage collection — small, frequent corrections are cheaper than a large refactor later.
 
@@ -824,13 +853,14 @@ A batch isn't done unless:
 6. Review performed. The review loop ran until no blockers remained. All review threads resolved or replied to.
 7. Legality check passed (if a constitution exists). No unresolved FAIL verdicts.
 8. No accumulated debt: no skipped gates, no "will fix later" items, no known regressions.
-9. **Regression attestation written.** The execution log entry for this batch includes: cumulative diff review (`git diff main...HEAD --stat`), shared surfaces identified with consumers verified, test baseline comparison (total tests never decreased), and a confidence level with reasoning. See step 9.
+9. **Regression attestation written.** The execution log entry for this batch includes: cumulative diff review (`git diff <default-branch>...HEAD --stat`), shared surfaces identified with consumers verified, test baseline comparison (total tests never decreased), and a confidence level with reasoning. See step 9.
 10. **Documentation is up to date.** Any user-facing behavior changed by this batch must be reflected in the relevant docs: README, API docs, inline doc comments, config references, migration guides, changelogs, `learnings.md`, `.ai-docs/*`, or whatever the project uses. Stale docs are debt. A user who reads the docs and gets wrong information is worse off than a user with no docs at all.
 11. `.elves-session.json` updated with batch status, commit SHA, completion timestamp, current batch state, `continuation_guard`, and `review_comments` dispositions.
-12. You're confident the batch is correct. Not "probably fine," but verified through testing, review, and deployment.
-13. Execution log updated with timestamps, evidence, and commit SHA.
-14. Survival guide updated with next batch and Stop Gate.
-15. Changes committed and pushed.
+12. Memory and resource hygiene checked for long runs or large batches: live docs are concise, old log entries are archived in place when needed, idle resources are reconciled, and a fresh-thread handoff exists if memory pressure is visible.
+13. You're confident the batch is correct. Not "probably fine," but verified through testing, review, and deployment.
+14. Execution log updated with timestamps, evidence, and commit SHA.
+15. Survival guide updated with next batch and Stop Gate.
+16. Changes committed and pushed.
 
 Every batch must be tight before you move on. The next batch builds on this one. If this one is shaky, everything after it is shaky. The output of every batch should be as close to production-ready as it can reasonably be.
 
@@ -916,9 +946,11 @@ Do not call a branch review-ready unless ALL of the following are true:
 2. **Local proof is green on the current tip.** All validation gates pass on the latest commit, not on an earlier commit that has since been amended by review fixes.
 3. **Preview proof is green on the current tip** (if deployed behavior was touched). Re-verify after every push that changes deployed code.
 4. **Artifact inspection done** for any export/download behavior changes. The actual output was inspected, not just the success status.
-5. **PR comments and checks have been polled.** No unresolved threads, no unreplied bot comments, no failing checks.
-6. **Legality check is clean.** If a constitution exists, the judge has run on the final tip with no unresolved FAIL verdicts. WARN findings are documented with reasoning.
-7. **Git status is clean.** No uncommitted changes, no untracked files that should be committed.
+5. **Final cumulative review is clean.** A fresh review subagent, if supported by the platform, has reviewed `git diff <default-branch>...HEAD`, the full commit history, the plan, the execution log, and all unresolved PR comments/checks. If subagents are unavailable, do this review directly. Fix blockers, push, and repeat until the cumulative review is clean.
+6. **PR comments and checks have been polled.** No unresolved threads, no unreplied bot comments, no failing checks.
+7. **Legality check is clean.** If a constitution exists, the judge has run on the final tip with no unresolved FAIL verdicts. WARN findings are documented with reasoning.
+8. **Strategic forgetting is complete.** The survival guide is concise, long execution logs are archived in place, durable lessons are promoted or pruned, and a reactivation handoff exists for any remaining work.
+9. **Git status is clean.** No uncommitted changes, no untracked files that should be committed.
 
 If any gate fails, fix it before declaring readiness. This checklist is the final quality gate between "autonomous run complete" and "ready for human review."
 
@@ -928,11 +960,12 @@ If any gate fails, fix it before declaring readiness. This checklist is the fina
 
 When all batches are done or time is up:
 
-1. Add a Session Summary to the execution log.
-2. Update `.elves-session.json`.
-3. Do a final TODO.md pass.
-4. Update the survival guide.
-5. **Clean up operational artifacts.** Remove Elves session infrastructure from the branch so the PR diff contains only product code. Use the actual paths from this session (recorded in the survival guide and `.elves-session.json`), not hard-coded defaults:
+1. **Run the Final Readiness Review before cleanup.** Poll all PR review threads, issue comments, and checks. Spawn a fresh review subagent if the platform supports it; otherwise do the same review directly. The reviewer must read `git diff <default-branch>...HEAD`, the full commit history, the plan, the execution log, `.elves-session.json`, and all unresolved PR feedback. Fix blocking findings, resolve or reply to addressed comments, update `.elves-session.json`, push, and repeat until no blockers, unresolved threads, unreplied bot comments, or failing checks remain.
+2. Add a Session Summary to the execution log.
+3. Update `.elves-session.json`.
+4. Do a final TODO.md pass.
+5. Update the survival guide and perform strategic forgetting: condense live state, archive old execution-log entries in place if the log is large, promote durable lessons, prune superseded lessons, and leave a concise reactivation handoff for any remaining work or future follow-up.
+6. **Clean up operational artifacts.** Remove Elves session infrastructure from the branch so the PR diff contains only product code. Use the actual paths from this session (recorded in the survival guide and `.elves-session.json`), not hard-coded defaults:
    ```bash
    git rm <survival-guide-path> <execution-log-path> .elves-session.json
    git commit -m "[<branch> · Batch N/N] Remove elves session artifacts from PR"
@@ -940,8 +973,9 @@ When all batches are done or time is up:
    These files were needed during the run for compaction recovery, but they're noise in the final PR. The plan file is kept by default since it documents what was built. If the user configured `cleanup.keep_plan: false` in `config.json`, add the plan path to the `git rm` command as well.
    
    **Important:** the execution log and survival guide still exist in the branch history if you need to reference them. This commit just removes them from the final diff.
-6. Push.
-7. Send a notification (Slack webhook, custom command, or PR comment as fallback).
+7. Push.
+8. Poll PR comments and checks one last time after the cleanup commit. If cleanup triggered new feedback or failing checks, address it before notifying.
+9. Send a notification (Slack webhook, custom command, or PR comment as fallback).
 
 **You don't merge. The PR is ready for the user to review and merge when they return.**
 
@@ -1123,7 +1157,13 @@ If the skill directory contains a `config.json`, read it at session start. This 
   "batch_sizing": { "team_size": 4, "sprint_weeks": 2 },
   "notification": { "method": "slack" },
   "review": { "method": "github-pr-comments" },
-  "default_branch": "main"
+  "default_branch": "main",
+  "cleanup": { "keep_plan": true },
+  "memory_hygiene": {
+    "archive_execution_log_after_entries": 50,
+    "create_reactivation_handoff": true,
+    "local_app_cleanup": "inspect-only-unless-user-requests-maintenance"
+  }
 }
 ```
 

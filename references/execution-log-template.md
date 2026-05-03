@@ -180,7 +180,7 @@
 - Deferred: [explicit doc debt left for later / "none"]
 
 **Regression attestation:**
-- Cumulative diff: `git diff main...HEAD --stat` shows [N] files changed, [+X/-Y] lines
+- Cumulative diff: `git diff <default-branch>...HEAD --stat` shows [N] files changed, [+X/-Y] lines
 - Files outside batch scope: [none / list with explanation]
 - Shared surfaces modified: [list shared utilities/types/interfaces/configs touched, with consumer count]
 - Consumers verified: [for each shared surface, how callers were checked, e.g., "grep shows 12 importers of validation.ts, all unchanged"]
