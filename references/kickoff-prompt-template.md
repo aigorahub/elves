@@ -152,6 +152,12 @@ this right. I'm going to stage the run and wait for your final launch command."
 Point to the plan by path. If the launch prompt starts looking like a second plan file, it is too
 long.
 
+**Use Codex Goals as a continuation backend when available**
+If launching from Codex with Goals enabled, wrap the same launch prompt in `/goal`. Goals keeps
+Codex moving; Elves still defines completion through the survival guide Stop Gate and Readiness
+Gate. If a goal budget is exhausted before readiness is clean, the agent should write a
+reactivation handoff, commit, push, and avoid claiming completion.
+
 **Point to durable memory too**
 If the run uses a learnings file or `.ai-docs`, include those paths in the launch prompt so the
 agent rehydrates from durable knowledge instead of rediscovering it.
@@ -166,6 +172,17 @@ Compute` updates in the survival guide.
 **Make the launch prompt behavior-heavy**
 The launch prompt should remind the agent how to behave: don't stop, use judgment, work in small
 batches, commit frequently, validate aggressively, review PR feedback, and watch for regressions.
+
+**Keep memory fast**
+For long runs, tell the agent to perform memory and resource hygiene during entropy checks: keep
+the survival guide concise, archive old execution-log entries in place, promote durable lessons,
+stop idle resources, and write a fresh-thread handoff if the active chat or app becomes sluggish.
+
+**Require a final readiness review**
+Before the final handoff, the agent should run a fresh cumulative review of
+`git diff <default-branch>...HEAD`, all unresolved PR feedback, checks, docs, and memory hygiene.
+Use a review subagent when the platform supports one; otherwise do the review directly. Fix
+blockers and repeat until clean.
 
 **Check in with `ra:`**
 You don't have to disappear completely. If you want to give context or change priorities during

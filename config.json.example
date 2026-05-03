@@ -23,5 +23,12 @@
   "cleanup": {
     "keep_plan": true,
     "_comment": "If false, the plan file is also removed in the final cleanup commit."
+  },
+
+  "memory_hygiene": {
+    "archive_execution_log_after_entries": 50,
+    "create_reactivation_handoff": true,
+    "local_app_cleanup": "inspect-only-unless-user-requests-maintenance",
+    "_comment": "Performance hygiene for long runs. Keep live docs concise, archive old log entries in place, and never mutate Codex/Claude app state during a coding run."
   }
 }

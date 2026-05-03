@@ -1,5 +1,5 @@
 ---
-version: "1.8.0"
+version: "1.9.0"
 ---
 
 # Elves: Autonomous Development Agent (Codex)
@@ -29,6 +29,26 @@ Elves keeps knowledge layered instead of piling everything into one long note:
 - **Human-facing docs:** README, CHANGELOG, TODO, API/config docs
 
 Promotion flow: `execution log -> learnings -> .ai-docs`
+
+## Strategic Forgetting
+
+Durable memory must stay curated. Giant chats, append-only scratchpads, and huge logs are drag, not
+memory. Chats are for execution, handoff docs are for memory, archives are for history, and fresh
+threads are for speed.
+
+- Rewrite the survival guide's live sections in place instead of stacking history there.
+- Keep chronology in the execution log, but archive completed entries under `## Completed Archive`
+  when the log gets long.
+- Promote only reusable, stable, actionable lessons to `learnings.md`; promote stable repo truths
+  into `.ai-docs/*`; condense or remove superseded lessons.
+- Before ending a long finite run, leave a concise reactivation handoff with branch, PR, status,
+  remaining work, validation state, risks, and a prompt to resume in a fresh chat.
+- During long runs, perform safe hygiene between batches: stop idle dev servers or paid jobs,
+  rotate oversized command logs, keep active docs lean, and checkpoint a fresh-thread handoff.
+- Do not delete or mutate local app state, chat databases, worktrees, logs, skills, plugins, or
+  automations unless the user explicitly requested maintenance. If maintenance is requested,
+  inspect first, back up important state, archive rather than delete, and do not modify active app
+  databases while the app is open.
 
 ## Code Quality Philosophy
 
@@ -282,7 +302,7 @@ If you can't write concrete acceptance criteria, the batch scope is too vague �
 
 **Use commit messages to communicate with the reviewer.** The reviewer reads your commit history. Every commit should reference which batch item is being addressed. When you make a non-obvious choice (hardcoded value, pattern deviation, design tradeoff), explain your reasoning in the commit body. This prevents review cycles from devolving into arguments where neither side understands the other.
 
-Build the full batch scope. Push after each meaningful chunk — **every commit must follow the progress format** from step 11: `[<branch> · Batch N/Total] <verb> <what changed>`. Self-check every subject line before committing. Handle tiny incidental fixes inline and note them in the log. Anything substantial outside scope: add to `TODO.md` tagged `[elves-scout]` and keep moving. All work is done directly. Codex doesn't have built-in subagent support.
+Build the full batch scope. Push after each meaningful chunk — **every commit must follow the progress format** from step 11: `[<branch> · Batch N/Total] <verb> <what changed>`. Self-check every subject line before committing. Handle tiny incidental fixes inline and note them in the log. Anything substantial outside scope: add to `TODO.md` tagged `[elves-scout]` and keep moving. Implementation work is done directly unless the user explicitly provided a worker workflow; review and judge passes should use read-only subagents when the platform supports them, otherwise do the analysis directly.
 
 Write tests for new code. Cover the logic you introduce, not just happy paths. If the project lacks test infrastructure, set it up in the first batch. During long implementation stretches, periodically update the execution log with progress notes to protect against mid-batch compaction.
 
@@ -322,7 +342,7 @@ Also review the diff for code quality, **using the contract's Build on section a
 
 **Check shared surfaces for regression risk.** For any modified file that's imported or used by code outside the batch scope: grep for consumers, verify backward compatibility, confirm no function signatures or interfaces changed without updating all callers. Mark BLOCKING if a shared surface was modified without verifying consumers.
 
-**For medium/high blast radius batches, run one more regression-focused pass.** If the contract marks the blast radius as medium or high, or the batch touches auth, billing, data models, shared utilities, public interfaces, or other widely-consumed surfaces, do a narrow second pass after the standard review is otherwise clean. Read the cumulative diff, the plan, the batch contract (especially blast radius), and the consumer evidence. Ignore style, architecture improvements, and new feature ideas. Ask only: "What existing behavior could this break?" Trace each changed shared surface to its callers or dependents and name the concrete failure mode. Treat confirmed breakage as BLOCKING. Treat plausible but unproven regression risk as WARNING until you either add verification or justify why the surface is safe in the execution log and commit message. Codex doesn't have built-in subagents, so do this pass directly unless the user explicitly provided another reviewer workflow.
+**For medium/high blast radius batches, run one more regression-focused pass.** If the contract marks the blast radius as medium or high, or the batch touches auth, billing, data models, shared utilities, public interfaces, or other widely-consumed surfaces, do a narrow second pass after the standard review is otherwise clean. Read the cumulative diff, the plan, the batch contract (especially blast radius), and the consumer evidence. Ignore style, architecture improvements, and new feature ideas. Ask only: "What existing behavior could this break?" Trace each changed shared surface to its callers or dependents and name the concrete failure mode. Treat confirmed breakage as BLOCKING. Treat plausible but unproven regression risk as WARNING until you either add verification or justify why the surface is safe in the execution log and commit message. Use a read-only review subagent when the platform supports it; otherwise do this pass directly.
 
 **Fix all blocking issues using the bug-fix protocol.** When a bug is found:
 1. **Diagnose the category** — what kind of bug is this? Missing null check? Unvalidated input? Off-by-one? The specific bug is a symptom; the category is the disease.
@@ -358,7 +378,7 @@ Never make unnecessary code changes just to appease a finding. If the same non-a
 
 ### 8. Legality Check (the Judge)
 
-**If a constitution exists, run the legality check now.** Read the constitution, identify which intentions could be affected by the current batch, and trace flows and invariants through the code. Produce a verdict: **PASS**, **WARN**, **FAIL**, or **UNCHANGED** for each. All PASS/UNCHANGED: continue. Any WARN: fix or document. Any FAIL: blocked until fixed. Codex doesn't have subagents, so do the check directly. See **Constitution and the Legality Check** for the full framework. If no constitution exists, skip this step.
+**If a constitution exists, run the legality check now.** Read the constitution, identify which intentions could be affected by the current batch, and trace flows and invariants through the code. Produce a verdict: **PASS**, **WARN**, **FAIL**, or **UNCHANGED** for each. All PASS/UNCHANGED: continue. Any WARN: fix or document. Any FAIL: blocked until fixed. Use a read-only judge/review subagent when the platform supports it; otherwise do the check directly. See **Constitution and the Legality Check** for the full framework. If no constitution exists, skip this step.
 
 ### 9. Document
 
@@ -381,7 +401,7 @@ Append to execution log:
 **Next:** 1. [next task]  2. [task after]
 ```
 
-**Write the regression attestation.** Review `git diff main...HEAD --stat` for the cumulative delta. Identify shared surfaces modified, verify consumers, compare test count against the baseline from step 2, and state a confidence level with reasoning.
+**Write the regression attestation.** Review `git diff <default-branch>...HEAD --stat` for the cumulative delta. Identify shared surfaces modified, verify consumers, compare test count against the baseline from step 2, and state a confidence level with reasoning.
 
 Also update `.elves-session.json`. Set the batch status to `"complete"`, record commit SHA and timestamp.
 
@@ -461,6 +481,8 @@ Skipping this means review feedback piles up silently and the user returns to a 
 
 Also spend 5 minutes on a **process retro**: skim the execution log, review findings, and validation timings for repeated friction. If the same category of issue keeps coming back (for example, the same review warning twice, repeated `PENDING-DOCS`, or validation getting slower each batch), tighten the process itself by updating the survival guide, a template, `learnings.md`, or tool configuration. Keep it lightweight: tune the loop you're already running instead of inventing a new subsystem. Record any real process adjustment in the execution log.
 
+Also spend 5 minutes on **memory and resource hygiene** during long runs: condense stale survival-guide state, archive old execution-log entries when the log is large, rotate oversized command logs if the project created them, and reconcile idle dev servers, local terminals, paid jobs, or remote resources. If memory pressure or app sluggishness is visible, write a fresh-thread handoff and continue from a new launch context when the platform allows it. Do not mutate Codex/Claude app databases or active session stores mid-run.
+
 If you find drift, fix it in a small focused commit: `[<branch> · Entropy check after Batch N] Consolidate <what changed>`. If nothing needs fixing, skip and move on. Should take minutes, not hours. The 3-batch cadence is a default; override in the survival guide under `## Run Control`. For short plans (4-5 batches), check after batch 2-3. For long plans (15+), every 3 is right. If batches pass review cleanly, stretch to every 4-5.
 
 ### 15. Continue or Stop
@@ -531,7 +553,7 @@ Between batches, proactively compact with specific instructions: "Preserve: surv
 
 ## Completion Contract
 
-Don't report "done" unless all are true for the current batch. This is a condensed checklist; see `SKILL.md` **Completion Contract** for the full 15-item version.
+Don't report "done" unless all are true for the current batch. This is a condensed checklist; see `SKILL.md` **Completion Contract** for the full version.
 
 1. Touched-surface validation gates passed (lint, typecheck, build, test, preview if configured). Broad regression runs at entropy checks and before the Readiness Gate.
 2. No accumulated debt: no skipped gates, no "will fix later" items, no known regressions.
@@ -541,9 +563,10 @@ Don't report "done" unless all are true for the current batch. This is a condens
 6. Legality check passed (if a constitution exists). No unresolved FAIL verdicts.
 7. **Documentation is up to date.** Any user-facing behavior changed by this batch is reflected in the relevant docs (README, API docs, inline doc comments, config references, changelogs, `learnings.md`, `.ai-docs/*`). Stale docs are debt.
 8. `.elves-session.json` updated with `session_id`, current batch state, batch status, commit SHA, completion timestamp, `continuation_guard`, and `review_comments` dispositions. The schema includes path fields for the plan/survival guide/learnings/execution log, a `batches` array (id, name, status, commit, rollback_tag, started_at, completed_at), a `continuation_guard` object (`remaining_batches`, `stop_allowed`, `checkpoint_is_stop`, `next_required_action`), and a `review_comments` array (id, type, source, batch, cycle, summary, disposition, fix_commit/reason). See `SKILL.md` **Structured Session Data** for the full schema.
-9. Execution log updated with timestamps, evidence, and commit SHA.
-10. Survival guide updated with next batch and Stop Gate.
-11. Changes committed and pushed.
+9. Memory and resource hygiene checked for long runs or large batches: live docs concise, old log entries archived in place if needed, idle resources reconciled, and fresh-thread handoff written if memory pressure is visible.
+10. Execution log updated with timestamps, evidence, and commit SHA.
+11. Survival guide updated with next batch and Stop Gate.
+12. Changes committed and pushed.
 
 ## Constitution and the Legality Check
 
@@ -567,7 +590,7 @@ After each batch passes validation and review, run the legality check. Read the 
 
 **All PASS or UNCHANGED:** batch continues. **Any WARN:** review and either fix or document why it's a false positive. **Any FAIL:** batch is blocked until the issue is fixed.
 
-Codex doesn't have subagents, so do the legality check directly. Triage findings using the same four categories from step 7. Do not call a branch review-ready with unresolved FAIL findings.
+Use a read-only judge or review subagent when the platform supports it; otherwise do the legality check directly. Triage findings using the same four categories from step 7. Do not call a branch review-ready with unresolved FAIL findings.
 
 ### The flywheel
 
@@ -592,9 +615,11 @@ The **Completion Contract** governs individual batches. The **Readiness Gate** g
 2. **Local proof is green on the current tip.** All gates pass on the latest commit.
 3. **Preview proof is green on the current tip** (if deployed behavior was touched).
 4. **Artifact inspection done** for any export/download behavior changes.
-5. **PR comments and checks have been polled.** No unresolved threads, no failing checks.
-6. **Legality check is clean.** If a constitution exists, no unresolved FAIL verdicts.
-7. **Git status is clean.** No uncommitted changes.
+5. **Final cumulative review is clean.** A fresh review subagent, if supported, has reviewed `git diff <default-branch>...HEAD`, the full commit history, the plan, the execution log, and all unresolved PR comments/checks. If subagents are unavailable, do this review directly. Fix blockers, push, and repeat until clean.
+6. **PR comments and checks have been polled.** No unresolved threads, no failing checks.
+7. **Legality check is clean.** If a constitution exists, no unresolved FAIL verdicts.
+8. **Strategic forgetting is complete.** Live docs are concise, old log entries are archived in place when large, durable lessons are promoted or pruned, and any remaining work has a reactivation handoff.
+9. **Git status is clean.** No uncommitted changes.
 
 If any gate fails, fix it before declaring readiness.
 
@@ -607,15 +632,17 @@ When all batches are done (or time is up):
 1. Add a **Session Summary** to the top of the execution log: duration, batches completed, time breakdown, status.
 2. Update `.elves-session.json` with final state. **Batch status tracking belongs in JSON, not just Markdown** — models are less likely to corrupt structured JSON during updates. The `.elves-session.json` should include a `batches` array with id, name, status, commit, rollback_tag, started_at, and completed_at for each batch. After compaction, this file is the fastest way to determine where the run stands.
 3. Final pass through TODO.md.
-4. Update the survival guide and make sure the learnings file contains any durable lessons that should survive into future runs.
-5. **Clean up operational artifacts.** Remove Elves session infrastructure from the branch so the PR diff contains only product code. Use the actual paths from this session (from the survival guide or `.elves-session.json`), not hard-coded defaults:
+4. Update the survival guide and make sure the learnings file contains any durable lessons that should survive into future runs. Perform strategic forgetting: condense live state, archive old execution-log entries in place if the log is large, prune superseded lessons, and leave a concise reactivation handoff for any remaining work.
+5. **Run the Final Readiness Review before operational-artifact cleanup.** Poll all PR review threads, issue comments, and checks. Spawn a fresh review subagent if supported; otherwise do the same review directly. The reviewer must read `git diff <default-branch>...HEAD`, the full commit history, the plan, the execution log, `.elves-session.json`, and all unresolved PR feedback. Fix blockers, resolve or reply to addressed comments, update `.elves-session.json`, push, and repeat until no blockers, unresolved threads, unreplied bot comments, failing checks, or memory-workspace findings remain. If any review fix changes docs or run-state files, rerun the final review.
+6. **Clean up operational artifacts.** Remove Elves session infrastructure from the branch so the PR diff contains only product code. Use the actual paths from this session (from the survival guide or `.elves-session.json`), not hard-coded defaults:
    ```bash
    git rm <survival-guide-path> <execution-log-path> .elves-session.json
    git commit -m "[<branch> · Batch N/N] Remove elves session artifacts from PR"
    ```
    The plan file is kept by default. If `cleanup.keep_plan: false` in `config.json`, add the plan path to `git rm` as well. Do **not** remove the learnings file; it is durable project memory for the next run. These session files still exist in branch history for reference.
-6. Push.
-7. Notify. Slack webhook if `ELVES_SLACK_WEBHOOK` set, else `ELVES_NOTIFY_CMD` if set, else leave a PR comment:
+7. Push.
+8. Poll PR comments and checks one last time after the cleanup commit. If cleanup triggered new feedback or failing checks, address it before notifying.
+9. Notify. Slack webhook if `ELVES_SLACK_WEBHOOK` set, else `ELVES_NOTIFY_CMD` if set, else leave a PR comment:
    ```bash
    gh pr comment --body "## Elves Session Complete\n\n**Batches:** N of M\n**Status:** [status]\n\nSee execution log for details."
    ```
