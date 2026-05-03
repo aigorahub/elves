@@ -152,6 +152,12 @@ this right. I'm going to stage the run and wait for your final launch command."
 Point to the plan by path. If the launch prompt starts looking like a second plan file, it is too
 long.
 
+**Use Codex Goals as a continuation backend when available**
+If launching from Codex with Goals enabled, wrap the same launch prompt in `/goal`. Goals keeps
+Codex moving; Elves still defines completion through the survival guide Stop Gate and Readiness
+Gate. If a goal budget is exhausted before readiness is clean, the agent should write a
+reactivation handoff, commit, push, and avoid claiming completion.
+
 **Point to durable memory too**
 If the run uses a learnings file or `.ai-docs`, include those paths in the launch prompt so the
 agent rehydrates from durable knowledge instead of rediscovering it.

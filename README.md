@@ -86,6 +86,29 @@ Elves works best as a two-call handoff:
 Think of staging as winding the spring. The launch call should feel small because the energy is
 already loaded into the repo artifacts.
 
+### Codex Goals
+
+Codex Goals can be a useful continuation backend for Elves. Goals keeps Codex working across turns;
+Elves tells it what "working well" means: staged docs, batch contracts, validation gates, PR review
+loops, memory hygiene, and a final Readiness Gate.
+
+If your Codex install supports `/goal`, stage the Elves run normally, then launch the prepared
+Elves prompt inside a goal:
+
+```text
+/goal The run is staged. Start now.
+Read docs/elves/survival-guide.md first, then `.elves-session.json` if it exists, then
+docs/elves/learnings.md if it exists, then docs/plans/my-plan.md, then the execution log at
+docs/elves/execution-log.md, then `.ai-docs/manifest.md` if it exists.
+Use the survival guide Stop Gate and Elves Readiness Gate as the definition of completion.
+If the goal budget is exhausted before readiness is clean, write a reactivation handoff, push, and
+do not claim the run is complete.
+```
+
+Do not replace the Elves loop with Goals. Goals handles continuation; Elves handles planning,
+review, documentation, strategic forgetting, and merge-readiness. See
+[`references/codex-goals.md`](references/codex-goals.md) for the full pattern.
+
 ### Common launch failures to head off
 
 - **Big plan plus "run now" in one message:** the agent should stage first and wait for a final
@@ -154,6 +177,9 @@ Use [`references/kickoff-prompt-template.md`](references/kickoff-prompt-template
 
 Use the launch template from the same reference file in a fresh call. The launch prompt should be short and behavior-heavy, not a second copy of the plan.
 
+If you are using Codex Goals, wrap the same launch prompt in `/goal` and tell Codex that Elves'
+Readiness Gate, not goal continuation alone, defines completion.
+
 **5. Walk away**
 
 The launch prompt starts unattended execution. Elves re-reads the prepared docs, confirms the run state, and enters the batch loop. From there it won't stop until the plan is complete, the user stops it, or it hits a genuine blocker.
@@ -164,6 +190,8 @@ The launch prompt starts unattended execution. Elves re-reads the prepared docs,
 
 - **Multi-batch execution** with configurable batch sizing (default: 4 developers × 2-week sprint)
 - **Two-step operator flow**: stage the run first, then launch it in a fresh short call so the agent starts with momentum instead of a giant overloaded prompt
+- **Codex Goals compatibility**: use `/goal` as an optional continuation backend while Elves keeps
+  ownership of planning, review, memory hygiene, and readiness
 - **Layered memory system**: reads survival guide, `.elves-session.json`, learnings, plan, execution log, and `.ai-docs/manifest.md` (if present) after compaction
 - **Strategic forgetting**: keeps active docs and sessions lean during long runs, archives old log
   history in place, promotes durable knowledge, and leaves reactivation handoffs for fresh threads
@@ -395,6 +423,7 @@ elves/
 │   ├── execution-log-template.md         # Log entry template
 │   ├── plan-template.md                  # How to write a good plan
 │   ├── kickoff-prompt-template.md        # Copy-paste prompts for staging and launching a run
+│   ├── codex-goals.md                    # How to launch Elves inside Codex Goals
 │   ├── tool-config-examples.md           # Configs for Node, Python, Go, Rust, etc.
 │   ├── validation-guide.md               # Detailed validation gates and auto-discovery
 │   ├── autonomy-guide.md                 # Non-interactive operation and mid-run protocols

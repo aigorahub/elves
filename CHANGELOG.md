@@ -21,6 +21,10 @@ All notable changes to the Elves skill are documented here.
 - **Safe local app maintenance documented.** The autonomy guide now describes inspect-first,
   backup-first, archive-first cleanup for Codex/Claude application state, with explicit warnings
   not to mutate active app databases during a coding run.
+- **Codex Goals launch guidance added.** The README, kickoff template, and new
+  `references/codex-goals.md` explain how to use `/goal` as an optional Codex continuation
+  backend while Elves remains responsible for the Stop Gate, review loop, memory hygiene, and
+  Readiness Gate.
 
 ## [1.8.0] - 2026-04-14
 
