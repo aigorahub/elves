@@ -4,6 +4,8 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-05-03
+
 ### Final cleanup and memory performance
 
 - **Final readiness review added.** Before finite-mode handoff, Elves now runs a fresh cumulative

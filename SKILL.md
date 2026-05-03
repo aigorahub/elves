@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "1.8.0"
+  version: "1.9.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -1056,7 +1056,7 @@ Maintain a `.elves-session.json` file with machine-readable session data (sessio
 ```json
 {
   "session_id": "elves-2026-03-24-auth-system",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "status": "in_progress",
   "branch": "feat/auth-system",
   "plan_path": "docs/plans/auth-system.md",
