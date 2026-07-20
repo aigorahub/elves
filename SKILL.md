@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.10.4"
+  version: "2.11.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -62,7 +62,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.10.4):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.11.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
@@ -270,6 +270,14 @@ registry launch gate open; behavioral evidence never grants launch authority. Un
 Claude transports are behaviorally qualified, the safe `auto` preference records actual mode
 `off`; `required` fails before launch. The driver still owns canonical memory, terminal review, PR,
 landing, and merge. Full contract and host grammar: `references/prewalk.md`.
+
+**Parallel lanes (Parallelves).** Serial is the default everywhere; parallel lanes are an earned
+routing outcome, never a mode switch. The deterministic width test (`cobbler_agents.py lanes plan`)
+gates the recommendation: `worker.parallel=auto` may only recommend lanes, every decline records a
+concrete `parallel_declined:<gate>:<detail>` reason, and nothing auto-launches. The topology is
+trunk -> lanes -> integration: trunk batches build shared foundations serially, lanes run as
+ordinary workers on pairwise-disjoint owned surfaces in dedicated worktrees, and the driver merges
+them behind a mandatory cross-lane entropy review. Full contract: `references/parallelves.md`.
 
 ## Git History as Operator UI
 

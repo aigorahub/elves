@@ -24,7 +24,8 @@ ${XDG_CONFIG_HOME:-~/.config}/elves/config.json
   "worker": {
     "provider": "auto",
     "native_effort": "auto",
-    "prewalk": "auto"
+    "prewalk": "auto",
+    "parallel": "off"
   }
 }
 ```
@@ -37,6 +38,7 @@ python3 scripts/cobbler_agents.py preferences show
 python3 scripts/cobbler_agents.py preferences set worker.provider native
 python3 scripts/cobbler_agents.py preferences set worker.provider grok
 python3 scripts/cobbler_agents.py preferences set worker.prewalk required
+python3 scripts/cobbler_agents.py preferences set worker.parallel auto
 python3 scripts/cobbler_agents.py preferences reset
 ```
 

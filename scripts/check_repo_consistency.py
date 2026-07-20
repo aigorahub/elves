@@ -170,6 +170,16 @@ def main() -> int:
         )
     )
     errors.extend(
+        find_missing_phrases(
+            {
+                label: read_text(REPO_ROOT / label)
+                for label in PARALLELVES_CONTRACT_PHRASES
+            },
+            PARALLELVES_CONTRACT_PHRASES,
+            "parallelves contract",
+        )
+    )
+    errors.extend(
         find_unscoped_patterns(
             single_kickoff_texts
             | {

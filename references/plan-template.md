@@ -213,6 +213,38 @@ actions, canonical memory, final review, and merge stay host-owned. Forbid vague
 
 ---
 
+## Lanes
+
+> Optional. Omitting this section means serial (the default). When present, it declares
+> Parallelves lanes (`references/parallelves.md`): the machine grammar is the fenced yaml-shaped
+> block below — a `lanes:` list where each lane carries `id`, `name`, `depends_on`,
+> `owned_surfaces`, and `batches`, plus a `trunk:` batch list built serially before lanes fork.
+> Declaring lanes never launches anything: `worker.parallel=auto` may only recommend them when
+> the width test passes, and every decline records a concrete reason.
+
+```yaml
+trunk:
+  - B1
+lanes:
+  - id: L1
+    name: Validator core
+    depends_on: []
+    owned_surfaces:
+      - scripts/validator/
+      - tests/test_validator.py
+    batches:
+      - B2
+  - id: L2
+    name: Docs and template
+    depends_on: []
+    owned_surfaces:
+      - docs/validator.md
+    batches:
+      - B3
+```
+
+---
+
 ## Non-Negotiables
 
 > The agent treats these as hard constraints. Violations are never acceptable regardless of

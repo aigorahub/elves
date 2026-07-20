@@ -340,3 +340,12 @@ the helper (`@_locked_full_run` ended up wrapping pure `resolve_worker_effort`, 
 `prepare_full_run` unserialized). Reviewers: when a diff adds a function directly above a
 decorated definition, check `hasattr(fn, "__wrapped__")` on both. Pin the invariant with a
 structure test asserting the wrapper is present on the entry point and absent on the helper.
+
+## Parallelves staging (2026-07-19)
+
+- Parallelves v1 is deliberately contracts + deterministic tooling with NO runtime
+  orchestrator: the honest-scope guard that made the audit run's PR land cleanly applies
+  doubly to a feature whose failure mode is overclaimed orchestration.
+- Fable/low workers get smaller, more mechanical batches with exact section/code lists in the
+  plan; re-drive budget 2/batch. The width-test/lane grammar is line-based on purpose so the
+  parser stays stdlib-only (no yaml dependency).

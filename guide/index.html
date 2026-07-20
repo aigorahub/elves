@@ -512,7 +512,7 @@
     <div class="masthead-inner">
       <div class="brand-row">
         <a class="wordmark" href="https://github.com/aigorahub/elves">Elves</a>
-        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.10.4 source and releases on GitHub</a>
+        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.11.0 source and releases on GitHub</a>
       </div>
       <h1>Using Elves</h1>
       <p class="intro">Plan with the main agent, hand implementation to a separate worker, then
@@ -816,6 +816,16 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" route-worker --json \
           cache hits, but Elves cannot export the live driver's active conversation memory or model
           state and inject it into another process.
         </div>
+
+        <h3>Parallel lanes (Parallelves)</h3>
+        <p>Parallelves runs several worker lanes at once, each in its own worktree on its own
+          branch, within one run. Serial stays the default. The <code>worker.parallel</code>
+          preference is <code>off</code> unless you set it to <code>auto</code>, and even
+          <code>auto</code> only recommends lanes when a deterministic width test passes. Nothing
+          launches lanes automatically; the driver composes each lane as its own supervised
+          session and records a concrete reason whenever lanes are declined. See the
+          <a href="https://github.com/aigorahub/elves/blob/main/references/parallelves.md">Parallelves
+          contract</a> for the full rules.</p>
       </section>
 
       <section id="watch">

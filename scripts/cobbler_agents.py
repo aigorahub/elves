@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 from functools import partial
 import json
+import math
 import os
 import sys
 from pathlib import Path
@@ -44,6 +45,15 @@ from cobbler_runtime.adapters import (  # noqa: E402
     workspace_sandbox_write_profile,
 )
 from cobbler_runtime.acceptance import normalize_batch_id  # noqa: E402
+from cobbler_runtime.parallel_lanes import (  # noqa: E402
+    DECLINE_NO_LANES,
+    DECLINE_PARTITION_INVALID,
+    DECLINE_PREFERENCE_OFF,
+    LANES_TIMINGS_MAX_BYTES,
+    load_lanes_from_plan,
+    validate_lane_partition,
+    width_test,
+)
 from cobbler_runtime.audit import (  # noqa: E402
     audit_lease_turn,
     build_audit_evidence,
@@ -328,6 +338,158 @@ def cmd_validate_config(args: argparse.Namespace) -> int:
     if args.json:
         return _emit_json(payload, exit_code=0 if resolved.ok else 1)
     return _emit_text_validate(payload)
+
+
+def _emit_lanes_payload(args: argparse.Namespace, payload: dict[str, Any], *, exit_code: int) -> int:
+    payload.setdefault("mutated_repo", False)
+    payload.setdefault("model_calls_made", False)
+    if getattr(args, "json", False):
+        return _emit_json(payload, exit_code=exit_code)
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return exit_code
+
+
+def _load_lane_timings(path: Path) -> dict[str, Any]:
+    if path.is_symlink() or not path.is_file():
+        raise ValidationIssue(
+            "parallel_lanes_timings_invalid",
+            "Timings file must be a regular non-symlink file",
+            path=str(path),
+        )
+    if path.stat().st_size > LANES_TIMINGS_MAX_BYTES:
+        raise ValidationIssue(
+            "parallel_lanes_timings_invalid",
+            "Timings file exceeds the bounded read size",
+            path=str(path),
+        )
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValidationIssue(
+            "parallel_lanes_timings_invalid",
+            f"Timings file is not valid bounded JSON: {exc}",
+            path=str(path),
+        ) from exc
+    if not isinstance(data, dict):
+        raise ValidationIssue(
+            "parallel_lanes_timings_invalid",
+            "Timings file must be a JSON object",
+            path=str(path),
+        )
+    for key in ("worker_seconds", "driver_seconds"):
+        value = data.get(key)
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            raise ValidationIssue(
+                "parallel_lanes_timings_invalid",
+                f"Timings key `{key}` must be numeric",
+                path=str(path),
+            )
+        # Reject non-finite (NaN/Infinity), negative, and float-overflowing
+        # huge-int values so the width test never sees garbage timings.
+        try:
+            finite = math.isfinite(float(value))
+        except (OverflowError, TypeError, ValueError):
+            finite = False
+        if not finite or value < 0:
+            raise ValidationIssue(
+                "parallel_lanes_timings_invalid",
+                f"Timings key `{key}` must be a finite non-negative number",
+                path=str(path),
+            )
+    return data
+
+
+def cmd_lanes(args: argparse.Namespace) -> int:
+    """Read-only lane validation and width-test recommendation; never launches."""
+
+    if not getattr(args, "plan", None):
+        payload = {
+            "ok": False,
+            "issues": [
+                {
+                    "code": "missing_required_argument",
+                    "message": "`--plan` is required",
+                    "path": "--plan",
+                }
+            ],
+        }
+        return _emit_lanes_payload(args, payload, exit_code=1)
+
+    plan_path = Path(args.plan)
+    action = args.lanes_action
+
+    parallel_preference = None
+    if action == "plan":
+        try:
+            parallel_preference = (
+                preference_snapshot().values.get("worker", {}).get("parallel", "off")
+            )
+        except ValidationIssue as issue:
+            payload = {"ok": False, "issues": [issue.to_dict()]}
+            return _emit_lanes_payload(args, payload, exit_code=1)
+
+    try:
+        declaration = load_lanes_from_plan(plan_path)
+    except ValidationIssue as issue:
+        if action == "plan" and issue.code == "parallel_lanes_missing":
+            payload = {
+                "ok": True,
+                "parallel": False,
+                "lanes": [],
+                "declined": [DECLINE_NO_LANES],
+                "issues": [],
+                "parallel_preference": parallel_preference,
+            }
+            return _emit_lanes_payload(args, payload, exit_code=0)
+        payload = {"ok": False, "issues": [issue.to_dict()]}
+        return _emit_lanes_payload(args, payload, exit_code=1)
+
+    lanes = declaration["lanes"]
+    issues = validate_lane_partition(lanes)
+
+    if action == "validate":
+        payload = {
+            "ok": not issues,
+            "issues": [issue.to_dict() for issue in issues],
+            "trunk": declaration["trunk"],
+            "lanes": [lane["id"] for lane in lanes],
+        }
+        return _emit_lanes_payload(args, payload, exit_code=0 if not issues else 1)
+
+    timings = None
+    if getattr(args, "timings", None):
+        try:
+            timings = _load_lane_timings(Path(args.timings))
+        except ValidationIssue as issue:
+            payload = {"ok": False, "issues": [issue.to_dict()]}
+            return _emit_lanes_payload(args, payload, exit_code=1)
+
+    if issues:
+        payload = {
+            "ok": True,
+            "parallel": False,
+            "lanes": [lane["id"] for lane in lanes],
+            "declined": [DECLINE_PARTITION_INVALID],
+            "issues": [issue.to_dict() for issue in issues],
+            "parallel_preference": parallel_preference,
+        }
+        return _emit_lanes_payload(args, payload, exit_code=0)
+
+    decision = width_test(
+        lanes,
+        timings=timings,
+        risk=args.risk,
+    )
+    if parallel_preference != "auto":
+        decision["parallel"] = False
+        decision["declined"].append(DECLINE_PREFERENCE_OFF)
+    payload = {
+        "ok": True,
+        "issues": [],
+        "parallel_preference": parallel_preference,
+        **decision,
+    }
+    return _emit_lanes_payload(args, payload, exit_code=0)
 
 
 def cmd_preferences(args: argparse.Namespace) -> int:
@@ -2235,11 +2397,31 @@ def build_parser() -> argparse.ArgumentParser:
     pref_set = preferences_sub.add_parser("set")
     pref_set.add_argument(
         "preference",
-        choices=("worker.provider", "worker.native_effort", "worker.prewalk"),
+        choices=("worker.provider", "worker.native_effort", "worker.prewalk", "worker.parallel"),
     )
     pref_set.add_argument("value")
     pref_set.add_argument("--json", action="store_true")
     pref_set.set_defaults(func=cmd_preferences)
+
+    lanes = sub.add_parser(
+        "lanes",
+        help="Deterministic Parallelves lane validation and width test (read-only, recommend-only)",
+    )
+    lanes_sub = lanes.add_subparsers(dest="lanes_action", required=True)
+    lanes_validate = lanes_sub.add_parser(
+        "validate", help="Parse the plan's `## Lanes` block and validate the lane partition"
+    )
+    lanes_validate.add_argument("--plan", default=None, help="Path to the plan markdown file")
+    lanes_validate.add_argument("--json", action="store_true")
+    lanes_validate.set_defaults(func=cmd_lanes)
+    lanes_plan = lanes_sub.add_parser(
+        "plan", help="Run the four-gate width test; recommend-only, never launches lanes"
+    )
+    lanes_plan.add_argument("--plan", default=None, help="Path to the plan markdown file")
+    lanes_plan.add_argument("--timings", default=None, help="Optional bounded timings JSON file")
+    lanes_plan.add_argument("--risk", choices=("low", "standard", "high"), default="standard")
+    lanes_plan.add_argument("--json", action="store_true")
+    lanes_plan.set_defaults(func=cmd_lanes)
 
     route_worker = sub.add_parser(
         "route-worker",

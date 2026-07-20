@@ -77,6 +77,24 @@ falls back to actual mode `off` with
 (`--permission-mode auto`) and distinct from the trusted full-run lane; see
 [`grok-open-source-worker.md`](grok-open-source-worker.md).
 
+## Parallelves parity
+
+The Parallelves contract (`references/parallelves.md`) has identical semantics on Claude Code and
+Codex: serial default, recommend-only `auto`, the four-gate width test, and the
+trunk -> lanes -> integration topology carry no host-specific behavior. The lanes tooling is
+deterministic and host-neutral; both hosts invoke it the same way, and the planner's width test
+runs through the same CLI's `lanes plan` subcommand:
+
+```bash
+python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" lanes plan --plan <path> --timings <json> --json
+```
+
+Per-lane worker launches introduce no new invocation grammar: the driver composes the existing
+documented per-session full-run commands, one per lane, using each host's grammar exactly as
+documented above and in [`adaptive-worker-routing.md`](adaptive-worker-routing.md). Lane workers
+follow the same subscription-native default and optional-provider rules as any worker; nothing in
+this section launches lanes at runtime.
+
 ## Do not confuse
 
 - **Codex Goals** — host continuation plumbing for long Codex sessions. Not Grok.

@@ -193,6 +193,35 @@ class ConsistencyPhraseTests(unittest.TestCase):
         self.assertIn("missing_signal_falls_back_to_full_review", runtime)
         self.assertIn("review_prompt_block", parity)
 
+    def test_parallelves_corpus_pins_serial_default_and_recommend_only(self) -> None:
+        required = {
+            "references/parallelves.md",
+            "references/glossary.md",
+            "references/plan-template.md",
+        }
+        self.assertTrue(
+            required.issubset(self.consistency.PARALLELVES_CONTRACT_PHRASES)
+        )
+        for label, phrases in self.consistency.PARALLELVES_CONTRACT_PHRASES.items():
+            with self.subTest(label=label):
+                self.assertTrue(phrases)
+        contract = " ".join(
+            self.consistency.PARALLELVES_CONTRACT_PHRASES[
+                "references/parallelves.md"
+            ]
+        )
+        template = " ".join(
+            self.consistency.PARALLELVES_CONTRACT_PHRASES[
+                "references/plan-template.md"
+            ]
+        )
+        self.assertIn("Serial remains the default everywhere.", contract)
+        self.assertIn("Nothing auto-launches.", contract)
+        self.assertIn(
+            "parallel_declined:worker_dominance:no_recorded_timings", contract
+        )
+        self.assertIn("Omitting this section means serial (the default).", template)
+
     def test_prewalk_corpus_rejects_summary_only_approximation(self) -> None:
         errors = self.consistency.find_missing_phrases(
             {"SKILL.md": "Prewalk starts a new worker from a summary."},

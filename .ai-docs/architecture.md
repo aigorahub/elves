@@ -61,6 +61,15 @@ managed inside the Elves run, not a separate Council or Cobbler memory system.
   artifacts/transition policy, exact separate-session Codex/Claude launch specs, and the private
   version-2/single-phase plus version-3/prewalk supervised follow/status lifecycle
 
+Parallelves (parallel implementation lanes) is a contract layer plus deterministic tooling, not a
+second orchestrator: the normative contract lives in `references/parallelves.md`, the bounded
+fail-closed lane parser / partition validator / four-gate width test live in
+`scripts/cobbler_runtime/parallel_lanes.py` (surfaced as the `lanes validate|plan` CLI), and the
+`worker.parallel` preference (`off` default | recommend-only `auto`) lives in `preferences.py`.
+The one-coordination-hierarchy rule is preserved: Cobbler routes lanes the way it routes lenses,
+lanes are ordinary writer agents under the existing lease/worktree/branch authority model, and no
+runtime lane orchestration exists in v1.
+
 The thin CLI is `scripts/cobbler_agents.py` (`validate-config`, `doctor`, `council`,
 `lightweight-review`, `session …`, trusted
 `implement full-run-prepare|full-run-launch|full-run-monitor|full-run-await|full-run-reconcile|full-run-logs|full-run-stop`,

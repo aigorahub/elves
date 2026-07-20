@@ -82,3 +82,21 @@ in this file, it is not project vocabulary — plain English wins.
 - **State capsule** — the bounded explicit handoff v1 declaration (leading Markdown
   `elves-handoff-v1` comment or JSON `elves_handoff`) binding fresh/resume state, ownership, and
   acceptance to branch/HEAD; cold-handoff evidence, never prewalk continuity.
+- **Parallelves** — Cobbler-coordinated parallel implementation lanes within one run: serial by
+  default, recommend-only `auto`, no runtime orchestrator, no authority change
+  (`references/parallelves.md`).
+- **Lane** — one Cobbler-routed writer agent in a Parallelves run: a dedicated worktree and
+  feature branch on pairwise-disjoint owned surfaces, under the existing worker authority model.
+- **Trunk batch** — a serial batch that builds shared foundations before lanes fork (or after a
+  reclassification pause); anything two lanes would both need lives in a trunk batch.
+- **Integration review** — the mandatory cross-lane entropy review before the integration PR is
+  review-ready: duplicated helpers, convention divergence, and shared-concern conflicts that
+  per-lane review structurally cannot see.
+- **Width test** — the deterministic four-gate check (structural width, worker dominance, lane
+  budget, risk posture) that must pass before `auto` may recommend lanes; any failed gate
+  declines with a concrete recorded reason.
+- **Competitive lanes** — optional Parallelves mode: two lanes attack the same problem with
+  different approaches, surfaces kept disjoint via per-lane scratch namespaces, integration
+  judges, and at most one lane's result lands.
+- **`parallel_declined` provenance** — the concrete `parallel_declined:<gate>:<detail>` reason
+  the width test records for every declined gate; parallelism is never silently withheld.

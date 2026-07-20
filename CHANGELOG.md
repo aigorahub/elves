@@ -4,6 +4,24 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-07-20
+
+### Parallelves v1: contract and deterministic lane tooling
+
+- Add the **Parallelves** contract (`references/parallelves.md`): Cobbler-coordinated parallel
+  implementation lanes within one run, with trunk -> lanes -> integration topology, a mandatory
+  cross-lane integration entropy review, reversible demotion back to serial, and optional
+  competitive lanes. Serial remains the default everywhere; there is no runtime lane
+  orchestrator in v1 and no sentence claims one.
+- Add deterministic, model-free lane tooling (`scripts/cobbler_runtime/parallel_lanes.py` and the
+  `lanes validate` / `lanes plan` CLI): a bounded fail-closed plan-lanes parser, a lane-partition
+  validator, and the four-gate width test (structural width, worker dominance, lane budget, risk
+  posture). The test is recommend-only; every declined gate records a concrete
+  `parallel_declined:<gate>:<detail>` reason, and nothing auto-launches.
+- Add the `worker.parallel` preference (`off` default | `auto`), glossary entries, plan-template
+  lane grammar, host-parity notes, review-subagent integration-entropy section, and
+  SKILL/AGENTS/README/guide coverage, all pinned by the consistency checker.
+
 ## [2.10.4] - 2026-07-19
 
 ### Doc precision and guide navigation

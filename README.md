@@ -8,7 +8,7 @@ plans and reviews; a subscription-native (or optional external) worker implement
 files let the work survive context compaction. You write the plan and own the merge decision. The
 agent does the middle.
 
-**Current release: v2.10.4** — see [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.11.0** — see [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 **New to Elves?** Use the [practical user guide](https://aigorahub.github.io/elves/) — especially
@@ -106,6 +106,10 @@ refs, final gates, PR, and merge — always. Details:
 [`references/prewalk.md`](references/prewalk.md),
 [`references/grok-open-source-worker.md`](references/grok-open-source-worker.md),
 [`references/grok-implementer-launch-prompt.md`](references/grok-implementer-launch-prompt.md).
+Parallel implementation lanes are optional and never the default: serial stays the default, and
+`worker.parallel=auto` only recommends lanes when the deterministic width test passes; see
+[`references/parallelves.md`](references/parallelves.md).
+
 Trusted Grok implementation launches use `--always-approve` alone: Grok Build treats an explicit
 `--permission-mode auto` as an override, so the two flags must not be combined.
 
@@ -292,6 +296,8 @@ exactly one file below; other docs link instead of restating.
   implements and why
 - [`references/prewalk.md`](references/prewalk.md) — exact-session guide→execution trajectory,
   qualification, checkpoints, and recovery
+- [`references/parallelves.md`](references/parallelves.md) — Cobbler-coordinated parallel
+  implementation lanes: serial default, recommend-only width test, trunk -> lanes -> integration
 - [`references/follow-mode.md`](references/follow-mode.md) — the parked driver's sanitized stream
 - [`references/grok-open-source-worker.md`](references/grok-open-source-worker.md) and
   [`references/grok-implementer-launch-prompt.md`](references/grok-implementer-launch-prompt.md)
@@ -329,12 +335,12 @@ exactly one file below; other docs link instead of restating.
 
 ```bash
 # Elves source checkout:
-python3 scripts/verify_repo.py --version 2.10.4
+python3 scripts/verify_repo.py --version 2.11.0
 # before operational-artifact cleanup, from a clean worktree:
-python3 scripts/verify_repo.py --version 2.10.4 --final-readiness \
+python3 scripts/verify_repo.py --version 2.11.0 --final-readiness \
   --session .elves-session.json
 # after the narrow operational-artifact cleanup commit, on its clean current tip:
-python3 scripts/verify_repo.py --ci --version 2.10.4 --base-ref origin/main
+python3 scripts/verify_repo.py --ci --version 2.11.0 --base-ref origin/main
 test -z "$(git status --porcelain)"
 ```
 

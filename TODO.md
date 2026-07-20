@@ -5,6 +5,10 @@ Project backlog and deferred tasks. Live items first; completed history under
 
 ## Live
 
+- [ ] Parallelves Phase 2: session-schema lane state and staging validation — v1 records `lanes`
+  advisorily for recovery only; validating staged lane state needs its own planned run.
+- [ ] Parallelves runtime lane supervision (future work beyond the v1 phase roadmap) — explicitly future work; v1 ships contract
+  plus recommend-only tooling and no orchestrator, so supervision needs a product decision first.
 - [ ] [#98] Investigate host-native UI prompts and arbitrary third-party tools that bypass
   Elves' transport helpers. Those surfaces cannot honestly be described as covered by the
   built-in external-lane filter and may require host or MCP-level interception.

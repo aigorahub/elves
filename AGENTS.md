@@ -1,5 +1,5 @@
 ---
-version: "2.10.4"
+version: "2.11.0"
 ---
 
 # Elves: Codex repository adapter
@@ -71,6 +71,8 @@ authenticated live catalog (`references/adaptive-worker-routing.md`).
   `review_context.review_prompt_block` verbatim, or derive the identical table from native
   `Confidence:` trailers; Claude Code/Codex semantics are identical
   (`references/review-subagent.md`; `references/host-parity.md`)
+- **Parallel lanes (Parallelves):** serial default; `worker.parallel=auto` is recommend-only and
+  nothing auto-launches (`references/parallelves.md`; SKILL.md Parallel lanes)
 - **Prewalk:** exact-session guide→execution continuity only; a cold packet handoff is not prewalk,
   and post-edit cold fallback is forbidden (`references/prewalk.md`; SKILL.md Exact-session prewalk)
 - **Worktree lifecycle:** One run owns one branch and one checkout; staging records

@@ -117,6 +117,26 @@ constructs the same table from every `Confidence:` trailer in the cumulative com
 signals are missing or partial, say so and perform the ordinary full baseline review. Never infer
 an asserted-clean answer from absence. Claude Code and Codex follow the same rule and prompt shape.
 
+## Integration entropy review (Parallelves)
+
+When a run used Parallelves lanes (`references/parallelves.md`), this cross-lane pass is mandatory
+before the integration PR is review-ready. Its inputs are: the cumulative integration diff, every
+lane's per-lane review record, and every lane's confidence signals. The reviewer asks three
+cross-lane question classes that per-lane review structurally cannot see:
+
+1. **Duplicated helpers across lanes** — did two lanes each introduce a utility, abstraction, or
+   fixture that should be one shared implementation?
+2. **Convention divergence** — did lanes drift apart on naming, error handling, module structure,
+   or test organization while each staying internally consistent?
+3. **Conflicting approaches to shared concerns** — did lanes make incompatible assumptions about a
+   shared surface, data shape, or contract that only the merged result exposes?
+
+Findings use the same output classes as every other review in this file: BLOCKING, WARNING, INFO,
+or PENDING-DOCS. Per-lane confidence signals order the review queue: low-confidence lanes and
+flagged `unsure_about` areas are reviewed first. Uniform `high` confidence with empty lists across
+many lanes is a calibration observation to note in the report, not a violation; the signal remains
+triage only, never authority.
+
 ## For each NEW or UNRESOLVED comment or finding:
 - Categorize as: BLOCKING (must fix), WARNING (should fix), INFO (note only), or PENDING-DOCS (implementation is acceptable but supporting docs are stale)
 - Identify the source: human reviewer, bot (name which bot), CI check

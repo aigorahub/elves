@@ -213,6 +213,18 @@ fields may remain alongside it.
 The plan is authoritative. Session criteria match it verbatim by stable ID. `sync-session` should
 create the rows before launch so the driver adds evidence later instead of hand-copying criteria.
 
+## Optional session `lanes` key (advisory in v1)
+
+A session for a run that uses Parallelves lanes (`references/parallelves.md`) may carry a
+top-level `lanes` array. The key is advisory in v1, exactly like the pre-handoff-v1
+`worker_packet_path` posture above: v1 records lane state for recovery and does not validate it
+beyond JSON shape — never a blocking issue and never an exit-code change. Each lane row mirrors
+the plan's `## Lanes` grammar fields — `id`, `name`, `depends_on`, `owned_surfaces`, `batches` —
+plus the runtime fields `branch`, `worktree`, `session_id`, and `status`. A session without
+`lanes` is serial (the default). Declaring `lanes` launches nothing and grants nothing: lane rows
+are recovery bookkeeping for driver-composed per-lane runs, not a scheduler input. This section is
+the canonical description of the session `lanes` key; other docs link here instead of restating it.
+
 ## Canonical landing and cleanup order
 
 The strict landing check intentionally reads committed evidence. A session that is ignored by the

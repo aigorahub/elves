@@ -22,13 +22,14 @@ from .schema import ValidationIssue
 PREFERENCE_SCHEMA_VERSION = 1
 DEFAULT_PREFERENCES: dict[str, Any] = {
     "version": PREFERENCE_SCHEMA_VERSION,
-    "worker": {"provider": "auto", "native_effort": "auto", "prewalk": "auto"},
+    "worker": {"provider": "auto", "native_effort": "auto", "prewalk": "auto", "parallel": "off"},
 }
 
 SAFE_PATHS: dict[str, tuple[type, set[str] | None]] = {
     "worker.provider": (str, {"auto", "native", "grok"}),
     "worker.native_effort": (str, {"auto", "low", "medium", "high"}),
     "worker.prewalk": (str, {"off", "auto", "required"}),
+    "worker.parallel": (str, {"off", "auto"}),
 }
 
 _FORBIDDEN_SEGMENTS = frozenset(
