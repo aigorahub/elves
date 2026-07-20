@@ -190,18 +190,38 @@ class RemoteApiRunnerTests(unittest.TestCase):
                 }
             return 404, {"error": "unexpected"}
 
-        with CaptureServer(responder) as server:
-            result = run_script(
-                "run_devin.sh",
-                "refactor",
-                "carefully",
-                env={
-                    "DEVIN_API_KEY": "test-devin-key",
-                    "DEVIN_API_BASE": server.base_url,
-                    "DEVIN_POLL_INTERVAL_SECONDS": "0",
-                    "DEVIN_MAX_WAIT_SECONDS": "5",
-                },
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = Path(tmpdir)
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            subprocess.run(
+                ["git", "-C", str(repo), "checkout", "-q", "-b", "feature/provider-test"],
+                check=True,
             )
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(repo),
+                    "remote",
+                    "add",
+                    "origin",
+                    "https://github.com/example/provider-test.git",
+                ],
+                check=True,
+            )
+            with CaptureServer(responder) as server:
+                result = run_script(
+                    "run_devin.sh",
+                    "refactor",
+                    "carefully",
+                    env={
+                        "DEVIN_API_KEY": "test-devin-key",
+                        "DEVIN_API_BASE": server.base_url,
+                        "DEVIN_POLL_INTERVAL_SECONDS": "0",
+                        "DEVIN_MAX_WAIT_SECONDS": "5",
+                    },
+                    cwd=repo,
+                )
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(result.stdout), {"summary": "done"})
@@ -209,8 +229,8 @@ class RemoteApiRunnerTests(unittest.TestCase):
         self.assertEqual(create[0:2], ("POST", "/sessions"))
         self.assertEqual(create[2]["authorization"], "Bearer test-devin-key")
         self.assertIn("refactor carefully", create[3]["prompt"])
-        self.assertIn("repository:", create[3]["prompt"])
-        self.assertIn("branch:", create[3]["prompt"])
+        self.assertIn("repository: https://github.com/example/provider-test.git", create[3]["prompt"])
+        self.assertIn("branch: feature/provider-test", create[3]["prompt"])
         self.assertFalse(create[3]["idempotent"])
 
     def test_remote_runners_can_create_and_return_without_polling(self) -> None:
