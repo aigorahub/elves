@@ -14,6 +14,7 @@ work (issues #88 and #89).
 | Primary invoke | `/elves`, natural language | `$elves`, natural language |
 | Cobbler | `/cobbler`, `/cobbler-mode` | `$elves cobbler: …`, natural chat |
 | Setup | `/setup-cobbler` | `$elves setup-cobbler` |
+| Provider shortcuts | `/fugu`, `/manus`, `/grok`, `/devin` | `$elves fugu|manus|grok|devin …`, natural chat |
 | Land PR | `/land-pr` or `\land-pr` | natural language or alias |
 | Continuation | optional | optional **Codex Goals** (seatbelt, not memory) |
 | Native worker | Separate custom/background session; supervised CLI uses safe mode and classifier-approved commits | Separate custom agent or sandboxed `codex exec`; narrow Git roots permit commits |
@@ -27,6 +28,10 @@ decision. Transport syntax differs; packet, authority, fallback, follow, and ter
 semantics do not. See [`adaptive-worker-routing.md`](adaptive-worker-routing.md).
 When checking a route, pass `--host claude` from Claude Code and `--host codex` from Codex so any
 native fallback uses the live driver's transport.
+
+Provider shortcuts preserve the same route semantics and authority on both hosts; only Claude Code
+installs the four slash aliases. Codex must use the main skill surface. See
+[`provider-shortcuts.md`](provider-shortcuts.md).
 
 The successful trusted full-run terminal response emits the host-neutral
 `elves-worker-confidence-review-v1` context. Both hosts attach its `review_prompt_block` verbatim

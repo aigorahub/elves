@@ -41,8 +41,9 @@ python3 "$ELVES_TMP/elves/scripts/sync_installed_skills.py" --apply --target cla
 rm -rf "$ELVES_TMP"
 ```
 
-This installs `~/.claude/skills/elves/` plus seven managed alias skills (`/cobbler`,
-`/cobbler-mode`, `/council`, `/ec`, `/elves-council`, `/setup-cobbler`, `/setup-council`). The sync
+This installs `~/.claude/skills/elves/` plus eleven managed alias skills (`/cobbler`,
+`/cobbler-mode`, `/council`, `/ec`, `/elves-council`, `/setup-cobbler`, `/setup-council`, `/fugu`,
+`/manus`, `/grok`, `/devin`). The sync
 helper creates missing aliases and updates only aliases carrying the Elves-managed marker. If it
 finds a user-owned alias, it reports the conflict before changing the install and never
 overwrites that alias.
@@ -59,6 +60,16 @@ python3 "$ELVES_TMP/elves/scripts/sync_installed_skills.py" --apply --target cod
 Codex installs the main skill bundle only — no slash aliases. Use `$elves cobbler: <task>` or
 natural language such as "Ask the Cobbler…".
 Codex users should not need or expect a top-level `/cobbler` command.
+
+### Optional provider shortcuts
+
+Focused provider tasks do not require a full Elves run. Claude Code gets `/fugu <file>`,
+`/manus <topic>`, `/grok <instructions>`, and `/devin <instructions>`; Codex uses the equivalent
+`$elves fugu|manus|grok|devin …` forms or natural language. Fugu is an ephemeral read-only
+`fugu-ultra` review at `xhigh`; Manus and Devin create bounded remote tasks; Grok uses headless
+high-reasoning mode without approval bypass. See
+[`references/provider-shortcuts.md`](references/provider-shortcuts.md) for requirements, auth
+environment names, timeouts, and follow behavior.
 
 ### Per-project install
 
@@ -304,6 +315,8 @@ exactly one file below; other docs link instead of restating.
   — external workers
 - [`references/model-onboarding.md`](references/model-onboarding.md),
   [`references/cobbler-setup-recipes.md`](references/cobbler-setup-recipes.md) — setup
+- [`references/provider-shortcuts.md`](references/provider-shortcuts.md) — focused Fugu Ultra,
+  Manus, Grok Build, and Devin command routes
 - [`references/host-parity.md`](references/host-parity.md) — Claude Code / Codex parity
 
 **Quality and proof**

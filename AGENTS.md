@@ -33,7 +33,23 @@ authenticated live catalog (`references/adaptive-worker-routing.md`).
 | Cobbler | `$elves cobbler: <task>` or "Ask the Cobbler…" |
 | Cobbler Mode | `$elves cobbler-mode` or natural "Cobbler Mode: on/off" |
 | Setup | `$elves setup-cobbler` / `$elves setup-council` |
+| Provider shortcut | `$elves fugu <file>`, `$elves manus <topic>`, `$elves grok <instructions>`, or `$elves devin <instructions>` |
 | Land PR | natural language; `\land-pr` / `/land-pr` when the host maps them |
+
+### Provider subprocess capabilities map
+
+For explicit provider-shortcut intent, follow SKILL.md **Provider shortcut protocols** and
+`references/provider-shortcuts.md`. Resolve helpers from the active installed skill root; do not
+assume `./scripts` belongs to the target repository and do not execute mappings blindly:
+
+- Fugu review → `run_fugu.sh <file>` (read-only `fugu-ultra`, `xhigh`)
+- Manus research → `run_manus.sh <topic>` (private remote task, bounded wait)
+- Grok Build task → `run_grok.sh <instructions>` (headless, non-bypass permissions)
+- Devin task → `run_devin.sh <instructions>` (remote session, bounded wait)
+
+Codex uses the `$elves` or natural-language forms above, not invented top-level `/fugu`, `/manus`,
+`/grok`, or `/devin` commands. Explicit invocation authorizes the provider call and any associated
+provider usage, but not merge, protected-ref, secret, or approval-bypass authority.
 
 ## Workflow pointers (SKILL.md owns every contract)
 

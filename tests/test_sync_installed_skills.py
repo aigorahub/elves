@@ -269,8 +269,8 @@ class SyncInstalledSkillsTests(unittest.TestCase):
             self.sync.TOP_LEVEL_RUNTIME_SCRIPT_PATHS,
         )
 
-    def test_exactly_seven_claude_aliases(self) -> None:
-        self.assertEqual(len(self.sync.CLAUDE_ALIAS_NAMES), 7)
+    def test_exactly_eleven_claude_aliases(self) -> None:
+        self.assertEqual(len(self.sync.CLAUDE_ALIAS_NAMES), 11)
         self.assertEqual(
             self.sync.CLAUDE_ALIAS_NAMES,
             [
@@ -279,6 +279,10 @@ class SyncInstalledSkillsTests(unittest.TestCase):
                 "council",
                 "ec",
                 "elves-council",
+                "fugu",
+                "manus",
+                "grok",
+                "devin",
                 "setup-cobbler",
                 "setup-council",
             ],

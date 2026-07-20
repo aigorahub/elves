@@ -1,6 +1,6 @@
 ---
 name: elves
-description: Autonomous multi-batch development agent for long unattended runs, reviewed-PR landing, and Cobbler-first orchestration. Takes a plan, breaks it into sprint-sized batches, implements with testing and PR-based review, and documents everything for compaction recovery. Use when user says "run overnight", "I'm going offline", "implement this plan", "keep going without me", "do not stop", "I'll be back in the morning", "run this end-to-end", asks to get a subagent to review the diff from main, read PR comments, test, fix, and merge commit once green, types \land-pr or /land-pr, asks for `/cobbler`, `/council`, `/ec`, or `/elves-council`, or says `$elves cobbler`.
+description: Autonomous multi-batch development agent for long unattended runs, reviewed-PR landing, Cobbler-first orchestration, and optional Fugu, Manus, Grok, or Devin provider shortcuts. Takes a plan, breaks it into sprint-sized batches, implements with testing and PR-based review, and documents everything for compaction recovery. Use when user says "run overnight", "I'm going offline", "implement this plan", "keep going without me", "do not stop", "I'll be back in the morning", "run this end-to-end", asks to get a subagent to review the diff from main, read PR comments, test, fix, and merge commit once green, types \land-pr or /land-pr, asks for `/cobbler`, `/council`, `/ec`, `/elves-council`, `/fugu`, `/manus`, `/grok`, or `/devin`, or says `$elves cobbler`.
 license: MIT
 compatibility: Works with Claude Code, Codex, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
@@ -201,6 +201,26 @@ workers never inherit host HOME/SSH/git identity ambiently.
 command. CLI: `python3 scripts/cobbler_agents.py onboard plan|show|apply|probe` and
 `cobbler_agents.py setup`. Write only ignored local `.elves/models.toml`. See
 `references/model-onboarding.md` and `references/cobbler-setup-recipes.md`.
+
+### Provider shortcut protocols
+
+When an explicit request matches one of these provider tags, resolve the runner from the **active
+Elves skill root**, keep the target repository as the working directory, validate its arguments and
+required capability, then execute it without an extra confirmation prompt:
+
+- `/fugu <file>` or `fugu review <file>` → `scripts/run_fugu.sh <file>` for a read-only Sakana
+  Fugu Ultra audit pinned to `fugu-ultra` at `xhigh`.
+- `/manus <topic>` → `scripts/run_manus.sh <topic>` for private, bounded Manus deep web research.
+- `/grok <instructions>` or `grok build <instructions>` → `scripts/run_grok.sh <instructions>` for
+  a headless, high-reasoning Grok task with non-bypass permissions.
+- `/devin <instructions>` → `scripts/run_devin.sh <instructions>` for a bounded remote Devin
+  development session.
+
+The slash spellings are Claude Code managed aliases. Codex uses `$elves fugu|manus|grok|devin …`
+or natural language; **never invent top-level Codex slash commands**. These are optional paid
+provider routes, not the native default, and never grant merge, protected-ref, secret, or
+approval-bypass authority. Full transport, timeout, auth-name, and follow-link contracts:
+`references/provider-shortcuts.md`.
 
 ## Strategic Forgetting
 

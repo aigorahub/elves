@@ -527,6 +527,7 @@
         <li><a href="#agent-onboarding">Paste this to your agent</a></li>
         <li><a href="#how-it-works">How it works</a></li>
         <li><a href="#install">Install Elves</a></li>
+        <li><a href="#shortcuts">Provider shortcuts</a></li>
         <li><a href="#first-run">Start a run</a></li>
         <li><a href="#worker">Choose a worker</a></li>
         <li><a href="#watch">Watch the work</a></li>
@@ -646,6 +647,28 @@ python3 ~/.claude/skills/elves/scripts/install_doctor.py --startup
 # Codex
 python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup</code></pre>
         </div>
+      </section>
+
+      <section id="shortcuts">
+        <h2>Use a focused provider shortcut</h2>
+        <p>A full run is unnecessary when you only want one specialist task. Claude Code installs
+          <code>/fugu &lt;file&gt;</code>, <code>/manus &lt;topic&gt;</code>,
+          <code>/grok &lt;instructions&gt;</code>, and <code>/devin &lt;instructions&gt;</code>.
+          In Codex, use the matching <code>$elves fugu|manus|grok|devin …</code> form or ask in
+          natural language; those top-level slash aliases are Claude-specific.</p>
+        <ul>
+          <li><strong>Fugu</strong> performs a read-only Sakana Fugu Ultra file audit at
+            <code>xhigh</code>.</li>
+          <li><strong>Manus</strong> creates private, bounded deep-web research and needs
+            <code>MANUS_API_KEY</code>.</li>
+          <li><strong>Grok</strong> runs the installed Grok Build CLI headlessly at high reasoning
+            without bypassing permissions.</li>
+          <li><strong>Devin</strong> creates and boundedly follows a remote developer session and
+            needs <code>DEVIN_API_KEY</code>.</li>
+        </ul>
+        <p>These optional routes can consume paid provider capacity. They do not grant merge or
+          protected-branch authority. A local timeout leaves the remote Manus or Devin task alive
+          and prints its follow link.</p>
       </section>
 
       <section id="first-run">

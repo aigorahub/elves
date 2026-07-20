@@ -31,6 +31,10 @@ EXPECTED_CLAUDE_ALIASES = (
     "council",
     "ec",
     "elves-council",
+    "fugu",
+    "manus",
+    "grok",
+    "devin",
     "setup-cobbler",
     "setup-council",
 )
@@ -49,6 +53,10 @@ REQUIRED_TOP_LEVEL_RUNTIME_PATHS = (
     "scripts/cobbler_agents.py",
     "scripts/openrouter_lens.py",
     "scripts/workspace_guard.py",
+    "scripts/run_fugu.sh",
+    "scripts/run_manus.sh",
+    "scripts/run_grok.sh",
+    "scripts/run_devin.sh",
 )
 
 # These helpers maintain this source repository and must not become mandatory
@@ -179,7 +187,7 @@ def _validate_alias_installation(
         expected = set(EXPECTED_CLAUDE_ALIASES)
         if found != expected:
             failures.append(
-                "Claude install expected exactly seven managed aliases "
+                "Claude install expected exactly eleven managed aliases "
                 f"{sorted(expected)}; found {sorted(found)}"
             )
         for name in EXPECTED_CLAUDE_ALIASES:

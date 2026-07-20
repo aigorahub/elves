@@ -4,6 +4,16 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+### Optional provider convenience shortcuts
+
+- Add installed runner scripts and Claude Code aliases for `/fugu`, `/manus`, `/grok`, and
+  `/devin`, with host-honest `$elves …` / natural-language equivalents for Codex.
+- Route Sakana review through `codex-fugu` with `fugu-ultra` at `xhigh` in a read-only ephemeral
+  session; use the Manus v2 task API, documented headless Grok CLI, and official Devin sessions API
+  instead of homepage URLs or shell-built JSON.
+- Ship the runners in installed bundles, preserve managed-alias conflict protection, bound remote
+  polling, and add hermetic transport and inventory coverage plus README/guide/host-parity docs.
+
 ## [2.11.0] - 2026-07-20
 
 ### Parallelves v1: contract and deterministic lane tooling

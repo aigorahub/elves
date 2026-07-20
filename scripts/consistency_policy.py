@@ -1131,6 +1131,41 @@ CLAUDE_ALIAS_SKILL_PHRASES = {
         "Next move",
         "must not require OpenRouter",
     ],
+    "aliases/claude/fugu/SKILL.md": [
+        CLAUDE_ALIAS_MARKER,
+        "name: fugu",
+        "/fugu <file>",
+        "Provider shortcut protocols",
+        "run_fugu.sh",
+        "fugu-ultra",
+        "xhigh",
+    ],
+    "aliases/claude/manus/SKILL.md": [
+        CLAUDE_ALIAS_MARKER,
+        "name: manus",
+        "/manus <topic>",
+        "Provider shortcut protocols",
+        "run_manus.sh",
+        "MANUS_API_KEY",
+        "bounded wait",
+    ],
+    "aliases/claude/grok/SKILL.md": [
+        CLAUDE_ALIAS_MARKER,
+        "name: grok",
+        "/grok <instructions>",
+        "Provider shortcut protocols",
+        "run_grok.sh",
+        "non-bypass permission posture",
+    ],
+    "aliases/claude/devin/SKILL.md": [
+        CLAUDE_ALIAS_MARKER,
+        "name: devin",
+        "/devin <instructions>",
+        "Provider shortcut protocols",
+        "run_devin.sh",
+        "DEVIN_API_KEY",
+        "bounded wait",
+    ],
 }
 
 CODEX_INSTALL_COBBLER_PHRASES = {
