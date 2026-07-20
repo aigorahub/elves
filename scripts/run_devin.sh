@@ -56,7 +56,7 @@ def request(method, path, payload=None):
         data=data,
         method=method,
         headers={
-            "Authorization": "Bearer " + os.environ["DEVIN_API_KEY"],
+            "Authorization": f"Bearer {os.environ['DEVIN_API_KEY']}",
             "Content-Type": "application/json",
         },
     )
