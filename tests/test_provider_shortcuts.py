@@ -150,12 +150,14 @@ class RemoteApiRunnerTests(unittest.TestCase):
                         "SAKANA_FUGU_MAX_WAIT_SECONDS": "5",
                         "SAKANA_FUGU_IDLE_TIMEOUT_SECONDS": "5",
                         "SAKANA_FUGU_RETRIES": "0",
+                        "SAKANA_FUGU_RAW_OUTPUT": str(repo),
                     },
                     cwd=repo,
                 )
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), "No actionable findings")
+        self.assertIn("could not write Sakana Fugu raw output", result.stderr)
         request = server.requests[0]
         self.assertEqual(request[2]["authorization"], "Bearer test-sakana-key")
         self.assertEqual(request[3]["model"], "fugu-ultra")
@@ -165,6 +167,23 @@ class RemoteApiRunnerTests(unittest.TestCase):
         self.assertIn(str(target), request[3]["input"])
         self.assertIn("important", request[3]["input"])
         self.assertIn("read-only audit", request[3]["input"])
+
+    def test_fugu_rejects_non_finite_timeout_overrides(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir) / "review.md"
+            target.write_text("important\n", encoding="utf-8")
+            result = run_script(
+                "run_fugu.sh",
+                str(target),
+                env={
+                    "SAKANA_API_KEY": "test-sakana-key",
+                    "SAKANA_FUGU_MAX_WAIT_SECONDS": "nan",
+                },
+                cwd=Path(tmpdir),
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("timeout limits must be finite and positive", result.stderr)
 
     def test_manus_uses_v2_private_max_task_contract(self) -> None:
         def responder(method, path, _payload):

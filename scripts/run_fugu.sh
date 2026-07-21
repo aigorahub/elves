@@ -20,8 +20,11 @@ TARGET_FILE="$TARGET_DIR/$(basename "$1")"
 
 exec python3 - "$TARGET_FILE" <<'PY'
 import json
+import math
 import os
 from pathlib import Path
+import signal
+import socket
 import sys
 import time
 import urllib.error
@@ -48,8 +51,14 @@ except ValueError as exc:
     raise SystemExit("Error: Sakana Fugu limits must be numeric.") from exc
 if max_output_tokens < 2048:
     raise SystemExit("Error: SAKANA_FUGU_MAX_OUTPUT_TOKENS must be at least 2048 for Fugu Ultra.")
-if max_input_bytes <= 0 or max_wait <= 0 or idle_timeout <= 0:
-    raise SystemExit("Error: Sakana Fugu input and timeout limits must be positive.")
+if (
+    max_input_bytes <= 0
+    or not math.isfinite(max_wait)
+    or not math.isfinite(idle_timeout)
+    or max_wait <= 0
+    or idle_timeout <= 0
+):
+    raise SystemExit("Error: Sakana Fugu input and timeout limits must be finite and positive.")
 if retries < 0:
     raise SystemExit("Error: SAKANA_FUGU_RETRIES must be zero or greater.")
 
@@ -94,6 +103,34 @@ headers = {
 }
 transient_statuses = {408, 409, 425, 429, 500, 502, 503, 504}
 deadline = time.monotonic() + max_wait
+raw_output = os.environ.get("SAKANA_FUGU_RAW_OUTPUT", "").strip()
+
+if not all(hasattr(signal, name) for name in ("SIGALRM", "ITIMER_REAL", "setitimer")):
+    raise SystemExit("Error: this platform cannot enforce the Sakana Fugu wall-clock limit.")
+
+
+def wall_clock_timeout(_signum, _frame):
+    raise TimeoutError(f"Sakana Fugu review exceeded {max_wait:g}s")
+
+
+signal.signal(signal.SIGALRM, wall_clock_timeout)
+
+
+def persist_raw(events):
+    if not raw_output:
+        return
+    try:
+        raw_path = Path(raw_output).expanduser()
+        raw_path.parent.mkdir(parents=True, exist_ok=True)
+        raw_path.write_text(json.dumps(events, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError as exc:
+        print(f"Warning: could not write Sakana Fugu raw output: {exc}", file=sys.stderr)
+
+
+class StreamEventError(RuntimeError):
+    def __init__(self, message, events):
+        super().__init__(message)
+        self.events = list(events)
 
 
 def extract_text(event):
@@ -139,26 +176,33 @@ def stream_once():
             return False
         raw_events.append(event)
         if str(event.get("type") or "") in {"error", "response.error"}:
-            raise RuntimeError("Sakana Fugu stream returned an error event")
+            detail = json.dumps(event, ensure_ascii=False)[:2048]
+            raise StreamEventError(
+                f"Sakana Fugu stream returned an error event: {detail}", raw_events
+            )
         text = extract_text(event)
         if text:
             chunks.append(text)
         return False
 
     timeout = min(idle_timeout, max(1.0, remaining))
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        for raw_line in response:
-            if time.monotonic() >= deadline:
-                raise TimeoutError(f"Sakana Fugu review exceeded {max_wait:g}s")
-            line = raw_line.decode("utf-8", errors="replace").rstrip("\r\n")
-            if not line:
-                if consume_event():
-                    break
-                continue
-            if line.startswith("data:"):
-                data_lines.append(line[5:].lstrip())
-        if data_lines:
-            consume_event()
+    signal.setitimer(signal.ITIMER_REAL, max(0.001, remaining))
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            for raw_line in response:
+                if time.monotonic() >= deadline:
+                    raise TimeoutError(f"Sakana Fugu review exceeded {max_wait:g}s")
+                line = raw_line.decode("utf-8", errors="replace").rstrip("\r\n")
+                if not line:
+                    if consume_event():
+                        break
+                    continue
+                if line.startswith("data:"):
+                    data_lines.append(line[5:].lstrip())
+            if data_lines:
+                consume_event()
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
     return "".join(chunks).strip(), raw_events
 
 
@@ -167,22 +211,23 @@ for attempt in range(retries + 1):
     try:
         text, events = stream_once()
         if not text:
+            persist_raw(events)
             raise RuntimeError(
                 "Sakana Fugu Ultra returned no visible review text; retry the compact prompt at high effort."
             )
-        raw_output = os.environ.get("SAKANA_FUGU_RAW_OUTPUT", "").strip()
-        if raw_output:
-            raw_path = Path(raw_output).expanduser()
-            raw_path.parent.mkdir(parents=True, exist_ok=True)
-            raw_path.write_text(json.dumps(events, ensure_ascii=False, indent=2), encoding="utf-8")
         print(text)
+        persist_raw(events)
         raise SystemExit(0)
     except urllib.error.HTTPError as exc:
-        last_error = RuntimeError(f"Sakana API error {exc.code}")
+        detail = exc.read(4096).decode("utf-8", errors="replace")
+        last_error = RuntimeError(f"Sakana API error {exc.code}: {detail}")
+        persist_raw([{"type": "http_error", "status": exc.code, "body": detail}])
         transient = exc.code in transient_statuses
-    except (urllib.error.URLError, TimeoutError, RuntimeError) as exc:
+    except (urllib.error.URLError, TimeoutError, socket.timeout, RuntimeError) as exc:
         last_error = exc
-        transient = isinstance(exc, (urllib.error.URLError, TimeoutError))
+        if isinstance(exc, StreamEventError):
+            persist_raw(exc.events)
+        transient = isinstance(exc, (urllib.error.URLError, TimeoutError, socket.timeout))
     if not transient or attempt >= retries or time.monotonic() >= deadline:
         break
     delay = min(30.0, 2.0 * (2**attempt), max(0.0, deadline - time.monotonic()))
