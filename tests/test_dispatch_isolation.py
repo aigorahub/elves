@@ -34,6 +34,7 @@ from cobbler_runtime.isolation import (  # noqa: E402
     QualifiedSandboxBackend,
     _macos_executable_access,
     _macos_dynamic_dependencies,
+    _narrow_runtime_root,
     create_tracked_snapshot,
     prepare_fs_sandbox,
     resolve_fs_sandbox_backend,
@@ -1533,6 +1534,19 @@ class IsolationSandboxRegressionTests(unittest.TestCase):
             self.assertIn("--unshare-all", argv)
             self.assertIn(("--dev", "/dev"), pairs)
 
+    def test_standalone_codex_runtime_root_is_one_versioned_release(self) -> None:
+        executable = Path(
+            "/Users/fixture/.codex/packages/standalone/releases/"
+            "0.144.6-aarch64-apple-darwin/bin/codex"
+        )
+        self.assertEqual(
+            _narrow_runtime_root(executable),
+            Path(
+                "/Users/fixture/.codex/packages/standalone/releases/"
+                "0.144.6-aarch64-apple-darwin"
+            ),
+        )
+
     def test_bwrap_never_mounts_entire_hidden_agent_install_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1826,6 +1840,11 @@ class IsolationSandboxRegressionTests(unittest.TestCase):
                 f'(allow file-read-metadata (literal "{lane.root.resolve()}"))',
                 profile_body,
             )
+            self.assertIn(
+                '(allow file-read-metadata (subpath "/var"))',
+                profile_body,
+            )
+            self.assertNotIn('(allow file-read* (subpath "/var"))', profile_body)
             self.assertTrue(lane.supervisor_executable)
             result = subprocess.run(
                 command,

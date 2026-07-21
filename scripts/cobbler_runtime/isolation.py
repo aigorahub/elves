@@ -978,7 +978,10 @@ def prepare_fs_sandbox(
             "/private/var/db",
         ):
             profile_lines.append(_sbpl_rule("allow file-read*", "subpath", system_root))
-        for metadata_root in ("/var/select", "/private/var/select"):
+        # Native macOS runtimes canonicalize temp/cache/socket locations below
+        # /var even when all writable state is redirected into the lane. Allow
+        # traversal metadata only; host file contents remain denied.
+        for metadata_root in ("/var", "/private/var"):
             profile_lines.append(
                 _sbpl_rule("allow file-read-metadata", "subpath", metadata_root)
             )
@@ -1056,6 +1059,14 @@ def _narrow_runtime_root(path: Path) -> Path | None:
         # The sibling lib/ tree is part of the interpreter runtime.
         bin_index = len(parts) - 1 - tuple(reversed(parts)).index("bin")
         return Path(*parts[:bin_index])
+    standalone_marker = (".codex", "packages", "standalone", "releases")
+    for index in range(len(parts) - len(standalone_marker)):
+        if parts[index : index + len(standalone_marker)] == standalone_marker:
+            release_index = index + len(standalone_marker)
+            if len(parts) > release_index:
+                # One immutable, versioned Codex distribution. The binary
+                # reads adjacent package metadata and sibling launch helpers.
+                return Path(*parts[: release_index + 1])
     if ".pyenv" in parts and "versions" in parts and "bin" in parts:
         bin_index = len(parts) - 1 - tuple(reversed(parts)).index("bin")
         return Path(*parts[:bin_index])

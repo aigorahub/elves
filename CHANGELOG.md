@@ -24,9 +24,10 @@ All notable changes to the Elves skill are documented here.
 - Harden every provider boundary after independent review: run Fugu over a tracked-only snapshot
   with same-policy diff evidence, including safe deletion patches but not deleted credential paths,
   in a required OS filesystem sandbox and allowlisted environment, without Linux procfs exposing
-  the credential-bearing parent; grant metadata-only traversal of the exact parents of sandbox-owned
-  paths on macOS so real provider CLIs can canonicalize isolated HOME paths without reading sibling data,
-  and explicitly let Codex review the deliberately Git-metadata-free snapshot;
+  the credential-bearing parent; grant metadata-only macOS traversal for native temp/cache path
+  resolution and only the active immutable Codex distribution for adjacent runtime metadata, so the
+  real CLI works without exposing sibling contents; and explicitly let Codex review the deliberately
+  Git-metadata-free snapshot;
   run Grok over a disposable tracked-source snapshot in Elves' required outer read-only kernel
   sandbox plus Grok's built-in inner `strict` profile, with an explicit provider key, a tool shell that
   scrubs both key names before model-directed commands, no Linux procfs for parent-environment

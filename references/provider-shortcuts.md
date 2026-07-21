@@ -164,7 +164,9 @@ installation and command details are at
 Fugu and Grok project access is a disposable tracked-source snapshot, not the host checkout:
 ignored and untracked files, `.git`, `.elves`, executable agent configuration, and ordinary
 credential stores are absent and outside the kernel read boundary. Both Linux boundaries omit
-procfs so model-directed commands cannot inspect the credential-bearing parent environment.
+procfs so model-directed commands cannot inspect the credential-bearing parent environment. On
+macOS, native temp/cache traversal receives metadata-only `/var` access and a standalone Codex
+binary receives only its active immutable versioned runtime; sibling host file data remains denied.
 Repositories must still apply their provider/data-governance policy before invoking either
 optional paid route.
 
