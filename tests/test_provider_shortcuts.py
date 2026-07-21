@@ -213,6 +213,7 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertIn("arg=<--ask-for-approval>\narg=<never>", result.stdout)
         self.assertRegex(result.stdout, r"arg=<--cd>\narg=<.*elves-iso-[^>]+/snapshot>")
         self.assertIn("arg=<exec>", result.stdout)
+        self.assertIn("arg=<--skip-git-repo-check>", result.stdout)
         self.assertIn("arg=<--ephemeral>", result.stdout)
         self.assertIn("arg=<->", result.stdout)
         self.assertIn("prompt=<Review task: review the auth flow>", result.stdout)

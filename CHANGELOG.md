@@ -25,7 +25,8 @@ All notable changes to the Elves skill are documented here.
   with same-policy diff evidence, including safe deletion patches but not deleted credential paths,
   in a required OS filesystem sandbox and allowlisted environment, without Linux procfs exposing
   the credential-bearing parent; grant metadata-only traversal of the exact parents of sandbox-owned
-  paths on macOS so real provider CLIs can canonicalize isolated HOME paths without reading sibling data;
+  paths on macOS so real provider CLIs can canonicalize isolated HOME paths without reading sibling data,
+  and explicitly let Codex review the deliberately Git-metadata-free snapshot;
   run Grok over a disposable tracked-source snapshot in Elves' required outer read-only kernel
   sandbox plus Grok's built-in inner `strict` profile, with an explicit provider key, a tool shell that
   scrubs both key names before model-directed commands, no Linux procfs for parent-environment

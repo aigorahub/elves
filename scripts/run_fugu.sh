@@ -493,6 +493,7 @@ say exactly \"No actionable findings\" and list only residual verification risks
                 "--cd",
                 str(lane.snapshot),
                 "exec",
+                "--skip-git-repo-check",
                 "--ephemeral",
                 "--color",
                 "never",
