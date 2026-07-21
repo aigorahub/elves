@@ -103,17 +103,30 @@ def request(method, path, payload=None, *, timeout=60.0):
     except (TimeoutError, socket.timeout) as exc:
         raise TimeoutError("Devin API request timed out") from exc
 
-created = request(
-    "POST",
-    "/sessions",
-    {
-        "prompt": prompt,
-        "idempotent": False,
-        "unlisted": False,
-        "secret_ids": [],
-        "knowledge_ids": [],
-    },
-)
+deadline = None if max_wait == 0 else time.monotonic() + max_wait
+create_timeout = 60.0
+if deadline is not None:
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        print(f"Devin session creation timed out after {max_wait}s.", file=sys.stderr)
+        raise SystemExit(124)
+    create_timeout = min(60.0, remaining)
+try:
+    created = request(
+        "POST",
+        "/sessions",
+        {
+            "prompt": prompt,
+            "idempotent": False,
+            "unlisted": False,
+            "secret_ids": [],
+            "knowledge_ids": [],
+        },
+        timeout=create_timeout,
+    )
+except TimeoutError:
+    print(f"Devin session creation timed out after {max_wait}s.", file=sys.stderr)
+    raise SystemExit(124)
 session_id = created.get("session_id")
 session_url = created.get("url") or ""
 if not session_id:
@@ -125,7 +138,7 @@ if max_wait == 0:
     print(json.dumps({"session_id": session_id, "url": session_url}))
     raise SystemExit(0)
 
-deadline = time.monotonic() + max_wait
+assert deadline is not None
 while time.monotonic() < deadline:
     remaining = deadline - time.monotonic()
     if remaining <= 0:

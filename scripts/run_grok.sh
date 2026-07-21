@@ -96,15 +96,17 @@ with tempfile.TemporaryDirectory(prefix="elves-grok-shortcut-") as raw_root:
         (grok_home / "config.toml").chmod(0o600)
 
     # A named custom profile fails closed if the kernel sandbox cannot be
-    # applied.  `strict` limits reads to CWD/system paths; the deny list also
-    # excludes common repository-local credential files from that CWD.
+    # applied. `strict` limits model-tool reads to CWD/system paths. Shared
+    # OAuth remains available to the provider process through GROK_AUTH_PATH,
+    # but is never added to a model-readable root and is exact-denied as a
+    # second boundary. The remaining denies exclude repository credentials.
     (grok_home / "sandbox.toml").write_text(
         "[profiles.elves-shortcut]\n"
         'extends = "strict"\n'
         "restrict_network = true\n"
-        + (f"read_only = [{json.dumps(auth_path)}]\n" if auth_path else "")
         + "deny = [\n"
-        '  "**/.env", "**/.env.*", "**/.netrc", "**/.npmrc",\n'
+        + (f"  {json.dumps(auth_path)},\n" if auth_path else "")
+        + '  "**/.env", "**/.env.*", "**/.netrc", "**/.npmrc",\n'
         '  "**/.pypirc", "**/.git-credentials", "**/.ssh/**",\n'
         '  "**/.aws/**", "**/.gnupg/**", "**/.credentials*",\n'
         '  "**/credentials", "**/credentials.json",\n'

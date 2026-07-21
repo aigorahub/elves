@@ -71,10 +71,12 @@ project-aware `codex-fugu` agent against a tracked-only snapshot in a required k
 sandbox: regular `fugu/high` by default,
 `fugu/xhigh` with `--deep`, or `fugu-ultra/high` with `--ultra`. Manus supports a normal private
 task plus Cobbler-managed `--wide` and deterministic `--fanout` rosters, explicit `--file`
-attachments, and duplicate-safe `--resume` that retries only known-failed steps; Devin creates a
-bounded remote task without granting stored secrets or knowledge by default. Grok uses headless
-high-reasoning mode without approval bypass, a minimal auth environment, and a fail-closed strict
-filesystem sandbox. Manus tasks likewise start with no account-default connectors or skills. See
+attachments, and duplicate-safe `--resume` that retries only known-failed steps; roster manifests
+are validated and exclusively reserved before any upload. Devin creates a bounded remote task,
+including its creation request, without granting stored secrets or knowledge by default. Grok uses
+headless high-reasoning mode without approval bypass, a minimal auth environment, and a fail-closed
+strict filesystem sandbox that exact-denies a shared OAuth record to model tools. Manus tasks
+likewise start with no account-default connectors or skills. See
 [`references/provider-shortcuts.md`](references/provider-shortcuts.md) for requirements, auth
 environment names, timeouts, and follow behavior.
 

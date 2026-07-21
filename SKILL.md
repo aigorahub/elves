@@ -221,14 +221,16 @@ required capability, then execute it without an extra confirmation prompt:
   `--resume <manifest>` continues the ignored `.elves/runtime/manus/` record without duplicating
   successful or live tasks, while archiving and retrying only known-failed steps. Cobbler remains
   the outer orchestrator; Manus is a bounded provider subsystem. New manifests are confined to
-  that runtime tree and never overwrite an existing file; tasks start without account-default
-  connectors or skills.
+  that runtime tree, are exclusively reserved before uploads, and never overwrite an existing
+  file; tasks start without account-default connectors or skills.
 - `/grok <instructions>` or `grok build <instructions>` → `scripts/run_grok.sh <instructions>` for
   a headless, high-reasoning Grok task with non-bypass permissions, a minimal provider-auth
-  projection, and Grok's fail-closed strict filesystem sandbox.
+  projection, and Grok's fail-closed strict filesystem sandbox; shared OAuth remains provider-only
+  and is exact-denied to model tools.
 - `/devin <instructions>` → `scripts/run_devin.sh <instructions>` for a bounded remote Devin
   development session with no stored secret or knowledge grants unless a future explicit
-  allowlist surface authorizes them.
+  allowlist surface authorizes them. Its creation and poll requests share the configured wait
+  budget; zero wait retains create-and-return behavior.
 
 The slash spellings are Claude Code managed aliases. Codex uses `$elves fugu|manus|grok|devin …`
 or natural language; **never invent top-level Codex slash commands**. These are optional paid

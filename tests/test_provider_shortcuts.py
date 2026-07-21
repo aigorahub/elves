@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -136,6 +137,48 @@ class LocalCliRunnerTests(unittest.TestCase):
             encoding="utf-8",
         )
         binary.chmod(0o755)
+        return binary
+
+    def make_native_grok_capture(self, root: Path) -> Path:
+        compiler = shutil.which("cc")
+        if compiler is None:
+            raise unittest.SkipTest("native C compiler unavailable")
+        worker = root / "grok-worker.py"
+        worker.write_text(
+            "import os, sys\n"
+            "from pathlib import Path\n"
+            "if '--version' in sys.argv or (len(sys.argv) > 1 and sys.argv[1] == 'version'):\n"
+            "    print('grok 0.2.93 (test)')\n"
+            "    raise SystemExit(0)\n"
+            "print('auth-path=<' + os.environ.get('GROK_AUTH_PATH', '') + '>')\n"
+            "print((Path(os.environ['GROK_HOME']) / 'sandbox.toml').read_text())\n",
+            encoding="utf-8",
+        )
+        source = root / "grok-launcher.c"
+        source.write_text(
+            "#include <stdlib.h>\n"
+            "#include <unistd.h>\n"
+            'static volatile const char marker[] = "GROK_AUTH_PATH";\n'
+            "int main(int argc, char **argv) {\n"
+            "  if (marker[0] == '\\0') return 126;\n"
+            "  char **forwarded = calloc((size_t)argc + 2, sizeof(char *));\n"
+            "  if (forwarded == NULL) return 127;\n"
+            f"  forwarded[0] = {json.dumps(sys.executable)};\n"
+            f"  forwarded[1] = {json.dumps(str(worker))};\n"
+            "  for (int i = 1; i < argc; i++) forwarded[i + 1] = argv[i];\n"
+            "  forwarded[argc + 1] = NULL;\n"
+            f"  execv({json.dumps(sys.executable)}, forwarded);\n"
+            "  return 127;\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        binary = root / "grok"
+        subprocess.run(
+            [compiler, "-std=c99", str(source), "-o", str(binary)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
         return binary
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
@@ -291,6 +334,41 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertNotIn("reasoning-effort", result.stdout)
         self.assertNotIn("always-approve", result.stdout)
         self.assertNotIn("bypassPermissions", result.stdout)
+
+    def test_grok_shared_oauth_is_exact_denied_to_model_tools(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_native_grok_capture(bin_dir)
+            host_home = root / "host-home"
+            auth_dir = host_home / ".grok"
+            auth_dir.mkdir(parents=True)
+            auth_path = auth_dir / "auth.json"
+            auth_path.write_text(
+                json.dumps({"account": {"refresh_token": "provider-refresh-secret"}}),
+                encoding="utf-8",
+            )
+            auth_path.chmod(0o600)
+            result = run_script(
+                "run_grok.sh",
+                "inspect oauth isolation",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "HOME": str(host_home),
+                    "GROK_HOME": "",
+                    "GROK_AUTH_PATH": "",
+                    "XAI_API_KEY": "",
+                    "GROK_CODE_XAI_API_KEY": "",
+                },
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        canonical_auth = auth_path.resolve()
+        self.assertIn(f"auth-path=<{canonical_auth}>", result.stdout)
+        self.assertIn(json.dumps(str(canonical_auth)), result.stdout)
+        self.assertNotIn("read_only", result.stdout)
+        self.assertNotIn("provider-refresh-secret", result.stdout)
 
     def test_all_runners_are_executable_bash(self) -> None:
         for name in ("run_fugu.sh", "run_manus.sh", "run_grok.sh", "run_devin.sh"):
@@ -471,6 +549,8 @@ class RemoteApiRunnerTests(unittest.TestCase):
             items.write_text('["ref-a"]', encoding="utf-8")
             victim = root / "README.md"
             victim.write_text("must survive\n", encoding="utf-8")
+            source = root / "private-source.pdf"
+            source.write_bytes(b"must not be uploaded")
             runtime_manifest = (
                 root / ".elves" / "runtime" / "manus" / "existing.json"
             )
@@ -485,6 +565,8 @@ class RemoteApiRunnerTests(unittest.TestCase):
                     str(items),
                     "--manifest",
                     str(victim),
+                    "--file",
+                    str(source),
                     "research",
                     env=env,
                     cwd=root,
@@ -496,6 +578,8 @@ class RemoteApiRunnerTests(unittest.TestCase):
                     str(items),
                     "--manifest",
                     str(runtime_manifest),
+                    "--file",
+                    str(source),
                     "research",
                     env=env,
                     cwd=root,
@@ -1379,6 +1463,31 @@ class RemoteApiRunnerTests(unittest.TestCase):
         self.assertEqual(result.returncode, 124, result.stderr)
         self.assertLess(elapsed, 2)
         self.assertIn("still running after 1s", result.stderr)
+
+    def test_devin_create_request_cannot_outlive_wait_budget(self) -> None:
+        def responder(method, path, _payload):
+            if method == "POST" and path == "/sessions":
+                time.sleep(3)
+                return 200, {"session_id": "too-late"}
+            return 404, {"error": "unexpected"}
+
+        with CaptureServer(responder) as server:
+            started = time.monotonic()
+            result = run_script(
+                "run_devin.sh",
+                "bounded creation",
+                env={
+                    "DEVIN_API_KEY": "key",
+                    "DEVIN_API_BASE": server.base_url,
+                    "DEVIN_POLL_INTERVAL_SECONDS": "0.1",
+                    "DEVIN_MAX_WAIT_SECONDS": "1",
+                },
+            )
+            elapsed = time.monotonic() - started
+
+        self.assertEqual(result.returncode, 124, result.stderr)
+        self.assertLess(elapsed, 2)
+        self.assertIn("session creation timed out after 1s", result.stderr.lower())
 
     def test_remote_runners_can_create_and_return_without_polling(self) -> None:
         def manuscript(method, path, _payload):

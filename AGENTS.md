@@ -48,11 +48,12 @@ assume `./scripts` belongs to the target repository and do not execute mappings 
 - Manus research → `run_manus.sh <topic>` for one private bounded task, or
   `run_manus.sh --wide --items-file <roster.json> [--file <source>] <goal>` for Cobbler-managed
   native-Wide-first research with exact coverage repair; use `--fanout` for deterministic
-  one-task-per-item execution and `--resume <manifest>` for duplicate-safe continuation
+  one-task-per-item execution and `--resume <manifest>` for duplicate-safe continuation; new
+  manifests are reserved before provider uploads
 - Grok Build task → `run_grok.sh <instructions>` (headless, non-bypass permissions, minimal auth
-  projection, fail-closed strict filesystem sandbox)
+  projection, fail-closed strict filesystem sandbox, shared OAuth exact-denied to model tools)
 - Devin task → `run_devin.sh <instructions>` (remote session, bounded wait, no default stored
-  secret or knowledge grants)
+  secret or knowledge grants; creation and polling share the bound)
 
 Codex uses the `$elves` or natural-language forms above, not invented top-level `/fugu`, `/manus`,
 `/grok`, or `/devin` commands. Explicit invocation authorizes the provider call and any associated

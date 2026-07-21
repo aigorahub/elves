@@ -186,11 +186,6 @@ def _runtime_manifest_path(
             raise ManusError(
                 f"Resume manifest must be a regular non-symlink file: {canonical_candidate}"
             )
-    elif canonical_candidate.exists():
-        raise ManusError(
-            f"Refusing to overwrite an existing Manus manifest: {canonical_candidate}. "
-            "Use --resume to continue it."
-        )
     runtime_root.mkdir(parents=True, exist_ok=True)
     try:
         runtime_root.chmod(0o700)
@@ -200,6 +195,25 @@ def _runtime_manifest_path(
     canonical_candidate = candidate.resolve(strict=False)
     if canonical_root not in canonical_candidate.parents:
         raise ManusError("Manus manifest path escaped its runtime directory.")
+    if not must_exist:
+        flags = (
+            os.O_WRONLY
+            | os.O_CREAT
+            | os.O_EXCL
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+        )
+        try:
+            descriptor = os.open(canonical_candidate, flags, 0o600)
+        except FileExistsError as exc:
+            raise ManusError(
+                f"Refusing to overwrite an existing Manus manifest: {canonical_candidate}. "
+                "Use --resume to continue it."
+            ) from exc
+        except OSError as exc:
+            raise ManusError(f"Could not reserve Manus manifest: {canonical_candidate}") from exc
+        else:
+            os.close(descriptor)
     return canonical_candidate
 
 
@@ -1321,17 +1335,17 @@ def main(argv: list[str] | None = None) -> int:
     if not args.items_file:
         raise ManusError("--wide and --fanout require --items-file.")
     items = _load_items(Path(args.items_file).expanduser())
-    client = ManusClient(deadline=deadline)
-    attachments = [
-        client.upload_path(_validate_attachment(path_text, attachment_limit))
-        for path_text in args.file
-    ]
     mode = "wide" if args.wide else "fanout"
+    validated_attachments = [
+        _validate_attachment(path_text, attachment_limit) for path_text in args.file
+    ]
     manifest_path = _runtime_manifest_path(
         args.manifest,
         mode=mode,
         must_exist=False,
     )
+    client = ManusClient(deadline=deadline)
+    attachments = [client.upload_path(path) for path in validated_attachments]
     manifest: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
         "mode": mode,

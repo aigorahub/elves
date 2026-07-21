@@ -47,13 +47,15 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
   constructs an isolated HOME/GROK_HOME, projects only `XAI_API_KEY` (or the validated
   owner-private OAuth record through native `GROK_AUTH_PATH`), and requests a custom profile
   extending Grok's `strict` kernel sandbox with repository credential-file denies. Custom-profile
-  application is fail-closed. It
+  application is fail-closed. A shared OAuth path is not added to a readable root and is also
+  exact-denied to model tools; it remains readable only by the provider process. It
   does not invent a model id; the authenticated live Grok configuration selects the available
   model.
 - **Devin:** requires `DEVIN_API_KEY`. It creates a remote session through the official
   `https://api.devin.ai/v1/sessions` API, includes the current origin/branch when available, sends
   empty `secret_ids` and `knowledge_ids`, and polls the documented session endpoint with each
-  request capped by the remaining overall wait.
+  creation and poll request capped by the same remaining overall wait. A zero wait explicitly means
+  create-and-return, so creation retains its standalone request timeout in that mode.
 
 ## Cobbler-managed Manus rosters
 
@@ -102,7 +104,8 @@ respect Manus's documented 10-create-per-minute limit. Poll and create intervals
 0.1 seconds, preventing accidental zero-delay request loops. Each create is recorded immediately in
 an atomic mode-0600 manifest under the gitignored `.elves/runtime/manus/` directory. Explicit
 manifest paths must remain inside that tree, may not traverse symlinks, and may not already exist;
-continue an existing record only through `--resume`. Resume paths have the same confinement.
+the destination is exclusively reserved before any attachment upload or provider task call.
+Continue an existing record only through `--resume`. Resume paths have the same confinement.
 `--resume` reuses successful or still-live ids and fills only unrecorded work. A known terminal
 `error` is
 archived in bounded `failed_task_attempts` history and only its failed repair, fan-out, or synthesis

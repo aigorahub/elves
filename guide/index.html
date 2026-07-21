@@ -671,14 +671,16 @@ python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup</code></pre>
             to skip the native attempt, <code>--file</code> for explicit sources, and
             <code>--resume</code> with the printed ignored manifest. Resume preserves successful
             and live task IDs while archiving and retrying only known-failed steps. New manifests
-            stay under <code>.elves/runtime/manus/</code>, never replace existing files, and tasks
-            start without account-default connectors or skills.</li>
+            stay under <code>.elves/runtime/manus/</code>, are exclusively reserved before upload,
+            never replace existing files, and tasks start without account-default connectors or
+            skills.</li>
           <li><strong>Grok</strong> runs the installed Grok Build CLI headlessly at high reasoning
             without bypassing permissions, with only its selected auth projected into a minimal
-            environment and a fail-closed strict filesystem sandbox.</li>
+            environment and a fail-closed strict filesystem sandbox. A shared OAuth record remains
+            provider-only and is exact-denied to model tools.</li>
           <li><strong>Devin</strong> creates and boundedly follows a remote developer session and
             needs <code>DEVIN_API_KEY</code>. Stored Devin secrets and knowledge are not granted by
-            default.</li>
+            default, and session creation and polling share the configured wait budget.</li>
         </ul>
         <p>Manus chooses whether its internal Wide mode activates; the public API has no documented
           force-Wide or create-child endpoint. Cobbler's coverage check and deterministic fallback
