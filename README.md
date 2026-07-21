@@ -41,8 +41,9 @@ python3 "$ELVES_TMP/elves/scripts/sync_installed_skills.py" --apply --target cla
 rm -rf "$ELVES_TMP"
 ```
 
-This installs `~/.claude/skills/elves/` plus seven managed alias skills (`/cobbler`,
-`/cobbler-mode`, `/council`, `/ec`, `/elves-council`, `/setup-cobbler`, `/setup-council`). The sync
+This installs `~/.claude/skills/elves/` plus eleven managed alias skills (`/cobbler`,
+`/cobbler-mode`, `/council`, `/ec`, `/elves-council`, `/setup-cobbler`, `/setup-council`, `/fugu`,
+`/manus`, `/grok`, `/devin`). The sync
 helper creates missing aliases and updates only aliases carrying the Elves-managed marker. If it
 finds a user-owned alias, it reports the conflict before changing the install and never
 overwrites that alias.
@@ -59,6 +60,40 @@ python3 "$ELVES_TMP/elves/scripts/sync_installed_skills.py" --apply --target cod
 Codex installs the main skill bundle only — no slash aliases. Use `$elves cobbler: <task>` or
 natural language such as "Ask the Cobbler…".
 Codex users should not need or expect a top-level `/cobbler` command.
+
+### Optional provider shortcuts
+
+Focused provider tasks do not require a full Elves run. Claude Code gets
+`/fugu [--deep|--ultra] <task>`,
+`/manus <topic>`, `/grok <instructions>`, and `/devin <instructions>`; Codex uses the equivalent
+`$elves fugu|manus|grok|devin …` forms or natural language. Fugu launches a bounded,
+project-aware `codex-fugu` agent against a tracked-only snapshot in a required kernel read
+sandbox: regular `fugu/high` by default, `fugu/xhigh` with `--deep`, or
+`fugu-ultra/high` with `--ultra`. Regular and deep reviews are ephemeral one-shot sessions;
+Ultra receives compact evidence and, if exploration consumes its reserved phase, resumes the exact
+same isolated session with further tool use forbidden so the remaining wall budget produces a
+verdict. Session state and raw events never leave the disposable lane. Codex's documented
+externally-sandboxed mode avoids an invalid nested macOS sandbox; Elves' required outer boundary
+still denies host reads and snapshot writes. Manus supports a normal private
+task plus Cobbler-managed `--wide` and deterministic `--fanout` rosters, explicit `--file`
+attachments, and duplicate-safe `--resume` that retries only known-failed steps; roster manifests
+are validated and exclusively reserved before any upload. A durable pre-create marker prevents
+resume from duplicating a paid Manus task when task-ID persistence was interrupted. Devin creates
+a bounded remote task, including its creation request, without granting stored secrets or knowledge
+by default. Grok uses
+headless high-reasoning mode without approval bypass over a disposable tracked-source snapshot in
+Elves' required outer kernel sandbox, plus Grok's built-in inner `strict` profile, provider-documented
+isolated `dontAsk` settings, and bypass mode locked off. The shortcut requires an explicit
+`XAI_API_KEY`; a dedicated Grok tool shell removes both supported key names before any
+model-directed command runs, and the Linux boundary omits procfs to prevent parent-environment
+inspection. It does not expose a shared OAuth file because Grok applies the same sandbox to
+provider and tool reads. Fugu's Linux boundary likewise omits procfs around its credential-bearing
+launcher. Manus requests nest empty connector, enabled-skill, and forced-skill lists under
+`message`, so the wrapper grants no connector or forced-skill IDs explicitly; the documented API
+still loads account-default enabled skills when `enable_skills` is empty, and this route therefore
+does not claim skill isolation. See
+[`references/provider-shortcuts.md`](references/provider-shortcuts.md) for requirements, auth
+environment names, timeouts, and follow behavior.
 
 ### Per-project install
 
@@ -304,6 +339,8 @@ exactly one file below; other docs link instead of restating.
   — external workers
 - [`references/model-onboarding.md`](references/model-onboarding.md),
   [`references/cobbler-setup-recipes.md`](references/cobbler-setup-recipes.md) — setup
+- [`references/provider-shortcuts.md`](references/provider-shortcuts.md) — focused Fugu,
+  Manus, Grok Build, and Devin command routes
 - [`references/host-parity.md`](references/host-parity.md) — Claude Code / Codex parity
 
 **Quality and proof**

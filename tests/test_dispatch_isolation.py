@@ -34,6 +34,7 @@ from cobbler_runtime.isolation import (  # noqa: E402
     QualifiedSandboxBackend,
     _macos_executable_access,
     _macos_dynamic_dependencies,
+    _narrow_runtime_root,
     create_tracked_snapshot,
     prepare_fs_sandbox,
     resolve_fs_sandbox_backend,
@@ -1515,6 +1516,37 @@ class IsolationSandboxRegressionTests(unittest.TestCase):
             self.assertNotIn(("--ro-bind-try", "/run", "/run"), triples)
             self.assertNotIn(("--ro-bind-try", "/etc", "/etc"), triples)
 
+    def test_bwrap_can_omit_proc_for_credential_bearing_process(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            executable = root / "fake-agent"
+            executable.write_text("#!/bin/sh\nexit 0\n")
+            executable.chmod(executable.stat().st_mode | stat.S_IXUSR)
+            lane = self._lane(root / "lane", backend="bwrap")
+            lane.env["PATH"] = f"{root}:/usr/bin:/bin"
+
+            argv = wrap_argv_with_sandbox(
+                ["fake-agent", "--version"], lane, mount_proc=False
+            )
+
+            pairs = list(zip(argv, argv[1:]))
+            self.assertNotIn(("--proc", "/proc"), pairs)
+            self.assertIn("--unshare-all", argv)
+            self.assertIn(("--dev", "/dev"), pairs)
+
+    def test_standalone_codex_runtime_root_is_one_versioned_release(self) -> None:
+        executable = Path(
+            "/Users/fixture/.codex/packages/standalone/releases/"
+            "0.144.6-aarch64-apple-darwin/bin/codex"
+        )
+        self.assertEqual(
+            _narrow_runtime_root(executable),
+            Path(
+                "/Users/fixture/.codex/packages/standalone/releases/"
+                "0.144.6-aarch64-apple-darwin"
+            ),
+        )
+
     def test_bwrap_never_mounts_entire_hidden_agent_install_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1774,6 +1806,9 @@ class IsolationSandboxRegressionTests(unittest.TestCase):
             sentinel.write_text("HOST_SECRET\n")
             source = lane.snapshot / "source.txt"
             source.write_text("SNAPSHOT_OK\n")
+            codex_home = lane.home / ".codex"
+            codex_home.mkdir()
+            lane.env["CODEX_HOME"] = str(codex_home)
             backend, profile = prepare_fs_sandbox(
                 lane,
                 required=True,
@@ -1787,8 +1822,10 @@ class IsolationSandboxRegressionTests(unittest.TestCase):
                     sys.executable,
                     "-c",
                     (
-                        "import pathlib; "
+                        "import os, pathlib; "
                         "assert pathlib.Path('source.txt').read_text().strip() == 'SNAPSHOT_OK'; "
+                        "assert pathlib.Path.cwd().resolve(strict=True).is_dir(); "
+                        "assert pathlib.Path(os.environ['CODEX_HOME']).resolve(strict=True).is_dir(); "
                         f"p=pathlib.Path({str(sentinel)!r}); "
                         "\ntry: p.read_text(); raise SystemExit(41)\nexcept OSError: pass\n"
                         "try: p.write_text('MUTATED'); raise SystemExit(42)\nexcept OSError: pass\n"
@@ -1799,6 +1836,15 @@ class IsolationSandboxRegressionTests(unittest.TestCase):
             profile_body = Path(profile).read_text()
             self.assertNotIn("(deny process-fork)", profile_body)
             self.assertNotIn('(subpath "/opt")', profile_body)
+            self.assertIn(
+                f'(allow file-read-metadata (literal "{lane.root.resolve()}"))',
+                profile_body,
+            )
+            self.assertIn(
+                '(allow file-read-metadata (subpath "/var"))',
+                profile_body,
+            )
+            self.assertNotIn('(allow file-read* (subpath "/var"))', profile_body)
             self.assertTrue(lane.supervisor_executable)
             result = subprocess.run(
                 command,

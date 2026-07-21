@@ -49,6 +49,10 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SHELL_SCRIPTS = [
     "scripts/preflight.sh",
     "scripts/notify.sh",
+    "scripts/run_fugu.sh",
+    "scripts/run_manus.sh",
+    "scripts/run_grok.sh",
+    "scripts/run_devin.sh",
 ]
 
 JSON_PATHS = [

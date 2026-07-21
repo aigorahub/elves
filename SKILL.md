@@ -1,6 +1,6 @@
 ---
 name: elves
-description: Autonomous multi-batch development agent for long unattended runs, reviewed-PR landing, and Cobbler-first orchestration. Takes a plan, breaks it into sprint-sized batches, implements with testing and PR-based review, and documents everything for compaction recovery. Use when user says "run overnight", "I'm going offline", "implement this plan", "keep going without me", "do not stop", "I'll be back in the morning", "run this end-to-end", asks to get a subagent to review the diff from main, read PR comments, test, fix, and merge commit once green, types \land-pr or /land-pr, asks for `/cobbler`, `/council`, `/ec`, or `/elves-council`, or says `$elves cobbler`.
+description: Autonomous multi-batch development agent for long unattended runs, reviewed-PR landing, Cobbler-first orchestration, and optional Fugu, Manus, Grok, or Devin provider shortcuts. Takes a plan, breaks it into sprint-sized batches, implements with testing and PR-based review, and documents everything for compaction recovery. Use when user says "run overnight", "I'm going offline", "implement this plan", "keep going without me", "do not stop", "I'll be back in the morning", "run this end-to-end", asks to get a subagent to review the diff from main, read PR comments, test, fix, and merge commit once green, types \land-pr or /land-pr, asks for `/cobbler`, `/council`, `/ec`, `/elves-council`, `/fugu`, `/manus`, `/grok`, or `/devin`, or says `$elves cobbler`.
 license: MIT
 compatibility: Works with Claude Code, Codex, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
@@ -201,6 +201,58 @@ workers never inherit host HOME/SSH/git identity ambiently.
 command. CLI: `python3 scripts/cobbler_agents.py onboard plan|show|apply|probe` and
 `cobbler_agents.py setup`. Write only ignored local `.elves/models.toml`. See
 `references/model-onboarding.md` and `references/cobbler-setup-recipes.md`.
+
+### Provider shortcut protocols
+
+When an explicit request matches one of these provider tags, resolve the runner from the **active
+Elves skill root**, keep the target repository as the working directory, validate its arguments and
+required capability, then execute it without an extra confirmation prompt:
+
+- `/fugu [--deep|--ultra] <task>` or `fugu review <task>` →
+  `scripts/run_fugu.sh [--deep|--ultra] <task>` for a bounded, read-only
+  `codex-fugu` repository review over a tracked-only snapshot and required kernel filesystem
+  sandbox. Host-generated diff evidence is restricted to paths that survived the same snapshot
+  policy, and the Linux boundary omits procfs so model-directed commands cannot inspect the
+  credential-bearing parent environment. Codex runs in its documented externally-sandboxed mode
+  so macOS does not attempt a forbidden nested sandbox; the already-proven outer boundary remains
+  the read/write authority. The default is regular `fugu/high`; `--deep` selects `fugu/xhigh`, and
+  `--ultra` selects `fugu-ultra/high`. Regular and deep are ephemeral one-shot sessions. Ultra is
+  a compact high-value route: it starts with bounded host evidence, reserves part of the total wall
+  budget for synthesis, and if needed resumes the exact captured session id with further tools
+  forbidden. It never guesses a “last” session, and its raw events and resumable state remain only
+  inside the disposable isolated lane.
+- `/manus <topic>` → `scripts/run_manus.sh <topic>` for one private, bounded Manus deep-web task.
+  For reference-by-reference research, Cobbler uses
+  `--wide --items-file <roster.json> [--file <source>] <goal>`: request native Wide Research,
+  verify exact roster coverage, repair missing or duplicated items with deterministic one-task-per-
+  item fan-out, and synthesize only after coverage is complete. `--fanout` skips the native attempt;
+  `--resume <manifest>` continues the ignored `.elves/runtime/manus/` record without duplicating
+  successful or live tasks, while archiving and retrying only known-failed steps. Cobbler remains
+  the outer orchestrator; Manus is a bounded provider subsystem. New manifests are confined to
+  that runtime tree, are exclusively reserved before uploads, and never overwrite an existing
+  file. Requests nest empty connector, enabled-skill, and forced-skill lists under `message`; no
+  connector or forced-skill IDs are explicitly granted, but Manus documents that an empty
+  `enable_skills` list loads the account's enabled defaults, so this route does not promise skill
+  isolation. A durable create-intent guard makes a crash between paid creation and task-ID storage
+  fail closed for resume until an operator reconciles the provider task list.
+- `/grok <instructions>` or `grok build <instructions>` → `scripts/run_grok.sh <instructions>` for
+  a headless, high-reasoning Grok task with non-bypass permissions over a disposable tracked-source
+  snapshot in Elves' required outer kernel sandbox, plus Grok's built-in inner `strict` profile,
+  provider-documented isolated `dontAsk` settings, and bypass locked off. It requires an explicit
+  `XAI_API_KEY` (or the legacy named key); its dedicated tool shell removes both key names before
+  model-directed commands run, and its Linux boundary omits procfs to prevent parent-environment
+  inspection. Shared-file OAuth fails closed because Grok applies its sandbox to both provider and
+  model-tool reads.
+- `/devin <instructions>` → `scripts/run_devin.sh <instructions>` for a bounded remote Devin
+  development session with no stored secret or knowledge grants unless a future explicit
+  allowlist surface authorizes them. Its creation and poll requests use bounded response bodies and
+  share a hard wall-clock wait budget; zero wait retains create-and-return behavior.
+
+The slash spellings are Claude Code managed aliases. Codex uses `$elves fugu|manus|grok|devin …`
+or natural language; **never invent top-level Codex slash commands**. These are optional paid
+provider routes, not the native default, and never grant merge, protected-ref, secret, or
+approval-bypass authority. Full transport, timeout, auth-name, and follow-link contracts:
+`references/provider-shortcuts.md`.
 
 ## Strategic Forgetting
 

@@ -55,7 +55,7 @@ class InstalledBundleSmokeTests(unittest.TestCase):
                     result["required_runtime_count"],
                     len(self.smoke.REQUIRED_TOP_LEVEL_RUNTIME_PATHS),
                 )
-                self.assertEqual(result["alias_count"], 7 if host == "claude" else 0)
+                self.assertEqual(result["alias_count"], 11 if host == "claude" else 0)
                 self.assertGreater(int(result["markdown_link_count"]), 0)
                 self.assertGreater(int(result["installed_document_count"]), 2)
                 self.assertIn("installed-cli-target-cwd=ok", result["notes"])
@@ -245,9 +245,9 @@ class InstalledBundleSmokeTests(unittest.TestCase):
                 bundle_root=bundle,
             )
 
-        self.assertEqual(count, 8)
+        self.assertEqual(count, 12)
         self.assertEqual(len(failures), 1)
-        self.assertIn("expected exactly seven managed aliases", failures[0])
+        self.assertIn("expected exactly eleven managed aliases", failures[0])
 
     def test_codex_alias_inventory_rejects_any_alias(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

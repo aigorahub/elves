@@ -33,7 +33,36 @@ authenticated live catalog (`references/adaptive-worker-routing.md`).
 | Cobbler | `$elves cobbler: <task>` or "Ask the Cobbler…" |
 | Cobbler Mode | `$elves cobbler-mode` or natural "Cobbler Mode: on/off" |
 | Setup | `$elves setup-cobbler` / `$elves setup-council` |
+| Provider shortcut | `$elves fugu [--deep\|--ultra] <task>`, `$elves manus [--wide\|--fanout] …`, `$elves grok <instructions>`, or `$elves devin <instructions>` |
 | Land PR | natural language; `\land-pr` / `/land-pr` when the host maps them |
+
+### Provider subprocess capabilities map
+
+For explicit provider-shortcut intent, follow SKILL.md **Provider shortcut protocols** and
+`references/provider-shortcuts.md`. Resolve helpers from the active installed skill root; do not
+assume `./scripts` belongs to the target repository and do not execute mappings blindly:
+
+- Fugu review → `run_fugu.sh [--deep|--ultra] <task>` (project-aware `codex-fugu`, tracked-only
+  snapshot and same-policy diff evidence, including safe deletion patches, plus required kernel
+  read sandbox with no Linux procfs; Codex external-sandbox mode inside that mandatory boundary;
+  regular `fugu/high` by default, `fugu/xhigh` for `--deep`, `fugu-ultra/high` for `--ultra`;
+  Ultra uses compact evidence and exact-session staged synthesis rather than an unbounded one-shot)
+- Manus research → `run_manus.sh <topic>` for one private bounded task, or
+  `run_manus.sh --wide --items-file <roster.json> [--file <source>] <goal>` for Cobbler-managed
+  native-Wide-first research with exact coverage repair; use `--fanout` for deterministic
+  one-task-per-item execution and `--resume <manifest>` for duplicate-safe continuation; new
+  manifests are reserved before provider uploads, and ambiguous paid creates fail closed pending
+  operator reconciliation
+- Grok Build task → `run_grok.sh <instructions>` (headless, non-bypass permissions, disposable
+  tracked-source snapshot in a required outer kernel sandbox, built-in inner `strict`, isolated `dontAsk`
+  plus bypass lock, explicit `XAI_API_KEY`, a key-scrubbing tool shell, and no Linux procfs; no
+  shared OAuth file)
+- Devin task → `run_devin.sh <instructions>` (remote session, bounded wait, no default stored
+  secret or knowledge grants; creation and polling share one hard wall-clock bound)
+
+Codex uses the `$elves` or natural-language forms above, not invented top-level `/fugu`, `/manus`,
+`/grok`, or `/devin` commands. Explicit invocation authorizes the provider call and any associated
+provider usage, but not merge, protected-ref, secret, or approval-bypass authority.
 
 ## Workflow pointers (SKILL.md owns every contract)
 

@@ -527,6 +527,7 @@
         <li><a href="#agent-onboarding">Paste this to your agent</a></li>
         <li><a href="#how-it-works">How it works</a></li>
         <li><a href="#install">Install Elves</a></li>
+        <li><a href="#shortcuts">Provider shortcuts</a></li>
         <li><a href="#first-run">Start a run</a></li>
         <li><a href="#worker">Choose a worker</a></li>
         <li><a href="#watch">Watch the work</a></li>
@@ -646,6 +647,67 @@ python3 ~/.claude/skills/elves/scripts/install_doctor.py --startup
 # Codex
 python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup</code></pre>
         </div>
+      </section>
+
+      <section id="shortcuts">
+        <h2>Use a focused provider shortcut</h2>
+        <p>A full run is unnecessary when you only want one specialist task. Claude Code installs
+          <code>/fugu [--deep|--ultra] &lt;task&gt;</code>, <code>/manus &lt;topic&gt;</code>,
+          <code>/grok &lt;instructions&gt;</code>, and <code>/devin &lt;instructions&gt;</code>.
+          In Codex, use the matching <code>$elves fugu|manus|grok|devin …</code> form or ask in
+          natural language; those top-level slash aliases are Claude-specific.</p>
+        <ul>
+          <li><strong>Fugu</strong> launches a bounded, project-aware
+            <code>codex-fugu</code> review over a tracked-only snapshot in a required kernel
+            filesystem sandbox. Generated diff evidence is filtered by the same snapshot policy,
+            including safe deletion patches while suppressing deleted credential paths.
+            Its Linux boundary omits procfs so model-directed commands cannot inspect the
+            credential-bearing parent environment.
+            Codex uses its documented externally-sandboxed mode so macOS does not attempt an
+            invalid nested sandbox; Elves' mandatory outer boundary still denies host reads and
+            snapshot writes.
+            It uses regular
+            <code>fugu/high</code> by default, <code>fugu/xhigh</code> with
+            <code>--deep</code>, or <code>fugu-ultra/high</code> with
+            <code>--ultra</code>. Regular and deep reviews are ephemeral one-shot sessions. Ultra
+            receives compact evidence and reserves part of its total wall limit for synthesis; if
+            exploration uses its phase, Elves resumes the exact captured session with further tools
+            forbidden. It never guesses the “last” session, and its state and raw events remain only
+            in the disposable lane.</li>
+          <li><strong>Manus</strong> creates private, bounded deep-web research and needs
+            <code>MANUS_API_KEY</code>. To request one worker per paper or reference, use
+            <code>/manus --wide --items-file references.json &lt;goal&gt;</code>. Cobbler requests
+            native Wide Research, checks exact roster coverage, repairs missing or duplicated
+            items with independently tracked tasks, then synthesizes. Use <code>--fanout</code>
+            to skip the native attempt, <code>--file</code> for explicit sources, and
+            <code>--resume</code> with the printed ignored manifest. Resume preserves successful
+            and live task IDs while archiving and retrying only known-failed steps. New manifests
+            stay under <code>.elves/runtime/manus/</code>, are exclusively reserved before upload,
+            never replace existing files, and durably mark each roster-task creation before its
+            request so an interrupted task-ID write cannot trigger an automatic duplicate. Requests
+            place empty connector, enabled-skill, and forced-skill lists under <code>message</code>, granting no
+            connector or forced-skill IDs explicitly. Manus documents that empty
+            <code>enable_skills</code> loads account-default enabled skills, so this route does not
+            promise skill isolation.</li>
+          <li><strong>Grok</strong> runs the installed Grok Build CLI headlessly at high reasoning
+            without bypassing permissions over a disposable tracked-source snapshot in a required
+            outer kernel sandbox. Grok also uses its built-in inner <code>strict</code> profile,
+            provider-documented isolated <code>dontAsk</code> settings, and a bypass lock. It
+            requires an explicit <code>XAI_API_KEY</code>; a dedicated tool shell removes both key
+            names before model-directed commands run, and the Linux boundary omits procfs to block
+            parent-environment inspection. Shared-file OAuth is rejected because Grok applies its
+            sandbox to both provider and tool reads.</li>
+          <li><strong>Devin</strong> creates and boundedly follows a remote developer session and
+            needs <code>DEVIN_API_KEY</code>. Stored Devin secrets and knowledge are not granted by
+            default, and bounded session creation and polling responses share a hard wall-clock
+            wait budget.</li>
+        </ul>
+        <p>Manus chooses whether its internal Wide mode activates; the public API has no documented
+          force-Wide or create-child endpoint. Cobbler's coverage check and deterministic fallback
+          make the result auditable without pretending otherwise.</p>
+        <p>These optional routes can consume paid provider capacity. They do not grant merge or
+          protected-branch authority. A local timeout leaves the remote Manus or Devin task alive
+          and prints its follow link.</p>
       </section>
 
       <section id="first-run">

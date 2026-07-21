@@ -4,6 +4,51 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+### Optional provider convenience shortcuts
+
+- Add installed runner scripts and Claude Code aliases for `/fugu`, `/manus`, `/grok`, and
+  `/devin`, with host-honest `$elves …` / natural-language equivalents for Codex.
+- Route Sakana review through the official project-aware `codex-fugu` CLI in a bounded, read-only
+  session: regular `fugu/high` by default, `fugu/xhigh` with `--deep`, and `fugu-ultra/high` with
+  `--ultra`. Keep regular/deep ephemeral; give Ultra compact evidence and a bounded exact-session
+  synthesis phase so it returns a verdict without guessing “last” state, while keeping all raw
+  events and session state inside the disposable lane. Use the Manus v2 task API, documented
+  headless Grok CLI, and
+  official Devin sessions API instead of homepage URLs, unbounded agent loops, or shell-built JSON.
+- Add Cobbler-managed Manus research rosters: `--wide` requests native Wide Research and
+  reconciles structured one-result-per-roster-item coverage; missing or duplicated items fall back
+  to deterministic top-level tasks before synthesis. Add explicit file upload, direct `--fanout`,
+  atomic ignored manifests, and duplicate-safe `--resume`, while documenting that the public API
+  cannot force Wide Research or directly create its internal child agents.
+- Make known-failed Manus repair, fan-out, and synthesis tasks selectively retryable on explicit
+  resume while retaining bounded failure history and emitting validated rows if synthesis fails.
+  Give synthesis a fresh task, normalize waiting exits, reject zero-delay polling, strengthen
+  credential-path refusal, and cover retry/recovery behavior hermetically.
+- Harden every provider boundary after independent review: run Fugu over a tracked-only snapshot
+  with same-policy diff evidence, including safe deletion patches but not deleted credential paths,
+  in a required OS filesystem sandbox and allowlisted environment, without Linux procfs exposing
+  the credential-bearing parent; grant metadata-only macOS traversal for native temp/cache path
+  resolution and only the active immutable Codex distribution for adjacent runtime metadata, so the
+  real CLI works without exposing sibling contents; and explicitly let Codex review the deliberately
+  Git-metadata-free snapshot in its documented external-sandbox mode while regression-proving that
+  Elves' mandatory outer boundary still blocks writes;
+  run Grok over a disposable tracked-source snapshot in Elves' required outer read-only kernel
+  sandbox plus Grok's built-in inner `strict` profile, with an explicit provider key, a tool shell that
+  scrubs both key names before model-directed commands, no Linux procfs for parent-environment
+  inspection, provider-documented isolated `dontAsk`, and a bypass lock, while rejecting
+  shared-file OAuth that the provider/tool sandbox cannot safely separate;
+  send Manus's connector and skill-selection lists at the documented nested `message` location,
+  avoid explicit connector/forced-skill grants, and disclose that empty `enable_skills` loads
+  account defaults instead of claiming skill isolation; confine new/resumed Manus manifests to
+  `.elves/runtime/manus/` through no-follow traversal, exclusively reserve new records before
+  upload, never overwrite, and durably mark paid roster-task create intent so interrupted task-ID
+  persistence fails closed against duplicate resume; and
+  give Devin empty secret/knowledge grants plus bounded response bodies and hard wall-clock
+  creation/poll timeouts capped by one wait budget. Manus API and upload bodies use the same hard
+  deadline instead of relying on socket-idle timeouts.
+- Ship the runners in installed bundles, preserve managed-alias conflict protection, bound remote
+  polling, and add hermetic transport and inventory coverage plus README/guide/host-parity docs.
+
 ## [2.11.0] - 2026-07-20
 
 ### Parallelves v1: contract and deterministic lane tooling

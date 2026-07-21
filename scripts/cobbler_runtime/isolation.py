@@ -113,7 +113,14 @@ _MACOS_SUPERVISOR_CANDIDATES: tuple[Path, ...] = (
     Path("/bin/ps"),
     Path("/usr/bin/ps"),
 )
-_MACOS_CHILD_TOOL_NAMES: tuple[str, ...] = ("git", "rg")
+# Read-only lanes commonly need Git/search, while the official codex-fugu
+# launcher resolves and execs the real Codex binary after the outer launcher
+# has entered the filesystem sandbox.  Every entry is resolved to one exact
+# executable (and a narrowly inferred runtime root when required); this is not
+# a PATH-wide read grant.
+_SANDBOX_CHILD_TOOL_NAMES: tuple[str, ...] = ("git", "rg", "codex")
+# Compatibility seam used by macOS sandbox regression fixtures.
+_MACOS_CHILD_TOOL_NAMES: tuple[str, ...] = _SANDBOX_CHILD_TOOL_NAMES
 
 DEFAULT_EXCLUDED_DIR_NAMES: frozenset[str] = frozenset(
     {
@@ -274,6 +281,35 @@ def _should_exclude(rel: str, *, extra_globs: Sequence[str] = ()) -> bool:
     if _matches_extra_exclude(rel, extra_globs):
         return True
     return False
+
+
+def source_path_allowed_at_original_location(
+    rel: str,
+    *,
+    extra_exclude_globs: Sequence[str] = (),
+) -> bool:
+    """Return whether a tracked path may appear at its original snapshot location.
+
+    This policy-only check deliberately does not require the current worktree
+    entry to exist. Review transports use it for deletion patches, where there
+    is no file left to realize in the snapshot. Snapshot creation still applies
+    its regular-file, symlink, and descriptor checks before copying content.
+    """
+    normalized = str(rel).replace("\\", "/")
+    parts = PurePosixPath(normalized).parts
+    if (
+        not normalized
+        or normalized.startswith("/")
+        or normalized != PurePosixPath(normalized).as_posix()
+        or ".." in parts
+    ):
+        return False
+    patterns = _normalize_extra_exclude_globs(extra_exclude_globs)
+    return not (
+        _should_exclude(normalized, extra_globs=patterns)
+        or _is_executable_agent_config(normalized)
+        or _is_instruction_surface(normalized)
+    )
 
 
 def _is_instruction_surface(rel: str) -> bool:
@@ -895,6 +931,41 @@ def prepare_fs_sandbox(
             "(deny file-write*)",
             _sbpl_rule("allow file-read*", "literal", "/"),
         ]
+        # realpath(3), canonicalize(), and getcwd(3) must stat every ancestor
+        # between `/` and an allowed sandbox-owned path. Grant only metadata on
+        # those exact parents: omitting this makes real Codex/Grok launchers
+        # unable to canonicalize HOME/CODEX_HOME, while granting file-read*
+        # would expose unrelated sibling contents under the host temp tree.
+        sandbox_metadata_ancestors: set[Path] = set()
+        sandbox_symlink_aliases: set[Path] = set()
+        lexical_sandbox_paths = (
+            lane.snapshot.absolute(),
+            lane.tmp.absolute(),
+            lane.home.absolute(),
+            lane.xdg_config.absolute(),
+            lane.xdg_cache.absolute(),
+            lane.xdg_data.absolute(),
+        )
+        for lexical in lexical_sandbox_paths:
+            sandbox_symlink_aliases.update(_symlink_path_components(lexical))
+        for approved in (
+            snapshot,
+            lane_tmp,
+            lane_home,
+            xdg_config,
+            xdg_cache,
+            xdg_data,
+        ):
+            sandbox_metadata_ancestors.update(
+                parent for parent in approved.parents if parent != Path("/")
+            )
+        for ancestor in sorted(
+            sandbox_metadata_ancestors | sandbox_symlink_aliases,
+            key=str,
+        ):
+            profile_lines.append(
+                _sbpl_rule("allow file-read-metadata", "literal", ancestor)
+            )
         for system_root in (
             "/System",
             "/usr",
@@ -907,7 +978,10 @@ def prepare_fs_sandbox(
             "/private/var/db",
         ):
             profile_lines.append(_sbpl_rule("allow file-read*", "subpath", system_root))
-        for metadata_root in ("/var/select", "/private/var/select"):
+        # Native macOS runtimes canonicalize temp/cache/socket locations below
+        # /var even when all writable state is redirected into the lane. Allow
+        # traversal metadata only; host file contents remain denied.
+        for metadata_root in ("/var", "/private/var"):
             profile_lines.append(
                 _sbpl_rule("allow file-read-metadata", "subpath", metadata_root)
             )
@@ -985,6 +1059,14 @@ def _narrow_runtime_root(path: Path) -> Path | None:
         # The sibling lib/ tree is part of the interpreter runtime.
         bin_index = len(parts) - 1 - tuple(reversed(parts)).index("bin")
         return Path(*parts[:bin_index])
+    standalone_marker = (".codex", "packages", "standalone", "releases")
+    for index in range(len(parts) - len(standalone_marker)):
+        if parts[index : index + len(standalone_marker)] == standalone_marker:
+            release_index = index + len(standalone_marker)
+            if len(parts) > release_index:
+                # One immutable, versioned Codex distribution. The binary
+                # reads adjacent package metadata and sibling launch helpers.
+                return Path(*parts[: release_index + 1])
     if ".pyenv" in parts and "versions" in parts and "bin" in parts:
         bin_index = len(parts) - 1 - tuple(reversed(parts)).index("bin")
         return Path(*parts[:bin_index])
@@ -1344,8 +1426,16 @@ def _macos_executable_access(
 def wrap_argv_with_sandbox(
     argv: Sequence[str],
     lane: IsolatedLane,
+    *,
+    mount_proc: bool = True,
 ) -> list[str]:
-    """Prefix argv with sandbox backend when configured."""
+    """Prefix argv with sandbox backend when configured.
+
+    Credential-bearing processes may set ``mount_proc=False`` so their
+    model-directed descendants cannot inspect the parent environment through a
+    fresh procfs. The default remains enabled for existing supervised routes
+    that require process discovery inside the namespace.
+    """
     cmd = list(argv)
     if not cmd:
         raise ValidationIssue("empty_command", "empty command")
@@ -1403,7 +1493,20 @@ def wrap_argv_with_sandbox(
         interpreter = _shebang_interpreter(qualified_executable, lane)
         if interpreter is not None:
             _prepend_executable_dirs(lane, [interpreter])
+        child_executables: list[Path] = []
+        for child_name in _SANDBOX_CHILD_TOOL_NAMES:
+            try:
+                child = _resolve_command_executable(child_name, lane)
+            except ValidationIssue:
+                continue
+            if child not in child_executables:
+                child_executables.append(child)
+        _prepend_executable_dirs(lane, child_executables)
         executable_roots = _bwrap_user_executable_roots(qualified_executable, lane)
+        for child in child_executables:
+            for root in _bwrap_user_executable_roots(child, lane):
+                if root not in executable_roots:
+                    executable_roots.append(root)
         return [
             lane.sandbox_executable,
             "--die-with-parent",
@@ -1445,8 +1548,7 @@ def wrap_argv_with_sandbox(
             ),
             "--dev",
             "/dev",
-            "--proc",
-            "/proc",
+            *(["--proc", "/proc"] if mount_proc else []),
             "--chdir",
             str(lane.snapshot),
             *cmd,

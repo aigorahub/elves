@@ -8,9 +8,9 @@ Usage:
 
 `--check` reports drift between this repo checkout and the local installed copies.
 `--apply` overwrites the managed files/directories in the installed copies so they match
-this checkout exactly. Claude Code Cobbler, Cobbler Mode, and Council-compatible alias skills are
-marker-gated: unmarked user-owned alias skill directories are reported as conflicts and are never
-overwritten.
+this checkout exactly. Claude Code Cobbler, setup, compatibility, and provider shortcut alias
+skills are marker-gated: unmarked user-owned alias skill directories are reported as conflicts and
+are never overwritten.
 When `--target all` is used, the script only operates on installed targets it actually finds.
 
 Runtime shipment rule (v2.1.0+): ship the entire ``scripts/cobbler_runtime/`` package
@@ -42,6 +42,10 @@ TOP_LEVEL_RUNTIME_SCRIPT_PATHS = [
     "scripts/cobbler_agents.py",
     "scripts/openrouter_lens.py",
     "scripts/workspace_guard.py",
+    "scripts/run_fugu.sh",
+    "scripts/run_manus.sh",
+    "scripts/run_grok.sh",
+    "scripts/run_devin.sh",
 ]
 
 # Entire package is shipped recursively — no per-module allowlist.
@@ -63,6 +67,10 @@ CLAUDE_ALIAS_NAMES = [
     "council",
     "ec",
     "elves-council",
+    "fugu",
+    "manus",
+    "grok",
+    "devin",
     "setup-cobbler",
     "setup-council",
 ]
