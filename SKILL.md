@@ -218,7 +218,8 @@ required capability, then execute it without an extra confirmation prompt:
   verify exact roster coverage, repair missing or duplicated items with deterministic one-task-per-
   item fan-out, and synthesize only after coverage is complete. `--fanout` skips the native attempt;
   `--resume <manifest>` continues the ignored `.elves/runtime/manus/` record without duplicating
-  recorded tasks. Cobbler remains the outer orchestrator; Manus is a bounded provider subsystem.
+  successful or live tasks, while archiving and retrying only known-failed steps. Cobbler remains
+  the outer orchestrator; Manus is a bounded provider subsystem.
 - `/grok <instructions>` or `grok build <instructions>` → `scripts/run_grok.sh <instructions>` for
   a headless, high-reasoning Grok task with non-bypass permissions.
 - `/devin <instructions>` → `scripts/run_devin.sh <instructions>` for a bounded remote Devin

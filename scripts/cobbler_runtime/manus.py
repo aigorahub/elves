@@ -33,6 +33,8 @@ MAX_PROMPT_BYTES = 262_144
 MAX_MANIFEST_BYTES = 16_777_216
 MAX_API_RESPONSE_BYTES = 16_777_216
 MAX_REPORT_BYTES = 4_000
+MAX_FAILED_TASK_ATTEMPTS = MAX_ITEMS * 2 + 10
+MIN_INTERVAL_SECONDS = 0.1
 DEFAULT_ATTACHMENT_LIMIT = 64 * 1024 * 1024
 PROVIDER_ATTACHMENT_LIMIT = 512 * 1024 * 1024
 SECRET_FILE_NAMES = {
@@ -41,12 +43,15 @@ SECRET_FILE_NAMES = {
     ".env.production",
     ".git-credentials",
     ".netrc",
+    ".pgpass",
     "credentials",
     "credentials.json",
     "id_ed25519",
     "id_rsa",
+    "kubeconfig",
 }
-SECRET_PATH_PARTS = {".aws", ".git", ".gnupg", ".ssh"}
+SECRET_FILE_SUFFIXES = {".key", ".p12", ".pem", ".pfx"}
+SECRET_PATH_PARTS = {".aws", ".docker", ".git", ".gnupg", ".kube", ".ssh"}
 
 
 class ManusError(RuntimeError):
@@ -261,6 +266,23 @@ def _load_manifest(path: Path) -> dict[str, Any]:
             raise ManusError(f"Resume manifest fan-out task {item_id} cannot be null.")
         _validate_task_record(task, f"Resume manifest fan-out task {item_id}")
     _validate_task_record(data.get("synthesis_task"), "Resume manifest synthesis task")
+    failures = data.setdefault("failed_task_attempts", [])
+    if not isinstance(failures, list) or len(failures) > MAX_FAILED_TASK_ATTEMPTS:
+        raise ManusError("Resume manifest has invalid failed task attempt history.")
+    for index, failure in enumerate(failures):
+        if not isinstance(failure, dict) or failure.get("role") not in {
+            "main",
+            "fanout",
+            "repair",
+            "synthesis",
+        }:
+            raise ManusError(f"Resume manifest failed task attempt {index + 1} is invalid.")
+        _validate_task_record(failure, f"Resume manifest failed task attempt {index + 1}")
+        item_id = failure.get("item_id")
+        if item_id is not None and item_id not in expected_ids:
+            raise ManusError(
+                f"Resume manifest failed task attempt {index + 1} has an invalid item id."
+            )
     return data
 
 
@@ -275,6 +297,7 @@ def _validate_attachment(path_text: str, byte_limit: int) -> Path:
     if (
         path.name.lower() in SECRET_FILE_NAMES
         or path.name.lower().startswith(".env")
+        or path.suffix.lower() in SECRET_FILE_SUFFIXES
         or lowered_parts.intersection(SECRET_PATH_PARTS)
     ):
         raise ManusError(f"Refusing to upload a credential-bearing path: {path}")
@@ -283,15 +306,80 @@ def _validate_attachment(path_text: str, byte_limit: int) -> Path:
     return path
 
 
-def _refresh_waiting_task_records(manifest: dict[str, Any]) -> None:
-    """Make a resumed run re-poll tasks that may have been answered remotely."""
+def _archive_failed_task(
+    manifest: dict[str, Any], role: str, task: dict[str, Any], *, item_id: str | None = None
+) -> None:
+    """Preserve bounded audit context before a known-failed task is replaced."""
+    archived: dict[str, Any] = {
+        "role": role,
+        "id": str(task.get("id") or "")[:512],
+        "status": str(task.get("status") or "error")[:64],
+    }
+    if item_id is not None:
+        archived["item_id"] = item_id
+    if task.get("url"):
+        archived["url"] = _bounded_text(task["url"], 2_048)
+    if task.get("assistant_text"):
+        archived["assistant_text"] = _bounded_text(task["assistant_text"])
+    if task.get("structured") is not None:
+        archived["structured_excerpt"] = _bounded_text(
+            json.dumps(task["structured"], ensure_ascii=False)
+        )
+    failures = manifest.setdefault("failed_task_attempts", [])
+    failures.append(archived)
+    if len(failures) > MAX_FAILED_TASK_ATTEMPTS:
+        del failures[: len(failures) - MAX_FAILED_TASK_ATTEMPTS]
+
+
+def _prepare_resume_task_records(manifest: dict[str, Any], *, repoll_waiting: bool) -> None:
+    """Re-poll waiting work and make terminal provider errors explicitly retryable."""
     tasks = [manifest.get("main_task"), manifest.get("synthesis_task")]
     tasks.extend((manifest.get("fanout_tasks") or {}).values())
     refreshed = False
-    for task in tasks:
-        if isinstance(task, dict) and task.get("status") == "waiting":
-            task["status"] = "running"
-            refreshed = True
+    if repoll_waiting:
+        for task in tasks:
+            if isinstance(task, dict) and task.get("status") == "waiting":
+                task["status"] = "running"
+                refreshed = True
+
+    synthesis = manifest.get("synthesis_task")
+    if isinstance(synthesis, dict) and synthesis.get("status") == "error":
+        _archive_failed_task(manifest, "synthesis", synthesis)
+        manifest["synthesis_task"] = None
+        refreshed = True
+
+    fanout = manifest.get("fanout_tasks") or {}
+    failed_item_ids = [
+        item_id
+        for item_id, task in fanout.items()
+        if isinstance(task, dict)
+        and (
+            task.get("status") == "error"
+            or (task.get("status") == "stopped" and _single_result(item_id, task) is None)
+        )
+    ]
+    for item_id in failed_item_ids:
+        role = "repair" if manifest.get("mode") == "wide" else "fanout"
+        _archive_failed_task(manifest, role, fanout[item_id], item_id=item_id)
+        del fanout[item_id]
+        refreshed = True
+
+    main = manifest.get("main_task")
+    if (
+        isinstance(main, dict)
+        and not manifest.get("fallback_enabled")
+        and (
+            main.get("status") == "error"
+            or (
+                main.get("status") == "stopped"
+                and bool(_coverage(manifest["items"], main.get("structured"))[0]["missing"])
+            )
+        )
+    ):
+        _archive_failed_task(manifest, "main", main)
+        manifest["main_task"] = None
+        refreshed = True
+
     if refreshed:
         manifest["state"] = "running"
 
@@ -480,7 +568,9 @@ class ManusClient:
         except (urllib.error.HTTPError, urllib.error.URLError) as exc:
             raise ManusError(f"Manus attachment upload failed: {exc}") from exc
         file_wait = _finite_number("MANUS_FILE_WAIT_SECONDS", "60", minimum=0)
-        file_interval = _finite_number("MANUS_FILE_POLL_INTERVAL_SECONDS", "1", minimum=0)
+        file_interval = _finite_number(
+            "MANUS_FILE_POLL_INTERVAL_SECONDS", "1", minimum=MIN_INTERVAL_SECONDS
+        )
         file_deadline = time.monotonic() + file_wait
         while True:
             detail = self.request_json(
@@ -556,31 +646,6 @@ class ManusClient:
             "assistant_text": "",
             "structured": None,
         }
-
-    def send_message(
-        self,
-        task_id: str,
-        prompt: str,
-        *,
-        attachments: list[dict[str, Any]],
-        profile: str,
-        schema: dict[str, Any],
-    ) -> None:
-        content: list[dict[str, str]] = [{"type": "text", "text": prompt}]
-        content.extend(
-            {"type": "file", "file_id": str(attachment["file_id"])}
-            for attachment in attachments
-        )
-        self.request_json(
-            "POST",
-            "/task.sendMessage",
-            {
-                "task_id": task_id,
-                "message": {"content": content},
-                "agent_profile": profile,
-                "structured_output_schema": schema,
-            },
-        )
 
     def inspect_task(self, task: dict[str, Any]) -> dict[str, Any]:
         detail = self.request_json(
@@ -963,6 +1028,28 @@ def _orchestrate(
         _atomic_write_json(manifest_path, manifest)
 
     if manifest["coverage"]["missing"]:
+        fanout = manifest.get("fanout_tasks") or {}
+        waiting = [
+            item_id
+            for item_id in manifest["coverage"]["missing"]
+            if isinstance(fanout.get(item_id), dict)
+            and fanout[item_id].get("status") == "waiting"
+        ]
+        if waiting:
+            manifest["state"] = "waiting"
+            _atomic_write_json(manifest_path, manifest)
+            print(
+                json.dumps(
+                    {
+                        "manifest": str(manifest_path),
+                        "state": "waiting",
+                        "waiting": waiting,
+                        "coverage": manifest["coverage"],
+                    },
+                    ensure_ascii=False,
+                )
+            )
+            return 3
         manifest["state"] = "incomplete"
         _atomic_write_json(manifest_path, manifest)
         print(
@@ -987,33 +1074,15 @@ def _orchestrate(
             "Do not perform a new fan-out. Preserve every exact item id and material uncertainty. "
             "Return the requested structured output with one row per expected item."
         )
-        if mode == "wide" and manifest["main_task"].get("status") == "stopped":
-            client.send_message(
-                manifest["main_task"]["id"],
-                synthesis_prompt,
-                attachments=[synthesis_file],
-                profile=manifest["profile"],
-                schema=_wide_schema(),
-            )
-            manifest["synthesis_task"] = {
-                "id": manifest["main_task"]["id"],
-                "url": manifest["main_task"].get("url", ""),
-                "status": "running",
-                "assistant_text": "",
-                "structured": None,
-            }
-        else:
-            _rate_limited_create_pause(
-                time.monotonic(), create_interval, client.deadline
-            )
-            manifest["synthesis_task"] = client.create_task(
-                synthesis_prompt,
-                profile=manifest["profile"],
-                title=manifest.get("title") or "Manus research synthesis",
-                attachments=[synthesis_file],
-                schema=_wide_schema(),
-            )
-            _print_task(manifest["synthesis_task"], "Manus synthesis task initiated")
+        _rate_limited_create_pause(time.monotonic(), create_interval, client.deadline)
+        manifest["synthesis_task"] = client.create_task(
+            synthesis_prompt,
+            profile=manifest["profile"],
+            title=manifest.get("title") or "Manus research synthesis",
+            attachments=[synthesis_file],
+            schema=_wide_schema(),
+        )
+        _print_task(manifest["synthesis_task"], "Manus synthesis task initiated")
         _atomic_write_json(manifest_path, manifest)
 
     synthesis = manifest.get("synthesis_task")
@@ -1023,7 +1092,21 @@ def _orchestrate(
     if synthesis and synthesis.get("status") != "stopped":
         manifest["state"] = synthesis.get("status") or "error"
         _atomic_write_json(manifest_path, manifest)
-        return 3 if manifest["state"] == "waiting" else 1
+        if manifest["state"] == "waiting":
+            print(
+                json.dumps(
+                    {"manifest": str(manifest_path), "state": "waiting"},
+                    ensure_ascii=False,
+                )
+            )
+            return 3
+        print(json.dumps(_manifest_result(manifest, accepted), ensure_ascii=False, indent=2))
+        print(
+            f"Validated per-item results were emitted; resume failed synthesis with: "
+            f"run_manus.sh --resume {manifest_path}",
+            file=sys.stderr,
+        )
+        return 1
 
     manifest["state"] = "complete"
     _atomic_write_json(manifest_path, manifest)
@@ -1103,8 +1186,12 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     max_wait = _finite_number("MANUS_MAX_WAIT_SECONDS", "1800", minimum=0)
-    interval = _finite_number("MANUS_POLL_INTERVAL_SECONDS", "15", minimum=0)
-    create_interval = _finite_number("MANUS_CREATE_INTERVAL_SECONDS", "6.1", minimum=0)
+    interval = _finite_number(
+        "MANUS_POLL_INTERVAL_SECONDS", "15", minimum=MIN_INTERVAL_SECONDS
+    )
+    create_interval = _finite_number(
+        "MANUS_CREATE_INTERVAL_SECONDS", "6.1", minimum=MIN_INTERVAL_SECONDS
+    )
     attachment_limit = _bounded_int(
         "MANUS_MAX_ATTACHMENT_BYTES",
         str(DEFAULT_ATTACHMENT_LIMIT),
@@ -1130,8 +1217,7 @@ def main(argv: list[str] | None = None) -> int:
         manifest_candidate = Path(args.resume).expanduser()
         manifest = _load_manifest(manifest_candidate)
         manifest_path = manifest_candidate.resolve()
-        if max_wait != 0:
-            _refresh_waiting_task_records(manifest)
+        _prepare_resume_task_records(manifest, repoll_waiting=max_wait != 0)
         client = ManusClient(deadline=deadline)
         return _run_orchestration(
             client, manifest, manifest_path, interval, max_wait, create_interval
@@ -1197,6 +1283,7 @@ def main(argv: list[str] | None = None) -> int:
         "main_task": None,
         "fanout_tasks": {},
         "synthesis_task": None,
+        "failed_task_attempts": [],
         "coverage": {
             "expected": [item["id"] for item in items],
             "complete": [],

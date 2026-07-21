@@ -15,6 +15,7 @@ Load the installed `elves` skill's **Provider shortcut protocols** and
 `references/provider-shortcuts.md`. Resolve `scripts/run_manus.sh` from the active Elves skill root,
 keep the target repository as the working directory, validate the arguments and `MANUS_API_KEY`,
 and run it. Preserve private visibility, bounded waits, structured coverage, ignored manifests,
-and duplicate-safe `--resume` behavior instead of improvising API calls. In `--wide` mode Cobbler
-is the outer orchestrator: it accepts native Wide Research only after exact roster reconciliation,
-repairs missing/duplicated items with deterministic fan-out, and synthesizes last.
+and duplicate-safe `--resume` behavior that retries only archived, known-failed steps instead of
+improvising API calls. In `--wide` mode Cobbler is the outer orchestrator: it accepts native Wide
+Research only after exact roster reconciliation, repairs missing/duplicated items with deterministic
+fan-out, and synthesizes last.

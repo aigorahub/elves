@@ -14,6 +14,7 @@ fi
 
 exec python3 - "$TASK_DESCRIPTION" <<'PY'
 import json
+import math
 import os
 import subprocess
 import sys
@@ -29,8 +30,11 @@ try:
     interval = float(os.environ.get("DEVIN_POLL_INTERVAL_SECONDS", "15"))
 except ValueError as exc:
     raise SystemExit("Error: Devin wait settings must be numeric.") from exc
-if max_wait < 0 or interval < 0:
-    raise SystemExit("Error: Devin wait settings must be non-negative.")
+if max_wait < 0 or not math.isfinite(interval) or interval < 0.1:
+    raise SystemExit(
+        "Error: Devin max wait must be non-negative and poll interval must be finite and "
+        "at least 0.1 seconds."
+    )
 
 def git_value(*args):
     result = subprocess.run(

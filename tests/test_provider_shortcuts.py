@@ -58,7 +58,12 @@ class CaptureServer:
                     payload = raw
                 headers = {key.lower(): value for key, value in self.headers.items()}
                 owner.requests.append((self.command, self.path, headers, payload))
-                status, response = responder(self.command, self.path, payload)
+                response_spec = responder(self.command, self.path, payload)
+                if len(response_spec) == 3:
+                    status, response, extra_headers = response_spec
+                else:
+                    status, response = response_spec
+                    extra_headers = {}
                 if isinstance(response, str):
                     encoded = response.encode("utf-8")
                     content_type = "text/event-stream"
@@ -68,6 +73,8 @@ class CaptureServer:
                 self.send_response(status)
                 self.send_header("Content-Type", content_type)
                 self.send_header("Content-Length", str(len(encoded)))
+                for name, value in extra_headers.items():
+                    self.send_header(name, value)
                 self.end_headers()
                 self.wfile.write(encoded)
 
@@ -269,7 +276,7 @@ class RemoteApiRunnerTests(unittest.TestCase):
                 env={
                     "MANUS_API_KEY": "test-manus-key",
                     "MANUS_API_BASE": server.base_url,
-                    "MANUS_POLL_INTERVAL_SECONDS": "0",
+                    "MANUS_POLL_INTERVAL_SECONDS": "0.1",
                     "MANUS_MAX_WAIT_SECONDS": "5",
                 },
             )
@@ -346,8 +353,8 @@ class RemoteApiRunnerTests(unittest.TestCase):
                     env={
                         "MANUS_API_KEY": "wide-key",
                         "MANUS_API_BASE": server.base_url,
-                        "MANUS_POLL_INTERVAL_SECONDS": "0",
-                        "MANUS_FILE_POLL_INTERVAL_SECONDS": "0",
+                        "MANUS_POLL_INTERVAL_SECONDS": "0.1",
+                        "MANUS_FILE_POLL_INTERVAL_SECONDS": "0.1",
                         "MANUS_MAX_WAIT_SECONDS": "5",
                     },
                 )
@@ -421,18 +428,98 @@ class RemoteApiRunnerTests(unittest.TestCase):
         self.assertEqual(len(server.requests), 1)
         self.assertEqual(server.requests[0][0:2], ("POST", "/task.create"))
 
+    def test_manus_retries_idempotent_gets_without_recreating_task(self) -> None:
+        state = {"create_count": 0, "detail_count": 0}
+
+        def responder(method, path, _payload):
+            if method == "POST" and path == "/task.create":
+                state["create_count"] += 1
+                return 200, {"data": {"task_id": "retry-get"}}
+            if path.startswith("/task.detail?"):
+                state["detail_count"] += 1
+                if state["detail_count"] == 1:
+                    return 503, {"error": "transient"}, {"Retry-After": "0"}
+                return 200, {"task": {"status": "stopped"}}
+            if path.startswith("/task.listMessages?"):
+                return 200, {"messages": [{"assistant_message": {"content": "done"}}]}
+            return 404, {"error": "unexpected"}
+
+        with CaptureServer(responder) as server:
+            result = run_script(
+                "run_manus.sh",
+                "retry idempotent read",
+                env={
+                    "MANUS_API_KEY": "key",
+                    "MANUS_API_BASE": server.base_url,
+                    "MANUS_API_RETRIES": "1",
+                    "MANUS_POLL_INTERVAL_SECONDS": "0.1",
+                    "MANUS_MAX_WAIT_SECONDS": "5",
+                },
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "done")
+        self.assertEqual(state, {"create_count": 1, "detail_count": 2})
+
+    def test_manus_refuses_credential_paths_and_symlinks_before_upload(self) -> None:
+        def responder(_method, _path, _payload):
+            return 500, {"error": "no provider request expected"}
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            candidates = [
+                root / ".env.local",
+                root / ".pgpass",
+                root / "private.pem",
+                root / "service.key",
+                root / "kubeconfig",
+                root / ".docker" / "config.json",
+                root / ".kube" / "config",
+            ]
+            for candidate in candidates:
+                candidate.parent.mkdir(parents=True, exist_ok=True)
+                candidate.write_text("credential material", encoding="utf-8")
+            safe_source = root / "source.txt"
+            safe_source.write_text("safe source", encoding="utf-8")
+            symlink = root / "source-link.txt"
+            symlink.symlink_to(safe_source)
+            candidates.append(symlink)
+
+            with CaptureServer(responder) as server:
+                for candidate in candidates:
+                    with self.subTest(candidate=candidate):
+                        result = run_script(
+                            "run_manus.sh",
+                            "--file",
+                            str(candidate),
+                            "research topic",
+                            env={
+                                "MANUS_API_KEY": "key",
+                                "MANUS_API_BASE": server.base_url,
+                                "MANUS_MAX_WAIT_SECONDS": "0",
+                            },
+                        )
+                        self.assertEqual(result.returncode, 2, result.stderr)
+                        self.assertIn("Refusing to upload", result.stderr)
+
+        self.assertEqual(server.requests, [])
+
     def test_manus_wide_repairs_only_missing_or_duplicate_items_then_synthesizes(self) -> None:
         items = ["paper-a", "paper-b", "paper-c"]
-        state = {"synthesis": False, "create_count": 0}
+        state = {"create_count": 0}
         task_items: dict[str, str] = {}
         server: CaptureServer
 
         def responder(method, path, payload):
             if method == "POST" and path == "/task.create":
                 state["create_count"] += 1
-                task_id = "wide-main" if state["create_count"] == 1 else f"repair-{state['create_count']}"
-                if task_id != "wide-main":
+                if state["create_count"] == 1:
+                    task_id = "wide-main"
+                elif state["create_count"] <= 3:
+                    task_id = f"repair-{state['create_count']}"
                     task_items[task_id] = payload["title"].split(": ", 1)[1]
+                else:
+                    task_id = "synthesis-main"
                 return 200, {"data": {"task_id": task_id}}
             if method == "POST" and path == "/file.upload":
                 return 200, {
@@ -443,14 +530,11 @@ class RemoteApiRunnerTests(unittest.TestCase):
                 return 200, {}
             if path.startswith("/file.detail?"):
                 return 200, {"file": {"status": "uploaded"}}
-            if method == "POST" and path == "/task.sendMessage":
-                state["synthesis"] = True
-                return 200, {"ok": True}
             if path.startswith("/task.detail?"):
                 return 200, {"task": {"status": "stopped"}}
             if path.startswith("/task.listMessages?"):
                 task_id = path.split("task_id=", 1)[1].split("&", 1)[0]
-                if task_id == "wide-main" and not state["synthesis"]:
+                if task_id == "wide-main":
                     value = {
                         "items": [
                             {"id": "paper-a", "status": "complete", "report": "A first"},
@@ -459,7 +543,7 @@ class RemoteApiRunnerTests(unittest.TestCase):
                         ],
                         "summary": "incomplete native run",
                     }
-                elif task_id == "wide-main":
+                elif task_id == "synthesis-main":
                     value = {
                         "items": [
                             {"id": item, "status": "complete", "report": f"{item} final"}
@@ -496,9 +580,9 @@ class RemoteApiRunnerTests(unittest.TestCase):
                     env={
                         "MANUS_API_KEY": "wide-key",
                         "MANUS_API_BASE": server.base_url,
-                        "MANUS_POLL_INTERVAL_SECONDS": "0",
-                        "MANUS_FILE_POLL_INTERVAL_SECONDS": "0",
-                        "MANUS_CREATE_INTERVAL_SECONDS": "0",
+                        "MANUS_POLL_INTERVAL_SECONDS": "0.1",
+                        "MANUS_FILE_POLL_INTERVAL_SECONDS": "0.1",
+                        "MANUS_CREATE_INTERVAL_SECONDS": "0.1",
                         "MANUS_MAX_WAIT_SECONDS": "5",
                     },
                 )
@@ -509,10 +593,10 @@ class RemoteApiRunnerTests(unittest.TestCase):
         self.assertTrue(manifest["fallback_used"])
         self.assertEqual(manifest["coverage"]["missing"], [])
         self.assertEqual(set(manifest["fanout_tasks"]), {"paper-a", "paper-b"})
-        self.assertEqual(state["create_count"], 3)
+        self.assertEqual(state["create_count"], 4)
         self.assertEqual(
             len([request for request in server.requests if request[1] == "/task.sendMessage"]),
-            1,
+            0,
         )
 
     def test_manus_wide_manifest_resumes_without_duplicate_task_creation(self) -> None:
@@ -551,8 +635,8 @@ class RemoteApiRunnerTests(unittest.TestCase):
                 base_env = {
                     "MANUS_API_KEY": "wide-key",
                     "MANUS_API_BASE": server.base_url,
-                    "MANUS_POLL_INTERVAL_SECONDS": "0",
-                    "MANUS_CREATE_INTERVAL_SECONDS": "0",
+                    "MANUS_POLL_INTERVAL_SECONDS": "0.1",
+                    "MANUS_CREATE_INTERVAL_SECONDS": "0.1",
                 }
                 created = run_script(
                     "run_manus.sh",
@@ -576,6 +660,262 @@ class RemoteApiRunnerTests(unittest.TestCase):
         self.assertEqual(resumed.returncode, 0, resumed.stderr)
         self.assertEqual(json.loads(resumed.stdout)["summary"], "resumed")
         self.assertEqual(state["create_count"], 1)
+
+    def test_manus_resume_recreates_only_a_failed_coverage_repair(self) -> None:
+        items = ["ref-a", "ref-b"]
+        state = {"create_count": 0}
+        task_roles: dict[str, str] = {}
+        server: CaptureServer
+
+        def responder(method, path, payload):
+            if method == "POST" and path == "/task.create":
+                state["create_count"] += 1
+                task_id = {
+                    1: "wide-main",
+                    2: "repair-failed",
+                    3: "repair-retry",
+                    4: "synthesis-ok",
+                }[state["create_count"]]
+                task_roles[task_id] = str(payload.get("title") or "")
+                return 200, {"data": {"task_id": task_id}}
+            if method == "POST" and path == "/file.upload":
+                return 200, {
+                    "file": {"id": "repair-results"},
+                    "upload_url": server.base_url + "/upload/repair-results",
+                }
+            if method == "PUT" and path == "/upload/repair-results":
+                return 200, {}
+            if path.startswith("/file.detail?"):
+                return 200, {"file": {"status": "uploaded"}}
+            if path.startswith("/task.detail?"):
+                task_id = path.split("task_id=", 1)[1].split("&", 1)[0]
+                status = "error" if task_id == "repair-failed" else "stopped"
+                return 200, {"task": {"status": status}}
+            if path.startswith("/task.listMessages?"):
+                task_id = path.split("task_id=", 1)[1].split("&", 1)[0]
+                if task_id == "wide-main":
+                    value = {
+                        "items": [
+                            {"id": "ref-a", "status": "complete", "report": "A evidence"}
+                        ],
+                        "summary": "native partial",
+                    }
+                elif task_id == "repair-retry":
+                    value = {"id": "ref-b", "status": "complete", "report": "B evidence"}
+                elif task_id == "synthesis-ok":
+                    value = {
+                        "items": [
+                            {"id": item, "status": "complete", "report": f"{item} final"}
+                            for item in items
+                        ],
+                        "summary": "repair recovered",
+                    }
+                else:
+                    return 200, {"messages": []}
+                return 200, {
+                    "messages": [
+                        {"structured_output_result": {"success": True, "value": value}}
+                    ]
+                }
+            return 404, {"error": "unexpected"}
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            items_path = root / "items.json"
+            items_path.write_text(json.dumps(items), encoding="utf-8")
+            manifest_path = root / "manifest.json"
+            server = CaptureServer(responder)
+            with server:
+                env = {
+                    "MANUS_API_KEY": "key",
+                    "MANUS_API_BASE": server.base_url,
+                    "MANUS_POLL_INTERVAL_SECONDS": "0.1",
+                    "MANUS_FILE_POLL_INTERVAL_SECONDS": "0.1",
+                    "MANUS_CREATE_INTERVAL_SECONDS": "0.1",
+                    "MANUS_MAX_WAIT_SECONDS": "5",
+                }
+                failed = run_script(
+                    "run_manus.sh",
+                    "--wide",
+                    "--items-file",
+                    str(items_path),
+                    "--manifest",
+                    str(manifest_path),
+                    "recover repair",
+                    env=env,
+                )
+                resumed = run_script(
+                    "run_manus.sh", "--resume", str(manifest_path), env=env
+                )
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(failed.returncode, 4, failed.stderr)
+        self.assertEqual(resumed.returncode, 0, resumed.stderr)
+        self.assertEqual(json.loads(resumed.stdout)["summary"], "repair recovered")
+        self.assertEqual(state["create_count"], 4)
+        self.assertEqual(
+            [failure["id"] for failure in manifest["failed_task_attempts"]],
+            ["repair-failed"],
+        )
+        self.assertEqual(manifest["fanout_tasks"]["ref-b"]["id"], "repair-retry")
+        self.assertEqual(
+            sum(role == "Manus Wide Research" for role in task_roles.values()),
+            1,
+        )
+
+    def test_manus_resume_recreates_an_unusable_no_fallback_main_task(self) -> None:
+        state = {"create_count": 0}
+
+        def responder(method, path, _payload):
+            if method == "POST" and path == "/task.create":
+                state["create_count"] += 1
+                task_id = "main-empty" if state["create_count"] == 1 else "main-retry"
+                return 200, {"data": {"task_id": task_id}}
+            if path.startswith("/task.detail?"):
+                return 200, {"task": {"status": "stopped"}}
+            if path.startswith("/task.listMessages?"):
+                task_id = path.split("task_id=", 1)[1].split("&", 1)[0]
+                if task_id == "main-empty":
+                    return 200, {"messages": []}
+                return 200, {
+                    "messages": [
+                        {
+                            "structured_output_result": {
+                                "success": True,
+                                "value": {
+                                    "items": [
+                                        {
+                                            "id": "ref-a",
+                                            "status": "complete",
+                                            "report": "A evidence",
+                                        }
+                                    ],
+                                    "summary": "main recovered",
+                                },
+                            }
+                        }
+                    ]
+                }
+            return 404, {"error": "unexpected"}
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            items_path = root / "items.json"
+            items_path.write_text('["ref-a"]', encoding="utf-8")
+            manifest_path = root / "manifest.json"
+            with CaptureServer(responder) as server:
+                env = {
+                    "MANUS_API_KEY": "key",
+                    "MANUS_API_BASE": server.base_url,
+                    "MANUS_POLL_INTERVAL_SECONDS": "0.1",
+                    "MANUS_CREATE_INTERVAL_SECONDS": "0.1",
+                    "MANUS_MAX_WAIT_SECONDS": "5",
+                }
+                empty = run_script(
+                    "run_manus.sh",
+                    "--wide",
+                    "--no-fallback",
+                    "--items-file",
+                    str(items_path),
+                    "--manifest",
+                    str(manifest_path),
+                    "recover main",
+                    env=env,
+                )
+                resumed = run_script(
+                    "run_manus.sh", "--resume", str(manifest_path), env=env
+                )
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(empty.returncode, 4, empty.stderr)
+        self.assertEqual(resumed.returncode, 0, resumed.stderr)
+        self.assertEqual(json.loads(resumed.stdout)["summary"], "main recovered")
+        self.assertEqual(state["create_count"], 2)
+        self.assertEqual(manifest["failed_task_attempts"][0]["id"], "main-empty")
+
+    def test_manus_resume_recreates_failed_synthesis_and_emits_validated_rows(self) -> None:
+        state = {"create_count": 0, "upload_count": 0}
+        server: CaptureServer
+
+        def responder(method, path, _payload):
+            if method == "POST" and path == "/task.create":
+                state["create_count"] += 1
+                task_id = {1: "item-ok", 2: "synthesis-failed", 3: "synthesis-retry"}[
+                    state["create_count"]
+                ]
+                return 200, {"data": {"task_id": task_id}}
+            if method == "POST" and path == "/file.upload":
+                state["upload_count"] += 1
+                file_id = f"synthesis-results-{state['upload_count']}"
+                return 200, {
+                    "file": {"id": file_id},
+                    "upload_url": server.base_url + "/upload/" + file_id,
+                }
+            if method == "PUT" and path.startswith("/upload/synthesis-results-"):
+                return 200, {}
+            if path.startswith("/file.detail?"):
+                return 200, {"file": {"status": "uploaded"}}
+            if path.startswith("/task.detail?"):
+                task_id = path.split("task_id=", 1)[1].split("&", 1)[0]
+                status = "error" if task_id == "synthesis-failed" else "stopped"
+                return 200, {"task": {"status": status}}
+            if path.startswith("/task.listMessages?"):
+                task_id = path.split("task_id=", 1)[1].split("&", 1)[0]
+                if task_id == "item-ok":
+                    value = {"id": "ref-a", "status": "complete", "report": "A evidence"}
+                elif task_id == "synthesis-retry":
+                    value = {
+                        "items": [
+                            {"id": "ref-a", "status": "complete", "report": "A final"}
+                        ],
+                        "summary": "synthesis recovered",
+                    }
+                else:
+                    return 200, {"messages": []}
+                return 200, {
+                    "messages": [
+                        {"structured_output_result": {"success": True, "value": value}}
+                    ]
+                }
+            return 404, {"error": "unexpected"}
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            items_path = root / "items.json"
+            items_path.write_text('["ref-a"]', encoding="utf-8")
+            manifest_path = root / "manifest.json"
+            server = CaptureServer(responder)
+            with server:
+                env = {
+                    "MANUS_API_KEY": "key",
+                    "MANUS_API_BASE": server.base_url,
+                    "MANUS_POLL_INTERVAL_SECONDS": "0.1",
+                    "MANUS_FILE_POLL_INTERVAL_SECONDS": "0.1",
+                    "MANUS_CREATE_INTERVAL_SECONDS": "0.1",
+                    "MANUS_MAX_WAIT_SECONDS": "5",
+                }
+                failed = run_script(
+                    "run_manus.sh",
+                    "--fanout",
+                    "--items-file",
+                    str(items_path),
+                    "--manifest",
+                    str(manifest_path),
+                    "recover synthesis",
+                    env=env,
+                )
+                resumed = run_script(
+                    "run_manus.sh", "--resume", str(manifest_path), env=env
+                )
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(failed.returncode, 1, failed.stderr)
+        self.assertEqual(json.loads(failed.stdout)["items"][0]["id"], "ref-a")
+        self.assertIn("Validated per-item results were emitted", failed.stderr)
+        self.assertEqual(resumed.returncode, 0, resumed.stderr)
+        self.assertEqual(json.loads(resumed.stdout)["summary"], "synthesis recovered")
+        self.assertEqual(state["create_count"], 3)
+        self.assertEqual(manifest["failed_task_attempts"][0]["id"], "synthesis-failed")
 
     def test_manus_fanout_creates_one_task_per_item_then_one_synthesis(self) -> None:
         items = ["ref-a", "ref-b"]
@@ -639,9 +979,9 @@ class RemoteApiRunnerTests(unittest.TestCase):
                     env={
                         "MANUS_API_KEY": "fanout-key",
                         "MANUS_API_BASE": server.base_url,
-                        "MANUS_POLL_INTERVAL_SECONDS": "0",
-                        "MANUS_FILE_POLL_INTERVAL_SECONDS": "0",
-                        "MANUS_CREATE_INTERVAL_SECONDS": "0",
+                        "MANUS_POLL_INTERVAL_SECONDS": "0.1",
+                        "MANUS_FILE_POLL_INTERVAL_SECONDS": "0.1",
+                        "MANUS_CREATE_INTERVAL_SECONDS": "0.1",
                         "MANUS_MAX_WAIT_SECONDS": "5",
                     },
                 )
@@ -652,6 +992,84 @@ class RemoteApiRunnerTests(unittest.TestCase):
         self.assertEqual(state["create_count"], 3)
         self.assertEqual(set(manifest["fanout_tasks"]), set(items))
         self.assertEqual(manifest["synthesis_task"]["id"], "task-3")
+
+    def test_manus_fanout_waiting_returns_waiting_and_resumes_without_recreating_item(self) -> None:
+        state = {"create_count": 0, "item_status": "waiting"}
+        server: CaptureServer
+
+        def responder(method, path, _payload):
+            if method == "POST" and path == "/task.create":
+                state["create_count"] += 1
+                task_id = "item-waiting" if state["create_count"] == 1 else "synthesis-ok"
+                return 200, {"data": {"task_id": task_id}}
+            if method == "POST" and path == "/file.upload":
+                return 200, {
+                    "file": {"id": "waiting-results"},
+                    "upload_url": server.base_url + "/upload/waiting-results",
+                }
+            if method == "PUT" and path == "/upload/waiting-results":
+                return 200, {}
+            if path.startswith("/file.detail?"):
+                return 200, {"file": {"status": "uploaded"}}
+            if path.startswith("/task.detail?"):
+                task_id = path.split("task_id=", 1)[1].split("&", 1)[0]
+                status = state["item_status"] if task_id == "item-waiting" else "stopped"
+                return 200, {"task": {"status": status}}
+            if path.startswith("/task.listMessages?"):
+                task_id = path.split("task_id=", 1)[1].split("&", 1)[0]
+                if task_id == "item-waiting" and state["item_status"] == "waiting":
+                    return 200, {"messages": []}
+                if task_id == "item-waiting":
+                    value = {"id": "ref-a", "status": "complete", "report": "A evidence"}
+                else:
+                    value = {
+                        "items": [
+                            {"id": "ref-a", "status": "complete", "report": "A final"}
+                        ],
+                        "summary": "continued after answer",
+                    }
+                return 200, {
+                    "messages": [
+                        {"structured_output_result": {"success": True, "value": value}}
+                    ]
+                }
+            return 404, {"error": "unexpected"}
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            items_path = root / "items.json"
+            items_path.write_text('["ref-a"]', encoding="utf-8")
+            manifest_path = root / "manifest.json"
+            server = CaptureServer(responder)
+            with server:
+                env = {
+                    "MANUS_API_KEY": "key",
+                    "MANUS_API_BASE": server.base_url,
+                    "MANUS_POLL_INTERVAL_SECONDS": "0.1",
+                    "MANUS_FILE_POLL_INTERVAL_SECONDS": "0.1",
+                    "MANUS_CREATE_INTERVAL_SECONDS": "0.1",
+                    "MANUS_MAX_WAIT_SECONDS": "5",
+                }
+                waiting = run_script(
+                    "run_manus.sh",
+                    "--fanout",
+                    "--items-file",
+                    str(items_path),
+                    "--manifest",
+                    str(manifest_path),
+                    "waiting fanout",
+                    env=env,
+                )
+                state["item_status"] = "stopped"
+                resumed = run_script(
+                    "run_manus.sh", "--resume", str(manifest_path), env=env
+                )
+
+        self.assertEqual(waiting.returncode, 3, waiting.stderr)
+        self.assertEqual(json.loads(waiting.stdout)["waiting"], ["ref-a"])
+        self.assertEqual(resumed.returncode, 0, resumed.stderr)
+        self.assertEqual(json.loads(resumed.stdout)["summary"], "continued after answer")
+        self.assertEqual(state["create_count"], 2)
 
     def test_manus_waiting_native_task_does_not_start_paid_fallback(self) -> None:
         state = {"create_count": 0, "remote_status": "waiting"}
@@ -691,8 +1109,8 @@ class RemoteApiRunnerTests(unittest.TestCase):
                 env = {
                     "MANUS_API_KEY": "wide-key",
                     "MANUS_API_BASE": server.base_url,
-                    "MANUS_POLL_INTERVAL_SECONDS": "0",
-                    "MANUS_CREATE_INTERVAL_SECONDS": "0",
+                    "MANUS_POLL_INTERVAL_SECONDS": "0.1",
+                    "MANUS_CREATE_INTERVAL_SECONDS": "0.1",
                     "MANUS_MAX_WAIT_SECONDS": "5",
                 }
                 result = run_script(
@@ -800,7 +1218,7 @@ class RemoteApiRunnerTests(unittest.TestCase):
                     env={
                         "DEVIN_API_KEY": "test-devin-key",
                         "DEVIN_API_BASE": server.base_url,
-                        "DEVIN_POLL_INTERVAL_SECONDS": "0",
+                        "DEVIN_POLL_INTERVAL_SECONDS": "0.1",
                         "DEVIN_MAX_WAIT_SECONDS": "5",
                     },
                     cwd=repo,
@@ -837,6 +1255,31 @@ class RemoteApiRunnerTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(result.stdout)["task_id"], "m2")
         self.assertEqual(len(server.requests), 1)
+
+    def test_remote_runners_reject_zero_poll_intervals(self) -> None:
+        manus = run_script(
+            "run_manus.sh",
+            "topic",
+            env={
+                "MANUS_API_KEY": "key",
+                "MANUS_POLL_INTERVAL_SECONDS": "0",
+                "MANUS_MAX_WAIT_SECONDS": "0",
+            },
+        )
+        devin = run_script(
+            "run_devin.sh",
+            "task",
+            env={
+                "DEVIN_API_KEY": "key",
+                "DEVIN_POLL_INTERVAL_SECONDS": "0",
+                "DEVIN_MAX_WAIT_SECONDS": "0",
+            },
+        )
+
+        self.assertEqual(manus.returncode, 2, manus.stderr)
+        self.assertIn("at least 0.1", manus.stderr)
+        self.assertNotEqual(devin.returncode, 0, devin.stderr)
+        self.assertIn("at least 0.1 seconds", devin.stderr)
 
 
 if __name__ == "__main__":

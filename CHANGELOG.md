@@ -15,9 +15,12 @@ All notable changes to the Elves skill are documented here.
 - Add Cobbler-managed Manus research rosters: `--wide` requests native Wide Research and
   reconciles structured one-result-per-roster-item coverage; missing or duplicated items fall back
   to deterministic top-level tasks before synthesis. Add explicit file upload, direct `--fanout`,
-  atomic ignored
-  manifests, and duplicate-safe `--resume`, while documenting that the public API cannot force
-  Wide Research or directly create its internal child agents.
+  atomic ignored manifests, and duplicate-safe `--resume`, while documenting that the public API
+  cannot force Wide Research or directly create its internal child agents.
+- Make known-failed Manus repair, fan-out, and synthesis tasks selectively retryable on explicit
+  resume while retaining bounded failure history and emitting validated rows if synthesis fails.
+  Give synthesis a fresh task, normalize waiting exits, reject zero-delay polling, strengthen
+  credential-path refusal, and cover retry/recovery behavior hermetically.
 - Ship the runners in installed bundles, preserve managed-alias conflict protection, bound remote
   polling, and add hermetic transport and inventory coverage plus README/guide/host-parity docs.
 

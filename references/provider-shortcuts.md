@@ -76,7 +76,7 @@ item-specific instructions:
 2. Reconcile returned ids and reject missing, duplicated, failed, or malformed item results.
 3. Create deterministic private repair tasks only for uncovered items, unless `--no-fallback` was
    requested.
-4. Upload the validated per-item packet and ask Manus to synthesize only after coverage is exact.
+4. Upload the validated per-item packet to a fresh synthesis task only after coverage is exact.
 
 Manus documents Wide Research as automatically triggered; its public Task API does not document a
 `wide_research` force switch, a create-child-subtask operation, or parent-linked enumeration of the
@@ -87,18 +87,26 @@ item, then creates one synthesis task. It is the predictable choice when task id
 than letting Manus choose its internal topology.
 
 The roster is capped at 250 items. Deterministic creates are spaced by 6.1 seconds by default to
-respect Manus's documented 10-create-per-minute limit. Each create is recorded immediately in an
-atomic mode-0600 manifest under the gitignored `.elves/runtime/manus/` directory; `--resume`
-reuses those exact ids and fills only unrecorded work. A native task that enters `waiting` returns
-control without starting fallback work. Exit 4 means coverage remains incomplete, 3 means Manus is
-waiting, 1 means a remote task failed, and 124 means the local wait expired while recorded remote
-work may still be live. Ambiguous connection/5xx failures on paid mutations are not automatically
-retried because the public API documents no idempotency key; explicit pre-acceptance 425/429
-responses may back off safely.
+respect Manus's documented 10-create-per-minute limit. Poll and create intervals must be at least
+0.1 seconds, preventing accidental zero-delay request loops. Each create is recorded immediately in
+an atomic mode-0600 manifest under the gitignored `.elves/runtime/manus/` directory; `--resume`
+reuses successful or still-live ids and fills only unrecorded work. A known terminal `error` is
+archived in bounded `failed_task_attempts` history and only its failed repair, fan-out, or synthesis
+step is recreated on an explicit resume. A synthesis failure emits the already validated per-item
+rows before returning failure, so paid research is never hidden behind a failed final summary.
+
+Any native, repair, or fan-out task that enters `waiting` returns control without starting new paid
+work. Exit 4 means coverage remains incomplete with no task waiting, 3 means Manus is waiting, 1
+means a remote task failed, and 124 means the local wait expired while recorded remote work may
+still be live. Ambiguous connection/5xx failures on paid mutations are not automatically retried
+because the public API documents no idempotency key; explicit pre-acceptance 425/429 responses may
+back off safely. Idempotent reads retry bounded transient failures.
 
 `--file <path>` uploads only that explicit regular file through Manus's presigned file flow and
 attaches its provider id to the task. Repeat it for multiple sources. Credential-like paths are
-refused; there is no implicit repository upload or project access. Provider file ids expire after
+refused, including symlinks, common credential directories and filenames, and private-key/archive
+suffixes such as `.key`, `.pem`, `.p12`, and `.pfx`; repository data-governance policy remains the
+real gate. There is no implicit repository upload or project access. Provider file ids expire after
 48 hours, so start or resume attachment-dependent fallback within that window. The manifest can
 contain prompts, local attachment paths, provider ids, and research output, but never the API key;
 it remains local and ignored.

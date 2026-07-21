@@ -668,7 +668,8 @@ python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup</code></pre>
             native Wide Research, checks exact roster coverage, repairs missing or duplicated
             items with independently tracked tasks, then synthesizes. Use <code>--fanout</code>
             to skip the native attempt, <code>--file</code> for explicit sources, and
-            <code>--resume</code> with the printed ignored manifest.</li>
+            <code>--resume</code> with the printed ignored manifest. Resume preserves successful
+            and live task IDs while archiving and retrying only known-failed steps.</li>
           <li><strong>Grok</strong> runs the installed Grok Build CLI headlessly at high reasoning
             without bypassing permissions.</li>
           <li><strong>Devin</strong> creates and boundedly follows a remote developer session and
