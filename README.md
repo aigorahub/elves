@@ -69,7 +69,9 @@ Focused provider tasks do not require a full Elves run. Claude Code gets
 `$elves fugu|manus|grok|devin …` forms or natural language. Fugu launches an ephemeral,
 project-aware `codex-fugu` agent against a tracked-only snapshot in a required kernel read
 sandbox: regular `fugu/high` by default,
-`fugu/xhigh` with `--deep`, or `fugu-ultra/high` with `--ultra`. Manus supports a normal private
+`fugu/xhigh` with `--deep`, or `fugu-ultra/high` with `--ultra`. Codex's documented
+externally-sandboxed mode avoids an invalid nested macOS sandbox; Elves' required outer boundary
+still denies host reads and snapshot writes. Manus supports a normal private
 task plus Cobbler-managed `--wide` and deterministic `--fanout` rosters, explicit `--file`
 attachments, and duplicate-safe `--resume` that retries only known-failed steps; roster manifests
 are validated and exclusively reserved before any upload. A durable pre-create marker prevents

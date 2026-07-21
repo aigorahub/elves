@@ -486,10 +486,11 @@ say exactly \"No actionable findings\" and list only residual verification risks
                 model,
                 "--config",
                 f'model_reasoning_effort="{effort}"',
-                "--sandbox",
-                "read-only",
-                "--ask-for-approval",
-                "never",
+                # Codex documents this mode for callers that already enforce
+                # an external sandbox. A nested sandbox-exec cannot initialize
+                # on macOS; Elves' required outer kernel boundary remains the
+                # authority that denies snapshot/host writes and host reads.
+                "--dangerously-bypass-approvals-and-sandbox",
                 "--cd",
                 str(lane.snapshot),
                 "exec",

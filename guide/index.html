@@ -663,6 +663,9 @@ python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup</code></pre>
             including safe deletion patches while suppressing deleted credential paths.
             Its Linux boundary omits procfs so model-directed commands cannot inspect the
             credential-bearing parent environment.
+            Codex uses its documented externally-sandboxed mode so macOS does not attempt an
+            invalid nested sandbox; Elves' mandatory outer boundary still denies host reads and
+            snapshot writes.
             It uses regular
             <code>fugu/high</code> by default, <code>fugu/xhigh</code> with
             <code>--deep</code>, or <code>fugu-ultra/high</code> with

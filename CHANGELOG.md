@@ -27,7 +27,8 @@ All notable changes to the Elves skill are documented here.
   the credential-bearing parent; grant metadata-only macOS traversal for native temp/cache path
   resolution and only the active immutable Codex distribution for adjacent runtime metadata, so the
   real CLI works without exposing sibling contents; and explicitly let Codex review the deliberately
-  Git-metadata-free snapshot;
+  Git-metadata-free snapshot in its documented external-sandbox mode while regression-proving that
+  Elves' mandatory outer boundary still blocks writes;
   run Grok over a disposable tracked-source snapshot in Elves' required outer read-only kernel
   sandbox plus Grok's built-in inner `strict` profile, with an explicit provider key, a tool shell that
   scrubs both key names before model-directed commands, no Linux procfs for parent-environment

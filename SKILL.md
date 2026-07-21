@@ -213,8 +213,10 @@ required capability, then execute it without an extra confirmation prompt:
   `codex-fugu` repository review over a tracked-only snapshot and required kernel filesystem
   sandbox. Host-generated diff evidence is restricted to paths that survived the same snapshot
   policy, and the Linux boundary omits procfs so model-directed commands cannot inspect the
-  credential-bearing parent environment. The default is regular `fugu/high`; `--deep` selects
-  `fugu/xhigh`, and `--ultra` selects `fugu-ultra/high`.
+  credential-bearing parent environment. Codex runs in its documented externally-sandboxed mode
+  so macOS does not attempt a forbidden nested sandbox; the already-proven outer boundary remains
+  the read/write authority. The default is regular `fugu/high`; `--deep` selects `fugu/xhigh`, and
+  `--ultra` selects `fugu-ultra/high`.
 - `/manus <topic>` → `scripts/run_manus.sh <topic>` for one private, bounded Manus deep-web task.
   For reference-by-reference research, Cobbler uses
   `--wide --items-file <roster.json> [--file <source>] <goal>`: request native Wide Research,

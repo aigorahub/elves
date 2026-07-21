@@ -169,6 +169,11 @@ class LocalCliRunnerTests(unittest.TestCase):
             "    printf 'evidence=<%s>\\n' \"$line\"\n"
             "  done < _elves_review/change-context.txt\n"
             "fi\n"
+            "if printf 'forbidden\\n' > \"$PWD/fugu-write-attempt\" 2>/dev/null; then\n"
+            "  printf 'snapshot-write=<allowed>\\n'\n"
+            "else\n"
+            "  printf 'snapshot-write=<blocked>\\n'\n"
+            "fi\n"
             "/usr/bin/env -u SAKANA_API_KEY /bin/sh -c 'if [ -r \"/proc/$PPID/environ\" ] && tr \"\\000\" \"\\n\" < \"/proc/$PPID/environ\" | grep -aEq \"^SAKANA_API_KEY=\"; then printf \"proc-parent-key=<visible>\\n\"; else printf \"proc-parent-key=<hidden>\\n\"; fi'\n"
             "while IFS= read -r line || [ -n \"$line\" ]; do \n"
             "  printf 'prompt=<%s>\\n' \"$line\"\n"
@@ -209,8 +214,9 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertIn("arg=<--no-update>", result.stdout)
         self.assertIn("arg=<--model>\narg=<fugu>", result.stdout)
         self.assertIn('arg=<model_reasoning_effort="high">', result.stdout)
-        self.assertIn("arg=<--sandbox>\narg=<read-only>", result.stdout)
-        self.assertIn("arg=<--ask-for-approval>\narg=<never>", result.stdout)
+        self.assertIn("arg=<--dangerously-bypass-approvals-and-sandbox>", result.stdout)
+        self.assertNotIn("arg=<--sandbox>", result.stdout)
+        self.assertNotIn("arg=<--ask-for-approval>", result.stdout)
         self.assertRegex(result.stdout, r"arg=<--cd>\narg=<.*elves-iso-[^>]+/snapshot>")
         self.assertIn("arg=<exec>", result.stdout)
         self.assertIn("arg=<--skip-git-repo-check>", result.stdout)
@@ -219,6 +225,7 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertIn("prompt=<Review task: review the auth flow>", result.stdout)
         self.assertIn("prompt=<do not ask the caller to paste files", result.stdout)
         self.assertIn("proc-parent-key=<hidden>", result.stdout)
+        self.assertIn("snapshot-write=<blocked>", result.stdout)
         self.assertNotIn("arg=<fugu-ultra>", result.stdout)
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")

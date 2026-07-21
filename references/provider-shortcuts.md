@@ -24,9 +24,11 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
   requires Elves' qualified kernel filesystem sandbox (`sandbox-exec` on macOS or `bwrap` on
   Linux), an isolated HOME/CODEX_HOME, an environment containing only runtime names plus the
   Sakana grant, and a Codex shell policy that does not forward that grant to model-run commands.
-  It also uses Codex's read-only sandbox, `never` approval policy, an ephemeral session, closed
-  interactive input after the prompt, disabled launcher notices/updates, and a hard process-group
-  wall-clock limit. If the OS read sandbox cannot be proven, the shortcut fails closed. The
+  Because macOS forbids nested `sandbox-exec`, it uses Codex's documented externally-sandboxed mode
+  only after the required outer boundary is active; that flag cannot bypass Elves' host-read and
+  snapshot-write denials, which are regression-tested independently. It also uses an ephemeral
+  session, closed interactive input after the prompt, disabled launcher notices/updates, and a hard
+  process-group wall-clock limit. If the OS read sandbox cannot be proven, the shortcut fails closed. The
   supported profiles are:
 
   | Shortcut | Model / effort | Default wall limit | Use |
