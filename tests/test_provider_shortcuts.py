@@ -369,7 +369,7 @@ class LocalCliRunnerTests(unittest.TestCase):
                     "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
                     "SAKANA_API_KEY": "test-sakana-key",
                     "SAKANA_FUGU_MAX_WAIT_SECONDS": "3",
-                    "SAKANA_FUGU_ULTRA_EXPLORE_SECONDS": "0.2",
+                    "SAKANA_FUGU_ULTRA_EXPLORE_SECONDS": "0.8",
                 },
                 cwd=repo,
             )
@@ -383,7 +383,7 @@ class LocalCliRunnerTests(unittest.TestCase):
         )
         self.assertIn("synthesis=<The bounded exploration phase is over", result.stdout)
         self.assertIn("synthesis=<run commands, or inspect more files", result.stdout)
-        self.assertIn("Fugu Ultra exploration phase: up to 0.2s", result.stderr)
+        self.assertIn("Fugu Ultra exploration phase: up to 0.8s", result.stderr)
         self.assertIn("Fugu Ultra exact-session synthesis phase", result.stderr)
         self.assertNotIn("--last", result.stdout + result.stderr)
 
@@ -434,7 +434,7 @@ class LocalCliRunnerTests(unittest.TestCase):
                     "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
                     "SAKANA_API_KEY": "test-sakana-key",
                     "SAKANA_FUGU_MAX_WAIT_SECONDS": "3",
-                    "SAKANA_FUGU_ULTRA_EXPLORE_SECONDS": "0.2",
+                    "SAKANA_FUGU_ULTRA_EXPLORE_SECONDS": "0.8",
                 },
                 cwd=repo,
             )
@@ -464,15 +464,15 @@ class LocalCliRunnerTests(unittest.TestCase):
                 env={
                     "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
                     "SAKANA_API_KEY": "test-sakana-key",
-                    "SAKANA_FUGU_MAX_WAIT_SECONDS": "1.2",
-                    "SAKANA_FUGU_ULTRA_EXPLORE_SECONDS": "0.25",
+                    "SAKANA_FUGU_MAX_WAIT_SECONDS": "2",
+                    "SAKANA_FUGU_ULTRA_EXPLORE_SECONDS": "0.8",
                 },
                 cwd=repo,
             )
             elapsed = time.monotonic() - started
 
         self.assertEqual(result.returncode, 124, result.stderr)
-        self.assertLess(elapsed, 2)
+        self.assertLess(elapsed, 3)
         self.assertIn("staged wall budget", result.stderr)
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")

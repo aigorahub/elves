@@ -36,7 +36,7 @@
           "id": "B1-A5",
           "criterion": "Hermetic shortcut, isolation, installation, and supported-Python tests cover success, failure, timeout, and stale-state paths.",
           "met": true,
-          "evidence": "39 provider tests and 96 dispatch/storage isolation tests pass locally; the new Ultra tests cover exact resume, normalized cutoff status, stale output, invalid reserve, and bounded resume timeout."
+          "evidence": "39 provider tests and 96 dispatch/storage isolation tests pass locally; the new Ultra tests cover exact resume, normalized cutoff status, stale output, invalid reserve, and bounded resume timeout, with the three staged timing tests repeated five times after full-suite load exposed a narrow startup budget."
         },
         {
           "id": "B1-A6",
