@@ -16,6 +16,7 @@ exec python3 - "$TASK_DESCRIPTION" <<'PY'
 import json
 import math
 import os
+import socket
 import subprocess
 import sys
 import time
@@ -78,7 +79,7 @@ prompt = task
 if context:
     prompt += "\n\nWork context supplied by Elves: " + "; ".join(context) + "."
 
-def request(method, path, payload=None):
+def request(method, path, payload=None, *, timeout=60.0):
     data = None if payload is None else json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
         base + path,
@@ -90,15 +91,29 @@ def request(method, path, payload=None):
         },
     )
     try:
-        with urllib.request.urlopen(req, timeout=60) as response:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
         raise SystemExit(f"Devin API error {exc.code}: {body}") from exc
     except urllib.error.URLError as exc:
+        if isinstance(exc.reason, (TimeoutError, socket.timeout)):
+            raise TimeoutError("Devin API request timed out") from exc
         raise SystemExit(f"Devin API connection error: {exc.reason}") from exc
+    except (TimeoutError, socket.timeout) as exc:
+        raise TimeoutError("Devin API request timed out") from exc
 
-created = request("POST", "/sessions", {"prompt": prompt, "idempotent": False, "unlisted": False})
+created = request(
+    "POST",
+    "/sessions",
+    {
+        "prompt": prompt,
+        "idempotent": False,
+        "unlisted": False,
+        "secret_ids": [],
+        "knowledge_ids": [],
+    },
+)
 session_id = created.get("session_id")
 session_url = created.get("url") or ""
 if not session_id:
@@ -112,7 +127,17 @@ if max_wait == 0:
 
 deadline = time.monotonic() + max_wait
 while time.monotonic() < deadline:
-    detail = request("GET", "/sessions/" + urllib.parse.quote(session_id, safe=""))
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        break
+    try:
+        detail = request(
+            "GET",
+            "/sessions/" + urllib.parse.quote(session_id, safe=""),
+            timeout=min(60.0, remaining),
+        )
+    except TimeoutError:
+        break
     status = str(detail.get("status_enum") or detail.get("status") or "unknown").lower()
     if status in {"finished", "blocked", "expired", "error", "failed"}:
         output = detail.get("structured_output")
@@ -127,7 +152,9 @@ while time.monotonic() < deadline:
             print("Pull request: " + str(pull_request["url"]), file=sys.stderr)
         print(f"Devin session status: {status}", file=sys.stderr)
         raise SystemExit(0 if status == "finished" else 3 if status == "blocked" else 1)
-    time.sleep(interval)
+    remaining = deadline - time.monotonic()
+    if remaining > 0:
+        time.sleep(min(interval, remaining))
 
 print(f"Devin session is still running after {max_wait}s: {session_id} {session_url}".rstrip(), file=sys.stderr)
 raise SystemExit(124)

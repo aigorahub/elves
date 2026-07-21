@@ -142,6 +142,67 @@ def _default_manifest(mode: str) -> Path:
     return _repo_root() / ".elves" / "runtime" / "manus" / f"{stamp}-{os.getpid()}-{mode}.json"
 
 
+def _runtime_manifest_path(
+    raw: str | None,
+    *,
+    mode: str | None = None,
+    must_exist: bool,
+) -> Path:
+    """Confine durable manifests to the ignored Elves runtime tree.
+
+    A new orchestration must never repurpose an existing user file, and resume
+    must not turn a valid-looking JSON document elsewhere in the repository
+    into a mutable provider state record.
+    """
+    repo_root = _repo_root()
+    runtime_root = repo_root / ".elves" / "runtime" / "manus"
+    candidate = (
+        Path(raw).expanduser()
+        if raw is not None
+        else _default_manifest(mode or "research")
+    )
+    canonical_root = runtime_root.resolve(strict=False)
+    canonical_candidate = candidate.resolve(strict=False)
+    if canonical_root not in canonical_candidate.parents:
+        raise ManusError(
+            "Manus manifests must live under "
+            f"{runtime_root}; use the printed --resume path for continuation."
+        )
+    try:
+        relative_parent = canonical_candidate.parent.relative_to(repo_root)
+    except ValueError as exc:
+        raise ManusError("Manus manifest path escaped the repository runtime tree.") from exc
+    cursor = repo_root
+    for part in relative_parent.parts:
+        cursor = cursor / part
+        if cursor.is_symlink():
+            raise ManusError(f"Manus manifest path may not traverse a symlink: {cursor}")
+        if cursor.exists() and not cursor.is_dir():
+            raise ManusError(f"Manus manifest parent is not a directory: {cursor}")
+    if canonical_candidate.is_symlink() or candidate.is_symlink():
+        raise ManusError(f"Manus manifest may not be a symlink: {canonical_candidate}")
+    if must_exist:
+        if not canonical_candidate.is_file():
+            raise ManusError(
+                f"Resume manifest must be a regular non-symlink file: {canonical_candidate}"
+            )
+    elif canonical_candidate.exists():
+        raise ManusError(
+            f"Refusing to overwrite an existing Manus manifest: {canonical_candidate}. "
+            "Use --resume to continue it."
+        )
+    runtime_root.mkdir(parents=True, exist_ok=True)
+    try:
+        runtime_root.chmod(0o700)
+    except OSError:
+        pass
+    canonical_root = runtime_root.resolve()
+    canonical_candidate = candidate.resolve(strict=False)
+    if canonical_root not in canonical_candidate.parents:
+        raise ManusError("Manus manifest path escaped its runtime directory.")
+    return canonical_candidate
+
+
 def _atomic_write_json(path: Path, data: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     data["updated_at"] = int(time.time())
@@ -627,6 +688,9 @@ class ManusClient:
             "agent_profile": profile,
             "hide_in_task_list": False,
             "share_visibility": "private",
+            "connectors": [],
+            "enable_skills": [],
+            "force_skills": [],
         }
         if title:
             payload["title"] = title
@@ -1214,9 +1278,8 @@ def main(argv: list[str] | None = None) -> int:
             or args.topic
         ):
             raise ManusError("--resume cannot be combined with new-run arguments.")
-        manifest_candidate = Path(args.resume).expanduser()
-        manifest = _load_manifest(manifest_candidate)
-        manifest_path = manifest_candidate.resolve()
+        manifest_path = _runtime_manifest_path(args.resume, must_exist=True)
+        manifest = _load_manifest(manifest_path)
         _prepare_resume_task_records(manifest, repoll_waiting=max_wait != 0)
         client = ManusClient(deadline=deadline)
         return _run_orchestration(
@@ -1264,8 +1327,10 @@ def main(argv: list[str] | None = None) -> int:
         for path_text in args.file
     ]
     mode = "wide" if args.wide else "fanout"
-    manifest_path = (
-        Path(args.manifest).expanduser().resolve() if args.manifest else _default_manifest(mode)
+    manifest_path = _runtime_manifest_path(
+        args.manifest,
+        mode=mode,
+        must_exist=False,
     )
     manifest: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,

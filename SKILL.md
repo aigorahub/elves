@@ -210,8 +210,9 @@ required capability, then execute it without an extra confirmation prompt:
 
 - `/fugu [--deep|--ultra] <task>` or `fugu review <task>` →
   `scripts/run_fugu.sh [--deep|--ultra] <task>` for a bounded, ephemeral, read-only
-  `codex-fugu` repository review. The default is regular `fugu/high`; `--deep` selects
-  `fugu/xhigh`, and `--ultra` selects `fugu-ultra/high`.
+  `codex-fugu` repository review over a tracked-only snapshot and required kernel filesystem
+  sandbox. The default is regular `fugu/high`; `--deep` selects `fugu/xhigh`, and `--ultra`
+  selects `fugu-ultra/high`.
 - `/manus <topic>` → `scripts/run_manus.sh <topic>` for one private, bounded Manus deep-web task.
   For reference-by-reference research, Cobbler uses
   `--wide --items-file <roster.json> [--file <source>] <goal>`: request native Wide Research,
@@ -219,11 +220,15 @@ required capability, then execute it without an extra confirmation prompt:
   item fan-out, and synthesize only after coverage is complete. `--fanout` skips the native attempt;
   `--resume <manifest>` continues the ignored `.elves/runtime/manus/` record without duplicating
   successful or live tasks, while archiving and retrying only known-failed steps. Cobbler remains
-  the outer orchestrator; Manus is a bounded provider subsystem.
+  the outer orchestrator; Manus is a bounded provider subsystem. New manifests are confined to
+  that runtime tree and never overwrite an existing file; tasks start without account-default
+  connectors or skills.
 - `/grok <instructions>` or `grok build <instructions>` → `scripts/run_grok.sh <instructions>` for
-  a headless, high-reasoning Grok task with non-bypass permissions.
+  a headless, high-reasoning Grok task with non-bypass permissions, a minimal provider-auth
+  projection, and Grok's fail-closed strict filesystem sandbox.
 - `/devin <instructions>` → `scripts/run_devin.sh <instructions>` for a bounded remote Devin
-  development session.
+  development session with no stored secret or knowledge grants unless a future explicit
+  allowlist surface authorizes them.
 
 The slash spellings are Claude Code managed aliases. Codex uses `$elves fugu|manus|grok|devin …`
 or natural language; **never invent top-level Codex slash commands**. These are optional paid

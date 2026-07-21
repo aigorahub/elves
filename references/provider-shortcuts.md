@@ -17,10 +17,15 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
 ## Route contracts
 
 - **Fugu:** requires the official `codex-fugu` launcher and its configured Sakana credentials. The
-  runner starts the launcher at the target repository root so the reviewer can inspect project
-  files directly. It uses a read-only sandbox, `never` approval policy, an ephemeral session,
-  closed interactive input after the prompt, disabled launcher notices/updates, and a hard
-  process-group wall-clock limit. The supported profiles are:
+  runner copies only tracked working-tree files into a disposable snapshot, moves prose agent
+  instructions to inert evidence paths, and adds host-generated branch/diff context. It then
+  requires Elves' qualified kernel filesystem sandbox (`sandbox-exec` on macOS or `bwrap` on
+  Linux), an isolated HOME/CODEX_HOME, an environment containing only runtime names plus the
+  Sakana grant, and a Codex shell policy that does not forward that grant to model-run commands.
+  It also uses Codex's read-only sandbox, `never` approval policy, an ephemeral session, closed
+  interactive input after the prompt, disabled launcher notices/updates, and a hard process-group
+  wall-clock limit. If the OS read sandbox cannot be proven, the shortcut fails closed. The
+  supported profiles are:
 
   | Shortcut | Model / effort | Default wall limit | Use |
   |---|---|---:|---|
@@ -34,15 +39,21 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
   the runner never copies file contents into the prompt. With no task, Fugu reviews the current
   repository changes.
 - **Manus:** requires `MANUS_API_KEY`. The ordinary form creates one private `manus-1.6-max` task
-  through `https://api.manus.ai/v2/task.create` with `x-manus-api-key`, then polls with a bounded
-  timeout. Roster forms add Cobbler-managed Wide Research or deterministic fan-out as described
-  below.
+  through `https://api.manus.ai/v2/task.create` with `x-manus-api-key`, explicitly empty
+  `connectors`, `enable_skills`, and `force_skills`, then polls with a bounded timeout. Roster forms
+  add Cobbler-managed Wide Research or deterministic fan-out as described below.
 - **Grok:** requires the `grok` CLI. It uses documented headless single-prompt mode, `high`
-  reasoning, self-checking, and `dontAsk`, which silently denies unapproved mutations. It does not
-  invent a model id; the authenticated live Grok configuration selects the available model.
+  reasoning, self-checking, and `dontAsk`, which silently denies unapproved mutations. The runner
+  constructs an isolated HOME/GROK_HOME, projects only `XAI_API_KEY` (or the validated
+  owner-private OAuth record through native `GROK_AUTH_PATH`), and requests a custom profile
+  extending Grok's `strict` kernel sandbox with repository credential-file denies. Custom-profile
+  application is fail-closed. It
+  does not invent a model id; the authenticated live Grok configuration selects the available
+  model.
 - **Devin:** requires `DEVIN_API_KEY`. It creates a remote session through the official
-  `https://api.devin.ai/v1/sessions` API, includes the current origin/branch when available, and
-  polls the documented session endpoint with a bounded timeout.
+  `https://api.devin.ai/v1/sessions` API, includes the current origin/branch when available, sends
+  empty `secret_ids` and `knowledge_ids`, and polls the documented session endpoint with each
+  request capped by the remaining overall wait.
 
 ## Cobbler-managed Manus rosters
 
@@ -89,8 +100,11 @@ than letting Manus choose its internal topology.
 The roster is capped at 250 items. Deterministic creates are spaced by 6.1 seconds by default to
 respect Manus's documented 10-create-per-minute limit. Poll and create intervals must be at least
 0.1 seconds, preventing accidental zero-delay request loops. Each create is recorded immediately in
-an atomic mode-0600 manifest under the gitignored `.elves/runtime/manus/` directory; `--resume`
-reuses successful or still-live ids and fills only unrecorded work. A known terminal `error` is
+an atomic mode-0600 manifest under the gitignored `.elves/runtime/manus/` directory. Explicit
+manifest paths must remain inside that tree, may not traverse symlinks, and may not already exist;
+continue an existing record only through `--resume`. Resume paths have the same confinement.
+`--resume` reuses successful or still-live ids and fills only unrecorded work. A known terminal
+`error` is
 archived in bounded `failed_task_attempts` history and only its failed repair, fan-out, or synthesis
 step is recreated on an explicit resume. A synthesis failure emits the already validated per-item
 rows before returning failure, so paid research is never hidden behind a failed final summary.
@@ -125,9 +139,12 @@ installation and command details are at
 [`console.sakana.ai/get-started`](https://console.sakana.ai/get-started) and
 [`SakanaAI/fugu`](https://github.com/SakanaAI/fugu/blob/main/docs/commands_details.md).
 
-Project access means the provider-backed agent can read repository content. The prompt forbids
-credential stores, `.env` files, authentication files, and secret output, but repositories should
-still apply their own provider/data-governance policy before invoking this optional paid route.
+Fugu's project access is the disposable tracked-source snapshot, not the host checkout: ignored
+and untracked files, `.git`, `.elves`, executable agent configuration, and ordinary credential
+stores are absent and outside the kernel read boundary. Grok intentionally works in the target
+checkout for build tasks, but its strict sandbox confines reads to that checkout/system roots and
+the custom deny list blocks common credential files inside the checkout. Repositories must still
+apply their provider/data-governance policy before invoking either optional paid route.
 
 `MANUS_MAX_WAIT_SECONDS=0` and `DEVIN_MAX_WAIT_SECONDS=0` provide create-and-return behavior. In a
 Manus roster mode the printed manifest, rather than “last task,” is the authoritative follow and

@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -16,6 +17,13 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = REPO_ROOT / "scripts"
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
+
+from cobbler_runtime.isolation import detect_fs_sandbox_backend  # noqa: E402
+
+
+HAS_FS_SANDBOX = detect_fs_sandbox_backend() is not None
 
 
 def run_script(name: str, *args: str, env: dict[str, str] | None = None, cwd: Path = REPO_ROOT):
@@ -76,7 +84,10 @@ class CaptureServer:
                 for name, value in extra_headers.items():
                     self.send_header(name, value)
                 self.end_headers()
-                self.wfile.write(encoded)
+                try:
+                    self.wfile.write(encoded)
+                except BrokenPipeError:
+                    pass
 
             def log_message(self, _format, *_args):
                 return
@@ -102,7 +113,12 @@ class CaptureServer:
 class LocalCliRunnerTests(unittest.TestCase):
     def make_fake(self, root: Path, name: str) -> Path:
         binary = root / name
-        binary.write_text("#!/bin/sh\nprintf '<%s>\\n' \"$@\"\n", encoding="utf-8")
+        binary.write_text(
+            "#!/bin/sh\n"
+            "printf 'unrelated-secret=<%s>\\n' \"${AWS_SECRET_ACCESS_KEY:-}\"\n"
+            "printf '<%s>\\n' \"$@\"\n",
+            encoding="utf-8",
+        )
         binary.chmod(0o755)
         return binary
 
@@ -112,6 +128,7 @@ class LocalCliRunnerTests(unittest.TestCase):
             "#!/bin/sh\n"
             "printf 'cwd=<%s>\\n' \"$PWD\"\n"
             "printf 'notice=<%s> update=<%s>\\n' \"$CODEX_FUGU_NO_NOTICE\" \"$CODEX_FUGU_NO_UPDATE\"\n"
+            "printf 'unrelated-secret=<%s>\\n' \"${AWS_SECRET_ACCESS_KEY:-}\"\n"
             "printf 'arg=<%s>\\n' \"$@\"\n"
             "while IFS= read -r line || [ -n \"$line\" ]; do \n"
             "  printf 'prompt=<%s>\\n' \"$line\"\n"
@@ -121,12 +138,14 @@ class LocalCliRunnerTests(unittest.TestCase):
         binary.chmod(0o755)
         return binary
 
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
     def test_fugu_defaults_to_project_aware_regular_high_read_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             bin_dir = root / "bin"
             bin_dir.mkdir()
             self.make_fugu_capture_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
             repo = root / "repo"
             nested = repo / "nested"
             nested.mkdir(parents=True)
@@ -135,19 +154,24 @@ class LocalCliRunnerTests(unittest.TestCase):
                 "run_fugu.sh",
                 "review",
                 "the auth flow",
-                env={"PATH": str(bin_dir) + os.pathsep + os.environ["PATH"]},
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "SAKANA_API_KEY": "test-sakana-key",
+                    "AWS_SECRET_ACCESS_KEY": "must-not-cross",
+                },
                 cwd=nested,
             )
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(f"cwd=<{nested.resolve()}>", result.stdout)
+        self.assertRegex(result.stdout, r"cwd=<.*elves-iso-[^>]+/snapshot>")
+        self.assertIn("unrelated-secret=<>", result.stdout)
         self.assertIn("notice=<1> update=<1>", result.stdout)
         self.assertIn("arg=<--no-update>", result.stdout)
         self.assertIn("arg=<--model>\narg=<fugu>", result.stdout)
         self.assertIn('arg=<model_reasoning_effort="high">', result.stdout)
         self.assertIn("arg=<--sandbox>\narg=<read-only>", result.stdout)
         self.assertIn("arg=<--ask-for-approval>\narg=<never>", result.stdout)
-        self.assertIn(f"arg=<--cd>\narg=<{repo.resolve()}>", result.stdout)
+        self.assertRegex(result.stdout, r"arg=<--cd>\narg=<.*elves-iso-[^>]+/snapshot>")
         self.assertIn("arg=<exec>", result.stdout)
         self.assertIn("arg=<--ephemeral>", result.stdout)
         self.assertIn("arg=<->", result.stdout)
@@ -155,16 +179,21 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertIn("prompt=<do not ask the caller to paste files", result.stdout)
         self.assertNotIn("arg=<fugu-ultra>", result.stdout)
 
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
     def test_fugu_profiles_select_regular_deep_or_ultra_high(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             bin_dir = root / "bin"
             bin_dir.mkdir()
             self.make_fugu_capture_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
             repo = root / "repo"
             repo.mkdir()
             subprocess.run(["git", "init", "-q", str(repo)], check=True)
-            env = {"PATH": str(bin_dir) + os.pathsep + os.environ["PATH"]}
+            env = {
+                "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                "SAKANA_API_KEY": "test-sakana-key",
+            }
             deep = run_script("run_fugu.sh", "--deep", "review parser", env=env, cwd=repo)
             ultra = run_script("run_fugu.sh", "--ultra", "review parser", env=env, cwd=repo)
 
@@ -175,12 +204,14 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertIn("arg=<--model>\narg=<fugu-ultra>", ultra.stdout)
         self.assertIn('arg=<model_reasoning_effort="high">', ultra.stdout)
 
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
     def test_fugu_legacy_file_is_focus_hint_not_copied_content(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             bin_dir = root / "bin"
             bin_dir.mkdir()
             self.make_fugu_capture_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
             repo = root / "repo"
             repo.mkdir()
             subprocess.run(["git", "init", "-q", str(repo)], check=True)
@@ -189,14 +220,21 @@ class LocalCliRunnerTests(unittest.TestCase):
             result = run_script(
                 "run_fugu.sh",
                 str(target),
-                env={"PATH": str(bin_dir) + os.pathsep + os.environ["PATH"]},
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "SAKANA_API_KEY": "test-sakana-key",
+                },
                 cwd=repo,
             )
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(f"prompt=<Review task: Review {target.resolve()}", result.stdout)
+        self.assertRegex(
+            result.stdout,
+            r"prompt=<Review task: Review .*elves-iso-[^>]+/snapshot/review me\.md",
+        )
         self.assertNotIn("SENSITIVE_SENTINEL_MUST_NOT_BE_COPIED", result.stdout)
 
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
     def test_fugu_enforces_finite_hard_wall_clock(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -205,11 +243,13 @@ class LocalCliRunnerTests(unittest.TestCase):
             sleeper = bin_dir / "codex-fugu"
             sleeper.write_text("#!/bin/sh\nsleep 5\n", encoding="utf-8")
             sleeper.chmod(0o755)
+            self.make_fake(bin_dir, "codex")
             repo = root / "repo"
             repo.mkdir()
             subprocess.run(["git", "init", "-q", str(repo)], check=True)
             env = {
                 "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                "SAKANA_API_KEY": "test-sakana-key",
                 "SAKANA_FUGU_MAX_WAIT_SECONDS": "0.05",
             }
             started = time.monotonic()
@@ -232,16 +272,22 @@ class LocalCliRunnerTests(unittest.TestCase):
                 "run_grok.sh",
                 "inspect",
                 "this",
-                env={"PATH": str(bin_dir) + os.pathsep + os.environ["PATH"]},
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "XAI_API_KEY": "test-xai-key",
+                    "AWS_SECRET_ACCESS_KEY": "must-not-cross",
+                },
             )
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("<--single>", result.stdout)
-        self.assertIn("<inspect this>", result.stdout)
+        self.assertIn("unrelated-secret=<>", result.stdout)
+        self.assertIn("<--single=inspect this>", result.stdout)
         self.assertIn("<dontAsk>", result.stdout)
         self.assertIn("<--effort>", result.stdout)
         self.assertIn("<high>", result.stdout)
         self.assertIn("<--check>", result.stdout)
+        self.assertIn("<--sandbox>", result.stdout)
+        self.assertIn("<elves-shortcut>", result.stdout)
         self.assertNotIn("reasoning-effort", result.stdout)
         self.assertNotIn("always-approve", result.stdout)
         self.assertNotIn("bypassPermissions", result.stdout)
@@ -289,6 +335,9 @@ class RemoteApiRunnerTests(unittest.TestCase):
         self.assertEqual(create[3]["message"]["content"], "research topic")
         self.assertEqual(create[3]["agent_profile"], "manus-1.6-max")
         self.assertEqual(create[3]["share_visibility"], "private")
+        self.assertEqual(create[3]["connectors"], [])
+        self.assertEqual(create[3]["enable_skills"], [])
+        self.assertEqual(create[3]["force_skills"], [])
 
     def test_manus_wide_reconciles_roster_and_uploads_explicit_files(self) -> None:
         reports = {
@@ -336,7 +385,7 @@ class RemoteApiRunnerTests(unittest.TestCase):
             items_path.write_text(json.dumps({"items": list(reports)}), encoding="utf-8")
             source_path = root / "source.pdf"
             source_path.write_bytes(b"paper source bytes")
-            manifest_path = root / "manifest.json"
+            manifest_path = root / ".elves" / "runtime" / "manus" / "manifest.json"
             server = CaptureServer(responder)
             with server:
                 result = run_script(
@@ -357,6 +406,7 @@ class RemoteApiRunnerTests(unittest.TestCase):
                         "MANUS_FILE_POLL_INTERVAL_SECONDS": "0.1",
                         "MANUS_MAX_WAIT_SECONDS": "5",
                     },
+                    cwd=root,
                 )
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
@@ -373,6 +423,9 @@ class RemoteApiRunnerTests(unittest.TestCase):
         payload = creates[0][3]
         self.assertEqual(payload["share_visibility"], "private")
         self.assertEqual(payload["agent_profile"], "manus-1.6-max")
+        self.assertEqual(payload["connectors"], [])
+        self.assertEqual(payload["enable_skills"], [])
+        self.assertEqual(payload["force_skills"], [])
         self.assertIn("structured_output_schema", payload)
         self.assertEqual(
             payload["message"]["content"][1],
@@ -406,6 +459,56 @@ class RemoteApiRunnerTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertIn("require --wide or --fanout", result.stderr)
+        self.assertEqual(server.requests, [])
+
+    def test_manus_refuses_non_runtime_or_existing_manifest_targets(self) -> None:
+        def responder(_method, _path, _payload):
+            return 500, {"error": "no provider request expected"}
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            items = root / "items.json"
+            items.write_text('["ref-a"]', encoding="utf-8")
+            victim = root / "README.md"
+            victim.write_text("must survive\n", encoding="utf-8")
+            runtime_manifest = (
+                root / ".elves" / "runtime" / "manus" / "existing.json"
+            )
+            runtime_manifest.parent.mkdir(parents=True)
+            runtime_manifest.write_text("existing runtime data\n", encoding="utf-8")
+            with CaptureServer(responder) as server:
+                env = {"MANUS_API_KEY": "key", "MANUS_API_BASE": server.base_url}
+                outside = run_script(
+                    "run_manus.sh",
+                    "--wide",
+                    "--items-file",
+                    str(items),
+                    "--manifest",
+                    str(victim),
+                    "research",
+                    env=env,
+                    cwd=root,
+                )
+                existing = run_script(
+                    "run_manus.sh",
+                    "--wide",
+                    "--items-file",
+                    str(items),
+                    "--manifest",
+                    str(runtime_manifest),
+                    "research",
+                    env=env,
+                    cwd=root,
+                )
+            victim_text = victim.read_text(encoding="utf-8")
+            runtime_text = runtime_manifest.read_text(encoding="utf-8")
+
+        self.assertEqual(outside.returncode, 2, outside.stderr)
+        self.assertIn("must live under", outside.stderr)
+        self.assertEqual(existing.returncode, 2, existing.stderr)
+        self.assertIn("Refusing to overwrite", existing.stderr)
+        self.assertEqual(victim_text, "must survive\n")
+        self.assertEqual(runtime_text, "existing runtime data\n")
         self.assertEqual(server.requests, [])
 
     def test_manus_does_not_retry_ambiguous_paid_task_creation(self) -> None:
@@ -565,7 +668,7 @@ class RemoteApiRunnerTests(unittest.TestCase):
             root = Path(tmpdir)
             items_path = root / "items.json"
             items_path.write_text(json.dumps(items), encoding="utf-8")
-            manifest_path = root / "manifest.json"
+            manifest_path = root / ".elves" / "runtime" / "manus" / "manifest.json"
             server = CaptureServer(responder)
             with server:
                 result = run_script(
@@ -585,6 +688,7 @@ class RemoteApiRunnerTests(unittest.TestCase):
                         "MANUS_CREATE_INTERVAL_SECONDS": "0.1",
                         "MANUS_MAX_WAIT_SECONDS": "5",
                     },
+                    cwd=root,
                 )
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
@@ -630,7 +734,7 @@ class RemoteApiRunnerTests(unittest.TestCase):
             root = Path(tmpdir)
             items_path = root / "items.json"
             items_path.write_text('["paper-a"]', encoding="utf-8")
-            manifest_path = root / "manifest.json"
+            manifest_path = root / ".elves" / "runtime" / "manus" / "manifest.json"
             with CaptureServer(responder) as server:
                 base_env = {
                     "MANUS_API_KEY": "wide-key",
@@ -647,12 +751,14 @@ class RemoteApiRunnerTests(unittest.TestCase):
                     str(manifest_path),
                     "resume test",
                     env={**base_env, "MANUS_MAX_WAIT_SECONDS": "0"},
+                    cwd=root,
                 )
                 resumed = run_script(
                     "run_manus.sh",
                     "--resume",
                     str(manifest_path),
                     env={**base_env, "MANUS_MAX_WAIT_SECONDS": "5"},
+                    cwd=root,
                 )
 
         self.assertEqual(created.returncode, 0, created.stderr)
@@ -723,7 +829,7 @@ class RemoteApiRunnerTests(unittest.TestCase):
             root = Path(tmpdir)
             items_path = root / "items.json"
             items_path.write_text(json.dumps(items), encoding="utf-8")
-            manifest_path = root / "manifest.json"
+            manifest_path = root / ".elves" / "runtime" / "manus" / "manifest.json"
             server = CaptureServer(responder)
             with server:
                 env = {
@@ -743,9 +849,10 @@ class RemoteApiRunnerTests(unittest.TestCase):
                     str(manifest_path),
                     "recover repair",
                     env=env,
+                    cwd=root,
                 )
                 resumed = run_script(
-                    "run_manus.sh", "--resume", str(manifest_path), env=env
+                    "run_manus.sh", "--resume", str(manifest_path), env=env, cwd=root
                 )
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
@@ -802,7 +909,7 @@ class RemoteApiRunnerTests(unittest.TestCase):
             root = Path(tmpdir)
             items_path = root / "items.json"
             items_path.write_text('["ref-a"]', encoding="utf-8")
-            manifest_path = root / "manifest.json"
+            manifest_path = root / ".elves" / "runtime" / "manus" / "manifest.json"
             with CaptureServer(responder) as server:
                 env = {
                     "MANUS_API_KEY": "key",
@@ -821,9 +928,10 @@ class RemoteApiRunnerTests(unittest.TestCase):
                     str(manifest_path),
                     "recover main",
                     env=env,
+                    cwd=root,
                 )
                 resumed = run_script(
-                    "run_manus.sh", "--resume", str(manifest_path), env=env
+                    "run_manus.sh", "--resume", str(manifest_path), env=env, cwd=root
                 )
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
@@ -883,7 +991,7 @@ class RemoteApiRunnerTests(unittest.TestCase):
             root = Path(tmpdir)
             items_path = root / "items.json"
             items_path.write_text('["ref-a"]', encoding="utf-8")
-            manifest_path = root / "manifest.json"
+            manifest_path = root / ".elves" / "runtime" / "manus" / "manifest.json"
             server = CaptureServer(responder)
             with server:
                 env = {
@@ -903,9 +1011,10 @@ class RemoteApiRunnerTests(unittest.TestCase):
                     str(manifest_path),
                     "recover synthesis",
                     env=env,
+                    cwd=root,
                 )
                 resumed = run_script(
-                    "run_manus.sh", "--resume", str(manifest_path), env=env
+                    "run_manus.sh", "--resume", str(manifest_path), env=env, cwd=root
                 )
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
@@ -965,7 +1074,7 @@ class RemoteApiRunnerTests(unittest.TestCase):
             root = Path(tmpdir)
             items_path = root / "items.json"
             items_path.write_text(json.dumps(items), encoding="utf-8")
-            manifest_path = root / "manifest.json"
+            manifest_path = root / ".elves" / "runtime" / "manus" / "manifest.json"
             server = CaptureServer(responder)
             with server:
                 result = run_script(
@@ -984,6 +1093,7 @@ class RemoteApiRunnerTests(unittest.TestCase):
                         "MANUS_CREATE_INTERVAL_SECONDS": "0.1",
                         "MANUS_MAX_WAIT_SECONDS": "5",
                     },
+                    cwd=root,
                 )
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
@@ -1039,7 +1149,7 @@ class RemoteApiRunnerTests(unittest.TestCase):
             root = Path(tmpdir)
             items_path = root / "items.json"
             items_path.write_text('["ref-a"]', encoding="utf-8")
-            manifest_path = root / "manifest.json"
+            manifest_path = root / ".elves" / "runtime" / "manus" / "manifest.json"
             server = CaptureServer(responder)
             with server:
                 env = {
@@ -1059,10 +1169,11 @@ class RemoteApiRunnerTests(unittest.TestCase):
                     str(manifest_path),
                     "waiting fanout",
                     env=env,
+                    cwd=root,
                 )
                 state["item_status"] = "stopped"
                 resumed = run_script(
-                    "run_manus.sh", "--resume", str(manifest_path), env=env
+                    "run_manus.sh", "--resume", str(manifest_path), env=env, cwd=root
                 )
 
         self.assertEqual(waiting.returncode, 3, waiting.stderr)
@@ -1104,7 +1215,7 @@ class RemoteApiRunnerTests(unittest.TestCase):
             root = Path(tmpdir)
             items_path = root / "items.json"
             items_path.write_text('["ref-a", "ref-b"]', encoding="utf-8")
-            manifest_path = root / "manifest.json"
+            manifest_path = root / ".elves" / "runtime" / "manus" / "manifest.json"
             with CaptureServer(responder) as server:
                 env = {
                     "MANUS_API_KEY": "wide-key",
@@ -1122,6 +1233,7 @@ class RemoteApiRunnerTests(unittest.TestCase):
                     str(manifest_path),
                     "waiting test",
                     env=env,
+                    cwd=root,
                 )
                 state["remote_status"] = "stopped"
                 resumed = run_script(
@@ -1129,6 +1241,7 @@ class RemoteApiRunnerTests(unittest.TestCase):
                     "--resume",
                     str(manifest_path),
                     env=env,
+                    cwd=root,
                 )
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
@@ -1151,7 +1264,7 @@ class RemoteApiRunnerTests(unittest.TestCase):
             root = Path(tmpdir)
             items_path = root / "items.json"
             items_path.write_text('["ref-a"]', encoding="utf-8")
-            manifest_path = root / "manifest.json"
+            manifest_path = root / ".elves" / "runtime" / "manus" / "manifest.json"
             with CaptureServer(responder) as server:
                 started = time.monotonic()
                 result = run_script(
@@ -1168,6 +1281,7 @@ class RemoteApiRunnerTests(unittest.TestCase):
                         "MANUS_POLL_INTERVAL_SECONDS": "5",
                         "MANUS_MAX_WAIT_SECONDS": "0.05",
                     },
+                    cwd=root,
                 )
                 elapsed = time.monotonic() - started
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -1236,6 +1350,35 @@ class RemoteApiRunnerTests(unittest.TestCase):
         self.assertNotIn("token=leak", create[3]["prompt"])
         self.assertIn("branch: feature/provider-test", create[3]["prompt"])
         self.assertFalse(create[3]["idempotent"])
+        self.assertEqual(create[3]["secret_ids"], [])
+        self.assertEqual(create[3]["knowledge_ids"], [])
+
+    def test_devin_poll_request_cannot_outlive_remaining_wait_budget(self) -> None:
+        def responder(method, path, _payload):
+            if method == "POST" and path == "/sessions":
+                return 200, {"session_id": "slow-session", "url": "https://devin/slow"}
+            if method == "GET" and path == "/sessions/slow-session":
+                time.sleep(3)
+                return 200, {"status_enum": "running"}
+            return 404, {"error": "unexpected"}
+
+        with CaptureServer(responder) as server:
+            started = time.monotonic()
+            result = run_script(
+                "run_devin.sh",
+                "bounded poll",
+                env={
+                    "DEVIN_API_KEY": "key",
+                    "DEVIN_API_BASE": server.base_url,
+                    "DEVIN_POLL_INTERVAL_SECONDS": "0.1",
+                    "DEVIN_MAX_WAIT_SECONDS": "1",
+                },
+            )
+            elapsed = time.monotonic() - started
+
+        self.assertEqual(result.returncode, 124, result.stderr)
+        self.assertLess(elapsed, 2)
+        self.assertIn("still running after 1s", result.stderr)
 
     def test_remote_runners_can_create_and_return_without_polling(self) -> None:
         def manuscript(method, path, _payload):

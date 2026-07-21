@@ -658,7 +658,8 @@ python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup</code></pre>
           natural language; those top-level slash aliases are Claude-specific.</p>
         <ul>
           <li><strong>Fugu</strong> launches a bounded, ephemeral, project-aware
-            <code>codex-fugu</code> review in a read-only sandbox. It uses regular
+            <code>codex-fugu</code> review over a tracked-only snapshot in a required kernel
+            filesystem sandbox. It uses regular
             <code>fugu/high</code> by default, <code>fugu/xhigh</code> with
             <code>--deep</code>, or <code>fugu-ultra/high</code> with
             <code>--ultra</code>.</li>
@@ -669,11 +670,15 @@ python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup</code></pre>
             items with independently tracked tasks, then synthesizes. Use <code>--fanout</code>
             to skip the native attempt, <code>--file</code> for explicit sources, and
             <code>--resume</code> with the printed ignored manifest. Resume preserves successful
-            and live task IDs while archiving and retrying only known-failed steps.</li>
+            and live task IDs while archiving and retrying only known-failed steps. New manifests
+            stay under <code>.elves/runtime/manus/</code>, never replace existing files, and tasks
+            start without account-default connectors or skills.</li>
           <li><strong>Grok</strong> runs the installed Grok Build CLI headlessly at high reasoning
-            without bypassing permissions.</li>
+            without bypassing permissions, with only its selected auth projected into a minimal
+            environment and a fail-closed strict filesystem sandbox.</li>
           <li><strong>Devin</strong> creates and boundedly follows a remote developer session and
-            needs <code>DEVIN_API_KEY</code>.</li>
+            needs <code>DEVIN_API_KEY</code>. Stored Devin secrets and knowledge are not granted by
+            default.</li>
         </ul>
         <p>Manus chooses whether its internal Wide mode activates; the public API has no documented
           force-Wide or create-child endpoint. Cobbler's coverage check and deterministic fallback

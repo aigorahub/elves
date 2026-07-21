@@ -113,7 +113,14 @@ _MACOS_SUPERVISOR_CANDIDATES: tuple[Path, ...] = (
     Path("/bin/ps"),
     Path("/usr/bin/ps"),
 )
-_MACOS_CHILD_TOOL_NAMES: tuple[str, ...] = ("git", "rg")
+# Read-only lanes commonly need Git/search, while the official codex-fugu
+# launcher resolves and execs the real Codex binary after the outer launcher
+# has entered the filesystem sandbox.  Every entry is resolved to one exact
+# executable (and a narrowly inferred runtime root when required); this is not
+# a PATH-wide read grant.
+_SANDBOX_CHILD_TOOL_NAMES: tuple[str, ...] = ("git", "rg", "codex")
+# Compatibility seam used by macOS sandbox regression fixtures.
+_MACOS_CHILD_TOOL_NAMES: tuple[str, ...] = _SANDBOX_CHILD_TOOL_NAMES
 
 DEFAULT_EXCLUDED_DIR_NAMES: frozenset[str] = frozenset(
     {
@@ -1403,7 +1410,20 @@ def wrap_argv_with_sandbox(
         interpreter = _shebang_interpreter(qualified_executable, lane)
         if interpreter is not None:
             _prepend_executable_dirs(lane, [interpreter])
+        child_executables: list[Path] = []
+        for child_name in _SANDBOX_CHILD_TOOL_NAMES:
+            try:
+                child = _resolve_command_executable(child_name, lane)
+            except ValidationIssue:
+                continue
+            if child not in child_executables:
+                child_executables.append(child)
+        _prepend_executable_dirs(lane, child_executables)
         executable_roots = _bwrap_user_executable_roots(qualified_executable, lane)
+        for child in child_executables:
+            for root in _bwrap_user_executable_roots(child, lane):
+                if root not in executable_roots:
+                    executable_roots.append(root)
         return [
             lane.sandbox_executable,
             "--die-with-parent",

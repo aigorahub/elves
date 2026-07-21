@@ -67,11 +67,14 @@ Focused provider tasks do not require a full Elves run. Claude Code gets
 `/fugu [--deep|--ultra] <task>`,
 `/manus <topic>`, `/grok <instructions>`, and `/devin <instructions>`; Codex uses the equivalent
 `$elves fugu|manus|grok|devin …` forms or natural language. Fugu launches an ephemeral,
-project-aware `codex-fugu` agent in a read-only sandbox: regular `fugu/high` by default,
+project-aware `codex-fugu` agent against a tracked-only snapshot in a required kernel read
+sandbox: regular `fugu/high` by default,
 `fugu/xhigh` with `--deep`, or `fugu-ultra/high` with `--ultra`. Manus supports a normal private
 task plus Cobbler-managed `--wide` and deterministic `--fanout` rosters, explicit `--file`
 attachments, and duplicate-safe `--resume` that retries only known-failed steps; Devin creates a
-bounded remote task. Grok uses headless high-reasoning mode without approval bypass. See
+bounded remote task without granting stored secrets or knowledge by default. Grok uses headless
+high-reasoning mode without approval bypass, a minimal auth environment, and a fail-closed strict
+filesystem sandbox. Manus tasks likewise start with no account-default connectors or skills. See
 [`references/provider-shortcuts.md`](references/provider-shortcuts.md) for requirements, auth
 environment names, timeouts, and follow behavior.
 

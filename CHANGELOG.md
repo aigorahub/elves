@@ -21,6 +21,11 @@ All notable changes to the Elves skill are documented here.
   resume while retaining bounded failure history and emitting validated rows if synthesis fails.
   Give synthesis a fresh task, normalize waiting exits, reject zero-delay polling, strengthen
   credential-path refusal, and cover retry/recovery behavior hermetically.
+- Harden every provider boundary after independent review: run Fugu over a tracked-only snapshot
+  in a required OS filesystem sandbox with an allowlisted environment; run Grok with a minimal
+  auth projection and fail-closed strict sandbox; disable Manus account-default connectors and
+  skills; confine new/resumed Manus manifests to `.elves/runtime/manus/` without overwrite; and
+  give Devin empty secret/knowledge grants plus request timeouts capped by the remaining wait.
 - Ship the runners in installed bundles, preserve managed-alias conflict protection, bound remote
   polling, and add hermetic transport and inventory coverage plus README/guide/host-parity docs.
 

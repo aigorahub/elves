@@ -42,14 +42,17 @@ For explicit provider-shortcut intent, follow SKILL.md **Provider shortcut proto
 `references/provider-shortcuts.md`. Resolve helpers from the active installed skill root; do not
 assume `./scripts` belongs to the target repository and do not execute mappings blindly:
 
-- Fugu review → `run_fugu.sh [--deep|--ultra] <task>` (project-aware `codex-fugu`, read-only;
-  regular `fugu/high` by default, `fugu/xhigh` for `--deep`, `fugu-ultra/high` for `--ultra`)
+- Fugu review → `run_fugu.sh [--deep|--ultra] <task>` (project-aware `codex-fugu`, tracked-only
+  snapshot plus required kernel read sandbox; regular `fugu/high` by default, `fugu/xhigh` for
+  `--deep`, `fugu-ultra/high` for `--ultra`)
 - Manus research → `run_manus.sh <topic>` for one private bounded task, or
   `run_manus.sh --wide --items-file <roster.json> [--file <source>] <goal>` for Cobbler-managed
   native-Wide-first research with exact coverage repair; use `--fanout` for deterministic
   one-task-per-item execution and `--resume <manifest>` for duplicate-safe continuation
-- Grok Build task → `run_grok.sh <instructions>` (headless, non-bypass permissions)
-- Devin task → `run_devin.sh <instructions>` (remote session, bounded wait)
+- Grok Build task → `run_grok.sh <instructions>` (headless, non-bypass permissions, minimal auth
+  projection, fail-closed strict filesystem sandbox)
+- Devin task → `run_devin.sh <instructions>` (remote session, bounded wait, no default stored
+  secret or knowledge grants)
 
 Codex uses the `$elves` or natural-language forms above, not invented top-level `/fugu`, `/manus`,
 `/grok`, or `/devin` commands. Explicit invocation authorizes the provider call and any associated
