@@ -33,7 +33,7 @@ authenticated live catalog (`references/adaptive-worker-routing.md`).
 | Cobbler | `$elves cobbler: <task>` or "Ask the Cobbler…" |
 | Cobbler Mode | `$elves cobbler-mode` or natural "Cobbler Mode: on/off" |
 | Setup | `$elves setup-cobbler` / `$elves setup-council` |
-| Provider shortcut | `$elves fugu <file>`, `$elves manus <topic>`, `$elves grok <instructions>`, or `$elves devin <instructions>` |
+| Provider shortcut | `$elves fugu [--deep\|--ultra] <task>`, `$elves manus <topic>`, `$elves grok <instructions>`, or `$elves devin <instructions>` |
 | Land PR | natural language; `\land-pr` / `/land-pr` when the host maps them |
 
 ### Provider subprocess capabilities map
@@ -42,7 +42,8 @@ For explicit provider-shortcut intent, follow SKILL.md **Provider shortcut proto
 `references/provider-shortcuts.md`. Resolve helpers from the active installed skill root; do not
 assume `./scripts` belongs to the target repository and do not execute mappings blindly:
 
-- Fugu review → `run_fugu.sh <file>` (direct streamed `fugu-ultra`, `max`, read-only)
+- Fugu review → `run_fugu.sh [--deep|--ultra] <task>` (project-aware `codex-fugu`, read-only;
+  regular `fugu/high` by default, `fugu/xhigh` for `--deep`, `fugu-ultra/high` for `--ultra`)
 - Manus research → `run_manus.sh <topic>` (private remote task, bounded wait)
 - Grok Build task → `run_grok.sh <instructions>` (headless, non-bypass permissions)
 - Devin task → `run_devin.sh <instructions>` (remote session, bounded wait)

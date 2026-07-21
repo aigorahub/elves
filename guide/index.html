@@ -652,13 +652,16 @@ python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup</code></pre>
       <section id="shortcuts">
         <h2>Use a focused provider shortcut</h2>
         <p>A full run is unnecessary when you only want one specialist task. Claude Code installs
-          <code>/fugu &lt;file&gt;</code>, <code>/manus &lt;topic&gt;</code>,
+          <code>/fugu [--deep|--ultra] &lt;task&gt;</code>, <code>/manus &lt;topic&gt;</code>,
           <code>/grok &lt;instructions&gt;</code>, and <code>/devin &lt;instructions&gt;</code>.
           In Codex, use the matching <code>$elves fugu|manus|grok|devin …</code> form or ask in
           natural language; those top-level slash aliases are Claude-specific.</p>
         <ul>
-          <li><strong>Fugu</strong> performs a direct, streamed, read-only Sakana Fugu Ultra file
-            audit at <code>max</code> with bounded input, output, and wait budgets.</li>
+          <li><strong>Fugu</strong> launches a bounded, ephemeral, project-aware
+            <code>codex-fugu</code> review in a read-only sandbox. It uses regular
+            <code>fugu/high</code> by default, <code>fugu/xhigh</code> with
+            <code>--deep</code>, or <code>fugu-ultra/high</code> with
+            <code>--ultra</code>.</li>
           <li><strong>Manus</strong> creates private, bounded deep-web research and needs
             <code>MANUS_API_KEY</code>.</li>
           <li><strong>Grok</strong> runs the installed Grok Build CLI headlessly at high reasoning

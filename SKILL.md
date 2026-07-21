@@ -208,9 +208,10 @@ When an explicit request matches one of these provider tags, resolve the runner 
 Elves skill root**, keep the target repository as the working directory, validate its arguments and
 required capability, then execute it without an extra confirmation prompt:
 
-- `/fugu <file>` or `fugu review <file>` → `scripts/run_fugu.sh <file>` for a direct, streamed,
-  read-only Sakana Fugu Ultra audit pinned to `fugu-ultra` at `max` with bounded input, output, and
-  wait budgets.
+- `/fugu [--deep|--ultra] <task>` or `fugu review <task>` →
+  `scripts/run_fugu.sh [--deep|--ultra] <task>` for a bounded, ephemeral, read-only
+  `codex-fugu` repository review. The default is regular `fugu/high`; `--deep` selects
+  `fugu/xhigh`, and `--ultra` selects `fugu-ultra/high`.
 - `/manus <topic>` → `scripts/run_manus.sh <topic>` for private, bounded Manus deep web research.
 - `/grok <instructions>` or `grok build <instructions>` → `scripts/run_grok.sh <instructions>` for
   a headless, high-reasoning Grok task with non-bypass permissions.

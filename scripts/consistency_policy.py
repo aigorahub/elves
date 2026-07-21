@@ -1134,12 +1134,13 @@ CLAUDE_ALIAS_SKILL_PHRASES = {
     "aliases/claude/fugu/SKILL.md": [
         CLAUDE_ALIAS_MARKER,
         "name: fugu",
-        "/fugu <file>",
+        "/fugu [--deep|--ultra] <task>",
         "Provider shortcut protocols",
         "run_fugu.sh",
-        "SAKANA_API_KEY",
+        "codex-fugu",
+        "fugu/high",
         "fugu-ultra",
-        "max",
+        "read-only",
     ],
     "aliases/claude/manus/SKILL.md": [
         CLAUDE_ALIAS_MARKER,

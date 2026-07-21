@@ -63,10 +63,12 @@ Codex users should not need or expect a top-level `/cobbler` command.
 
 ### Optional provider shortcuts
 
-Focused provider tasks do not require a full Elves run. Claude Code gets `/fugu <file>`,
+Focused provider tasks do not require a full Elves run. Claude Code gets
+`/fugu [--deep|--ultra] <task>`,
 `/manus <topic>`, `/grok <instructions>`, and `/devin <instructions>`; Codex uses the equivalent
-`$elves fugu|manus|grok|devin …` forms or natural language. Fugu is a direct streamed read-only
-`fugu-ultra` review at `max` with bounded input/output/wait budgets; Manus and Devin create bounded
+`$elves fugu|manus|grok|devin …` forms or natural language. Fugu launches an ephemeral,
+project-aware `codex-fugu` agent in a read-only sandbox: regular `fugu/high` by default,
+`fugu/xhigh` with `--deep`, or `fugu-ultra/high` with `--ultra`. Manus and Devin create bounded
 remote tasks; Grok uses headless high-reasoning mode without approval bypass. See
 [`references/provider-shortcuts.md`](references/provider-shortcuts.md) for requirements, auth
 environment names, timeouts, and follow behavior.
@@ -315,7 +317,7 @@ exactly one file below; other docs link instead of restating.
   — external workers
 - [`references/model-onboarding.md`](references/model-onboarding.md),
   [`references/cobbler-setup-recipes.md`](references/cobbler-setup-recipes.md) — setup
-- [`references/provider-shortcuts.md`](references/provider-shortcuts.md) — focused Fugu Ultra,
+- [`references/provider-shortcuts.md`](references/provider-shortcuts.md) — focused Fugu,
   Manus, Grok Build, and Devin command routes
 - [`references/host-parity.md`](references/host-parity.md) — Claude Code / Codex parity
 

@@ -8,6 +8,7 @@ import os
 import subprocess
 import tempfile
 import threading
+import time
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -92,6 +93,124 @@ class LocalCliRunnerTests(unittest.TestCase):
         binary.chmod(0o755)
         return binary
 
+    def make_fugu_capture_fake(self, root: Path) -> Path:
+        binary = root / "codex-fugu"
+        binary.write_text(
+            "#!/bin/sh\n"
+            "printf 'cwd=<%s>\\n' \"$PWD\"\n"
+            "printf 'notice=<%s> update=<%s>\\n' \"$CODEX_FUGU_NO_NOTICE\" \"$CODEX_FUGU_NO_UPDATE\"\n"
+            "printf 'arg=<%s>\\n' \"$@\"\n"
+            "while IFS= read -r line || [ -n \"$line\" ]; do \n"
+            "  printf 'prompt=<%s>\\n' \"$line\"\n"
+            "done\n",
+            encoding="utf-8",
+        )
+        binary.chmod(0o755)
+        return binary
+
+    def test_fugu_defaults_to_project_aware_regular_high_read_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_capture_fake(bin_dir)
+            repo = root / "repo"
+            nested = repo / "nested"
+            nested.mkdir(parents=True)
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "review",
+                "the auth flow",
+                env={"PATH": str(bin_dir) + os.pathsep + os.environ["PATH"]},
+                cwd=nested,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(f"cwd=<{nested.resolve()}>", result.stdout)
+        self.assertIn("notice=<1> update=<1>", result.stdout)
+        self.assertIn("arg=<--no-update>", result.stdout)
+        self.assertIn("arg=<--model>\narg=<fugu>", result.stdout)
+        self.assertIn('arg=<model_reasoning_effort="high">', result.stdout)
+        self.assertIn("arg=<--sandbox>\narg=<read-only>", result.stdout)
+        self.assertIn("arg=<--ask-for-approval>\narg=<never>", result.stdout)
+        self.assertIn(f"arg=<--cd>\narg=<{repo.resolve()}>", result.stdout)
+        self.assertIn("arg=<exec>", result.stdout)
+        self.assertIn("arg=<--ephemeral>", result.stdout)
+        self.assertIn("arg=<->", result.stdout)
+        self.assertIn("prompt=<Review task: review the auth flow>", result.stdout)
+        self.assertIn("prompt=<do not ask the caller to paste files", result.stdout)
+        self.assertNotIn("arg=<fugu-ultra>", result.stdout)
+
+    def test_fugu_profiles_select_regular_deep_or_ultra_high(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_capture_fake(bin_dir)
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            env = {"PATH": str(bin_dir) + os.pathsep + os.environ["PATH"]}
+            deep = run_script("run_fugu.sh", "--deep", "review parser", env=env, cwd=repo)
+            ultra = run_script("run_fugu.sh", "--ultra", "review parser", env=env, cwd=repo)
+
+        self.assertEqual(deep.returncode, 0, deep.stderr)
+        self.assertIn("arg=<--model>\narg=<fugu>", deep.stdout)
+        self.assertIn('arg=<model_reasoning_effort="xhigh">', deep.stdout)
+        self.assertEqual(ultra.returncode, 0, ultra.stderr)
+        self.assertIn("arg=<--model>\narg=<fugu-ultra>", ultra.stdout)
+        self.assertIn('arg=<model_reasoning_effort="high">', ultra.stdout)
+
+    def test_fugu_legacy_file_is_focus_hint_not_copied_content(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_capture_fake(bin_dir)
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            target = repo / "review me.md"
+            target.write_text("SENSITIVE_SENTINEL_MUST_NOT_BE_COPIED\n", encoding="utf-8")
+            result = run_script(
+                "run_fugu.sh",
+                str(target),
+                env={"PATH": str(bin_dir) + os.pathsep + os.environ["PATH"]},
+                cwd=repo,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(f"prompt=<Review task: Review {target.resolve()}", result.stdout)
+        self.assertNotIn("SENSITIVE_SENTINEL_MUST_NOT_BE_COPIED", result.stdout)
+
+    def test_fugu_enforces_finite_hard_wall_clock(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            sleeper = bin_dir / "codex-fugu"
+            sleeper.write_text("#!/bin/sh\nsleep 5\n", encoding="utf-8")
+            sleeper.chmod(0o755)
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            env = {
+                "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                "SAKANA_FUGU_MAX_WAIT_SECONDS": "0.05",
+            }
+            started = time.monotonic()
+            timed_out = run_script("run_fugu.sh", "review", env=env, cwd=repo)
+            elapsed = time.monotonic() - started
+            env["SAKANA_FUGU_MAX_WAIT_SECONDS"] = "nan"
+            non_finite = run_script("run_fugu.sh", "review", env=env, cwd=repo)
+
+        self.assertEqual(timed_out.returncode, 124, timed_out.stderr)
+        self.assertLess(elapsed, 2)
+        self.assertIn("terminating it", timed_out.stderr)
+        self.assertNotEqual(non_finite.returncode, 0)
+        self.assertIn("must be finite and positive", non_finite.stderr)
+
     def test_grok_uses_headless_checked_non_bypass_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             bin_dir = Path(tmpdir)
@@ -126,122 +245,6 @@ class LocalCliRunnerTests(unittest.TestCase):
 
 
 class RemoteApiRunnerTests(unittest.TestCase):
-    def test_fugu_streams_direct_ultra_max_file_review(self) -> None:
-        def responder(method, path, _payload):
-            self.assertEqual((method, path), ("POST", "/responses"))
-            return 200, (
-                'data: {"type":"response.output_text.delta","delta":"No actionable "}\n\n'
-                'data: {"type":"response.output_text.delta","delta":"findings"}\n\n'
-                "data: [DONE]\n\n"
-            )
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo = Path(tmpdir) / "repo"
-            repo.mkdir()
-            target = repo / "review me.md"
-            target.write_text("important\n", encoding="utf-8")
-            with CaptureServer(responder) as server:
-                result = run_script(
-                    "run_fugu.sh",
-                    str(target),
-                    env={
-                        "SAKANA_API_KEY": "test-sakana-key",
-                        "SAKANA_API_BASE": server.base_url,
-                        "SAKANA_FUGU_MAX_WAIT_SECONDS": "5",
-                        "SAKANA_FUGU_IDLE_TIMEOUT_SECONDS": "5",
-                        "SAKANA_FUGU_RETRIES": "0",
-                        "SAKANA_FUGU_RAW_OUTPUT": str(repo),
-                    },
-                    cwd=repo,
-                )
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.strip(), "No actionable findings")
-        self.assertIn("could not write Sakana Fugu raw output", result.stderr)
-        request = server.requests[0]
-        self.assertEqual(request[2]["authorization"], "Bearer test-sakana-key")
-        self.assertEqual(request[3]["model"], "fugu-ultra")
-        self.assertEqual(request[3]["reasoning"], {"effort": "max"})
-        self.assertEqual(request[3]["max_output_tokens"], 16384)
-        self.assertTrue(request[3]["stream"])
-        self.assertIn(str(target), request[3]["input"])
-        self.assertIn("important", request[3]["input"])
-        self.assertIn("read-only audit", request[3]["input"])
-
-    def test_fugu_rejects_non_finite_timeout_overrides(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            target = Path(tmpdir) / "review.md"
-            target.write_text("important\n", encoding="utf-8")
-            result = run_script(
-                "run_fugu.sh",
-                str(target),
-                env={
-                    "SAKANA_API_KEY": "test-sakana-key",
-                    "SAKANA_FUGU_MAX_WAIT_SECONDS": "nan",
-                },
-                cwd=Path(tmpdir),
-            )
-
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("timeout limits must be finite and positive", result.stderr)
-
-    def test_fugu_preserves_http_error_diagnostics(self) -> None:
-        def responder(method, path, _payload):
-            self.assertEqual((method, path), ("POST", "/responses"))
-            return 400, {"error": "bad request shape"}
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo = Path(tmpdir)
-            target = repo / "review.md"
-            raw_output = repo / "raw-error.json"
-            target.write_text("important\n", encoding="utf-8")
-            with CaptureServer(responder) as server:
-                result = run_script(
-                    "run_fugu.sh",
-                    str(target),
-                    env={
-                        "SAKANA_API_KEY": "test-sakana-key",
-                        "SAKANA_API_BASE": server.base_url,
-                        "SAKANA_FUGU_MAX_WAIT_SECONDS": "5",
-                        "SAKANA_FUGU_RETRIES": "0",
-                        "SAKANA_FUGU_RAW_OUTPUT": str(raw_output),
-                    },
-                    cwd=repo,
-                )
-            raw = json.loads(raw_output.read_text(encoding="utf-8"))
-
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("bad request shape", result.stderr)
-        self.assertEqual(raw[0]["status"], 400)
-        self.assertIn("bad request shape", raw[0]["body"])
-
-    def test_fugu_raw_path_expansion_failure_is_best_effort(self) -> None:
-        def responder(_method, _path, _payload):
-            return 200, (
-                'data: {"type":"response.output_text.delta","delta":"No actionable findings"}\n\n'
-                "data: [DONE]\n\n"
-            )
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            target = Path(tmpdir) / "review.md"
-            target.write_text("important\n", encoding="utf-8")
-            with CaptureServer(responder) as server:
-                result = run_script(
-                    "run_fugu.sh",
-                    str(target),
-                    env={
-                        "SAKANA_API_KEY": "test-sakana-key",
-                        "SAKANA_API_BASE": server.base_url,
-                        "SAKANA_FUGU_RETRIES": "0",
-                        "SAKANA_FUGU_RAW_OUTPUT": "~elves-user-that-does-not-exist/review.json",
-                    },
-                    cwd=Path(tmpdir),
-                )
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.strip(), "No actionable findings")
-        self.assertIn("could not write Sakana Fugu raw output", result.stderr)
-
     def test_manus_uses_v2_private_max_task_contract(self) -> None:
         def responder(method, path, _payload):
             if method == "POST" and path == "/task.create":
