@@ -56,9 +56,9 @@ projection, tracked-source isolation, and Claude/Codex parity.
 
 ## Master Acceptance
 
-- [ ] [M-A1] The canonical repository verifier passes on the exact pull-request head against the immutable pull-request base.
-- [ ] [M-A2] Independent cumulative and revision-delta review reports no unresolved actionable findings.
-- [ ] [M-A3] The pull request is mergeable by a regular merge commit with current required checks green, an unchanged base, and a clean exact-head worktree.
+- [x] [M-A1] The canonical repository verifier passes on the exact pull-request head against the immutable pull-request base.
+- [x] [M-A2] Independent cumulative and revision-delta review reports no unresolved actionable findings.
+- [x] [M-A3] The pull request is mergeable by a regular merge commit with current required checks green, an unchanged base, and a clean exact-head worktree.
 
 ## Non-negotiables
 

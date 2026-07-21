@@ -51,20 +51,20 @@
     {
       "id": "M-A1",
       "criterion": "The canonical repository verifier passes on the exact pull-request head against the immutable pull-request base.",
-      "met": false,
-      "evidence": ""
+      "met": true,
+      "evidence": "Strict verifier passed at Close head 11c90c6 against base d910700: 1333 tests in 244.113s plus compile, shell, JSON, consistency, release-development, public API, links, secrets, installed bundle smokes, cumulative diff, and preflight evidence."
     },
     {
       "id": "M-A2",
       "criterion": "Independent cumulative and revision-delta review reports no unresolved actionable findings.",
-      "met": false,
-      "evidence": ""
+      "met": true,
+      "evidence": "Cumulative provider reviews were resolved across the Review commits; the final production fugu-ultra/high exact-session revision review returned No actionable findings."
     },
     {
       "id": "M-A3",
       "criterion": "The pull request is mergeable by a regular merge commit with current required checks green, an unchanged base, and a clean exact-head worktree.",
-      "met": false,
-      "evidence": ""
+      "met": true,
+      "evidence": "PR #102 reported MERGEABLE at 11c90c6; all seven GitHub checks passed, origin/main remained d9107004a447453c1c91430ea47a1dd820ffbd99, and the exact Close worktree was clean."
     }
   ]
 }
