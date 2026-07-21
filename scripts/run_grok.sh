@@ -15,6 +15,7 @@ if ! command -v grok >/dev/null 2>&1; then
 fi
 
 exec python3 - "$PROMPT_CONTENT" "$PWD" "$SCRIPT_DIR" <<'PY'
+import ast
 import json
 import os
 from pathlib import Path
@@ -22,7 +23,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import tomllib
 
 
 prompt = sys.argv[1]
@@ -71,11 +71,22 @@ with tempfile.TemporaryDirectory(prefix="elves-grok-shortcut-") as raw_root:
     config_source = source_home / "config.toml"
     try:
         if config_source.is_file() and not config_source.is_symlink():
-            config = tomllib.loads(config_source.read_text(encoding="utf-8"))
-            configured = (config.get("models") or {}).get("default")
-            if isinstance(configured, str) and configured.strip():
-                model_default = configured.strip()
-    except (OSError, UnicodeError, tomllib.TOMLDecodeError):
+            current_section = ""
+            for raw in config_source.read_text(encoding="utf-8").splitlines():
+                line = raw.strip()
+                if line.startswith("[") and line.endswith("]"):
+                    current_section = line[1:-1].strip()
+                    continue
+                if current_section != "models" or "=" not in line or line.startswith("#"):
+                    continue
+                key, raw_value = line.split("=", 1)
+                if key.strip() != "default":
+                    continue
+                configured = ast.literal_eval(raw_value.strip())
+                if isinstance(configured, str) and configured.strip():
+                    model_default = configured.strip()
+                break
+    except (OSError, UnicodeError, SyntaxError, ValueError):
         pass
     if model_default:
         (grok_home / "config.toml").write_text(

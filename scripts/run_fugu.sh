@@ -107,6 +107,7 @@ fi
 
 TODAY=$(date +%F)
 exec python3 - "$MAX_WAIT" "$REPO_ROOT" "$MODEL" "$EFFORT" "$TASK" "$TODAY" "$SCRIPT_DIR" <<'PY'
+import ast
 import json
 import math
 import os
@@ -116,7 +117,6 @@ import shutil
 import stat
 import subprocess
 import sys
-import tomllib
 
 
 try:
@@ -194,6 +194,33 @@ def dotenv_value(path: Path, name: str) -> str:
         if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
             value = value[1:-1]
         return value
+    return ""
+
+
+def toml_string(path: Path, key: str, *, section: str | None = None) -> str:
+    """Read one quoted TOML string without requiring Python 3.11 tomllib."""
+    if not secure_regular(path, max_bytes=256 * 1024):
+        return ""
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeError):
+        return ""
+    current: str | None = None
+    for raw in lines:
+        line = raw.strip()
+        if line.startswith("[") and line.endswith("]"):
+            current = line[1:-1].strip()
+            continue
+        if current != section or "=" not in line or line.startswith("#"):
+            continue
+        candidate_key, raw_value = line.split("=", 1)
+        if candidate_key.strip() != key:
+            continue
+        try:
+            value = ast.literal_eval(raw_value.strip())
+        except (SyntaxError, ValueError):
+            return ""
+        return value if isinstance(value, str) else ""
     return ""
 
 
@@ -288,16 +315,11 @@ try:
 
         catalog_source = source_codex_home / "fugu.json"
         profile_source = source_codex_home / "fugu.config.toml"
-        if secure_regular(profile_source, max_bytes=256 * 1024):
-            try:
-                configured = tomllib.loads(profile_source.read_text(encoding="utf-8"))
-                configured_catalog = configured.get("model_catalog_json")
-                if isinstance(configured_catalog, str) and configured_catalog:
-                    candidate = Path(configured_catalog).expanduser()
-                    if secure_regular(candidate):
-                        catalog_source = candidate
-            except (OSError, UnicodeError, tomllib.TOMLDecodeError):
-                pass
+        configured_catalog = toml_string(profile_source, "model_catalog_json")
+        if configured_catalog:
+            candidate = Path(configured_catalog).expanduser()
+            if secure_regular(candidate):
+                catalog_source = candidate
         catalog_line = ""
         if secure_regular(catalog_source):
             isolated_catalog = codex_home / "fugu.json"
