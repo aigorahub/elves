@@ -8,9 +8,12 @@ All notable changes to the Elves skill are documented here.
 
 - Add installed runner scripts and Claude Code aliases for `/fugu`, `/manus`, `/grok`, and
   `/devin`, with host-honest `$elves …` / natural-language equivalents for Codex.
-- Route Sakana review through the official project-aware `codex-fugu` CLI in a bounded, ephemeral,
-  read-only session: regular `fugu/high` by default, `fugu/xhigh` with `--deep`, and
-  `fugu-ultra/high` with `--ultra`. Use the Manus v2 task API, documented headless Grok CLI, and
+- Route Sakana review through the official project-aware `codex-fugu` CLI in a bounded, read-only
+  session: regular `fugu/high` by default, `fugu/xhigh` with `--deep`, and `fugu-ultra/high` with
+  `--ultra`. Keep regular/deep ephemeral; give Ultra compact evidence and a bounded exact-session
+  synthesis phase so it returns a verdict without guessing “last” state, while keeping all raw
+  events and session state inside the disposable lane. Use the Manus v2 task API, documented
+  headless Grok CLI, and
   official Devin sessions API instead of homepage URLs, unbounded agent loops, or shell-built JSON.
 - Add Cobbler-managed Manus research rosters: `--wide` requests native Wide Research and
   reconciles structured one-result-per-roster-item coverage; missing or duplicated items fall back

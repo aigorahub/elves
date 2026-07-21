@@ -160,6 +160,22 @@ class LocalCliRunnerTests(unittest.TestCase):
         binary = root / "codex-fugu"
         binary.write_text(
             "#!/bin/sh\n"
+            "OUTPUT_FILE=\n"
+            "JSON_MODE=0\n"
+            "PREVIOUS=\n"
+            "for ARG in \"$@\"; do\n"
+            "  if [ \"$PREVIOUS\" = \"--output-last-message\" ] || [ \"$PREVIOUS\" = \"-o\" ]; then OUTPUT_FILE=$ARG; fi\n"
+            "  if [ \"$ARG\" = \"--json\" ]; then JSON_MODE=1; fi\n"
+            "  PREVIOUS=$ARG\n"
+            "done\n"
+            "if [ \"$JSON_MODE\" = 1 ]; then\n"
+            "  printf '{\"type\":\"thread.started\",\"thread_id\":\"019f0000-0000-7000-8000-000000000001\"}\\n'\n"
+            "  {\n"
+            "    printf 'No actionable findings\\n'\n"
+            "    printf 'arg=<%s>\\n' \"$@\"\n"
+            "  } > \"$OUTPUT_FILE\"\n"
+            "  exit 0\n"
+            "fi\n"
             "printf 'cwd=<%s>\\n' \"$PWD\"\n"
             "printf 'notice=<%s> update=<%s>\\n' \"$CODEX_FUGU_NO_NOTICE\" \"$CODEX_FUGU_NO_UPDATE\"\n"
             "printf 'unrelated-secret=<%s>\\n' \"${AWS_SECRET_ACCESS_KEY:-}\"\n"
@@ -178,6 +194,83 @@ class LocalCliRunnerTests(unittest.TestCase):
             "while IFS= read -r line || [ -n \"$line\" ]; do \n"
             "  printf 'prompt=<%s>\\n' \"$line\"\n"
             "done\n",
+            encoding="utf-8",
+        )
+        binary.chmod(0o755)
+        return binary
+
+    def make_fugu_staged_fake(self, root: Path) -> Path:
+        binary = root / "codex-fugu"
+        binary.write_text(
+            "#!/bin/sh\n"
+            "OUTPUT_FILE=\n"
+            "IS_RESUME=0\n"
+            "PREVIOUS=\n"
+            "for ARG in \"$@\"; do\n"
+            "  if [ \"$PREVIOUS\" = \"--output-last-message\" ] || [ \"$PREVIOUS\" = \"-o\" ]; then OUTPUT_FILE=$ARG; fi\n"
+            "  if [ \"$ARG\" = \"resume\" ]; then IS_RESUME=1; fi\n"
+            "  PREVIOUS=$ARG\n"
+            "done\n"
+            "if [ \"$IS_RESUME\" = 1 ]; then\n"
+            "  {\n"
+            "    printf 'No actionable findings\\n'\n"
+            "    printf 'resume-arg=<%s>\\n' \"$@\"\n"
+            "    while IFS= read -r LINE || [ -n \"$LINE\" ]; do printf 'synthesis=<%s>\\n' \"$LINE\"; done\n"
+            "  } > \"$OUTPUT_FILE\"\n"
+            "  exit 0\n"
+            "fi\n"
+            "while IFS= read -r LINE || [ -n \"$LINE\" ]; do :; done\n"
+            "printf '{\"type\":\"thread.started\",\"thread_id\":\"019f0000-0000-7000-8000-000000000002\"}\\n'\n"
+            "# External sandbox wrappers may normalize our intentional cutoff to status 1.\n"
+            "trap 'exit 1' INT TERM\n"
+            "while :; do sleep 1; done\n",
+            encoding="utf-8",
+        )
+        binary.chmod(0o755)
+        return binary
+
+    def make_fugu_stale_resume_fake(self, root: Path) -> Path:
+        binary = root / "codex-fugu"
+        binary.write_text(
+            "#!/bin/sh\n"
+            "OUTPUT_FILE=\n"
+            "IS_RESUME=0\n"
+            "PREVIOUS=\n"
+            "for ARG in \"$@\"; do\n"
+            "  if [ \"$PREVIOUS\" = \"--output-last-message\" ]; then OUTPUT_FILE=$ARG; fi\n"
+            "  if [ \"$ARG\" = \"resume\" ]; then IS_RESUME=1; fi\n"
+            "  PREVIOUS=$ARG\n"
+            "done\n"
+            "while IFS= read -r LINE || [ -n \"$LINE\" ]; do :; done\n"
+            "if [ \"$IS_RESUME\" = 1 ]; then\n"
+            "  printf '{\"type\":\"turn.completed\"}\\n'\n"
+            "  exit 0\n"
+            "fi\n"
+            "printf 'STALE_EXPLORATION_MESSAGE\\n' > \"$OUTPUT_FILE\"\n"
+            "printf '{\"type\":\"thread.started\",\"thread_id\":\"019f0000-0000-7000-8000-000000000003\"}\\n'\n"
+            "printf '{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"STALE_EVENT_MESSAGE\"}}\\n'\n"
+            "trap 'exit 1' INT TERM\n"
+            "while :; do sleep 1; done\n",
+            encoding="utf-8",
+        )
+        binary.chmod(0o755)
+        return binary
+
+    def make_fugu_resume_timeout_fake(self, root: Path) -> Path:
+        binary = root / "codex-fugu"
+        binary.write_text(
+            "#!/bin/sh\n"
+            "IS_RESUME=0\n"
+            "for ARG in \"$@\"; do [ \"$ARG\" = \"resume\" ] && IS_RESUME=1; done\n"
+            "while IFS= read -r LINE || [ -n \"$LINE\" ]; do :; done\n"
+            "if [ \"$IS_RESUME\" = 1 ]; then\n"
+            "  trap '' INT TERM\n"
+            "  sleep 5\n"
+            "  exit 0\n"
+            "fi\n"
+            "printf '{\"type\":\"thread.started\",\"thread_id\":\"019f0000-0000-7000-8000-000000000004\"}\\n'\n"
+            "trap 'exit 1' INT TERM\n"
+            "while :; do sleep 1; done\n",
             encoding="utf-8",
         )
         binary.chmod(0o755)
@@ -252,6 +345,135 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertEqual(ultra.returncode, 0, ultra.stderr)
         self.assertIn("arg=<--model>\narg=<fugu-ultra>", ultra.stdout)
         self.assertIn('arg=<model_reasoning_effort="high">', ultra.stdout)
+        self.assertIn("arg=<--json>", ultra.stdout)
+        self.assertIn("arg=<--output-last-message>", ultra.stdout)
+        self.assertNotIn("arg=<--ephemeral>", ultra.stdout)
+        self.assertIn("Fugu Ultra exploration phase", ultra.stderr)
+
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    def test_fugu_ultra_resumes_exact_session_for_bounded_synthesis(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_staged_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "--ultra",
+                "review exact resume",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "SAKANA_API_KEY": "test-sakana-key",
+                    "SAKANA_FUGU_MAX_WAIT_SECONDS": "3",
+                    "SAKANA_FUGU_ULTRA_EXPLORE_SECONDS": "0.2",
+                },
+                cwd=repo,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("No actionable findings", result.stdout)
+        self.assertIn("resume-arg=<resume>", result.stdout)
+        self.assertIn(
+            "resume-arg=<019f0000-0000-7000-8000-000000000002>",
+            result.stdout,
+        )
+        self.assertIn("synthesis=<The bounded exploration phase is over", result.stdout)
+        self.assertIn("synthesis=<run commands, or inspect more files", result.stdout)
+        self.assertIn("Fugu Ultra exploration phase: up to 0.2s", result.stderr)
+        self.assertIn("Fugu Ultra exact-session synthesis phase", result.stderr)
+        self.assertNotIn("--last", result.stdout + result.stderr)
+
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    def test_fugu_ultra_rejects_exploration_without_synthesis_reserve(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_capture_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "--ultra",
+                "review invalid budget",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "SAKANA_API_KEY": "test-sakana-key",
+                    "SAKANA_FUGU_MAX_WAIT_SECONDS": "1",
+                    "SAKANA_FUGU_ULTRA_EXPLORE_SECONDS": "1",
+                },
+                cwd=repo,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("must be finite, positive, and at most", result.stderr)
+        self.assertIn("cleanup and synthesis retain reserved wall time", result.stderr)
+
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    def test_fugu_ultra_never_emits_stale_exploration_message_after_resume(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_stale_resume_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "--ultra",
+                "review stale output",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "SAKANA_API_KEY": "test-sakana-key",
+                    "SAKANA_FUGU_MAX_WAIT_SECONDS": "3",
+                    "SAKANA_FUGU_ULTRA_EXPLORE_SECONDS": "0.2",
+                },
+                cwd=repo,
+            )
+
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertEqual(result.stdout, "")
+        self.assertNotIn("STALE_EXPLORATION_MESSAGE", result.stdout)
+        self.assertNotIn("STALE_EVENT_MESSAGE", result.stdout)
+        self.assertIn("completed without a final review message", result.stderr)
+
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    def test_fugu_ultra_resume_timeout_includes_bounded_shutdown(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_resume_timeout_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            started = time.monotonic()
+            result = run_script(
+                "run_fugu.sh",
+                "--ultra",
+                "review bounded timeout",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "SAKANA_API_KEY": "test-sakana-key",
+                    "SAKANA_FUGU_MAX_WAIT_SECONDS": "1.2",
+                    "SAKANA_FUGU_ULTRA_EXPLORE_SECONDS": "0.25",
+                },
+                cwd=repo,
+            )
+            elapsed = time.monotonic() - started
+
+        self.assertEqual(result.returncode, 124, result.stderr)
+        self.assertLess(elapsed, 2)
+        self.assertIn("staged wall budget", result.stderr)
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
     def test_fugu_diff_evidence_omits_snapshot_excluded_paths(self) -> None:

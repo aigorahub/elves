@@ -26,16 +26,21 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
   Sakana grant, and a Codex shell policy that does not forward that grant to model-run commands.
   Because macOS forbids nested `sandbox-exec`, it uses Codex's documented externally-sandboxed mode
   only after the required outer boundary is active; that flag cannot bypass Elves' host-read and
-  snapshot-write denials, which are regression-tested independently. It also uses an ephemeral
-  session, closed interactive input after the prompt, disabled launcher notices/updates, and a hard
-  process-group wall-clock limit. If the OS read sandbox cannot be proven, the shortcut fails closed. The
-  supported profiles are:
+  snapshot-write denials, which are regression-tested independently. Regular and deep reviews use
+  ephemeral one-shot sessions. Ultra instead uses a resumable session confined to the disposable
+  isolated CODEX_HOME: it supplies compact host evidence, captures the exact `thread.started` id,
+  and reserves part of the hard wall limit for a no-more-tools synthesis turn on that exact id when
+  exploration does not finish first. It never uses ambiguous `--last` state; raw JSON events, the
+  final-message file, and resumable session state are destroyed with the lane. Every profile closes
+  interactive input after each prompt, disables launcher notices/updates, and has a hard
+  process-group wall-clock limit. If the OS read sandbox cannot be proven, the shortcut fails
+  closed. The supported profiles are:
 
   | Shortcut | Model / effort | Default wall limit | Use |
   |---|---|---:|---|
   | `/fugu <task>` | `fugu` / `high` | 10 minutes | routine repository review |
   | `/fugu --deep <task>` | `fugu` / `xhigh` | 20 minutes | harder correctness or security review |
-  | `/fugu --ultra <task>` | `fugu-ultra` / `high` | 30 minutes | compact, high-stakes final audit |
+  | `/fugu --ultra <task>` | `fugu-ultra` / `high` | 30 minutes total; at most 20 minutes exploring by default | compact, high-stakes final audit with a reserved synthesis phase |
 
   Sakana documents `max` as a compatibility alias for `xhigh`, not a separate effort level. The
   public shortcut therefore uses `xhigh` explicitly and does not market an Ultra/max lane. A
@@ -156,7 +161,10 @@ Relevant official surfaces: [Wide Research behavior](https://help.manus.im/en/ar
 [API rate limits](https://open.manus.im/docs/v2/rate-limits).
 
 `SAKANA_FUGU_MAX_WAIT_SECONDS` can replace a profile's wall limit with another finite, positive
-number of seconds. A timeout terminates the entire launcher process group and returns exit 124.
+number of seconds. For Ultra only, `SAKANA_FUGU_ULTRA_EXPLORE_SECONDS` can replace the exploration
+phase, but it must be finite, positive, and low enough that the dynamically reported cleanup and
+synthesis reserves still fit inside the total. A timeout terminates the entire launcher process
+group and returns exit 124.
 The runner intentionally does not use a direct API fallback: `codex-fugu` owns Sakana transport,
 stream resilience, project instructions, and model-catalog compatibility. Official launcher
 installation and command details are at

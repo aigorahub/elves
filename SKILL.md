@@ -209,14 +209,18 @@ Elves skill root**, keep the target repository as the working directory, validat
 required capability, then execute it without an extra confirmation prompt:
 
 - `/fugu [--deep|--ultra] <task>` or `fugu review <task>` →
-  `scripts/run_fugu.sh [--deep|--ultra] <task>` for a bounded, ephemeral, read-only
+  `scripts/run_fugu.sh [--deep|--ultra] <task>` for a bounded, read-only
   `codex-fugu` repository review over a tracked-only snapshot and required kernel filesystem
   sandbox. Host-generated diff evidence is restricted to paths that survived the same snapshot
   policy, and the Linux boundary omits procfs so model-directed commands cannot inspect the
   credential-bearing parent environment. Codex runs in its documented externally-sandboxed mode
   so macOS does not attempt a forbidden nested sandbox; the already-proven outer boundary remains
   the read/write authority. The default is regular `fugu/high`; `--deep` selects `fugu/xhigh`, and
-  `--ultra` selects `fugu-ultra/high`.
+  `--ultra` selects `fugu-ultra/high`. Regular and deep are ephemeral one-shot sessions. Ultra is
+  a compact high-value route: it starts with bounded host evidence, reserves part of the total wall
+  budget for synthesis, and if needed resumes the exact captured session id with further tools
+  forbidden. It never guesses a “last” session, and its raw events and resumable state remain only
+  inside the disposable isolated lane.
 - `/manus <topic>` → `scripts/run_manus.sh <topic>` for one private, bounded Manus deep-web task.
   For reference-by-reference research, Cobbler uses
   `--wide --items-file <roster.json> [--file <source>] <goal>`: request native Wide Research,

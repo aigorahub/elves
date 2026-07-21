@@ -14,6 +14,8 @@ Load the installed `elves` skill's **Provider shortcut protocols** and
 `references/provider-shortcuts.md`. Resolve `scripts/run_fugu.sh` from the active Elves skill root,
 keep the target repository as the working directory, pass through the optional profile and task,
 and run it. The runner uses the official `codex-fugu` launcher with project access, a read-only
-sandbox, an ephemeral session, closed interactive input, and a hard wall-clock bound. It selects
-regular `fugu/high` by default, `fugu/xhigh` with `--deep`, or `fugu-ultra/high` with `--ultra`.
+sandbox, closed interactive input, and a hard wall-clock bound. It selects regular `fugu/high` by
+default, `fugu/xhigh` with `--deep`, or `fugu-ultra/high` with `--ultra`. Regular/deep sessions are
+ephemeral; Ultra uses compact evidence and exact-session staged synthesis, with its state confined
+to the disposable isolated lane.
 Do not replace it with an improvised API request or remove its sandbox and timeout controls.

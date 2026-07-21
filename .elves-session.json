@@ -1,0 +1,70 @@
+{
+  "run_id": "provider-shortcuts-pr102-2026-07-21",
+  "branch": "codex/provider-shortcuts",
+  "start_head": "d9107004a447453c1c91430ea47a1dd820ffbd99",
+  "plan_path": "docs/plans/provider-shortcuts.md",
+  "batches": [
+    {
+      "id": "B1",
+      "status": "complete",
+      "acceptance": [
+        {
+          "id": "B1-A1",
+          "criterion": "Claude and Codex expose host-honest Fugu, Manus, Grok, and Devin shortcuts that resolve installed runners without inventing Codex slash commands.",
+          "met": true,
+          "evidence": "Installed aliases, SKILL.md, AGENTS.md, host-parity docs, sync tests, and installed-bundle smokes define host-specific invocation surfaces."
+        },
+        {
+          "id": "B1-A2",
+          "criterion": "Fugu regular, deep, and Ultra profiles use official codex-fugu with tracked-source filesystem and credential isolation; Ultra completes through bounded exact-session synthesis.",
+          "met": true,
+          "evidence": "39 provider tests pass; two production fugu-ultra/high runs used real JSON thread events and exact UUID resume, and the revision review returned No actionable findings."
+        },
+        {
+          "id": "B1-A3",
+          "criterion": "Manus ordinary, Wide-first, deterministic fan-out, attachment, and duplicate-safe resume flows use official bounded private v2 tasks with exact roster coverage.",
+          "met": true,
+          "evidence": "Hermetic Manus transport tests cover private tasks, Wide reconciliation, fan-out, uploads, waiting, timeouts, failure repair, durable manifests, and duplicate-safe resume."
+        },
+        {
+          "id": "B1-A4",
+          "criterion": "Grok and Devin use documented CLI or API surfaces with bounded non-bypass execution and explicit secret and knowledge constraints.",
+          "met": true,
+          "evidence": "Provider tests prove Grok non-bypass read-only launch and key scrubbing plus bounded Devin official-session creation, polling, and empty secret/knowledge grants."
+        },
+        {
+          "id": "B1-A5",
+          "criterion": "Hermetic shortcut, isolation, installation, and supported-Python tests cover success, failure, timeout, and stale-state paths.",
+          "met": true,
+          "evidence": "39 provider tests and 96 dispatch/storage isolation tests pass locally; the new Ultra tests cover exact resume, normalized cutoff status, stale output, invalid reserve, and bounded resume timeout."
+        },
+        {
+          "id": "B1-A6",
+          "criterion": "README, guide, changelog, SKILL, AGENTS, host-parity, aliases, and shortcut reference remain aligned for Claude and Codex.",
+          "met": true,
+          "evidence": "Repository consistency check passes with provider semantics aligned across every operator-facing surface."
+        }
+      ]
+    }
+  ],
+  "master_acceptance": [
+    {
+      "id": "M-A1",
+      "criterion": "The canonical repository verifier passes on the exact pull-request head against the immutable pull-request base.",
+      "met": false,
+      "evidence": ""
+    },
+    {
+      "id": "M-A2",
+      "criterion": "Independent cumulative and revision-delta review reports no unresolved actionable findings.",
+      "met": false,
+      "evidence": ""
+    },
+    {
+      "id": "M-A3",
+      "criterion": "The pull request is mergeable by a regular merge commit with current required checks green, an unchanged base, and a clean exact-head worktree.",
+      "met": false,
+      "evidence": ""
+    }
+  ]
+}

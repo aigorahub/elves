@@ -66,10 +66,13 @@ Codex users should not need or expect a top-level `/cobbler` command.
 Focused provider tasks do not require a full Elves run. Claude Code gets
 `/fugu [--deep|--ultra] <task>`,
 `/manus <topic>`, `/grok <instructions>`, and `/devin <instructions>`; Codex uses the equivalent
-`$elves fugu|manus|grok|devin …` forms or natural language. Fugu launches an ephemeral,
+`$elves fugu|manus|grok|devin …` forms or natural language. Fugu launches a bounded,
 project-aware `codex-fugu` agent against a tracked-only snapshot in a required kernel read
-sandbox: regular `fugu/high` by default,
-`fugu/xhigh` with `--deep`, or `fugu-ultra/high` with `--ultra`. Codex's documented
+sandbox: regular `fugu/high` by default, `fugu/xhigh` with `--deep`, or
+`fugu-ultra/high` with `--ultra`. Regular and deep reviews are ephemeral one-shot sessions;
+Ultra receives compact evidence and, if exploration consumes its reserved phase, resumes the exact
+same isolated session with further tool use forbidden so the remaining wall budget produces a
+verdict. Session state and raw events never leave the disposable lane. Codex's documented
 externally-sandboxed mode avoids an invalid nested macOS sandbox; Elves' required outer boundary
 still denies host reads and snapshot writes. Manus supports a normal private
 task plus Cobbler-managed `--wide` and deterministic `--fanout` rosters, explicit `--file`

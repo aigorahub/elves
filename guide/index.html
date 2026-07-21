@@ -657,7 +657,7 @@ python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup</code></pre>
           In Codex, use the matching <code>$elves fugu|manus|grok|devin …</code> form or ask in
           natural language; those top-level slash aliases are Claude-specific.</p>
         <ul>
-          <li><strong>Fugu</strong> launches a bounded, ephemeral, project-aware
+          <li><strong>Fugu</strong> launches a bounded, project-aware
             <code>codex-fugu</code> review over a tracked-only snapshot in a required kernel
             filesystem sandbox. Generated diff evidence is filtered by the same snapshot policy,
             including safe deletion patches while suppressing deleted credential paths.
@@ -669,7 +669,11 @@ python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup</code></pre>
             It uses regular
             <code>fugu/high</code> by default, <code>fugu/xhigh</code> with
             <code>--deep</code>, or <code>fugu-ultra/high</code> with
-            <code>--ultra</code>.</li>
+            <code>--ultra</code>. Regular and deep reviews are ephemeral one-shot sessions. Ultra
+            receives compact evidence and reserves part of its total wall limit for synthesis; if
+            exploration uses its phase, Elves resumes the exact captured session with further tools
+            forbidden. It never guesses the “last” session, and its state and raw events remain only
+            in the disposable lane.</li>
           <li><strong>Manus</strong> creates private, bounded deep-web research and needs
             <code>MANUS_API_KEY</code>. To request one worker per paper or reference, use
             <code>/manus --wide --items-file references.json &lt;goal&gt;</code>. Cobbler requests

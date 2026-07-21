@@ -45,7 +45,8 @@ assume `./scripts` belongs to the target repository and do not execute mappings 
 - Fugu review → `run_fugu.sh [--deep|--ultra] <task>` (project-aware `codex-fugu`, tracked-only
   snapshot and same-policy diff evidence, including safe deletion patches, plus required kernel
   read sandbox with no Linux procfs; Codex external-sandbox mode inside that mandatory boundary;
-  regular `fugu/high` by default, `fugu/xhigh` for `--deep`, `fugu-ultra/high` for `--ultra`)
+  regular `fugu/high` by default, `fugu/xhigh` for `--deep`, `fugu-ultra/high` for `--ultra`;
+  Ultra uses compact evidence and exact-session staged synthesis rather than an unbounded one-shot)
 - Manus research → `run_manus.sh <topic>` for one private bounded task, or
   `run_manus.sh --wide --items-file <roster.json> [--file <source>] <goal>` for Cobbler-managed
   native-Wide-first research with exact coverage repair; use `--fanout` for deterministic
