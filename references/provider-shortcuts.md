@@ -19,7 +19,8 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
 - **Fugu:** requires the official `codex-fugu` launcher and its configured Sakana credentials. The
   runner copies only tracked working-tree files into a disposable snapshot, moves prose agent
   instructions to inert evidence paths, and adds host-generated branch/diff context filtered to
-  paths that survived that same snapshot policy. It then
+  paths that survived that same snapshot policy. Safe tracked deletions are admitted by that policy
+  even though no current file remains, while deleted credential/config paths stay suppressed. It then
   requires Elves' qualified kernel filesystem sandbox (`sandbox-exec` on macOS or `bwrap` on
   Linux), an isolated HOME/CODEX_HOME, an environment containing only runtime names plus the
   Sakana grant, and a Codex shell policy that does not forward that grant to model-run commands.
@@ -46,11 +47,14 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
 - **Grok:** requires the `grok` CLI plus explicit `XAI_API_KEY` (or the legacy
   `GROK_CODE_XAI_API_KEY`). It uses documented headless single-prompt mode, `high`
   reasoning, self-checking, and `dontAsk`, which silently denies unapproved mutations. The runner
-  constructs an isolated HOME/GROK_HOME, projects only the selected named key, and requests a
-  custom profile extending Grok's `strict` kernel sandbox with the repository marked read-only and
-  repository credential-file denies. It writes `permissions.defaultMode: dontAsk` to the isolated
-  Claude-compatible settings (the similarly named CLI flag does not activate this mode) and locks
-  bypass mode off in isolated Grok requirements. Custom-profile application is fail-closed.
+  copies tracked source into a disposable snapshot and requires Elves' qualified outer kernel
+  sandbox, which makes that snapshot read-only independently of Grok's profile merger. It constructs
+  isolated HOME/GROK_HOME state, projects only the selected named key to Grok itself, and selects a
+  dedicated shell that unsets both supported key names before every model-directed terminal command.
+  Grok also runs its custom inner `strict` profile with child network and credential-file denies. The
+  runner writes `permissions.defaultMode: dontAsk` to isolated Claude-compatible settings (the
+  similarly named CLI flag does not activate this mode) and locks bypass mode off in isolated Grok
+  requirements. Both outer and inner sandbox application fail closed.
   Shared-file OAuth is deliberately unsupported by the shortcut: Grok applies the profile to
   provider authentication reads as well as model tools, so a file grant would expose the credential
   and a deny would prevent authentication. It

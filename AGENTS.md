@@ -43,16 +43,17 @@ For explicit provider-shortcut intent, follow SKILL.md **Provider shortcut proto
 assume `./scripts` belongs to the target repository and do not execute mappings blindly:
 
 - Fugu review → `run_fugu.sh [--deep|--ultra] <task>` (project-aware `codex-fugu`, tracked-only
-  snapshot and same-policy diff evidence plus required kernel read sandbox; regular `fugu/high` by
-  default, `fugu/xhigh` for `--deep`, `fugu-ultra/high` for `--ultra`)
+  snapshot and same-policy diff evidence, including safe deletion patches, plus required kernel
+  read sandbox; regular `fugu/high` by default, `fugu/xhigh` for `--deep`, `fugu-ultra/high` for
+  `--ultra`)
 - Manus research → `run_manus.sh <topic>` for one private bounded task, or
   `run_manus.sh --wide --items-file <roster.json> [--file <source>] <goal>` for Cobbler-managed
   native-Wide-first research with exact coverage repair; use `--fanout` for deterministic
   one-task-per-item execution and `--resume <manifest>` for duplicate-safe continuation; new
   manifests are reserved before provider uploads
-- Grok Build task → `run_grok.sh <instructions>` (headless, non-bypass permissions, minimal auth
-  projection, isolated `dontAsk` plus bypass lock, fail-closed strict/read-only filesystem sandbox,
-  explicit `XAI_API_KEY`; no shared OAuth file)
+- Grok Build task → `run_grok.sh <instructions>` (headless, non-bypass permissions, disposable
+  tracked-source snapshot in a required outer kernel sandbox, inner `strict`, isolated `dontAsk`
+  plus bypass lock, explicit `XAI_API_KEY`, and a key-scrubbing tool shell; no shared OAuth file)
 - Devin task → `run_devin.sh <instructions>` (remote session, bounded wait, no default stored
   secret or knowledge grants; creation and polling share one hard wall-clock bound)
 

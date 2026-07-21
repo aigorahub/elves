@@ -283,6 +283,35 @@ def _should_exclude(rel: str, *, extra_globs: Sequence[str] = ()) -> bool:
     return False
 
 
+def source_path_allowed_at_original_location(
+    rel: str,
+    *,
+    extra_exclude_globs: Sequence[str] = (),
+) -> bool:
+    """Return whether a tracked path may appear at its original snapshot location.
+
+    This policy-only check deliberately does not require the current worktree
+    entry to exist. Review transports use it for deletion patches, where there
+    is no file left to realize in the snapshot. Snapshot creation still applies
+    its regular-file, symlink, and descriptor checks before copying content.
+    """
+    normalized = str(rel).replace("\\", "/")
+    parts = PurePosixPath(normalized).parts
+    if (
+        not normalized
+        or normalized.startswith("/")
+        or normalized != PurePosixPath(normalized).as_posix()
+        or ".." in parts
+    ):
+        return False
+    patterns = _normalize_extra_exclude_globs(extra_exclude_globs)
+    return not (
+        _should_exclude(normalized, extra_globs=patterns)
+        or _is_executable_agent_config(normalized)
+        or _is_instruction_surface(normalized)
+    )
+
+
 def _is_instruction_surface(rel: str) -> bool:
     rel = PurePosixPath(rel).as_posix()
     path = PurePosixPath(rel)

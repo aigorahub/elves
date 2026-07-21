@@ -134,6 +134,7 @@ sys.path.insert(0, str(script_dir))
 from cobbler_runtime.isolation import (  # noqa: E402
     IsolationSpec,
     isolated_lane,
+    source_path_allowed_at_original_location,
     wrap_argv_with_sandbox,
 )
 from cobbler_runtime.schema import ValidationIssue  # noqa: E402
@@ -308,7 +309,27 @@ def snapshot_source_paths(snapshot: Path) -> set[str]:
 def filtered_diff(allowed: set[str], *range_args: str, limit: int = 6 * 1024 * 1024) -> str:
     """Render patches only for paths present at their policy-approved snapshot location."""
     changed = git_names("diff", "--name-only", "--no-renames", "-z", *range_args)
-    selected = sorted({path for path in changed if path in allowed})
+    deleted = set(
+        git_names(
+            "diff",
+            "--name-only",
+            "--diff-filter=D",
+            "--no-renames",
+            "-z",
+            *range_args,
+        )
+    )
+    selected = sorted(
+        {
+            path
+            for path in changed
+            if path in allowed
+            or (
+                path in deleted
+                and source_path_allowed_at_original_location(path)
+            )
+        }
+    )
     if not selected:
         return ""
     chunks: list[str] = []

@@ -133,6 +133,16 @@ class LocalCliRunnerTests(unittest.TestCase):
             "#!/bin/sh\n"
             "printf 'unrelated-secret=<%s>\\n' \"${AWS_SECRET_ACCESS_KEY:-}\"\n"
             "printf '<%s>\\n' \"$@\"\n"
+            "if [ \"$(basename \"$0\")\" = grok ]; then\n"
+            "  if [ -n \"${XAI_API_KEY:-}\" ]; then printf 'provider-auth=<current>\\n'; fi\n"
+            "  if [ -n \"${GROK_CODE_XAI_API_KEY:-}\" ]; then printf 'provider-auth=<legacy>\\n'; fi\n"
+            "  \"$GROK_SHELL\" -lc 'printf '\"'\"'tool-current=<%s> tool-legacy=<%s>\\n'\"'\"' \"${XAI_API_KEY:-}\" \"${GROK_CODE_XAI_API_KEY:-}\"'\n"
+            "  if printf 'forbidden\\n' > \"$PWD/grok-write-attempt\" 2>/dev/null; then\n"
+            "    printf 'snapshot-write=<allowed>\\n'\n"
+            "  else\n"
+            "    printf 'snapshot-write=<blocked>\\n'\n"
+            "  fi\n"
+            "fi\n"
             "for file in \"${HOME:-}/.claude/settings.json\" \"${GROK_HOME:-}/requirements.toml\" \"${GROK_HOME:-}/sandbox.toml\"; do\n"
             "  if [ -f \"$file\" ]; then\n"
             "    while IFS= read -r line || [ -n \"$line\" ]; do printf 'config=<%s>\\n' \"$line\"; done < \"$file\"\n"
@@ -245,12 +255,24 @@ class LocalCliRunnerTests(unittest.TestCase):
             subprocess.run(["git", "-C", str(repo), "config", "user.name", "Test"], check=True)
             safe = repo / "safe.txt"
             excluded = repo / ".env"
+            deleted_safe = repo / "deleted.txt"
+            deleted_excluded = repo / ".netrc"
             safe.write_text("safe baseline\n", encoding="utf-8")
             excluded.write_text("SECRET_BASELINE_MUST_NOT_CROSS\n", encoding="utf-8")
-            subprocess.run(["git", "-C", str(repo), "add", "safe.txt", ".env"], check=True)
+            deleted_safe.write_text("SAFE_DELETION_MARKER\n", encoding="utf-8")
+            deleted_excluded.write_text(
+                "SECRET_DELETION_MARKER_MUST_NOT_CROSS\n",
+                encoding="utf-8",
+            )
+            subprocess.run(
+                ["git", "-C", str(repo), "add", "safe.txt", ".env", "deleted.txt", ".netrc"],
+                check=True,
+            )
             subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", "baseline"], check=True)
             safe.write_text("SAFE_DIFF_MARKER\n", encoding="utf-8")
             excluded.write_text("SECRET_DIFF_MARKER_MUST_NOT_CROSS\n", encoding="utf-8")
+            deleted_safe.unlink()
+            deleted_excluded.unlink()
             result = run_script(
                 "run_fugu.sh",
                 "review filtered changes",
@@ -266,6 +288,10 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertNotIn("SECRET_BASELINE_MUST_NOT_CROSS", result.stdout)
         self.assertNotIn("SECRET_DIFF_MARKER_MUST_NOT_CROSS", result.stdout)
         self.assertNotIn("diff --git a/.env", result.stdout)
+        self.assertIn("SAFE_DELETION_MARKER", result.stdout)
+        self.assertIn("diff --git a/deleted.txt b/deleted.txt", result.stdout)
+        self.assertNotIn("SECRET_DELETION_MARKER_MUST_NOT_CROSS", result.stdout)
+        self.assertNotIn("diff --git a/.netrc", result.stdout)
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
     def test_fugu_legacy_file_is_focus_hint_not_copied_content(self) -> None:
@@ -327,36 +353,46 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertNotEqual(non_finite.returncode, 0)
         self.assertIn("must be finite and positive", non_finite.stderr)
 
-    def test_grok_uses_headless_checked_non_bypass_mode(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            bin_dir = Path(tmpdir)
-            self.make_fake(bin_dir, "grok")
-            result = run_script(
-                "run_grok.sh",
-                "inspect",
-                "this",
-                env={
-                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
-                    "XAI_API_KEY": "test-xai-key",
-                    "AWS_SECRET_ACCESS_KEY": "must-not-cross",
-                },
-            )
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    def test_grok_uses_read_only_checked_key_scrubbed_non_bypass_mode(self) -> None:
+        for env_name, expected_auth in (
+            ("XAI_API_KEY", "current"),
+            ("GROK_CODE_XAI_API_KEY", "legacy"),
+        ):
+            with self.subTest(env_name=env_name), tempfile.TemporaryDirectory() as tmpdir:
+                bin_dir = Path(tmpdir)
+                self.make_fake(bin_dir, "grok")
+                result = run_script(
+                    "run_grok.sh",
+                    "inspect",
+                    "this",
+                    env={
+                        "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                        "XAI_API_KEY": "",
+                        "GROK_CODE_XAI_API_KEY": "",
+                        env_name: "test-xai-key",
+                        "AWS_SECRET_ACCESS_KEY": "must-not-cross",
+                    },
+                )
 
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("unrelated-secret=<>", result.stdout)
-        self.assertIn("<--single=inspect this>", result.stdout)
-        self.assertIn('config=<    "defaultMode": "dontAsk">', result.stdout)
-        self.assertIn("config=<disable_bypass_permissions_mode = true>", result.stdout)
-        self.assertIn("config=<read_only = [", result.stdout)
-        self.assertNotIn("<--permission-mode>", result.stdout)
-        self.assertIn("<--effort>", result.stdout)
-        self.assertIn("<high>", result.stdout)
-        self.assertIn("<--check>", result.stdout)
-        self.assertIn("<--sandbox>", result.stdout)
-        self.assertIn("<elves-shortcut>", result.stdout)
-        self.assertNotIn("reasoning-effort", result.stdout)
-        self.assertNotIn("always-approve", result.stdout)
-        self.assertNotIn("bypassPermissions", result.stdout)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("unrelated-secret=<>", result.stdout)
+            self.assertIn(f"provider-auth=<{expected_auth}>", result.stdout)
+            self.assertIn("tool-current=<> tool-legacy=<>", result.stdout)
+            self.assertIn("snapshot-write=<blocked>", result.stdout)
+            self.assertIn("<--single=inspect this>", result.stdout)
+            self.assertIn('config=<    "defaultMode": "dontAsk">', result.stdout)
+            self.assertIn("config=<disable_bypass_permissions_mode = true>", result.stdout)
+            self.assertNotIn("config=<read_only = [", result.stdout)
+            self.assertNotIn("<--permission-mode>", result.stdout)
+            self.assertIn("<--effort>", result.stdout)
+            self.assertIn("<high>", result.stdout)
+            self.assertIn("<--check>", result.stdout)
+            self.assertIn("<--sandbox>", result.stdout)
+            self.assertIn("<elves-shortcut>", result.stdout)
+            self.assertNotIn("reasoning-effort", result.stdout)
+            self.assertNotIn("always-approve", result.stdout)
+            self.assertNotIn("bypassPermissions", result.stdout)
 
     def test_grok_shared_oauth_fails_closed_before_provider_launch(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

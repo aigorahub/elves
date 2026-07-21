@@ -659,7 +659,8 @@ python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup</code></pre>
         <ul>
           <li><strong>Fugu</strong> launches a bounded, ephemeral, project-aware
             <code>codex-fugu</code> review over a tracked-only snapshot in a required kernel
-            filesystem sandbox. Generated diff evidence is filtered by the same snapshot policy.
+            filesystem sandbox. Generated diff evidence is filtered by the same snapshot policy,
+            including safe deletion patches while suppressing deleted credential paths.
             It uses regular
             <code>fugu/high</code> by default, <code>fugu/xhigh</code> with
             <code>--deep</code>, or <code>fugu-ultra/high</code> with
@@ -676,11 +677,12 @@ python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup</code></pre>
             never replace existing files, and tasks start without account-default connectors or
             skills.</li>
           <li><strong>Grok</strong> runs the installed Grok Build CLI headlessly at high reasoning
-            without bypassing permissions, with only its selected auth projected into a minimal
-            environment, provider-documented isolated <code>dontAsk</code> settings, bypass locked
-            off, and a fail-closed strict sandbox that makes the repository read-only. It requires
-            an explicit <code>XAI_API_KEY</code>; shared-file OAuth is rejected because Grok applies
-            this sandbox to both provider and tool reads.</li>
+            without bypassing permissions over a disposable tracked-source snapshot in a required
+            outer kernel sandbox. Grok also uses its inner <code>strict</code> profile,
+            provider-documented isolated <code>dontAsk</code> settings, and a bypass lock. It
+            requires an explicit <code>XAI_API_KEY</code>; a dedicated tool shell removes both key
+            names before model-directed commands run. Shared-file OAuth is rejected because Grok
+            applies its sandbox to both provider and tool reads.</li>
           <li><strong>Devin</strong> creates and boundedly follows a remote developer session and
             needs <code>DEVIN_API_KEY</code>. Stored Devin secrets and knowledge are not granted by
             default, and bounded session creation and polling responses share a hard wall-clock
