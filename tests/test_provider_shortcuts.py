@@ -185,6 +185,63 @@ class RemoteApiRunnerTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("timeout limits must be finite and positive", result.stderr)
 
+    def test_fugu_preserves_http_error_diagnostics(self) -> None:
+        def responder(method, path, _payload):
+            self.assertEqual((method, path), ("POST", "/responses"))
+            return 400, {"error": "bad request shape"}
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = Path(tmpdir)
+            target = repo / "review.md"
+            raw_output = repo / "raw-error.json"
+            target.write_text("important\n", encoding="utf-8")
+            with CaptureServer(responder) as server:
+                result = run_script(
+                    "run_fugu.sh",
+                    str(target),
+                    env={
+                        "SAKANA_API_KEY": "test-sakana-key",
+                        "SAKANA_API_BASE": server.base_url,
+                        "SAKANA_FUGU_MAX_WAIT_SECONDS": "5",
+                        "SAKANA_FUGU_RETRIES": "0",
+                        "SAKANA_FUGU_RAW_OUTPUT": str(raw_output),
+                    },
+                    cwd=repo,
+                )
+            raw = json.loads(raw_output.read_text(encoding="utf-8"))
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("bad request shape", result.stderr)
+        self.assertEqual(raw[0]["status"], 400)
+        self.assertIn("bad request shape", raw[0]["body"])
+
+    def test_fugu_raw_path_expansion_failure_is_best_effort(self) -> None:
+        def responder(_method, _path, _payload):
+            return 200, (
+                'data: {"type":"response.output_text.delta","delta":"No actionable findings"}\n\n'
+                "data: [DONE]\n\n"
+            )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir) / "review.md"
+            target.write_text("important\n", encoding="utf-8")
+            with CaptureServer(responder) as server:
+                result = run_script(
+                    "run_fugu.sh",
+                    str(target),
+                    env={
+                        "SAKANA_API_KEY": "test-sakana-key",
+                        "SAKANA_API_BASE": server.base_url,
+                        "SAKANA_FUGU_RETRIES": "0",
+                        "SAKANA_FUGU_RAW_OUTPUT": "~elves-user-that-does-not-exist/review.json",
+                    },
+                    cwd=Path(tmpdir),
+                )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "No actionable findings")
+        self.assertIn("could not write Sakana Fugu raw output", result.stderr)
+
     def test_manus_uses_v2_private_max_task_contract(self) -> None:
         def responder(method, path, _payload):
             if method == "POST" and path == "/task.create":

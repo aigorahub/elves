@@ -123,7 +123,7 @@ def persist_raw(events):
         raw_path = Path(raw_output).expanduser()
         raw_path.parent.mkdir(parents=True, exist_ok=True)
         raw_path.write_text(json.dumps(events, ensure_ascii=False, indent=2), encoding="utf-8")
-    except OSError as exc:
+    except (OSError, RuntimeError, ValueError) as exc:
         print(f"Warning: could not write Sakana Fugu raw output: {exc}", file=sys.stderr)
 
 
@@ -219,7 +219,17 @@ for attempt in range(retries + 1):
         persist_raw(events)
         raise SystemExit(0)
     except urllib.error.HTTPError as exc:
-        detail = exc.read(4096).decode("utf-8", errors="replace")
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            detail = "<error body not read: total wait expired>"
+        else:
+            signal.setitimer(signal.ITIMER_REAL, max(0.001, remaining))
+            try:
+                detail = exc.read(4096).decode("utf-8", errors="replace")
+            except (OSError, TimeoutError, socket.timeout) as body_exc:
+                detail = f"<error body unavailable: {body_exc}>"
+            finally:
+                signal.setitimer(signal.ITIMER_REAL, 0)
         last_error = RuntimeError(f"Sakana API error {exc.code}: {detail}")
         persist_raw([{"type": "http_error", "status": exc.code, "body": detail}])
         transient = exc.code in transient_statuses
