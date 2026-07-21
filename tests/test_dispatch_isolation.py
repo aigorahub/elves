@@ -1792,6 +1792,9 @@ class IsolationSandboxRegressionTests(unittest.TestCase):
             sentinel.write_text("HOST_SECRET\n")
             source = lane.snapshot / "source.txt"
             source.write_text("SNAPSHOT_OK\n")
+            codex_home = lane.home / ".codex"
+            codex_home.mkdir()
+            lane.env["CODEX_HOME"] = str(codex_home)
             backend, profile = prepare_fs_sandbox(
                 lane,
                 required=True,
@@ -1805,8 +1808,10 @@ class IsolationSandboxRegressionTests(unittest.TestCase):
                     sys.executable,
                     "-c",
                     (
-                        "import pathlib; "
+                        "import os, pathlib; "
                         "assert pathlib.Path('source.txt').read_text().strip() == 'SNAPSHOT_OK'; "
+                        "assert pathlib.Path.cwd().resolve(strict=True).is_dir(); "
+                        "assert pathlib.Path(os.environ['CODEX_HOME']).resolve(strict=True).is_dir(); "
                         f"p=pathlib.Path({str(sentinel)!r}); "
                         "\ntry: p.read_text(); raise SystemExit(41)\nexcept OSError: pass\n"
                         "try: p.write_text('MUTATED'); raise SystemExit(42)\nexcept OSError: pass\n"
@@ -1817,6 +1822,10 @@ class IsolationSandboxRegressionTests(unittest.TestCase):
             profile_body = Path(profile).read_text()
             self.assertNotIn("(deny process-fork)", profile_body)
             self.assertNotIn('(subpath "/opt")', profile_body)
+            self.assertIn(
+                f'(allow file-read-metadata (literal "{lane.root.resolve()}"))',
+                profile_body,
+            )
             self.assertTrue(lane.supervisor_executable)
             result = subprocess.run(
                 command,

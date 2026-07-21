@@ -931,6 +931,41 @@ def prepare_fs_sandbox(
             "(deny file-write*)",
             _sbpl_rule("allow file-read*", "literal", "/"),
         ]
+        # realpath(3), canonicalize(), and getcwd(3) must stat every ancestor
+        # between `/` and an allowed sandbox-owned path. Grant only metadata on
+        # those exact parents: omitting this makes real Codex/Grok launchers
+        # unable to canonicalize HOME/CODEX_HOME, while granting file-read*
+        # would expose unrelated sibling contents under the host temp tree.
+        sandbox_metadata_ancestors: set[Path] = set()
+        sandbox_symlink_aliases: set[Path] = set()
+        lexical_sandbox_paths = (
+            lane.snapshot.absolute(),
+            lane.tmp.absolute(),
+            lane.home.absolute(),
+            lane.xdg_config.absolute(),
+            lane.xdg_cache.absolute(),
+            lane.xdg_data.absolute(),
+        )
+        for lexical in lexical_sandbox_paths:
+            sandbox_symlink_aliases.update(_symlink_path_components(lexical))
+        for approved in (
+            snapshot,
+            lane_tmp,
+            lane_home,
+            xdg_config,
+            xdg_cache,
+            xdg_data,
+        ):
+            sandbox_metadata_ancestors.update(
+                parent for parent in approved.parents if parent != Path("/")
+            )
+        for ancestor in sorted(
+            sandbox_metadata_ancestors | sandbox_symlink_aliases,
+            key=str,
+        ):
+            profile_lines.append(
+                _sbpl_rule("allow file-read-metadata", "literal", ancestor)
+            )
         for system_root in (
             "/System",
             "/usr",
