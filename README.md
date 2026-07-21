@@ -65,9 +65,9 @@ Codex users should not need or expect a top-level `/cobbler` command.
 
 Focused provider tasks do not require a full Elves run. Claude Code gets `/fugu <file>`,
 `/manus <topic>`, `/grok <instructions>`, and `/devin <instructions>`; Codex uses the equivalent
-`$elves fugu|manus|grok|devin …` forms or natural language. Fugu is an ephemeral read-only
-`fugu-ultra` review at `xhigh`; Manus and Devin create bounded remote tasks; Grok uses headless
-high-reasoning mode without approval bypass. See
+`$elves fugu|manus|grok|devin …` forms or natural language. Fugu is a direct streamed read-only
+`fugu-ultra` review at `max` with bounded input/output/wait budgets; Manus and Devin create bounded
+remote tasks; Grok uses headless high-reasoning mode without approval bypass. See
 [`references/provider-shortcuts.md`](references/provider-shortcuts.md) for requirements, auth
 environment names, timeouts, and follow behavior.
 

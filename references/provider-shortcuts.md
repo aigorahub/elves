@@ -16,9 +16,10 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
 
 ## Route contracts
 
-- **Fugu:** requires the configured `codex-fugu` launcher. The runner pins Sakana `fugu-ultra`,
-  `xhigh` reasoning, an ephemeral session, and a read-only sandbox. It passes the exact file path
-  for direct inspection instead of copying file contents through shell-built JSON.
+- **Fugu:** requires `SAKANA_API_KEY`. The runner sends one compact file-scoped prompt directly to
+  Sakana's streamed Responses API, pins `fugu-ultra` at `max`, and bounds input bytes, visible
+  output tokens, idle time, and total wait. It has no repository tools, so the review is read-only
+  by construction and cannot enter an agent/context-compaction loop.
 - **Manus:** requires `MANUS_API_KEY`. It creates a private `manus-1.6-max` task through
   `https://api.manus.ai/v2/task.create` with `x-manus-api-key`, then polls with a bounded timeout.
 - **Grok:** requires the `grok` CLI. It uses documented headless single-prompt mode, `high`
@@ -27,6 +28,11 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
 - **Devin:** requires `DEVIN_API_KEY`. It creates a remote session through the official
   `https://api.devin.ai/v1/sessions` API, includes the current origin/branch when available, and
   polls the documented session endpoint with a bounded timeout.
+
+Fugu defaults to a 256 KiB input ceiling, 16,384 visible output tokens, and a 30-minute total wait.
+`SAKANA_FUGU_REASONING_EFFORT=high|xhigh|max` selects an explicit fallback when needed, and
+`SAKANA_FUGU_RAW_OUTPUT=/path` optionally preserves the streamed event record. Tiny output caps
+below 2,048 are rejected because Ultra can consume them before visible review text appears.
 
 `MANUS_MAX_WAIT_SECONDS=0` and `DEVIN_MAX_WAIT_SECONDS=0` provide create-and-return behavior. A
 bounded local timeout does not cancel the remote task; the printed task/session URL remains the

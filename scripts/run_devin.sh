@@ -38,8 +38,33 @@ def git_value(*args):
     )
     return result.stdout.strip() if result.returncode == 0 else ""
 
+
+def provider_safe_remote(value):
+    """Return host/path context without forwarding URL credentials or local paths."""
+    remote = str(value or "").strip()
+    if not remote:
+        return ""
+    try:
+        if "://" in remote:
+            parsed = urllib.parse.urlsplit(remote)
+            host = parsed.hostname or ""
+            if not host:
+                return ""
+            if ":" in host and not host.startswith("["):
+                host = f"[{host}]"
+            if parsed.port is not None:
+                host += f":{parsed.port}"
+            return host + (parsed.path or "")
+        if "@" in remote:
+            host_path = remote.rsplit("@", 1)[1]
+            return host_path if ":" in host_path else ""
+    except ValueError:
+        return ""
+    return ""
+
+
 branch = git_value("branch", "--show-current")
-origin = git_value("remote", "get-url", "origin")
+origin = provider_safe_remote(git_value("remote", "get-url", "origin"))
 context = []
 if origin:
     context.append(f"repository: {origin}")

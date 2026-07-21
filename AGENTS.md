@@ -42,7 +42,7 @@ For explicit provider-shortcut intent, follow SKILL.md **Provider shortcut proto
 `references/provider-shortcuts.md`. Resolve helpers from the active installed skill root; do not
 assume `./scripts` belongs to the target repository and do not execute mappings blindly:
 
-- Fugu review → `run_fugu.sh <file>` (read-only `fugu-ultra`, `xhigh`)
+- Fugu review → `run_fugu.sh <file>` (direct streamed `fugu-ultra`, `max`, read-only)
 - Manus research → `run_manus.sh <topic>` (private remote task, bounded wait)
 - Grok Build task → `run_grok.sh <instructions>` (headless, non-bypass permissions)
 - Devin task → `run_devin.sh <instructions>` (remote session, bounded wait)

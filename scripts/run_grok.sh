@@ -16,7 +16,7 @@ exec grok \
   --no-auto-update \
   --cwd "$PWD" \
   --permission-mode dontAsk \
-  --reasoning-effort high \
+  --effort high \
   --output-format plain \
   --check \
   --single "$PROMPT_CONTENT"

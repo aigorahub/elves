@@ -52,9 +52,14 @@ class CaptureServer:
                 headers = {key.lower(): value for key, value in self.headers.items()}
                 owner.requests.append((self.command, self.path, headers, payload))
                 status, response = responder(self.command, self.path, payload)
-                encoded = json.dumps(response).encode("utf-8")
+                if isinstance(response, str):
+                    encoded = response.encode("utf-8")
+                    content_type = "text/event-stream"
+                else:
+                    encoded = json.dumps(response).encode("utf-8")
+                    content_type = "application/json"
                 self.send_response(status)
-                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Type", content_type)
                 self.send_header("Content-Length", str(len(encoded)))
                 self.end_headers()
                 self.wfile.write(encoded)
@@ -87,32 +92,6 @@ class LocalCliRunnerTests(unittest.TestCase):
         binary.chmod(0o755)
         return binary
 
-    def test_fugu_pins_ultra_xhigh_and_read_only(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            root = Path(tmpdir)
-            bin_dir = root / "bin"
-            bin_dir.mkdir()
-            self.make_fake(bin_dir, "codex-fugu")
-            repo = root / "repo"
-            repo.mkdir()
-            subprocess.run(["git", "init", "-q", str(repo)], check=True)
-            target = repo / "review me.md"
-            target.write_text("important\n", encoding="utf-8")
-            result = run_script(
-                "run_fugu.sh",
-                str(target),
-                env={"PATH": str(bin_dir) + os.pathsep + os.environ["PATH"]},
-                cwd=repo,
-            )
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("<--no-update>", result.stdout)
-        self.assertIn("<fugu-ultra>", result.stdout)
-        self.assertIn('<model_reasoning_effort="xhigh">', result.stdout)
-        self.assertIn("<read-only>", result.stdout)
-        self.assertIn("<--ephemeral>", result.stdout)
-        self.assertIn(str(target), result.stdout)
-
     def test_grok_uses_headless_checked_non_bypass_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             bin_dir = Path(tmpdir)
@@ -128,8 +107,10 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertIn("<--single>", result.stdout)
         self.assertIn("<inspect this>", result.stdout)
         self.assertIn("<dontAsk>", result.stdout)
+        self.assertIn("<--effort>", result.stdout)
         self.assertIn("<high>", result.stdout)
         self.assertIn("<--check>", result.stdout)
+        self.assertNotIn("reasoning-effort", result.stdout)
         self.assertNotIn("always-approve", result.stdout)
         self.assertNotIn("bypassPermissions", result.stdout)
 
@@ -145,6 +126,46 @@ class LocalCliRunnerTests(unittest.TestCase):
 
 
 class RemoteApiRunnerTests(unittest.TestCase):
+    def test_fugu_streams_direct_ultra_max_file_review(self) -> None:
+        def responder(method, path, _payload):
+            self.assertEqual((method, path), ("POST", "/responses"))
+            return 200, (
+                'data: {"type":"response.output_text.delta","delta":"No actionable "}\n\n'
+                'data: {"type":"response.output_text.delta","delta":"findings"}\n\n'
+                "data: [DONE]\n\n"
+            )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = Path(tmpdir) / "repo"
+            repo.mkdir()
+            target = repo / "review me.md"
+            target.write_text("important\n", encoding="utf-8")
+            with CaptureServer(responder) as server:
+                result = run_script(
+                    "run_fugu.sh",
+                    str(target),
+                    env={
+                        "SAKANA_API_KEY": "test-sakana-key",
+                        "SAKANA_API_BASE": server.base_url,
+                        "SAKANA_FUGU_MAX_WAIT_SECONDS": "5",
+                        "SAKANA_FUGU_IDLE_TIMEOUT_SECONDS": "5",
+                        "SAKANA_FUGU_RETRIES": "0",
+                    },
+                    cwd=repo,
+                )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "No actionable findings")
+        request = server.requests[0]
+        self.assertEqual(request[2]["authorization"], "Bearer test-sakana-key")
+        self.assertEqual(request[3]["model"], "fugu-ultra")
+        self.assertEqual(request[3]["reasoning"], {"effort": "max"})
+        self.assertEqual(request[3]["max_output_tokens"], 16384)
+        self.assertTrue(request[3]["stream"])
+        self.assertIn(str(target), request[3]["input"])
+        self.assertIn("important", request[3]["input"])
+        self.assertIn("read-only audit", request[3]["input"])
+
     def test_manus_uses_v2_private_max_task_contract(self) -> None:
         def responder(method, path, _payload):
             if method == "POST" and path == "/task.create":
@@ -205,7 +226,7 @@ class RemoteApiRunnerTests(unittest.TestCase):
                     "remote",
                     "add",
                     "origin",
-                    "https://github.com/example/provider-test.git",
+                    "https://oauth2:ghp_supersecret@github.com/example/provider-test.git?token=leak",
                 ],
                 check=True,
             )
@@ -229,7 +250,10 @@ class RemoteApiRunnerTests(unittest.TestCase):
         self.assertEqual(create[0:2], ("POST", "/sessions"))
         self.assertEqual(create[2]["authorization"], "Bearer test-devin-key")
         self.assertIn("refactor carefully", create[3]["prompt"])
-        self.assertIn("repository: https://github.com/example/provider-test.git", create[3]["prompt"])
+        self.assertIn("repository: github.com/example/provider-test.git", create[3]["prompt"])
+        self.assertNotIn("ghp_supersecret", create[3]["prompt"])
+        self.assertNotIn("oauth2", create[3]["prompt"])
+        self.assertNotIn("token=leak", create[3]["prompt"])
         self.assertIn("branch: feature/provider-test", create[3]["prompt"])
         self.assertFalse(create[3]["idempotent"])
 
