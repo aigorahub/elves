@@ -4,6 +4,8 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.12.0] - 2026-07-21
+
 ### Optional provider convenience shortcuts
 
 - Add installed runner scripts and Claude Code aliases for `/fugu`, `/manus`, `/grok`, and
