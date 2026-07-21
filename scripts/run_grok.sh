@@ -50,6 +50,19 @@ with tempfile.TemporaryDirectory(prefix="elves-grok-shortcut-") as raw_root:
     for directory in (home, grok_home, tmp, xdg_config, xdg_cache):
         directory.mkdir(mode=0o700)
 
+    claude_home = home / ".claude"
+    claude_home.mkdir(mode=0o700)
+    (claude_home / "settings.json").write_text(
+        json.dumps({"permissions": {"defaultMode": "dontAsk"}}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (claude_home / "settings.json").chmod(0o600)
+    (grok_home / "requirements.toml").write_text(
+        "[ui]\ndisable_bypass_permissions_mode = true\n",
+        encoding="utf-8",
+    )
+    (grok_home / "requirements.toml").chmod(0o600)
+
     model_default = ""
     config_source = source_home / "config.toml"
     try:
@@ -85,6 +98,7 @@ with tempfile.TemporaryDirectory(prefix="elves-grok-shortcut-") as raw_root:
         "[profiles.elves-shortcut]\n"
         'extends = "strict"\n'
         "restrict_network = true\n"
+        + f"read_only = [{json.dumps(str(repo_root))}]\n"
         + "deny = [\n"
         + '  "**/.env", "**/.env.*", "**/.netrc", "**/.npmrc",\n'
         '  "**/.pypirc", "**/.git-credentials", "**/.ssh/**",\n'
@@ -120,8 +134,6 @@ with tempfile.TemporaryDirectory(prefix="elves-grok-shortcut-") as raw_root:
             str(repo_root),
             "--sandbox",
             "elves-shortcut",
-            "--permission-mode",
-            "dontAsk",
             "--effort",
             "high",
             "--output-format",

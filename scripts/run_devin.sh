@@ -16,6 +16,7 @@ exec python3 - "$TASK_DESCRIPTION" <<'PY'
 import json
 import math
 import os
+import signal
 import socket
 import subprocess
 import sys
@@ -79,6 +80,47 @@ prompt = task
 if context:
     prompt += "\n\nWork context supplied by Elves: " + "; ".join(context) + "."
 
+MAX_RESPONSE_BYTES = 16 * 1024 * 1024
+
+
+class hard_wall_timeout:
+    """Interrupt connect, send, and slow-drip body reads at one wall deadline."""
+
+    def __init__(self, seconds):
+        self.seconds = seconds
+        self.previous_handler = None
+        self.previous_timer = (0.0, 0.0)
+        self.started = 0.0
+
+    def __enter__(self):
+        if not hasattr(signal, "setitimer") or not hasattr(signal, "SIGALRM"):
+            raise SystemExit(
+                "Error: this platform cannot enforce the required Devin wall-clock timeout."
+            )
+        if self.seconds <= 0:
+            raise TimeoutError("Devin API request timed out")
+        self.previous_handler = signal.getsignal(signal.SIGALRM)
+        self.started = time.monotonic()
+
+        def expired(_signum, _frame):
+            raise TimeoutError("Devin API request timed out")
+
+        signal.signal(signal.SIGALRM, expired)
+        self.previous_timer = signal.setitimer(signal.ITIMER_REAL, self.seconds)
+        return self
+
+    def __exit__(self, _type, _value, _traceback):
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        assert self.previous_handler is not None
+        signal.signal(signal.SIGALRM, self.previous_handler)
+        previous_delay, previous_interval = self.previous_timer
+        if previous_delay > 0:
+            restored_delay = previous_delay - (time.monotonic() - self.started)
+            if restored_delay > 0:
+                signal.setitimer(signal.ITIMER_REAL, restored_delay, previous_interval)
+        return False
+
+
 def request(method, path, payload=None, *, timeout=60.0):
     data = None if payload is None else json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
@@ -90,11 +132,22 @@ def request(method, path, payload=None, *, timeout=60.0):
             "Content-Type": "application/json",
         },
     )
+    call_deadline = time.monotonic() + timeout
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as response:
-            return json.loads(response.read().decode("utf-8"))
+        with hard_wall_timeout(timeout):
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                body_bytes = response.read(MAX_RESPONSE_BYTES + 1)
+                if len(body_bytes) > MAX_RESPONSE_BYTES:
+                    raise SystemExit(
+                        f"Devin API response exceeds {MAX_RESPONSE_BYTES} bytes."
+                    )
+                return json.loads(body_bytes.decode("utf-8"))
     except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")
+        remaining = call_deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("Devin API request timed out") from exc
+        with hard_wall_timeout(remaining):
+            body = exc.read(4096).decode("utf-8", errors="replace")
         raise SystemExit(f"Devin API error {exc.code}: {body}") from exc
     except urllib.error.URLError as exc:
         if isinstance(exc.reason, (TimeoutError, socket.timeout)):

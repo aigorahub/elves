@@ -677,12 +677,14 @@ python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup</code></pre>
             skills.</li>
           <li><strong>Grok</strong> runs the installed Grok Build CLI headlessly at high reasoning
             without bypassing permissions, with only its selected auth projected into a minimal
-            environment and a fail-closed strict filesystem sandbox. It requires an explicit
-            <code>XAI_API_KEY</code>; shared-file OAuth is rejected because Grok applies this
-            sandbox to both provider and tool reads.</li>
+            environment, provider-documented isolated <code>dontAsk</code> settings, bypass locked
+            off, and a fail-closed strict sandbox that makes the repository read-only. It requires
+            an explicit <code>XAI_API_KEY</code>; shared-file OAuth is rejected because Grok applies
+            this sandbox to both provider and tool reads.</li>
           <li><strong>Devin</strong> creates and boundedly follows a remote developer session and
             needs <code>DEVIN_API_KEY</code>. Stored Devin secrets and knowledge are not granted by
-            default, and session creation and polling share the configured wait budget.</li>
+            default, and bounded session creation and polling responses share a hard wall-clock
+            wait budget.</li>
         </ul>
         <p>Manus chooses whether its internal Wide mode activates; the public API has no documented
           force-Wide or create-child endpoint. Cobbler's coverage check and deterministic fallback

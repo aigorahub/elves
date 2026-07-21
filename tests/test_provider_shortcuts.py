@@ -26,6 +26,12 @@ from cobbler_runtime.isolation import detect_fs_sandbox_backend  # noqa: E402
 HAS_FS_SANDBOX = detect_fs_sandbox_backend() is not None
 
 
+class SlowBody:
+    def __init__(self, payload: object, interval: float = 0.1):
+        self.encoded = json.dumps(payload).encode("utf-8")
+        self.interval = interval
+
+
 def run_script(name: str, *args: str, env: dict[str, str] | None = None, cwd: Path = REPO_ROOT):
     merged = os.environ.copy()
     if env:
@@ -72,7 +78,11 @@ class CaptureServer:
                 else:
                     status, response = response_spec
                     extra_headers = {}
-                if isinstance(response, str):
+                slow_body = response if isinstance(response, SlowBody) else None
+                if slow_body is not None:
+                    encoded = slow_body.encoded
+                    content_type = "application/json"
+                elif isinstance(response, str):
                     encoded = response.encode("utf-8")
                     content_type = "text/event-stream"
                 else:
@@ -85,8 +95,14 @@ class CaptureServer:
                     self.send_header(name, value)
                 self.end_headers()
                 try:
-                    self.wfile.write(encoded)
-                except BrokenPipeError:
+                    if slow_body is None:
+                        self.wfile.write(encoded)
+                    else:
+                        for byte in encoded:
+                            self.wfile.write(bytes([byte]))
+                            self.wfile.flush()
+                            time.sleep(slow_body.interval)
+                except (BrokenPipeError, ConnectionResetError):
                     pass
 
             def log_message(self, _format, *_args):
@@ -116,7 +132,12 @@ class LocalCliRunnerTests(unittest.TestCase):
         binary.write_text(
             "#!/bin/sh\n"
             "printf 'unrelated-secret=<%s>\\n' \"${AWS_SECRET_ACCESS_KEY:-}\"\n"
-            "printf '<%s>\\n' \"$@\"\n",
+            "printf '<%s>\\n' \"$@\"\n"
+            "for file in \"${HOME:-}/.claude/settings.json\" \"${GROK_HOME:-}/requirements.toml\" \"${GROK_HOME:-}/sandbox.toml\"; do\n"
+            "  if [ -f \"$file\" ]; then\n"
+            "    while IFS= read -r line || [ -n \"$line\" ]; do printf 'config=<%s>\\n' \"$line\"; done < \"$file\"\n"
+            "  fi\n"
+            "done\n",
             encoding="utf-8",
         )
         binary.chmod(0o755)
@@ -324,7 +345,10 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("unrelated-secret=<>", result.stdout)
         self.assertIn("<--single=inspect this>", result.stdout)
-        self.assertIn("<dontAsk>", result.stdout)
+        self.assertIn('config=<    "defaultMode": "dontAsk">', result.stdout)
+        self.assertIn("config=<disable_bypass_permissions_mode = true>", result.stdout)
+        self.assertIn("config=<read_only = [", result.stdout)
+        self.assertNotIn("<--permission-mode>", result.stdout)
         self.assertIn("<--effort>", result.stdout)
         self.assertIn("<high>", result.stdout)
         self.assertIn("<--check>", result.stdout)
@@ -413,6 +437,72 @@ class RemoteApiRunnerTests(unittest.TestCase):
         self.assertEqual(create[3]["connectors"], [])
         self.assertEqual(create[3]["enable_skills"], [])
         self.assertEqual(create[3]["force_skills"], [])
+
+    def test_manus_create_slow_drip_cannot_outlive_wait_budget(self) -> None:
+        def responder(method, path, _payload):
+            if method == "POST" and path == "/task.create":
+                return 200, SlowBody(
+                    {"ok": True, "data": {"task_id": "too-late", "task_url": "https://manus/late"}}
+                )
+            return 404, {"error": "unexpected"}
+
+        with CaptureServer(responder) as server:
+            started = time.monotonic()
+            result = run_script(
+                "run_manus.sh",
+                "bounded slow response",
+                env={
+                    "MANUS_API_KEY": "key",
+                    "MANUS_API_BASE": server.base_url,
+                    "MANUS_POLL_INTERVAL_SECONDS": "0.1",
+                    "MANUS_MAX_WAIT_SECONDS": "1",
+                },
+            )
+            elapsed = time.monotonic() - started
+
+        self.assertEqual(result.returncode, 124, result.stderr)
+        self.assertLess(elapsed, 2)
+        self.assertIn("hard wall-clock timeout", result.stderr)
+
+    def test_manus_upload_slow_drip_cannot_outlive_wait_budget(self) -> None:
+        server: CaptureServer
+
+        def responder(method, path, _payload):
+            if method == "POST" and path == "/file.upload":
+                return 200, {
+                    "ok": True,
+                    "data": {
+                        "file": {"id": "slow-file"},
+                        "upload_url": server.base_url + "/upload/slow-file",
+                    },
+                }
+            if method == "PUT" and path == "/upload/slow-file":
+                return 200, SlowBody({"ok": True, "padding": "slow-response"})
+            return 404, {"error": "unexpected"}
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = Path(tmpdir) / "source.pdf"
+            source.write_bytes(b"source bytes")
+            server = CaptureServer(responder)
+            with server:
+                started = time.monotonic()
+                result = run_script(
+                    "run_manus.sh",
+                    "--file",
+                    str(source),
+                    "bounded upload",
+                    env={
+                        "MANUS_API_KEY": "key",
+                        "MANUS_API_BASE": server.base_url,
+                        "MANUS_FILE_POLL_INTERVAL_SECONDS": "0.1",
+                        "MANUS_MAX_WAIT_SECONDS": "1",
+                    },
+                )
+                elapsed = time.monotonic() - started
+
+        self.assertEqual(result.returncode, 124, result.stderr)
+        self.assertLess(elapsed, 2)
+        self.assertNotIn("/task.create", [request[1] for request in server.requests])
 
     def test_manus_wide_reconciles_roster_and_uploads_explicit_files(self) -> None:
         reports = {
@@ -627,6 +717,39 @@ class RemoteApiRunnerTests(unittest.TestCase):
         self.assertIn("symlink", result.stderr)
         self.assertEqual(server.requests, [])
         self.assertFalse((redirected / "manifest.json").exists())
+
+    def test_manus_refuses_in_repo_alias_to_repo_before_upload(self) -> None:
+        def responder(_method, _path, _payload):
+            return 500, {"error": "no provider request expected"}
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            items = root / "items.json"
+            items.write_text('["ref-a"]', encoding="utf-8")
+            source = root / "private-source.pdf"
+            source.write_bytes(b"must not be uploaded through a repo alias")
+            alias = root / "alias"
+            alias.symlink_to(root, target_is_directory=True)
+            manifest = alias / ".elves" / "runtime" / "manus" / "alias.json"
+            with CaptureServer(responder) as server:
+                result = run_script(
+                    "run_manus.sh",
+                    "--wide",
+                    "--items-file",
+                    str(items),
+                    "--manifest",
+                    str(manifest),
+                    "--file",
+                    str(source),
+                    "research",
+                    env={"MANUS_API_KEY": "key", "MANUS_API_BASE": server.base_url},
+                    cwd=root,
+                )
+
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("symlink", result.stderr)
+        self.assertEqual(server.requests, [])
+        self.assertFalse((root / ".elves" / "runtime" / "manus" / "alias.json").exists())
 
     def test_manus_does_not_retry_ambiguous_paid_task_creation(self) -> None:
         def responder(_method, _path, _payload):
@@ -1509,6 +1632,30 @@ class RemoteApiRunnerTests(unittest.TestCase):
             result = run_script(
                 "run_devin.sh",
                 "bounded creation",
+                env={
+                    "DEVIN_API_KEY": "key",
+                    "DEVIN_API_BASE": server.base_url,
+                    "DEVIN_POLL_INTERVAL_SECONDS": "0.1",
+                    "DEVIN_MAX_WAIT_SECONDS": "1",
+                },
+            )
+            elapsed = time.monotonic() - started
+
+        self.assertEqual(result.returncode, 124, result.stderr)
+        self.assertLess(elapsed, 2)
+        self.assertIn("session creation timed out after 1s", result.stderr.lower())
+
+    def test_devin_create_slow_drip_cannot_outlive_wait_budget(self) -> None:
+        def responder(method, path, _payload):
+            if method == "POST" and path == "/sessions":
+                return 200, SlowBody({"session_id": "too-late", "url": "https://devin/late"})
+            return 404, {"error": "unexpected"}
+
+        with CaptureServer(responder) as server:
+            started = time.monotonic()
+            result = run_script(
+                "run_devin.sh",
+                "bounded slow creation",
                 env={
                     "DEVIN_API_KEY": "key",
                     "DEVIN_API_BASE": server.base_url,

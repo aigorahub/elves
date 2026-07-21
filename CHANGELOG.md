@@ -23,12 +23,15 @@ All notable changes to the Elves skill are documented here.
   credential-path refusal, and cover retry/recovery behavior hermetically.
 - Harden every provider boundary after independent review: run Fugu over a tracked-only snapshot
   with same-policy diff evidence in a required OS filesystem sandbox and allowlisted environment;
-  run Grok with an explicit provider key, minimal auth projection, and fail-closed strict sandbox
-  while rejecting shared-file OAuth that the provider/tool sandbox cannot safely separate;
+  run Grok with an explicit provider key, minimal auth projection, provider-documented isolated
+  `dontAsk` plus bypass lock, and fail-closed strict/read-only sandbox while rejecting shared-file
+  OAuth that the provider/tool sandbox cannot safely separate;
   disable Manus account-default connectors and skills; confine new/resumed Manus manifests to
   `.elves/runtime/manus/` through no-follow traversal, exclusively reserve new records before
   upload, and never overwrite; and
-  give Devin empty secret/knowledge grants plus creation/poll timeouts capped by one wait budget.
+  give Devin empty secret/knowledge grants plus bounded response bodies and hard wall-clock
+  creation/poll timeouts capped by one wait budget. Manus API and upload bodies use the same hard
+  deadline instead of relying on socket-idle timeouts.
 - Ship the runners in installed bundles, preserve managed-alias conflict protection, bound remote
   polling, and add hermetic transport and inventory coverage plus README/guide/host-parity docs.
 

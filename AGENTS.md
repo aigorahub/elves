@@ -51,9 +51,10 @@ assume `./scripts` belongs to the target repository and do not execute mappings 
   one-task-per-item execution and `--resume <manifest>` for duplicate-safe continuation; new
   manifests are reserved before provider uploads
 - Grok Build task → `run_grok.sh <instructions>` (headless, non-bypass permissions, minimal auth
-  projection, fail-closed strict filesystem sandbox, explicit `XAI_API_KEY`; no shared OAuth file)
+  projection, isolated `dontAsk` plus bypass lock, fail-closed strict/read-only filesystem sandbox,
+  explicit `XAI_API_KEY`; no shared OAuth file)
 - Devin task → `run_devin.sh <instructions>` (remote session, bounded wait, no default stored
-  secret or knowledge grants; creation and polling share the bound)
+  secret or knowledge grants; creation and polling share one hard wall-clock bound)
 
 Codex uses the `$elves` or natural-language forms above, not invented top-level `/fugu`, `/manus`,
 `/grok`, or `/devin` commands. Explicit invocation authorizes the provider call and any associated

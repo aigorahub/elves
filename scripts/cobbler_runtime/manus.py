@@ -9,9 +9,11 @@ resume without creating duplicate paid tasks.
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 import json
 import math
 import os
+import signal
 import stat
 import subprocess
 import sys
@@ -65,6 +67,33 @@ class ManusTimeout(ManusError):
 
 class ManusAuthError(ManusError):
     """The explicit provider shortcut has no usable API credential."""
+
+
+@contextmanager
+def _hard_wall_timeout(seconds: float):
+    """Interrupt connect, send, and slow-drip body reads at one wall deadline."""
+    if not hasattr(signal, "setitimer") or not hasattr(signal, "SIGALRM"):
+        raise ManusError("This platform cannot enforce the required Manus wall-clock timeout.")
+    if seconds <= 0:
+        raise ManusTimeout("Manus orchestration exceeded the configured local wait.")
+    previous_handler = signal.getsignal(signal.SIGALRM)
+    started = time.monotonic()
+
+    def expired(_signum, _frame):
+        raise ManusTimeout("Manus API request exceeded its hard wall-clock timeout.")
+
+    signal.signal(signal.SIGALRM, expired)
+    previous_timer = signal.setitimer(signal.ITIMER_REAL, seconds)
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous_handler)
+        previous_delay, previous_interval = previous_timer
+        if previous_delay > 0:
+            restored_delay = previous_delay - (time.monotonic() - started)
+            if restored_delay > 0:
+                signal.setitimer(signal.ITIMER_REAL, restored_delay, previous_interval)
 
 
 def _finite_number(name: str, default: str, *, minimum: float = 0) -> float:
@@ -164,11 +193,13 @@ def _runtime_manifest_path(
     )
     raw_candidate = Path(os.path.abspath(os.fspath(supplied)))
     lexical_repo: Path | None = None
+    # Keep the outermost match: a path inside `repo/alias -> repo` must remain
+    # relative to the real repo root so `alias` is descriptor-walked/rejected.
+    # This still accepts an OS-level spelling alias such as /var -> /private/var.
     for ancestor in raw_candidate.parents:
         try:
             if ancestor.resolve(strict=True) == repo_root:
                 lexical_repo = ancestor
-                break
         except OSError:
             continue
     if lexical_repo is None:
@@ -180,7 +211,8 @@ def _runtime_manifest_path(
     if relative_manifest.parts[:3] != (".elves", "runtime", "manus"):
         raise ManusError(
             "Manus manifests must live under "
-            f"{runtime_root}; use the printed --resume path for continuation."
+            f"{runtime_root} and may not enter it through an in-repository symlink or alias; "
+            "use the printed --resume path for continuation."
         )
     if len(relative_manifest.parts) < 4:
         raise ManusError("Manus manifest path must name a file inside the runtime directory.")
@@ -585,7 +617,9 @@ class ManusClient:
         remaining = self.deadline - time.monotonic()
         if remaining <= 0:
             raise ManusTimeout("Manus orchestration exceeded the configured local wait.")
-        return max(0.1, min(self.request_timeout, remaining))
+        if remaining < 0.001:
+            raise ManusTimeout("Manus orchestration exceeded the configured local wait.")
+        return min(self.request_timeout, remaining)
 
     def request_json(self, method: str, path: str, payload: Any = None) -> dict[str, Any]:
         data = None if payload is None else json.dumps(payload).encode("utf-8")
@@ -602,9 +636,12 @@ class ManusClient:
                     "x-manus-api-key": self.key,
                 },
             )
+            call_timeout = self._remaining_timeout()
+            call_deadline = time.monotonic() + call_timeout
             try:
-                with urllib.request.urlopen(request, timeout=self._remaining_timeout()) as response:
-                    body_bytes = response.read(MAX_API_RESPONSE_BYTES + 1)
+                with _hard_wall_timeout(call_timeout):
+                    with urllib.request.urlopen(request, timeout=call_timeout) as response:
+                        body_bytes = response.read(MAX_API_RESPONSE_BYTES + 1)
                 if len(body_bytes) > MAX_API_RESPONSE_BYTES:
                     raise ManusError(
                         f"Manus API response exceeds {MAX_API_RESPONSE_BYTES} bytes."
@@ -617,7 +654,13 @@ class ManusClient:
                     raise ManusError("Manus API rejected the request: " + json.dumps(decoded))
                 return decoded
             except urllib.error.HTTPError as exc:
-                detail = exc.read(4096).decode("utf-8", errors="replace")
+                error_remaining = call_deadline - time.monotonic()
+                if error_remaining <= 0:
+                    raise ManusTimeout(
+                        "Manus API request exceeded its hard wall-clock timeout."
+                    ) from exc
+                with _hard_wall_timeout(error_remaining):
+                    detail = exc.read(4096).decode("utf-8", errors="replace")
                 last_error = f"HTTP {exc.code}: {detail}"
                 transient = exc.code in TRANSIENT_HTTP_STATUSES and (
                     idempotent or exc.code in {425, 429}
@@ -669,11 +712,13 @@ class ManusClient:
             method="PUT",
             headers={"Content-Type": "application/octet-stream"},
         )
+        upload_timeout = self._remaining_timeout()
         try:
-            with urllib.request.urlopen(
-                upload_request, timeout=self._remaining_timeout()
-            ) as response:
-                response.read(4096)
+            with _hard_wall_timeout(upload_timeout):
+                with urllib.request.urlopen(upload_request, timeout=upload_timeout) as response:
+                    upload_response = response.read(4097)
+            if len(upload_response) > 4096:
+                raise ManusError("Manus attachment upload response exceeds 4096 bytes.")
         except (urllib.error.HTTPError, urllib.error.URLError) as exc:
             raise ManusError(f"Manus attachment upload failed: {exc}") from exc
         file_wait = _finite_number("MANUS_FILE_WAIT_SECONDS", "60", minimum=0)

@@ -75,9 +75,10 @@ attachments, and duplicate-safe `--resume` that retries only known-failed steps;
 are validated and exclusively reserved before any upload. Devin creates a bounded remote task,
 including its creation request, without granting stored secrets or knowledge by default. Grok uses
 headless high-reasoning mode without approval bypass, a minimal auth environment, and a fail-closed
-strict filesystem sandbox. The shortcut requires an explicit `XAI_API_KEY`; it does not expose a
-shared OAuth file because Grok applies the same sandbox to provider and tool reads. Manus tasks
-likewise start with no account-default connectors or skills. See
+strict filesystem sandbox with the repository read-only, provider-documented isolated `dontAsk`
+settings, and bypass mode locked off. The shortcut requires an explicit `XAI_API_KEY`; it does not
+expose a shared OAuth file because Grok applies the same sandbox to provider and tool reads. Manus
+tasks likewise start with no account-default connectors or skills. See
 [`references/provider-shortcuts.md`](references/provider-shortcuts.md) for requirements, auth
 environment names, timeouts, and follow behavior.
 

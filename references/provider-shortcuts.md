@@ -47,17 +47,21 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
   `GROK_CODE_XAI_API_KEY`). It uses documented headless single-prompt mode, `high`
   reasoning, self-checking, and `dontAsk`, which silently denies unapproved mutations. The runner
   constructs an isolated HOME/GROK_HOME, projects only the selected named key, and requests a
-  custom profile extending Grok's `strict` kernel sandbox with repository credential-file denies.
-  Custom-profile application is fail-closed. Shared-file OAuth is deliberately unsupported by the
-  shortcut: Grok applies the profile to provider authentication reads as well as model tools, so a
-  file grant would expose the credential and a deny would prevent authentication. It
+  custom profile extending Grok's `strict` kernel sandbox with the repository marked read-only and
+  repository credential-file denies. It writes `permissions.defaultMode: dontAsk` to the isolated
+  Claude-compatible settings (the similarly named CLI flag does not activate this mode) and locks
+  bypass mode off in isolated Grok requirements. Custom-profile application is fail-closed.
+  Shared-file OAuth is deliberately unsupported by the shortcut: Grok applies the profile to
+  provider authentication reads as well as model tools, so a file grant would expose the credential
+  and a deny would prevent authentication. It
   does not invent a model id; the authenticated live Grok configuration selects the available
   model.
 - **Devin:** requires `DEVIN_API_KEY`. It creates a remote session through the official
   `https://api.devin.ai/v1/sessions` API, includes the current origin/branch when available, sends
   empty `secret_ids` and `knowledge_ids`, and polls the documented session endpoint with each
-  creation and poll request capped by the same remaining overall wait. A zero wait explicitly means
-  create-and-return, so creation retains its standalone request timeout in that mode.
+  creation and poll request, including its bounded response-body read, interrupted at the same hard
+  wall-clock deadline. A zero wait explicitly means create-and-return, so creation retains its
+  standalone hard request timeout in that mode.
 
 ## Cobbler-managed Manus rosters
 
@@ -120,7 +124,9 @@ work. Exit 4 means coverage remains incomplete with no task waiting, 3 means Man
 means a remote task failed, and 124 means the local wait expired while recorded remote work may
 still be live. Ambiguous connection/5xx failures on paid mutations are not automatically retried
 because the public API documents no idempotency key; explicit pre-acceptance 425/429 responses may
-back off safely. Idempotent reads retry bounded transient failures.
+back off safely. Idempotent reads retry bounded transient failures. API responses and presigned
+upload responses use bounded reads under hard wall-clock alarms; a slow byte trickle cannot extend
+the configured local deadline.
 
 `--file <path>` uploads only that explicit regular file through Manus's presigned file flow and
 attaches its provider id to the task. Repeat it for multiple sources. Credential-like paths are

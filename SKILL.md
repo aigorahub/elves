@@ -226,13 +226,14 @@ required capability, then execute it without an extra confirmation prompt:
   file; tasks start without account-default connectors or skills.
 - `/grok <instructions>` or `grok build <instructions>` → `scripts/run_grok.sh <instructions>` for
   a headless, high-reasoning Grok task with non-bypass permissions, a minimal provider-auth
-  projection, and Grok's fail-closed strict filesystem sandbox. It requires an explicit
+  projection, provider-documented isolated `dontAsk` settings with bypass locked off, and Grok's
+  fail-closed strict filesystem sandbox with the repository read-only. It requires an explicit
   `XAI_API_KEY` (or the legacy named key); shared-file OAuth fails closed because Grok applies the
   sandbox to both provider and model-tool reads.
 - `/devin <instructions>` → `scripts/run_devin.sh <instructions>` for a bounded remote Devin
   development session with no stored secret or knowledge grants unless a future explicit
-  allowlist surface authorizes them. Its creation and poll requests share the configured wait
-  budget; zero wait retains create-and-return behavior.
+  allowlist surface authorizes them. Its creation and poll requests use bounded response bodies and
+  share a hard wall-clock wait budget; zero wait retains create-and-return behavior.
 
 The slash spellings are Claude Code managed aliases. Codex uses `$elves fugu|manus|grok|devin …`
 or natural language; **never invent top-level Codex slash commands**. These are optional paid
