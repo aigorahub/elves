@@ -678,11 +678,12 @@ python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup</code></pre>
             skills.</li>
           <li><strong>Grok</strong> runs the installed Grok Build CLI headlessly at high reasoning
             without bypassing permissions over a disposable tracked-source snapshot in a required
-            outer kernel sandbox. Grok also uses its inner <code>strict</code> profile,
+            outer kernel sandbox. Grok also uses its built-in inner <code>strict</code> profile,
             provider-documented isolated <code>dontAsk</code> settings, and a bypass lock. It
             requires an explicit <code>XAI_API_KEY</code>; a dedicated tool shell removes both key
-            names before model-directed commands run. Shared-file OAuth is rejected because Grok
-            applies its sandbox to both provider and tool reads.</li>
+            names before model-directed commands run, and the Linux boundary omits procfs to block
+            parent-environment inspection. Shared-file OAuth is rejected because Grok applies its
+            sandbox to both provider and tool reads.</li>
           <li><strong>Devin</strong> creates and boundedly follows a remote developer session and
             needs <code>DEVIN_API_KEY</code>. Stored Devin secrets and knowledge are not granted by
             default, and bounded session creation and polling responses share a hard wall-clock

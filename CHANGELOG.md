@@ -25,10 +25,10 @@ All notable changes to the Elves skill are documented here.
   with same-policy diff evidence, including safe deletion patches but not deleted credential paths,
   in a required OS filesystem sandbox and allowlisted environment;
   run Grok over a disposable tracked-source snapshot in Elves' required outer read-only kernel
-  sandbox plus Grok's inner `strict` profile, with an explicit provider key, a tool shell that
-  scrubs both key names before model-directed commands, provider-documented isolated `dontAsk`, and
-  a bypass lock, while rejecting shared-file OAuth that the provider/tool sandbox cannot safely
-  separate;
+  sandbox plus Grok's built-in inner `strict` profile, with an explicit provider key, a tool shell that
+  scrubs both key names before model-directed commands, no Linux procfs for parent-environment
+  inspection, provider-documented isolated `dontAsk`, and a bypass lock, while rejecting
+  shared-file OAuth that the provider/tool sandbox cannot safely separate;
   disable Manus account-default connectors and skills; confine new/resumed Manus manifests to
   `.elves/runtime/manus/` through no-follow traversal, exclusively reserve new records before
   upload, and never overwrite; and

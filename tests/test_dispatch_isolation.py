@@ -1515,6 +1515,24 @@ class IsolationSandboxRegressionTests(unittest.TestCase):
             self.assertNotIn(("--ro-bind-try", "/run", "/run"), triples)
             self.assertNotIn(("--ro-bind-try", "/etc", "/etc"), triples)
 
+    def test_bwrap_can_omit_proc_for_credential_bearing_process(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            executable = root / "fake-agent"
+            executable.write_text("#!/bin/sh\nexit 0\n")
+            executable.chmod(executable.stat().st_mode | stat.S_IXUSR)
+            lane = self._lane(root / "lane", backend="bwrap")
+            lane.env["PATH"] = f"{root}:/usr/bin:/bin"
+
+            argv = wrap_argv_with_sandbox(
+                ["fake-agent", "--version"], lane, mount_proc=False
+            )
+
+            pairs = list(zip(argv, argv[1:]))
+            self.assertNotIn(("--proc", "/proc"), pairs)
+            self.assertIn("--unshare-all", argv)
+            self.assertIn(("--dev", "/dev"), pairs)
+
     def test_bwrap_never_mounts_entire_hidden_agent_install_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -226,11 +226,12 @@ required capability, then execute it without an extra confirmation prompt:
   file; tasks start without account-default connectors or skills.
 - `/grok <instructions>` or `grok build <instructions>` → `scripts/run_grok.sh <instructions>` for
   a headless, high-reasoning Grok task with non-bypass permissions over a disposable tracked-source
-  snapshot in Elves' required outer kernel sandbox, plus Grok's inner `strict` profile,
+  snapshot in Elves' required outer kernel sandbox, plus Grok's built-in inner `strict` profile,
   provider-documented isolated `dontAsk` settings, and bypass locked off. It requires an explicit
   `XAI_API_KEY` (or the legacy named key); its dedicated tool shell removes both key names before
-  model-directed commands run. Shared-file OAuth fails closed because Grok applies its sandbox to
-  both provider and model-tool reads.
+  model-directed commands run, and its Linux boundary omits procfs to prevent parent-environment
+  inspection. Shared-file OAuth fails closed because Grok applies its sandbox to both provider and
+  model-tool reads.
 - `/devin <instructions>` → `scripts/run_devin.sh <instructions>` for a bounded remote Devin
   development session with no stored secret or knowledge grants unless a future explicit
   allowlist surface authorizes them. Its creation and poll requests use bounded response bodies and

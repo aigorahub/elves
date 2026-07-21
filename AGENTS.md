@@ -52,8 +52,9 @@ assume `./scripts` belongs to the target repository and do not execute mappings 
   one-task-per-item execution and `--resume <manifest>` for duplicate-safe continuation; new
   manifests are reserved before provider uploads
 - Grok Build task → `run_grok.sh <instructions>` (headless, non-bypass permissions, disposable
-  tracked-source snapshot in a required outer kernel sandbox, inner `strict`, isolated `dontAsk`
-  plus bypass lock, explicit `XAI_API_KEY`, and a key-scrubbing tool shell; no shared OAuth file)
+  tracked-source snapshot in a required outer kernel sandbox, built-in inner `strict`, isolated `dontAsk`
+  plus bypass lock, explicit `XAI_API_KEY`, a key-scrubbing tool shell, and no Linux procfs; no
+  shared OAuth file)
 - Devin task → `run_devin.sh <instructions>` (remote session, bounded wait, no default stored
   secret or knowledge grants; creation and polling share one hard wall-clock bound)
 

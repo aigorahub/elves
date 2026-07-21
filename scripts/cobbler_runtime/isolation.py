@@ -1380,8 +1380,16 @@ def _macos_executable_access(
 def wrap_argv_with_sandbox(
     argv: Sequence[str],
     lane: IsolatedLane,
+    *,
+    mount_proc: bool = True,
 ) -> list[str]:
-    """Prefix argv with sandbox backend when configured."""
+    """Prefix argv with sandbox backend when configured.
+
+    Credential-bearing processes may set ``mount_proc=False`` so their
+    model-directed descendants cannot inspect the parent environment through a
+    fresh procfs. The default remains enabled for existing supervised routes
+    that require process discovery inside the namespace.
+    """
     cmd = list(argv)
     if not cmd:
         raise ValidationIssue("empty_command", "empty command")
@@ -1494,8 +1502,7 @@ def wrap_argv_with_sandbox(
             ),
             "--dev",
             "/dev",
-            "--proc",
-            "/proc",
+            *(["--proc", "/proc"] if mount_proc else []),
             "--chdir",
             str(lane.snapshot),
             *cmd,

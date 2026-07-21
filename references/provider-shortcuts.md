@@ -51,10 +51,13 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
   sandbox, which makes that snapshot read-only independently of Grok's profile merger. It constructs
   isolated HOME/GROK_HOME state, projects only the selected named key to Grok itself, and selects a
   dedicated shell that unsets both supported key names before every model-directed terminal command.
-  Grok also runs its custom inner `strict` profile with child network and credential-file denies. The
+  Grok also runs its built-in inner `strict` profile for narrow reads and Linux child-network
+  restriction; it does not add a custom read-deny profile because Grok implements that profile with
+  a nested Linux bwrap that would recreate procfs. The outer snapshot policy removes credential and
+  executable configuration paths instead. The
   runner writes `permissions.defaultMode: dontAsk` to isolated Claude-compatible settings (the
   similarly named CLI flag does not activate this mode) and locks bypass mode off in isolated Grok
-  requirements. Both outer and inner sandbox application fail closed.
+  requirements. The required outer sandbox fails closed.
   Shared-file OAuth is deliberately unsupported by the shortcut: Grok applies the profile to
   provider authentication reads as well as model tools, so a file grant would expose the credential
   and a deny would prevent authentication. It
@@ -155,12 +158,12 @@ installation and command details are at
 [`console.sakana.ai/get-started`](https://console.sakana.ai/get-started) and
 [`SakanaAI/fugu`](https://github.com/SakanaAI/fugu/blob/main/docs/commands_details.md).
 
-Fugu's project access is the disposable tracked-source snapshot, not the host checkout: ignored
-and untracked files, `.git`, `.elves`, executable agent configuration, and ordinary credential
-stores are absent and outside the kernel read boundary. Grok intentionally works in the target
-checkout for build tasks, but its strict sandbox confines reads to that checkout/system roots and
-the custom deny list blocks common credential files inside the checkout. Repositories must still
-apply their provider/data-governance policy before invoking either optional paid route.
+Fugu and Grok project access is a disposable tracked-source snapshot, not the host checkout:
+ignored and untracked files, `.git`, `.elves`, executable agent configuration, and ordinary
+credential stores are absent and outside the kernel read boundary. Grok's Linux boundary also
+omits procfs so model-directed commands cannot inspect the credential-bearing parent environment.
+Repositories must still apply their provider/data-governance policy before invoking either
+optional paid route.
 
 `MANUS_MAX_WAIT_SECONDS=0` and `DEVIN_MAX_WAIT_SECONDS=0` provide create-and-return behavior. In a
 Manus roster mode the printed manifest, rather than “last task,” is the authoritative follow and

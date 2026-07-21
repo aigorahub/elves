@@ -75,11 +75,12 @@ attachments, and duplicate-safe `--resume` that retries only known-failed steps;
 are validated and exclusively reserved before any upload. Devin creates a bounded remote task,
 including its creation request, without granting stored secrets or knowledge by default. Grok uses
 headless high-reasoning mode without approval bypass over a disposable tracked-source snapshot in
-Elves' required outer kernel sandbox, plus Grok's inner `strict` profile, provider-documented
+Elves' required outer kernel sandbox, plus Grok's built-in inner `strict` profile, provider-documented
 isolated `dontAsk` settings, and bypass mode locked off. The shortcut requires an explicit
 `XAI_API_KEY`; a dedicated Grok tool shell removes both supported key names before any
-model-directed command runs. It does not expose a shared OAuth file because Grok applies the same
-sandbox to provider and tool reads. Manus
+model-directed command runs, and the Linux boundary omits procfs to prevent parent-environment
+inspection. It does not expose a shared OAuth file because Grok applies the same sandbox to
+provider and tool reads. Manus
 tasks likewise start with no account-default connectors or skills. See
 [`references/provider-shortcuts.md`](references/provider-shortcuts.md) for requirements, auth
 environment names, timeouts, and follow behavior.

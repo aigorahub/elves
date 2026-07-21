@@ -117,24 +117,11 @@ try:
             )
             (grok_home / "config.toml").chmod(0o600)
 
-        # Grok applies this inner profile to itself and all of its tools. The
-        # outer Elves sandbox is the independent write veto: it mounts/allows
-        # the tracked snapshot read-only while leaving only isolated HOME/TMP
-        # writable. The inner profile narrows reads and blocks child network.
-        (grok_home / "sandbox.toml").write_text(
-            "[profiles.elves-shortcut]\n"
-            'extends = "strict"\n'
-            "restrict_network = true\n"
-            "deny = [\n"
-            '  "**/.env", "**/.env.*", "**/.netrc", "**/.npmrc",\n'
-            '  "**/.pypirc", "**/.git-credentials", "**/.ssh/**",\n'
-            '  "**/.aws/**", "**/.gnupg/**", "**/.credentials*",\n'
-            '  "**/credentials", "**/credentials.json",\n'
-            '  "**/*.pem", "**/*.key", "**/*.p12", "**/*.pfx"\n'
-            "]\n",
-            encoding="utf-8",
-        )
-        (grok_home / "sandbox.toml").chmod(0o600)
+        # Grok's built-in strict profile narrows reads and blocks child network
+        # on Linux. Do not add a custom deny profile here: Grok implements Linux
+        # read-deny with a nested bwrap re-exec that mounts procfs. The outer
+        # Elves sandbox already removes credential/config paths, independently
+        # vetoes snapshot writes, and deliberately leaves procfs unmounted.
 
         # Grok itself needs the provider variable, but model-directed terminal
         # commands do not. GROK_SHELL is Grok's documented shell-selection
@@ -165,7 +152,7 @@ try:
                 "--cwd",
                 str(lane.snapshot),
                 "--sandbox",
-                "elves-shortcut",
+                "strict",
                 "--effort",
                 "high",
                 "--output-format",
@@ -174,6 +161,7 @@ try:
                 "--single=" + prompt,
             ],
             lane,
+            mount_proc=False,
         )
         completed = subprocess.run(
             command,

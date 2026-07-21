@@ -137,6 +137,7 @@ class LocalCliRunnerTests(unittest.TestCase):
             "  if [ -n \"${XAI_API_KEY:-}\" ]; then printf 'provider-auth=<current>\\n'; fi\n"
             "  if [ -n \"${GROK_CODE_XAI_API_KEY:-}\" ]; then printf 'provider-auth=<legacy>\\n'; fi\n"
             "  \"$GROK_SHELL\" -lc 'printf '\"'\"'tool-current=<%s> tool-legacy=<%s>\\n'\"'\"' \"${XAI_API_KEY:-}\" \"${GROK_CODE_XAI_API_KEY:-}\"'\n"
+            "  \"$GROK_SHELL\" -lc 'if [ -r \"/proc/$PPID/environ\" ] && tr \"\\000\" \"\\n\" < \"/proc/$PPID/environ\" | grep -aEq \"^(XAI_API_KEY|GROK_CODE_XAI_API_KEY)=\"; then printf \"proc-parent-key=<visible>\\n\"; else printf \"proc-parent-key=<hidden>\\n\"; fi'\n"
             "  if printf 'forbidden\\n' > \"$PWD/grok-write-attempt\" 2>/dev/null; then\n"
             "    printf 'snapshot-write=<allowed>\\n'\n"
             "  else\n"
@@ -379,6 +380,7 @@ class LocalCliRunnerTests(unittest.TestCase):
             self.assertIn("unrelated-secret=<>", result.stdout)
             self.assertIn(f"provider-auth=<{expected_auth}>", result.stdout)
             self.assertIn("tool-current=<> tool-legacy=<>", result.stdout)
+            self.assertIn("proc-parent-key=<hidden>", result.stdout)
             self.assertIn("snapshot-write=<blocked>", result.stdout)
             self.assertIn("<--single=inspect this>", result.stdout)
             self.assertIn('config=<    "defaultMode": "dontAsk">', result.stdout)
@@ -389,7 +391,7 @@ class LocalCliRunnerTests(unittest.TestCase):
             self.assertIn("<high>", result.stdout)
             self.assertIn("<--check>", result.stdout)
             self.assertIn("<--sandbox>", result.stdout)
-            self.assertIn("<elves-shortcut>", result.stdout)
+            self.assertIn("<strict>", result.stdout)
             self.assertNotIn("reasoning-effort", result.stdout)
             self.assertNotIn("always-approve", result.stdout)
             self.assertNotIn("bypassPermissions", result.stdout)
