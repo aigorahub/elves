@@ -129,7 +129,11 @@ try:
         # removed, so descendants cannot recover either variable.
         shell_dir = home / "bin"
         shell_dir.mkdir(mode=0o700)
-        scrub_shell = shell_dir / "grok-tool-shell"
+        # Grok resolves its configured terminal by shell basename and currently
+        # accepts standard names such as bash/zsh. Keep the credential scrubber
+        # on that documented-compatible surface instead of using a custom name
+        # that the real CLI would reject before executing it.
+        scrub_shell = shell_dir / "bash"
         scrub_shell.write_text(
             "#!/bin/bash\n"
             "unset XAI_API_KEY GROK_CODE_XAI_API_KEY\n"

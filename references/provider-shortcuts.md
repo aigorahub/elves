@@ -42,8 +42,11 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
   repository changes.
 - **Manus:** requires `MANUS_API_KEY`. The ordinary form creates one private `manus-1.6-max` task
   through `https://api.manus.ai/v2/task.create` with `x-manus-api-key`, explicitly empty
-  `connectors`, `enable_skills`, and `force_skills`, then polls with a bounded timeout. Roster forms
-  add Cobbler-managed Wide Research or deterministic fan-out as described below.
+  `message.connectors`, `message.enable_skills`, and `message.force_skills`, then polls with a
+  bounded timeout. No connector or forced-skill IDs are explicitly granted. Manus documents that
+  empty `enable_skills` loads account-default enabled skills, however, so the shortcut does not
+  promise skill isolation. Roster forms add Cobbler-managed Wide Research or deterministic fan-out
+  as described below.
 - **Grok:** requires the `grok` CLI plus explicit `XAI_API_KEY` (or the legacy
   `GROK_CODE_XAI_API_KEY`). It uses documented headless single-prompt mode, `high`
   reasoning, self-checking, and `dontAsk`, which silently denies unapproved mutations. The runner
@@ -160,8 +163,8 @@ installation and command details are at
 
 Fugu and Grok project access is a disposable tracked-source snapshot, not the host checkout:
 ignored and untracked files, `.git`, `.elves`, executable agent configuration, and ordinary
-credential stores are absent and outside the kernel read boundary. Grok's Linux boundary also
-omits procfs so model-directed commands cannot inspect the credential-bearing parent environment.
+credential stores are absent and outside the kernel read boundary. Both Linux boundaries omit
+procfs so model-directed commands cannot inspect the credential-bearing parent environment.
 Repositories must still apply their provider/data-governance policy before invoking either
 optional paid route.
 

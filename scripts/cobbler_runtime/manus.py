@@ -298,6 +298,17 @@ def _atomic_write_json(path: Path, data: dict[str, Any]) -> None:
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temp_path, path)
+        parent_fd = os.open(
+            path.parent,
+            os.O_RDONLY
+            | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NOFOLLOW", 0),
+        )
+        try:
+            os.fsync(parent_fd)
+        finally:
+            os.close(parent_fd)
     finally:
         if temp_path.exists():
             temp_path.unlink()
@@ -407,6 +418,21 @@ def _load_manifest(path: Path) -> dict[str, Any]:
             raise ManusError(f"Resume manifest fan-out task {item_id} cannot be null.")
         _validate_task_record(task, f"Resume manifest fan-out task {item_id}")
     _validate_task_record(data.get("synthesis_task"), "Resume manifest synthesis task")
+    pending_create = data.setdefault("pending_create", None)
+    if pending_create is not None:
+        if not isinstance(pending_create, dict) or pending_create.get("role") not in {
+            "main",
+            "fanout",
+            "repair",
+            "synthesis",
+        }:
+            raise ManusError("Resume manifest has an invalid pending task creation record.")
+        item_id = pending_create.get("item_id")
+        if item_id is not None and item_id not in expected_ids:
+            raise ManusError("Resume manifest pending task creation has an invalid item id.")
+        started_at = pending_create.get("started_at")
+        if not isinstance(started_at, int) or started_at <= 0:
+            raise ManusError("Resume manifest pending task creation has an invalid timestamp.")
     failures = data.setdefault("failed_task_attempts", [])
     if not isinstance(failures, list) or len(failures) > MAX_FAILED_TASK_ATTEMPTS:
         raise ManusError("Resume manifest has invalid failed task attempt history.")
@@ -523,6 +549,31 @@ def _prepare_resume_task_records(manifest: dict[str, Any], *, repoll_waiting: bo
 
     if refreshed:
         manifest["state"] = "running"
+
+
+def _record_create_intent(
+    manifest: dict[str, Any],
+    manifest_path: Path,
+    role: str,
+    *,
+    item_id: str | None = None,
+) -> None:
+    """Durably mark one paid create as ambiguous until its task id is stored."""
+    if manifest.get("pending_create") is not None:
+        raise ManusError("A Manus task creation is already recorded as pending.")
+    pending: dict[str, Any] = {"role": role, "started_at": int(time.time())}
+    if item_id is not None:
+        pending["item_id"] = item_id
+    manifest["pending_create"] = pending
+    manifest["state"] = "creating"
+    _atomic_write_json(manifest_path, manifest)
+
+
+def _commit_created_task(manifest: dict[str, Any], manifest_path: Path) -> None:
+    """Atomically publish a returned task id and clear its create-intent guard."""
+    manifest["pending_create"] = None
+    manifest["state"] = "running"
+    _atomic_write_json(manifest_path, manifest)
 
 
 def _wide_schema() -> dict[str, Any]:
@@ -776,14 +827,20 @@ class ManusClient:
                 {"type": "file", "file_id": str(attachment["file_id"])}
                 for attachment in attachments
             )
+        # Manus v2 nests capability selection inside `message`. The API
+        # documents empty `enable_skills` as loading the user's enabled
+        # defaults, so this request avoids explicit connector/forced-skill IDs
+        # but intentionally does not claim complete skill isolation.
         payload: dict[str, Any] = {
-            "message": {"content": content},
+            "message": {
+                "content": content,
+                "connectors": [],
+                "enable_skills": [],
+                "force_skills": [],
+            },
             "agent_profile": profile,
             "hide_in_task_list": False,
             "share_visibility": "private",
-            "connectors": [],
-            "enable_skills": [],
-            "force_skills": [],
         }
         if title:
             payload["title"] = title
@@ -1064,7 +1121,19 @@ def _orchestrate(
     attachments = manifest.get("attachments") or []
     mode = manifest["mode"]
 
+    pending_create = manifest.get("pending_create")
+    if pending_create is not None:
+        role = pending_create.get("role", "unknown")
+        item_id = pending_create.get("item_id")
+        label = f"{role}:{item_id}" if item_id else str(role)
+        raise ManusError(
+            "Manifest records an ambiguous in-flight Manus task creation "
+            f"({label}). The provider may have accepted the paid request, so resume refuses to "
+            "create a duplicate. Reconcile the provider task list and manifest manually."
+        )
+
     if mode == "wide" and not manifest.get("main_task"):
+        _record_create_intent(manifest, manifest_path, "main")
         task = client.create_task(
             _task_prompt(prompt, items),
             profile=manifest["profile"],
@@ -1073,8 +1142,7 @@ def _orchestrate(
             schema=_wide_schema(),
         )
         manifest["main_task"] = task
-        manifest["state"] = "running"
-        _atomic_write_json(manifest_path, manifest)
+        _commit_created_task(manifest, manifest_path)
         _print_task(task, "Manus Wide Research task initiated")
 
     if mode == "fanout":
@@ -1086,6 +1154,9 @@ def _orchestrate(
             last_created = _rate_limited_create_pause(
                 last_created, create_interval, client.deadline
             )
+            _record_create_intent(
+                manifest, manifest_path, "fanout", item_id=item["id"]
+            )
             task = client.create_task(
                 _fanout_prompt(prompt, item),
                 profile=manifest["profile"],
@@ -1094,7 +1165,7 @@ def _orchestrate(
                 schema=_single_schema(),
             )
             fanout[item["id"]] = task
-            _atomic_write_json(manifest_path, manifest)
+            _commit_created_task(manifest, manifest_path)
             _print_task(task, f"Manus fan-out item {item['id']}")
 
     if max_wait == 0:
@@ -1162,6 +1233,7 @@ def _orchestrate(
                 last_created, create_interval, client.deadline
             )
             item = item_by_id[item_id]
+            _record_create_intent(manifest, manifest_path, "repair", item_id=item_id)
             fanout[item_id] = client.create_task(
                 _fanout_prompt(prompt, item),
                 profile=manifest["profile"],
@@ -1169,7 +1241,7 @@ def _orchestrate(
                 attachments=attachments,
                 schema=_single_schema(),
             )
-            _atomic_write_json(manifest_path, manifest)
+            _commit_created_task(manifest, manifest_path)
             _print_task(fanout[item_id], f"Manus coverage repair {item_id}")
         _wait_tasks(client, [fanout[item_id] for item_id in missing], interval)
         for item_id in missing:
@@ -1232,6 +1304,7 @@ def _orchestrate(
             "Return the requested structured output with one row per expected item."
         )
         _rate_limited_create_pause(time.monotonic(), create_interval, client.deadline)
+        _record_create_intent(manifest, manifest_path, "synthesis")
         manifest["synthesis_task"] = client.create_task(
             synthesis_prompt,
             profile=manifest["profile"],
@@ -1240,7 +1313,7 @@ def _orchestrate(
             schema=_wide_schema(),
         )
         _print_task(manifest["synthesis_task"], "Manus synthesis task initiated")
-        _atomic_write_json(manifest_path, manifest)
+        _commit_created_task(manifest, manifest_path)
 
     synthesis = manifest.get("synthesis_task")
     if synthesis and synthesis.get("status") not in TERMINAL_STATUSES:
@@ -1441,6 +1514,7 @@ def main(argv: list[str] | None = None) -> int:
         "main_task": None,
         "fanout_tasks": {},
         "synthesis_task": None,
+        "pending_create": None,
         "failed_task_attempts": [],
         "coverage": {
             "expected": [item["id"] for item in items],

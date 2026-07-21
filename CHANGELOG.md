@@ -23,15 +23,19 @@ All notable changes to the Elves skill are documented here.
   credential-path refusal, and cover retry/recovery behavior hermetically.
 - Harden every provider boundary after independent review: run Fugu over a tracked-only snapshot
   with same-policy diff evidence, including safe deletion patches but not deleted credential paths,
-  in a required OS filesystem sandbox and allowlisted environment;
+  in a required OS filesystem sandbox and allowlisted environment, without Linux procfs exposing
+  the credential-bearing parent;
   run Grok over a disposable tracked-source snapshot in Elves' required outer read-only kernel
   sandbox plus Grok's built-in inner `strict` profile, with an explicit provider key, a tool shell that
   scrubs both key names before model-directed commands, no Linux procfs for parent-environment
   inspection, provider-documented isolated `dontAsk`, and a bypass lock, while rejecting
   shared-file OAuth that the provider/tool sandbox cannot safely separate;
-  disable Manus account-default connectors and skills; confine new/resumed Manus manifests to
+  send Manus's connector and skill-selection lists at the documented nested `message` location,
+  avoid explicit connector/forced-skill grants, and disclose that empty `enable_skills` loads
+  account defaults instead of claiming skill isolation; confine new/resumed Manus manifests to
   `.elves/runtime/manus/` through no-follow traversal, exclusively reserve new records before
-  upload, and never overwrite; and
+  upload, never overwrite, and durably mark paid roster-task create intent so interrupted task-ID
+  persistence fails closed against duplicate resume; and
   give Devin empty secret/knowledge grants plus bounded response bodies and hard wall-clock
   creation/poll timeouts capped by one wait budget. Manus API and upload bodies use the same hard
   deadline instead of relying on socket-idle timeouts.

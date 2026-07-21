@@ -44,13 +44,14 @@ assume `./scripts` belongs to the target repository and do not execute mappings 
 
 - Fugu review → `run_fugu.sh [--deep|--ultra] <task>` (project-aware `codex-fugu`, tracked-only
   snapshot and same-policy diff evidence, including safe deletion patches, plus required kernel
-  read sandbox; regular `fugu/high` by default, `fugu/xhigh` for `--deep`, `fugu-ultra/high` for
-  `--ultra`)
+  read sandbox with no Linux procfs; regular `fugu/high` by default, `fugu/xhigh` for `--deep`,
+  `fugu-ultra/high` for `--ultra`)
 - Manus research → `run_manus.sh <topic>` for one private bounded task, or
   `run_manus.sh --wide --items-file <roster.json> [--file <source>] <goal>` for Cobbler-managed
   native-Wide-first research with exact coverage repair; use `--fanout` for deterministic
   one-task-per-item execution and `--resume <manifest>` for duplicate-safe continuation; new
-  manifests are reserved before provider uploads
+  manifests are reserved before provider uploads, and ambiguous paid creates fail closed pending
+  operator reconciliation
 - Grok Build task → `run_grok.sh <instructions>` (headless, non-bypass permissions, disposable
   tracked-source snapshot in a required outer kernel sandbox, built-in inner `strict`, isolated `dontAsk`
   plus bypass lock, explicit `XAI_API_KEY`, a key-scrubbing tool shell, and no Linux procfs; no

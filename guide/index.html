@@ -661,6 +661,8 @@ python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup</code></pre>
             <code>codex-fugu</code> review over a tracked-only snapshot in a required kernel
             filesystem sandbox. Generated diff evidence is filtered by the same snapshot policy,
             including safe deletion patches while suppressing deleted credential paths.
+            Its Linux boundary omits procfs so model-directed commands cannot inspect the
+            credential-bearing parent environment.
             It uses regular
             <code>fugu/high</code> by default, <code>fugu/xhigh</code> with
             <code>--deep</code>, or <code>fugu-ultra/high</code> with
@@ -674,8 +676,12 @@ python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup</code></pre>
             <code>--resume</code> with the printed ignored manifest. Resume preserves successful
             and live task IDs while archiving and retrying only known-failed steps. New manifests
             stay under <code>.elves/runtime/manus/</code>, are exclusively reserved before upload,
-            never replace existing files, and tasks start without account-default connectors or
-            skills.</li>
+            never replace existing files, and durably mark each roster-task creation before its
+            request so an interrupted task-ID write cannot trigger an automatic duplicate. Requests
+            place empty connector, enabled-skill, and forced-skill lists under <code>message</code>, granting no
+            connector or forced-skill IDs explicitly. Manus documents that empty
+            <code>enable_skills</code> loads account-default enabled skills, so this route does not
+            promise skill isolation.</li>
           <li><strong>Grok</strong> runs the installed Grok Build CLI headlessly at high reasoning
             without bypassing permissions over a disposable tracked-source snapshot in a required
             outer kernel sandbox. Grok also uses its built-in inner <code>strict</code> profile,

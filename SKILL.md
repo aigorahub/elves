@@ -212,8 +212,9 @@ required capability, then execute it without an extra confirmation prompt:
   `scripts/run_fugu.sh [--deep|--ultra] <task>` for a bounded, ephemeral, read-only
   `codex-fugu` repository review over a tracked-only snapshot and required kernel filesystem
   sandbox. Host-generated diff evidence is restricted to paths that survived the same snapshot
-  policy. The default is regular `fugu/high`; `--deep` selects `fugu/xhigh`, and `--ultra` selects
-  `fugu-ultra/high`.
+  policy, and the Linux boundary omits procfs so model-directed commands cannot inspect the
+  credential-bearing parent environment. The default is regular `fugu/high`; `--deep` selects
+  `fugu/xhigh`, and `--ultra` selects `fugu-ultra/high`.
 - `/manus <topic>` → `scripts/run_manus.sh <topic>` for one private, bounded Manus deep-web task.
   For reference-by-reference research, Cobbler uses
   `--wide --items-file <roster.json> [--file <source>] <goal>`: request native Wide Research,
@@ -223,7 +224,11 @@ required capability, then execute it without an extra confirmation prompt:
   successful or live tasks, while archiving and retrying only known-failed steps. Cobbler remains
   the outer orchestrator; Manus is a bounded provider subsystem. New manifests are confined to
   that runtime tree, are exclusively reserved before uploads, and never overwrite an existing
-  file; tasks start without account-default connectors or skills.
+  file. Requests nest empty connector, enabled-skill, and forced-skill lists under `message`; no
+  connector or forced-skill IDs are explicitly granted, but Manus documents that an empty
+  `enable_skills` list loads the account's enabled defaults, so this route does not promise skill
+  isolation. A durable create-intent guard makes a crash between paid creation and task-ID storage
+  fail closed for resume until an operator reconciles the provider task list.
 - `/grok <instructions>` or `grok build <instructions>` → `scripts/run_grok.sh <instructions>` for
   a headless, high-reasoning Grok task with non-bypass permissions over a disposable tracked-source
   snapshot in Elves' required outer kernel sandbox, plus Grok's built-in inner `strict` profile,

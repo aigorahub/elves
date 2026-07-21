@@ -499,6 +499,7 @@ say exactly \"No actionable findings\" and list only residual verification risks
                 "-",
             ],
             lane,
+            mount_proc=False,
         )
 
         process = subprocess.Popen(

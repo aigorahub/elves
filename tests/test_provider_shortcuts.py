@@ -136,8 +136,10 @@ class LocalCliRunnerTests(unittest.TestCase):
             "if [ \"$(basename \"$0\")\" = grok ]; then\n"
             "  if [ -n \"${XAI_API_KEY:-}\" ]; then printf 'provider-auth=<current>\\n'; fi\n"
             "  if [ -n \"${GROK_CODE_XAI_API_KEY:-}\" ]; then printf 'provider-auth=<legacy>\\n'; fi\n"
-            "  \"$GROK_SHELL\" -lc 'printf '\"'\"'tool-current=<%s> tool-legacy=<%s>\\n'\"'\"' \"${XAI_API_KEY:-}\" \"${GROK_CODE_XAI_API_KEY:-}\"'\n"
-            "  \"$GROK_SHELL\" -lc 'if [ -r \"/proc/$PPID/environ\" ] && tr \"\\000\" \"\\n\" < \"/proc/$PPID/environ\" | grep -aEq \"^(XAI_API_KEY|GROK_CODE_XAI_API_KEY)=\"; then printf \"proc-parent-key=<visible>\\n\"; else printf \"proc-parent-key=<hidden>\\n\"; fi'\n"
+            "  case \"$(basename \"$GROK_SHELL\")\" in bash|zsh) TOOL_SHELL=$GROK_SHELL ;; *) TOOL_SHELL=/bin/bash ;; esac\n"
+            "  printf 'tool-shell=<%s>\\n' \"$(basename \"$TOOL_SHELL\")\"\n"
+            "  \"$TOOL_SHELL\" -lc 'printf '\"'\"'tool-current=<%s> tool-legacy=<%s>\\n'\"'\"' \"${XAI_API_KEY:-}\" \"${GROK_CODE_XAI_API_KEY:-}\"'\n"
+            "  \"$TOOL_SHELL\" -lc 'if [ -r \"/proc/$PPID/environ\" ] && tr \"\\000\" \"\\n\" < \"/proc/$PPID/environ\" | grep -aEq \"^(XAI_API_KEY|GROK_CODE_XAI_API_KEY)=\"; then printf \"proc-parent-key=<visible>\\n\"; else printf \"proc-parent-key=<hidden>\\n\"; fi'\n"
             "  if printf 'forbidden\\n' > \"$PWD/grok-write-attempt\" 2>/dev/null; then\n"
             "    printf 'snapshot-write=<allowed>\\n'\n"
             "  else\n"
@@ -167,6 +169,7 @@ class LocalCliRunnerTests(unittest.TestCase):
             "    printf 'evidence=<%s>\\n' \"$line\"\n"
             "  done < _elves_review/change-context.txt\n"
             "fi\n"
+            "/usr/bin/env -u SAKANA_API_KEY /bin/sh -c 'if [ -r \"/proc/$PPID/environ\" ] && tr \"\\000\" \"\\n\" < \"/proc/$PPID/environ\" | grep -aEq \"^SAKANA_API_KEY=\"; then printf \"proc-parent-key=<visible>\\n\"; else printf \"proc-parent-key=<hidden>\\n\"; fi'\n"
             "while IFS= read -r line || [ -n \"$line\" ]; do \n"
             "  printf 'prompt=<%s>\\n' \"$line\"\n"
             "done\n",
@@ -214,6 +217,7 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertIn("arg=<->", result.stdout)
         self.assertIn("prompt=<Review task: review the auth flow>", result.stdout)
         self.assertIn("prompt=<do not ask the caller to paste files", result.stdout)
+        self.assertIn("proc-parent-key=<hidden>", result.stdout)
         self.assertNotIn("arg=<fugu-ultra>", result.stdout)
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
@@ -379,6 +383,7 @@ class LocalCliRunnerTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("unrelated-secret=<>", result.stdout)
             self.assertIn(f"provider-auth=<{expected_auth}>", result.stdout)
+            self.assertIn("tool-shell=<bash>", result.stdout)
             self.assertIn("tool-current=<> tool-legacy=<>", result.stdout)
             self.assertIn("proc-parent-key=<hidden>", result.stdout)
             self.assertIn("snapshot-write=<blocked>", result.stdout)
@@ -472,9 +477,12 @@ class RemoteApiRunnerTests(unittest.TestCase):
         self.assertEqual(create[3]["message"]["content"], "research topic")
         self.assertEqual(create[3]["agent_profile"], "manus-1.6-max")
         self.assertEqual(create[3]["share_visibility"], "private")
-        self.assertEqual(create[3]["connectors"], [])
-        self.assertEqual(create[3]["enable_skills"], [])
-        self.assertEqual(create[3]["force_skills"], [])
+        self.assertEqual(create[3]["message"]["connectors"], [])
+        self.assertEqual(create[3]["message"]["enable_skills"], [])
+        self.assertEqual(create[3]["message"]["force_skills"], [])
+        self.assertNotIn("connectors", create[3])
+        self.assertNotIn("enable_skills", create[3])
+        self.assertNotIn("force_skills", create[3])
 
     def test_manus_create_slow_drip_cannot_outlive_wait_budget(self) -> None:
         def responder(method, path, _payload):
@@ -626,9 +634,12 @@ class RemoteApiRunnerTests(unittest.TestCase):
         payload = creates[0][3]
         self.assertEqual(payload["share_visibility"], "private")
         self.assertEqual(payload["agent_profile"], "manus-1.6-max")
-        self.assertEqual(payload["connectors"], [])
-        self.assertEqual(payload["enable_skills"], [])
-        self.assertEqual(payload["force_skills"], [])
+        self.assertEqual(payload["message"]["connectors"], [])
+        self.assertEqual(payload["message"]["enable_skills"], [])
+        self.assertEqual(payload["message"]["force_skills"], [])
+        self.assertNotIn("connectors", payload)
+        self.assertNotIn("enable_skills", payload)
+        self.assertNotIn("force_skills", payload)
         self.assertIn("structured_output_schema", payload)
         self.assertEqual(
             payload["message"]["content"][1],
@@ -638,6 +649,75 @@ class RemoteApiRunnerTests(unittest.TestCase):
             "exactly one independent research subagent",
             payload["message"]["content"][0]["text"],
         )
+
+    def test_manus_create_intent_prevents_ambiguous_resume_duplication(self) -> None:
+        observed_pending: list[object] = []
+        manifest_path: Path
+
+        def responder(method, path, _payload):
+            if method == "POST" and path == "/task.create":
+                current = json.loads(manifest_path.read_text(encoding="utf-8"))
+                observed_pending.append(current.get("pending_create"))
+                return 200, {"data": {"task_id": "fanout-created"}}
+            return 404, {"error": "unexpected"}
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            items_path = root / "items.json"
+            items_path.write_text('["ref-a"]', encoding="utf-8")
+            manifest_path = root / ".elves" / "runtime" / "manus" / "manifest.json"
+            server = CaptureServer(responder)
+            env = {
+                "MANUS_API_KEY": "intent-key",
+                "MANUS_API_BASE": server.base_url,
+                "MANUS_CREATE_INTERVAL_SECONDS": "0.1",
+                "MANUS_POLL_INTERVAL_SECONDS": "0.1",
+                "MANUS_MAX_WAIT_SECONDS": "0",
+            }
+            with server:
+                created = run_script(
+                    "run_manus.sh",
+                    "--fanout",
+                    "--items-file",
+                    str(items_path),
+                    "--manifest",
+                    str(manifest_path),
+                    "audit ref-a",
+                    env=env,
+                    cwd=root,
+                )
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                self.assertIsNone(manifest["pending_create"])
+                manifest["fanout_tasks"] = {}
+                manifest["pending_create"] = {
+                    "role": "fanout",
+                    "item_id": "ref-a",
+                    "started_at": int(time.time()),
+                }
+                manifest["state"] = "creating"
+                manifest_path.write_text(
+                    json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+                    encoding="utf-8",
+                )
+                request_count = len(server.requests)
+                resumed = run_script(
+                    "run_manus.sh",
+                    "--resume",
+                    str(manifest_path),
+                    env=env,
+                    cwd=root,
+                )
+
+        self.assertEqual(created.returncode, 0, created.stderr)
+        self.assertEqual(len(observed_pending), 1)
+        self.assertIsInstance(observed_pending[0], dict)
+        self.assertEqual(observed_pending[0]["role"], "fanout")
+        self.assertEqual(observed_pending[0]["item_id"], "ref-a")
+        self.assertIsInstance(observed_pending[0]["started_at"], int)
+        self.assertEqual(resumed.returncode, 2, resumed.stderr)
+        self.assertIn("ambiguous in-flight Manus task creation", resumed.stderr)
+        self.assertIn("refuses to create a duplicate", resumed.stderr)
+        self.assertEqual(len(server.requests), request_count)
 
     def test_manus_rejects_invalid_modes_before_uploading_files(self) -> None:
         def responder(_method, _path, _payload):
