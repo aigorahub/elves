@@ -12,6 +12,12 @@ All notable changes to the Elves skill are documented here.
   read-only session: regular `fugu/high` by default, `fugu/xhigh` with `--deep`, and
   `fugu-ultra/high` with `--ultra`. Use the Manus v2 task API, documented headless Grok CLI, and
   official Devin sessions API instead of homepage URLs, unbounded agent loops, or shell-built JSON.
+- Add Cobbler-managed Manus research rosters: `--wide` requests native Wide Research and
+  reconciles structured one-result-per-roster-item coverage; missing or duplicated items fall back
+  to deterministic top-level tasks before synthesis. Add explicit file upload, direct `--fanout`,
+  atomic ignored
+  manifests, and duplicate-safe `--resume`, while documenting that the public API cannot force
+  Wide Research or directly create its internal child agents.
 - Ship the runners in installed bundles, preserve managed-alias conflict protection, bound remote
   polling, and add hermetic transport and inventory coverage plus README/guide/host-parity docs.
 

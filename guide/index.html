@@ -663,12 +663,20 @@ python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup</code></pre>
             <code>--deep</code>, or <code>fugu-ultra/high</code> with
             <code>--ultra</code>.</li>
           <li><strong>Manus</strong> creates private, bounded deep-web research and needs
-            <code>MANUS_API_KEY</code>.</li>
+            <code>MANUS_API_KEY</code>. To request one worker per paper or reference, use
+            <code>/manus --wide --items-file references.json &lt;goal&gt;</code>. Cobbler requests
+            native Wide Research, checks exact roster coverage, repairs missing or duplicated
+            items with independently tracked tasks, then synthesizes. Use <code>--fanout</code>
+            to skip the native attempt, <code>--file</code> for explicit sources, and
+            <code>--resume</code> with the printed ignored manifest.</li>
           <li><strong>Grok</strong> runs the installed Grok Build CLI headlessly at high reasoning
             without bypassing permissions.</li>
           <li><strong>Devin</strong> creates and boundedly follows a remote developer session and
             needs <code>DEVIN_API_KEY</code>.</li>
         </ul>
+        <p>Manus chooses whether its internal Wide mode activates; the public API has no documented
+          force-Wide or create-child endpoint. Cobbler's coverage check and deterministic fallback
+          make the result auditable without pretending otherwise.</p>
         <p>These optional routes can consume paid provider capacity. They do not grant merge or
           protected-branch authority. A local timeout leaves the remote Manus or Devin task alive
           and prints its follow link.</p>

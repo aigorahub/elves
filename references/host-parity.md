@@ -31,7 +31,9 @@ native fallback uses the live driver's transport.
 
 Provider shortcuts preserve the same route semantics and authority on both hosts; only Claude Code
 installs the four slash aliases. Codex must use the main skill surface. See
-[`provider-shortcuts.md`](provider-shortcuts.md).
+[`provider-shortcuts.md`](provider-shortcuts.md). This includes Manus roster modes: Claude's
+`/manus --wide|--fanout …` and Codex's `$elves manus --wide|--fanout …` reach the same runner,
+coverage contract, manifest, and resume behavior.
 
 The successful trusted full-run terminal response emits the host-neutral
 `elves-worker-confidence-review-v1` context. Both hosts attach its `review_prompt_block` verbatim

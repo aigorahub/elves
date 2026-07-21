@@ -6,7 +6,7 @@ not change the native-first worker default, the supported-host policy, or landin
 | Intent | Claude Code | Codex / natural language | Runner |
 |---|---|---|---|
 | Fugu repository review | `/fugu [--deep\|--ultra] <task>` | `$elves fugu [--deep\|--ultra] <task>` | `run_fugu.sh` |
-| Manus web research | `/manus <topic>` | `$elves manus <topic>` | `run_manus.sh` |
+| Manus web research | `/manus [--wide\|--fanout] …` | `$elves manus [--wide\|--fanout] …` | `run_manus.sh` |
 | Grok Build headless task | `/grok <instructions>` | `$elves grok <instructions>` | `run_grok.sh` |
 | Devin remote task | `/devin <instructions>` | `$elves devin <instructions>` | `run_devin.sh` |
 
@@ -33,14 +33,81 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
   legacy invocation containing one existing file still works, but the path is only a focus hint;
   the runner never copies file contents into the prompt. With no task, Fugu reviews the current
   repository changes.
-- **Manus:** requires `MANUS_API_KEY`. It creates a private `manus-1.6-max` task through
-  `https://api.manus.ai/v2/task.create` with `x-manus-api-key`, then polls with a bounded timeout.
+- **Manus:** requires `MANUS_API_KEY`. The ordinary form creates one private `manus-1.6-max` task
+  through `https://api.manus.ai/v2/task.create` with `x-manus-api-key`, then polls with a bounded
+  timeout. Roster forms add Cobbler-managed Wide Research or deterministic fan-out as described
+  below.
 - **Grok:** requires the `grok` CLI. It uses documented headless single-prompt mode, `high`
   reasoning, self-checking, and `dontAsk`, which silently denies unapproved mutations. It does not
   invent a model id; the authenticated live Grok configuration selects the available model.
 - **Devin:** requires `DEVIN_API_KEY`. It creates a remote session through the official
   `https://api.devin.ai/v1/sessions` API, includes the current origin/branch when available, and
   polls the documented session endpoint with a bounded timeout.
+
+## Cobbler-managed Manus rosters
+
+Use a roster when the research goal has independently checkable units such as one paper reference,
+company, dataset, or jurisdiction per worker. Cobbler stays the outer orchestrator and Manus is a
+bounded research subsystem:
+
+```text
+/manus --wide --items-file references.json --file draft.pdf audit every cited reference
+/manus --fanout --items-file references.json audit every cited reference
+/manus --resume .elves/runtime/manus/<manifest>.json
+```
+
+Codex uses the same arguments after `$elves manus` or an unambiguous natural-language request. A
+roster is a JSON list of ids or an object containing an `items` list. An item may add bounded,
+item-specific instructions:
+
+```json
+{
+  "items": [
+    {"id": "smith-2024", "instructions": "Verify the theorem attributed in section 2."},
+    {"id": "lee-2025", "instructions": "Check the dataset size and license."}
+  ]
+}
+```
+
+`--wide` performs this transaction:
+
+1. Create one private Max task with the exact roster, a request for native Wide Research, and a
+   structured coverage schema.
+2. Reconcile returned ids and reject missing, duplicated, failed, or malformed item results.
+3. Create deterministic private repair tasks only for uncovered items, unless `--no-fallback` was
+   requested.
+4. Upload the validated per-item packet and ask Manus to synthesize only after coverage is exact.
+
+Manus documents Wide Research as automatically triggered; its public Task API does not document a
+`wide_research` force switch, a create-child-subtask operation, or parent-linked enumeration of the
+internal Wide workers. Therefore a prompt claiming “one subagent per reference” is a request, not
+proof. The roster result is accepted only after Cobbler's structured coverage check. `--fanout`
+skips the native attempt and guarantees one independently tracked top-level Manus task per roster
+item, then creates one synthesis task. It is the predictable choice when task identity matters more
+than letting Manus choose its internal topology.
+
+The roster is capped at 250 items. Deterministic creates are spaced by 6.1 seconds by default to
+respect Manus's documented 10-create-per-minute limit. Each create is recorded immediately in an
+atomic mode-0600 manifest under the gitignored `.elves/runtime/manus/` directory; `--resume`
+reuses those exact ids and fills only unrecorded work. A native task that enters `waiting` returns
+control without starting fallback work. Exit 4 means coverage remains incomplete, 3 means Manus is
+waiting, 1 means a remote task failed, and 124 means the local wait expired while recorded remote
+work may still be live. Ambiguous connection/5xx failures on paid mutations are not automatically
+retried because the public API documents no idempotency key; explicit pre-acceptance 425/429
+responses may back off safely.
+
+`--file <path>` uploads only that explicit regular file through Manus's presigned file flow and
+attaches its provider id to the task. Repeat it for multiple sources. Credential-like paths are
+refused; there is no implicit repository upload or project access. Provider file ids expire after
+48 hours, so start or resume attachment-dependent fallback within that window. The manifest can
+contain prompts, local attachment paths, provider ids, and research output, but never the API key;
+it remains local and ignored.
+
+Relevant official surfaces: [Wide Research behavior](https://help.manus.im/en/articles/11960169-what-is-wide-research),
+[create a task](https://open.manus.im/docs/v2/task.create),
+[upload a file](https://open.manus.im/docs/v2/file.upload),
+[list task messages](https://open.manus.im/docs/v2/task.listMessages), and
+[API rate limits](https://open.manus.im/docs/v2/rate-limits).
 
 `SAKANA_FUGU_MAX_WAIT_SECONDS` can replace a profile's wall limit with another finite, positive
 number of seconds. A timeout terminates the entire launcher process group and returns exit 124.
@@ -54,9 +121,11 @@ Project access means the provider-backed agent can read repository content. The 
 credential stores, `.env` files, authentication files, and secret output, but repositories should
 still apply their own provider/data-governance policy before invoking this optional paid route.
 
-`MANUS_MAX_WAIT_SECONDS=0` and `DEVIN_MAX_WAIT_SECONDS=0` provide create-and-return behavior. A
-bounded local timeout does not cancel the remote task; the printed task/session URL remains the
-follow surface. API base overrides exist only for hermetic testing and controlled proxies.
+`MANUS_MAX_WAIT_SECONDS=0` and `DEVIN_MAX_WAIT_SECONDS=0` provide create-and-return behavior. In a
+Manus roster mode the printed manifest, rather than “last task,” is the authoritative follow and
+resume surface. A bounded local timeout does not cancel the remote task; the printed task/session
+URL remains the ordinary follow surface. API base overrides exist only for hermetic testing and
+controlled proxies.
 
 These routes can consume paid provider capacity. They never grant merge, protected-ref, secret,
 or approval-bypass authority, and their output remains evidence for the supported Claude Code or
