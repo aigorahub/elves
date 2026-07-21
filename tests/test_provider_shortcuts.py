@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -131,54 +130,17 @@ class LocalCliRunnerTests(unittest.TestCase):
             "printf 'notice=<%s> update=<%s>\\n' \"$CODEX_FUGU_NO_NOTICE\" \"$CODEX_FUGU_NO_UPDATE\"\n"
             "printf 'unrelated-secret=<%s>\\n' \"${AWS_SECRET_ACCESS_KEY:-}\"\n"
             "printf 'arg=<%s>\\n' \"$@\"\n"
+            "if [ -f _elves_review/change-context.txt ]; then\n"
+            "  while IFS= read -r line || [ -n \"$line\" ]; do\n"
+            "    printf 'evidence=<%s>\\n' \"$line\"\n"
+            "  done < _elves_review/change-context.txt\n"
+            "fi\n"
             "while IFS= read -r line || [ -n \"$line\" ]; do \n"
             "  printf 'prompt=<%s>\\n' \"$line\"\n"
             "done\n",
             encoding="utf-8",
         )
         binary.chmod(0o755)
-        return binary
-
-    def make_native_grok_capture(self, root: Path) -> Path:
-        compiler = shutil.which("cc")
-        if compiler is None:
-            raise unittest.SkipTest("native C compiler unavailable")
-        worker = root / "grok-worker.py"
-        worker.write_text(
-            "import os, sys\n"
-            "from pathlib import Path\n"
-            "if '--version' in sys.argv or (len(sys.argv) > 1 and sys.argv[1] == 'version'):\n"
-            "    print('grok 0.2.93 (test)')\n"
-            "    raise SystemExit(0)\n"
-            "print('auth-path=<' + os.environ.get('GROK_AUTH_PATH', '') + '>')\n"
-            "print((Path(os.environ['GROK_HOME']) / 'sandbox.toml').read_text())\n",
-            encoding="utf-8",
-        )
-        source = root / "grok-launcher.c"
-        source.write_text(
-            "#include <stdlib.h>\n"
-            "#include <unistd.h>\n"
-            'static volatile const char marker[] = "GROK_AUTH_PATH";\n'
-            "int main(int argc, char **argv) {\n"
-            "  if (marker[0] == '\\0') return 126;\n"
-            "  char **forwarded = calloc((size_t)argc + 2, sizeof(char *));\n"
-            "  if (forwarded == NULL) return 127;\n"
-            f"  forwarded[0] = {json.dumps(sys.executable)};\n"
-            f"  forwarded[1] = {json.dumps(str(worker))};\n"
-            "  for (int i = 1; i < argc; i++) forwarded[i + 1] = argv[i];\n"
-            "  forwarded[argc + 1] = NULL;\n"
-            f"  execv({json.dumps(sys.executable)}, forwarded);\n"
-            "  return 127;\n"
-            "}\n",
-            encoding="utf-8",
-        )
-        binary = root / "grok"
-        subprocess.run(
-            [compiler, "-std=c99", str(source), "-o", str(binary)],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
         return binary
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
@@ -246,6 +208,43 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertEqual(ultra.returncode, 0, ultra.stderr)
         self.assertIn("arg=<--model>\narg=<fugu-ultra>", ultra.stdout)
         self.assertIn('arg=<model_reasoning_effort="high">', ultra.stdout)
+
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    def test_fugu_diff_evidence_omits_snapshot_excluded_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_capture_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            subprocess.run(["git", "-C", str(repo), "config", "user.email", "test@example.com"], check=True)
+            subprocess.run(["git", "-C", str(repo), "config", "user.name", "Test"], check=True)
+            safe = repo / "safe.txt"
+            excluded = repo / ".env"
+            safe.write_text("safe baseline\n", encoding="utf-8")
+            excluded.write_text("SECRET_BASELINE_MUST_NOT_CROSS\n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(repo), "add", "safe.txt", ".env"], check=True)
+            subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", "baseline"], check=True)
+            safe.write_text("SAFE_DIFF_MARKER\n", encoding="utf-8")
+            excluded.write_text("SECRET_DIFF_MARKER_MUST_NOT_CROSS\n", encoding="utf-8")
+            result = run_script(
+                "run_fugu.sh",
+                "review filtered changes",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "SAKANA_API_KEY": "test-sakana-key",
+                },
+                cwd=repo,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("SAFE_DIFF_MARKER", result.stdout)
+        self.assertNotIn("SECRET_BASELINE_MUST_NOT_CROSS", result.stdout)
+        self.assertNotIn("SECRET_DIFF_MARKER_MUST_NOT_CROSS", result.stdout)
+        self.assertNotIn("diff --git a/.env", result.stdout)
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
     def test_fugu_legacy_file_is_focus_hint_not_copied_content(self) -> None:
@@ -335,12 +334,12 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertNotIn("always-approve", result.stdout)
         self.assertNotIn("bypassPermissions", result.stdout)
 
-    def test_grok_shared_oauth_is_exact_denied_to_model_tools(self) -> None:
+    def test_grok_shared_oauth_fails_closed_before_provider_launch(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             bin_dir = root / "bin"
             bin_dir.mkdir()
-            self.make_native_grok_capture(bin_dir)
+            self.make_fake(bin_dir, "grok")
             host_home = root / "host-home"
             auth_dir = host_home / ".grok"
             auth_dir.mkdir(parents=True)
@@ -363,11 +362,9 @@ class LocalCliRunnerTests(unittest.TestCase):
                 },
             )
 
-        self.assertEqual(result.returncode, 0, result.stderr)
-        canonical_auth = auth_path.resolve()
-        self.assertIn(f"auth-path=<{canonical_auth}>", result.stdout)
-        self.assertIn(json.dumps(str(canonical_auth)), result.stdout)
-        self.assertNotIn("read_only", result.stdout)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("requires an explicit XAI_API_KEY", result.stderr)
+        self.assertEqual(result.stdout, "")
         self.assertNotIn("provider-refresh-secret", result.stdout)
 
     def test_all_runners_are_executable_bash(self) -> None:
@@ -594,6 +591,42 @@ class RemoteApiRunnerTests(unittest.TestCase):
         self.assertEqual(victim_text, "must survive\n")
         self.assertEqual(runtime_text, "existing runtime data\n")
         self.assertEqual(server.requests, [])
+
+    def test_manus_refuses_symlinked_runtime_root_before_upload(self) -> None:
+        def responder(_method, _path, _payload):
+            return 500, {"error": "no provider request expected"}
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            items = root / "items.json"
+            items.write_text('["ref-a"]', encoding="utf-8")
+            source = root / "private-source.pdf"
+            source.write_bytes(b"must not be uploaded through symlinked runtime")
+            redirected = root / "redirected-manus"
+            redirected.mkdir()
+            runtime_parent = root / ".elves" / "runtime"
+            runtime_parent.mkdir(parents=True)
+            (runtime_parent / "manus").symlink_to(redirected, target_is_directory=True)
+            manifest = runtime_parent / "manus" / "manifest.json"
+            with CaptureServer(responder) as server:
+                result = run_script(
+                    "run_manus.sh",
+                    "--wide",
+                    "--items-file",
+                    str(items),
+                    "--manifest",
+                    str(manifest),
+                    "--file",
+                    str(source),
+                    "research",
+                    env={"MANUS_API_KEY": "key", "MANUS_API_BASE": server.base_url},
+                    cwd=root,
+                )
+
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("symlink", result.stderr)
+        self.assertEqual(server.requests, [])
+        self.assertFalse((redirected / "manifest.json").exists())
 
     def test_manus_does_not_retry_ambiguous_paid_task_creation(self) -> None:
         def responder(_method, _path, _payload):

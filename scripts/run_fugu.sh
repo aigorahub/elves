@@ -271,7 +271,72 @@ def git_text(*args: str, limit: int = 6 * 1024 * 1024) -> str:
     return text
 
 
-def review_context() -> str:
+def git_names(*args: str, limit: int = 32 * 1024 * 1024) -> list[str]:
+    """Read a bounded NUL-delimited Git path list without rendering file bodies."""
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(repo_root), *args],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            check=False,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+    if completed.returncode != 0 or len(completed.stdout) > limit:
+        return []
+    return [os.fsdecode(raw) for raw in completed.stdout.split(b"\0") if raw]
+
+
+def snapshot_source_paths(snapshot: Path) -> set[str]:
+    """Return only original tracked paths that actually survived snapshot policy."""
+    included: set[str] = set()
+    for rel in git_names("ls-files", "-z"):
+        parts = Path(rel).parts
+        if not parts or Path(rel).is_absolute() or ".." in parts:
+            continue
+        candidate = snapshot.joinpath(*parts)
+        try:
+            info = candidate.lstat()
+        except OSError:
+            continue
+        if stat.S_ISREG(info.st_mode):
+            included.add(rel)
+    return included
+
+
+def filtered_diff(allowed: set[str], *range_args: str, limit: int = 6 * 1024 * 1024) -> str:
+    """Render patches only for paths present at their policy-approved snapshot location."""
+    changed = git_names("diff", "--name-only", "--no-renames", "-z", *range_args)
+    selected = sorted({path for path in changed if path in allowed})
+    if not selected:
+        return ""
+    chunks: list[str] = []
+    remaining = limit
+    for offset in range(0, len(selected), 64):
+        if remaining <= 0:
+            break
+        batch = selected[offset : offset + 64]
+        rendered = git_text(
+            "--literal-pathspecs",
+            "diff",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--no-renames",
+            *range_args,
+            "--",
+            *batch,
+            limit=remaining,
+        )
+        chunks.append(rendered)
+        remaining -= len(rendered.encode("utf-8", errors="replace"))
+    if remaining <= 0:
+        chunks.append("\n[review context truncated by Elves]\n")
+    return "".join(chunks)
+
+
+def review_context(snapshot: Path) -> str:
+    allowed = snapshot_source_paths(snapshot)
     base = ""
     for ref in ("origin/main", "origin/master", "main", "master"):
         if git_text("rev-parse", "--verify", "--quiet", ref).strip():
@@ -289,12 +354,12 @@ def review_context() -> str:
                 f"Base commit: {base}",
                 "\nCommits after base:\n" + git_text("log", "--oneline", f"{base}..HEAD"),
                 "\nCommitted change diff:\n"
-                + git_text("diff", "--no-ext-diff", "--no-textconv", f"{base}...HEAD"),
+                + filtered_diff(allowed, f"{base}...HEAD"),
             ]
         )
     sections.append(
         "\nTracked index/worktree diff:\n"
-        + git_text("diff", "--no-ext-diff", "--no-textconv", "HEAD", "--")
+        + filtered_diff(allowed, "HEAD")
     )
     return "\n".join(sections)
 
@@ -356,7 +421,7 @@ try:
         evidence_dir = lane.snapshot / "_elves_review"
         evidence_dir.mkdir(mode=0o700)
         evidence_path = evidence_dir / "change-context.txt"
-        evidence_path.write_text(review_context(), encoding="utf-8")
+        evidence_path.write_text(review_context(lane.snapshot), encoding="utf-8")
         evidence_path.chmod(0o600)
 
         mapped_task = task.replace(str(repo_root), str(lane.snapshot))

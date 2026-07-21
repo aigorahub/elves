@@ -12,6 +12,7 @@ import argparse
 import json
 import math
 import os
+import stat
 import subprocess
 import sys
 import tempfile
@@ -156,65 +157,98 @@ def _runtime_manifest_path(
     """
     repo_root = _repo_root()
     runtime_root = repo_root / ".elves" / "runtime" / "manus"
-    candidate = (
+    supplied = (
         Path(raw).expanduser()
         if raw is not None
         else _default_manifest(mode or "research")
     )
-    canonical_root = runtime_root.resolve(strict=False)
-    canonical_candidate = candidate.resolve(strict=False)
-    if canonical_root not in canonical_candidate.parents:
+    raw_candidate = Path(os.path.abspath(os.fspath(supplied)))
+    lexical_repo: Path | None = None
+    for ancestor in raw_candidate.parents:
+        try:
+            if ancestor.resolve(strict=True) == repo_root:
+                lexical_repo = ancestor
+                break
+        except OSError:
+            continue
+    if lexical_repo is None:
         raise ManusError(
             "Manus manifests must live under "
             f"{runtime_root}; use the printed --resume path for continuation."
         )
-    try:
-        relative_parent = canonical_candidate.parent.relative_to(repo_root)
-    except ValueError as exc:
-        raise ManusError("Manus manifest path escaped the repository runtime tree.") from exc
-    cursor = repo_root
-    for part in relative_parent.parts:
-        cursor = cursor / part
-        if cursor.is_symlink():
-            raise ManusError(f"Manus manifest path may not traverse a symlink: {cursor}")
-        if cursor.exists() and not cursor.is_dir():
-            raise ManusError(f"Manus manifest parent is not a directory: {cursor}")
-    if canonical_candidate.is_symlink() or candidate.is_symlink():
-        raise ManusError(f"Manus manifest may not be a symlink: {canonical_candidate}")
-    if must_exist:
-        if not canonical_candidate.is_file():
-            raise ManusError(
-                f"Resume manifest must be a regular non-symlink file: {canonical_candidate}"
-            )
-    runtime_root.mkdir(parents=True, exist_ok=True)
-    try:
-        runtime_root.chmod(0o700)
-    except OSError:
-        pass
-    canonical_root = runtime_root.resolve()
-    canonical_candidate = candidate.resolve(strict=False)
-    if canonical_root not in canonical_candidate.parents:
-        raise ManusError("Manus manifest path escaped its runtime directory.")
-    if not must_exist:
-        flags = (
-            os.O_WRONLY
-            | os.O_CREAT
-            | os.O_EXCL
-            | getattr(os, "O_CLOEXEC", 0)
-            | getattr(os, "O_NOFOLLOW", 0)
+    relative_manifest = raw_candidate.relative_to(lexical_repo)
+    if relative_manifest.parts[:3] != (".elves", "runtime", "manus"):
+        raise ManusError(
+            "Manus manifests must live under "
+            f"{runtime_root}; use the printed --resume path for continuation."
         )
-        try:
-            descriptor = os.open(canonical_candidate, flags, 0o600)
-        except FileExistsError as exc:
-            raise ManusError(
-                f"Refusing to overwrite an existing Manus manifest: {canonical_candidate}. "
-                "Use --resume to continue it."
-            ) from exc
-        except OSError as exc:
-            raise ManusError(f"Could not reserve Manus manifest: {canonical_candidate}") from exc
+    if len(relative_manifest.parts) < 4:
+        raise ManusError("Manus manifest path must name a file inside the runtime directory.")
+    candidate = repo_root.joinpath(*relative_manifest.parts)
+    relative_parent = relative_manifest.parent
+
+    directory_flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    current_fd = -1
+    leaf_fd = -1
+    try:
+        current_fd = os.open(repo_root, directory_flags)
+        for part in relative_parent.parts:
+            if not must_exist:
+                try:
+                    os.mkdir(part, mode=0o700, dir_fd=current_fd)
+                except FileExistsError:
+                    pass
+            next_fd = os.open(part, directory_flags, dir_fd=current_fd)
+            os.close(current_fd)
+            current_fd = next_fd
+
+        if must_exist:
+            leaf_fd = os.open(
+                candidate.name,
+                os.O_RDONLY
+                | getattr(os, "O_CLOEXEC", 0)
+                | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=current_fd,
+            )
+            if not stat.S_ISREG(os.fstat(leaf_fd).st_mode):
+                raise ManusError(
+                    f"Resume manifest must be a regular non-symlink file: {candidate}"
+                )
         else:
-            os.close(descriptor)
-    return canonical_candidate
+            leaf_fd = os.open(
+                candidate.name,
+                os.O_WRONLY
+                | os.O_CREAT
+                | os.O_EXCL
+                | getattr(os, "O_CLOEXEC", 0)
+                | getattr(os, "O_NOFOLLOW", 0),
+                0o600,
+                dir_fd=current_fd,
+            )
+    except ManusError:
+        raise
+    except FileExistsError as exc:
+        raise ManusError(
+            f"Refusing to overwrite an existing Manus manifest: {candidate}. "
+            "Use --resume to continue it."
+        ) from exc
+    except OSError as exc:
+        action = "read" if must_exist else "reserve"
+        raise ManusError(
+            f"Could not {action} Manus manifest without traversing a symlink or unsafe parent: "
+            f"{candidate}"
+        ) from exc
+    finally:
+        if leaf_fd >= 0:
+            os.close(leaf_fd)
+        if current_fd >= 0:
+            os.close(current_fd)
+    return candidate
 
 
 def _atomic_write_json(path: Path, data: dict[str, Any]) -> None:

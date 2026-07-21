@@ -18,7 +18,8 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
 
 - **Fugu:** requires the official `codex-fugu` launcher and its configured Sakana credentials. The
   runner copies only tracked working-tree files into a disposable snapshot, moves prose agent
-  instructions to inert evidence paths, and adds host-generated branch/diff context. It then
+  instructions to inert evidence paths, and adds host-generated branch/diff context filtered to
+  paths that survived that same snapshot policy. It then
   requires Elves' qualified kernel filesystem sandbox (`sandbox-exec` on macOS or `bwrap` on
   Linux), an isolated HOME/CODEX_HOME, an environment containing only runtime names plus the
   Sakana grant, and a Codex shell policy that does not forward that grant to model-run commands.
@@ -42,13 +43,14 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
   through `https://api.manus.ai/v2/task.create` with `x-manus-api-key`, explicitly empty
   `connectors`, `enable_skills`, and `force_skills`, then polls with a bounded timeout. Roster forms
   add Cobbler-managed Wide Research or deterministic fan-out as described below.
-- **Grok:** requires the `grok` CLI. It uses documented headless single-prompt mode, `high`
+- **Grok:** requires the `grok` CLI plus explicit `XAI_API_KEY` (or the legacy
+  `GROK_CODE_XAI_API_KEY`). It uses documented headless single-prompt mode, `high`
   reasoning, self-checking, and `dontAsk`, which silently denies unapproved mutations. The runner
-  constructs an isolated HOME/GROK_HOME, projects only `XAI_API_KEY` (or the validated
-  owner-private OAuth record through native `GROK_AUTH_PATH`), and requests a custom profile
-  extending Grok's `strict` kernel sandbox with repository credential-file denies. Custom-profile
-  application is fail-closed. A shared OAuth path is not added to a readable root and is also
-  exact-denied to model tools; it remains readable only by the provider process. It
+  constructs an isolated HOME/GROK_HOME, projects only the selected named key, and requests a
+  custom profile extending Grok's `strict` kernel sandbox with repository credential-file denies.
+  Custom-profile application is fail-closed. Shared-file OAuth is deliberately unsupported by the
+  shortcut: Grok applies the profile to provider authentication reads as well as model tools, so a
+  file grant would expose the credential and a deny would prevent authentication. It
   does not invent a model id; the authenticated live Grok configuration selects the available
   model.
 - **Devin:** requires `DEVIN_API_KEY`. It creates a remote session through the official
@@ -103,8 +105,9 @@ The roster is capped at 250 items. Deterministic creates are spaced by 6.1 secon
 respect Manus's documented 10-create-per-minute limit. Poll and create intervals must be at least
 0.1 seconds, preventing accidental zero-delay request loops. Each create is recorded immediately in
 an atomic mode-0600 manifest under the gitignored `.elves/runtime/manus/` directory. Explicit
-manifest paths must remain inside that tree, may not traverse symlinks, and may not already exist;
-the destination is exclusively reserved before any attachment upload or provider task call.
+manifest paths must remain inside that tree, are traversed component-by-component without following
+symlinks, and may not already exist; the destination is exclusively reserved before any attachment
+upload or provider task call.
 Continue an existing record only through `--resume`. Resume paths have the same confinement.
 `--resume` reuses successful or still-live ids and fills only unrecorded work. A known terminal
 `error` is

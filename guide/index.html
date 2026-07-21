@@ -659,7 +659,8 @@ python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup</code></pre>
         <ul>
           <li><strong>Fugu</strong> launches a bounded, ephemeral, project-aware
             <code>codex-fugu</code> review over a tracked-only snapshot in a required kernel
-            filesystem sandbox. It uses regular
+            filesystem sandbox. Generated diff evidence is filtered by the same snapshot policy.
+            It uses regular
             <code>fugu/high</code> by default, <code>fugu/xhigh</code> with
             <code>--deep</code>, or <code>fugu-ultra/high</code> with
             <code>--ultra</code>.</li>
@@ -676,8 +677,9 @@ python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup</code></pre>
             skills.</li>
           <li><strong>Grok</strong> runs the installed Grok Build CLI headlessly at high reasoning
             without bypassing permissions, with only its selected auth projected into a minimal
-            environment and a fail-closed strict filesystem sandbox. A shared OAuth record remains
-            provider-only and is exact-denied to model tools.</li>
+            environment and a fail-closed strict filesystem sandbox. It requires an explicit
+            <code>XAI_API_KEY</code>; shared-file OAuth is rejected because Grok applies this
+            sandbox to both provider and tool reads.</li>
           <li><strong>Devin</strong> creates and boundedly follows a remote developer session and
             needs <code>DEVIN_API_KEY</code>. Stored Devin secrets and knowledge are not granted by
             default, and session creation and polling share the configured wait budget.</li>

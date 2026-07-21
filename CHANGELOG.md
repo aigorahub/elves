@@ -22,10 +22,12 @@ All notable changes to the Elves skill are documented here.
   Give synthesis a fresh task, normalize waiting exits, reject zero-delay polling, strengthen
   credential-path refusal, and cover retry/recovery behavior hermetically.
 - Harden every provider boundary after independent review: run Fugu over a tracked-only snapshot
-  in a required OS filesystem sandbox with an allowlisted environment; run Grok with a minimal
-  auth projection and fail-closed strict sandbox that exact-denies shared OAuth to model tools;
+  with same-policy diff evidence in a required OS filesystem sandbox and allowlisted environment;
+  run Grok with an explicit provider key, minimal auth projection, and fail-closed strict sandbox
+  while rejecting shared-file OAuth that the provider/tool sandbox cannot safely separate;
   disable Manus account-default connectors and skills; confine new/resumed Manus manifests to
-  `.elves/runtime/manus/`, exclusively reserve new records before upload, and never overwrite; and
+  `.elves/runtime/manus/` through no-follow traversal, exclusively reserve new records before
+  upload, and never overwrite; and
   give Devin empty secret/knowledge grants plus creation/poll timeouts capped by one wait budget.
 - Ship the runners in installed bundles, preserve managed-alias conflict protection, bound remote
   polling, and add hermetic transport and inventory coverage plus README/guide/host-parity docs.

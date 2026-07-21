@@ -211,8 +211,9 @@ required capability, then execute it without an extra confirmation prompt:
 - `/fugu [--deep|--ultra] <task>` or `fugu review <task>` →
   `scripts/run_fugu.sh [--deep|--ultra] <task>` for a bounded, ephemeral, read-only
   `codex-fugu` repository review over a tracked-only snapshot and required kernel filesystem
-  sandbox. The default is regular `fugu/high`; `--deep` selects `fugu/xhigh`, and `--ultra`
-  selects `fugu-ultra/high`.
+  sandbox. Host-generated diff evidence is restricted to paths that survived the same snapshot
+  policy. The default is regular `fugu/high`; `--deep` selects `fugu/xhigh`, and `--ultra` selects
+  `fugu-ultra/high`.
 - `/manus <topic>` → `scripts/run_manus.sh <topic>` for one private, bounded Manus deep-web task.
   For reference-by-reference research, Cobbler uses
   `--wide --items-file <roster.json> [--file <source>] <goal>`: request native Wide Research,
@@ -225,8 +226,9 @@ required capability, then execute it without an extra confirmation prompt:
   file; tasks start without account-default connectors or skills.
 - `/grok <instructions>` or `grok build <instructions>` → `scripts/run_grok.sh <instructions>` for
   a headless, high-reasoning Grok task with non-bypass permissions, a minimal provider-auth
-  projection, and Grok's fail-closed strict filesystem sandbox; shared OAuth remains provider-only
-  and is exact-denied to model tools.
+  projection, and Grok's fail-closed strict filesystem sandbox. It requires an explicit
+  `XAI_API_KEY` (or the legacy named key); shared-file OAuth fails closed because Grok applies the
+  sandbox to both provider and model-tool reads.
 - `/devin <instructions>` → `scripts/run_devin.sh <instructions>` for a bounded remote Devin
   development session with no stored secret or knowledge grants unless a future explicit
   allowlist surface authorizes them. Its creation and poll requests share the configured wait
