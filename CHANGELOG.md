@@ -4,6 +4,22 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.14.0] - 2026-07-22
+
+### Landing profile learning loop
+
+- Add host-owned observation capture, deterministic candidate synthesis, explicit promotion, and
+  exact-HEAD waivers under gitignored `.elves/runtime/landing-profile/`. Learning state never grants
+  merge, tag, release, protected-ref, connector, secret, or posting authority.
+- Extend `scripts/landing_profile.py` with `observe`, `propose`, `candidates`, `promote`, `waive`,
+  and `clear-waiver`. Only explicit `promote` rewrites tracked `.elves/landing-profile.json`; there
+  is no auto-promotion. Candidates remain schema-v1 shapes (`path_touched` /
+  `post_merge_checklist`); executable shapes stay unsupported and fail closed.
+- Bind exact-HEAD waivers into evaluation digests: a waived blocking path failure becomes
+  `status=waived` for that HEAD only, and a moved HEAD invalidates the waiver.
+- Keep missing-profile neutrality and schema-v1 evaluation unchanged for repositories that never use
+  learning commands. Document the learning loop and ship focused hermetic coverage.
+
 ## [2.13.0] - 2026-07-22
 
 ### Exact-HEAD project landing profiles

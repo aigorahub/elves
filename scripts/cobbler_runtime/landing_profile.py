@@ -406,7 +406,7 @@ class ValidatedProfile:
 class CheckOutcome:
     id: str
     kind: str
-    status: Literal["passed", "failed", "skipped", "applicable"]
+    status: Literal["passed", "failed", "skipped", "applicable", "waived"]
     severity: str | None = None
     code: str | None = None
     message: str | None = None
@@ -1111,6 +1111,24 @@ def evaluate_landing_profile(
             ),
         )
 
+    # Host-owned exact-HEAD waivers are optional runtime state. A corrupt waiver
+    # store fails closed; a missing store is neutral.
+    from cobbler_runtime.landing_profile_learn import active_waivers_for_head
+
+    waivers, waiver_issues = active_waivers_for_head(root, head)
+    if waiver_issues:
+        return ProjectLandingResult(
+            "invalid",
+            False,
+            True,
+            head=head,
+            base_commit=base_commit,
+            merge_base=merge_base,
+            profile_content_sha256=loaded.content_sha256,
+            changed_paths=changed_paths,
+            diagnostics=waiver_issues,
+        )
+
     outcomes: list[CheckOutcome] = []
     for check in profile.checks:
         applies = _condition_applies(check.condition, changed_paths)
@@ -1138,6 +1156,22 @@ def evaluate_landing_profile(
             continue
         if check.kind == "path_touched":
             touched = any(path_matches_any(path, check.paths) for path in changed_paths)
+            if (
+                not touched
+                and check.severity == "blocking"
+                and check.id in waivers
+            ):
+                outcomes.append(
+                    CheckOutcome(
+                        id=check.id,
+                        kind=check.kind,
+                        severity=check.severity,
+                        status="waived",
+                        code="exact_head_waiver",
+                        message=waivers[check.id],
+                    )
+                )
+                continue
             outcomes.append(
                 CheckOutcome(
                     id=check.id,

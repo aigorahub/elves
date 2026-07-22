@@ -1,5 +1,5 @@
 ---
-version: "2.13.0"
+version: "2.14.0"
 ---
 
 # Elves: Codex repository adapter
@@ -78,8 +78,9 @@ provider usage, but not merge, protected-ref, secret, or approval-bypass authori
 - **Project landing profiles:** a tracked `.elves/landing-profile.json` may add bounded,
   declarative exact-HEAD path co-change checks. Executable checks are unsupported; missing is
   neutral; present invalid or blocking-failed is red; live results are recomputed host-owned digest
-  inputs that worker reports cannot override, and never authority
-  (`references/project-landing-profiles.md`)
+  inputs that worker reports cannot override, and never authority. Host-owned
+  observe/propose/promote/waive learning stays under `.elves/runtime/landing-profile/` with no
+  auto-promotion (`references/project-landing-profiles.md`)
 - **Helper paths:** `python3 scripts/...` is **source-checkout shorthand**; installed skills
   (`~/.claude/skills/elves` or `~/.codex/skills/elves`) resolve helpers from the
   **active Elves skill root** while keeping the target repository as the working directory. An

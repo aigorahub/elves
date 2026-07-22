@@ -46,6 +46,9 @@ Repositories may track `.elves/landing-profile.json`; run it directly with
 --json`. Strict landing runs it automatically and binds any present profile to exact HEAD, resolved
 base/merge-base identity, normalized results, and host-owned readiness evidence. Schema v1 accepts
 only declarative path checks and post-merge checklist items; it never runs profile-supplied commands.
+The same CLI also exposes host-owned learning commands (`observe`, `propose`, `candidates`,
+`promote`, `waive`, `clear-waiver`). Only explicit `promote` rewrites the tracked profile; runtime
+learning state stays under gitignored `.elves/runtime/landing-profile/`.
 
 Repository-maintenance helpers such as `scripts/verify_repo.py`, `scripts/release_checklist.py`,
 and `scripts/check_repo_consistency.py` are intentionally not part of an installed bundle. Use one

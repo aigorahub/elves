@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.13.0"
+  version: "2.14.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -62,7 +62,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.13.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.14.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
@@ -542,6 +542,8 @@ checks. A missing profile is neutral; a present invalid or blocking-failed profi
 readiness. The host recomputes live results and binds exact profile bytes, HEAD, resolved base and
 merge base, and normalized outcomes to a host-owned digest; worker reports cannot override them.
 Profiles never grant merge, tag, release, protected-ref, connector, secret, or posting authority.
+Hosts may record observations, synthesize candidates, and explicitly promote checks, or waive one
+blocking check at the exact HEAD; learning state is gitignored runtime data and never auto-promotes.
 See `references/project-landing-profiles.md`.
 
 ## Constitution and the Legality Check

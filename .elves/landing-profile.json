@@ -11,6 +11,7 @@
           "scripts/landing_profile.py",
           "scripts/elves_landing_check.py",
           "scripts/cobbler_runtime/landing_profile.py",
+          "scripts/cobbler_runtime/landing_profile_learn.py",
           "scripts/cobbler_runtime/landing_authority.py",
           "scripts/sync_installed_skills.py",
           "scripts/installed_bundle_smoke.py"
@@ -52,6 +53,7 @@
           "scripts/landing_profile.py",
           "scripts/elves_landing_check.py",
           "scripts/cobbler_runtime/landing_profile.py",
+          "scripts/cobbler_runtime/landing_profile_learn.py",
           "scripts/cobbler_runtime/landing_authority.py"
         ]
       },
