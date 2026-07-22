@@ -50,7 +50,7 @@ without posting it.
 - **Planned batches remaining:** 1
 - **Stop allowed right now:** no
 - **Why:** fresh exact-tip review, final acceptance/readiness proof, PR landing, release verification, and X draft remain
-- **Next required action:** push the terminal-review correction tip, then obtain clean cumulative and security review at that exact revision
+- **Next required action:** validate and push the isolated macOS timing-envelope test stabilization, then obtain clean exact-delta review
 
 ## Effort Standard
 
@@ -70,15 +70,15 @@ cumulative landing and installed-bundle contracts remain unproved.
 
 ## Current Phase
 
-- **Status:** terminal review corrections locally green and committed
+- **Status:** exact-tip product review clean; required-check timing-envelope correction in progress
 - **Active batch:** B1
-- **What was just finished:** the driver fixed all three terminal-review findings with 104 focused tests, repository consistency, release checks, contract parity, and randomized glob-semantics proof green
-- **Single next action:** push the correction tip and re-run both independent reviews against its exact commit
+- **What was just finished:** two macOS runs failed only because a whole-wrapper Fugu test exceeded its three-second envelope by 40.6 ms and 7.7 ms; independent diagnosis proved the production two-second process-group deadline remains correctly bounded
+- **Single next action:** validate the test-only loaded-runner margin, commit/push it, and review that exact delta
 
 ## Active Compute
 
-No implementation worker is active. The cumulative and security reviewers will be reactivated only
-after the correction commit is pushed and its exact identity is frozen.
+No implementation worker is active. One read-only diagnostic agent confirmed the required-check
+failure is a pre-existing test-envelope flake rather than production deadline leakage.
 
 ## Next Exact Batch
 
@@ -125,17 +125,17 @@ restaging completed work.
 ## Current State
 
 Draft PR #189 contains the declarative-only v2.13.0 implementation on a branch that started exactly
-at released `v2.12.0`. The GPT-5.6-high worker correction is pushed through `18a4336`. Fresh review
-then found a stale failed-outcome field, exponential repeated-globstar matching, and an invalid Git
-argument escape. The driver correction at `fe6977f` removes all three, adds a deterministic glob
-work budget and end-to-end regressions, and is locally green pending push and exact-tip re-review.
+at released `v2.12.0`. Product/security review and the local 1,355-test verifier are clean at
+`6d9acbc`. Linux and Socket checks are green. macOS exposed a pre-existing Fugu whole-wrapper timing
+assertion that failed twice by at most 40.6 ms even though the production two-second provider
+deadline is correctly enforced; an isolated test-only four-second envelope is pending validation.
 Observation, promotion, executable gates, and posting remain future work.
 
 ## Next Exact Action
 
-Push the terminal-review corrections and refreshed run control, re-read this guide, then reactivate
-the cumulative and security reviewers against the new exact remote-matched tip. Do not close B1 or
-attest landing readiness until both return with no actionable findings.
+Repeat the focused Fugu timeout test, commit and push the isolated test-envelope stabilization with
+this refreshed run control, re-read this guide, then obtain exact-delta review. Do not close B1 or
+attest landing readiness until that review and required checks are green.
 
 ## Recovery Order
 

@@ -93,3 +93,19 @@ push, and PR creation.
   boundary.
 - Next: focused and broad validation, a Review commit/push, then fresh exact-tip cumulative and
   security review.
+
+## Required-check timing-envelope correction: 2026-07-22 EDT
+
+- Exact-tip local verification passed 1,355 tests, and cumulative plus security review were clean
+  at `6d9acbc`.
+- GitHub Linux 3.10/3.12/3.14 and Socket checks passed. macOS failed twice only in the pre-existing
+  Fugu Ultra timeout test: its whole-wrapper elapsed assertion exceeded three seconds by 40.6 ms
+  and 7.7 ms while all other 1,354 tests passed.
+- Independent diagnosis confirmed production shares one absolute two-second provider process-group
+  deadline through synthesis and reaping. The test also times snapshot copying, sandbox setup,
+  dependency qualification, startup, and teardown outside that documented deadline.
+- The isolated correction gives the whole-wrapper test a four-second loaded-runner envelope, still
+  below the fake process's five-second ignored-signal sleep, so failure to SIGKILL/reap remains
+  detectable. Production timeout behavior is unchanged.
+- Next: repeat the focused test, commit/push the isolated stabilization, obtain exact-delta review,
+  then resume acceptance close.

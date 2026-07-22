@@ -472,7 +472,13 @@ class LocalCliRunnerTests(unittest.TestCase):
             elapsed = time.monotonic() - started
 
         self.assertEqual(result.returncode, 124, result.stderr)
-        self.assertLess(elapsed, 3)
+        # Elapsed includes tracked-snapshot and sandbox bootstrap outside the
+        # provider process-group deadline; allow loaded macOS runner overhead.
+        self.assertLess(
+            elapsed,
+            4.0,
+            f"bounded Ultra shutdown took {elapsed:.3f}s",
+        )
         self.assertIn("staged wall budget", result.stderr)
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
