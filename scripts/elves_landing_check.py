@@ -1274,7 +1274,6 @@ def _check_project_landing_profile(
         message = (
             f"Project landing check {outcome.id!r} failed"
             + (f": {outcome.code}" if outcome.code else "")
-            + (f"\n{outcome.output}" if outcome.output else "")
         )
         if outcome.severity == "advisory":
             report.warn("project_landing_advisory_failed", message)

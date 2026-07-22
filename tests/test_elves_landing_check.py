@@ -1528,6 +1528,114 @@ class ElvesLandingCheckTests(unittest.TestCase):
                 "worker_authority_claims_ignored",
                 {finding.code for finding in hostile.warnings},
             )
+
+    def test_failed_project_profile_checks_are_structured_findings(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw) / "repo"
+            root.mkdir()
+            subprocess.run(["git", "init", "-q", "-b", "feature"], cwd=root, check=True)
+            subprocess.run(
+                ["git", "config", "user.email", "tests@example.invalid"],
+                cwd=root,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Elves Tests"], cwd=root, check=True
+            )
+            (root / "README.md").write_text("base\n", encoding="utf-8")
+            subprocess.run(["git", "add", "README.md"], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-qm", "base"], cwd=root, check=True)
+            base = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=root,
+                text=True,
+                capture_output=True,
+                check=True,
+            ).stdout.strip()
+
+            (root / "plan.md").write_text(
+                "### Batch 0: Complete\n\n**Acceptance criteria:**\n"
+                "- [x] B0-A1: Profile ready\n\n"
+                "## Master Acceptance\n\n- [x] M-A1: Landing ready\n",
+                encoding="utf-8",
+            )
+            profile_path = root / ".elves" / "landing-profile.json"
+            profile_path.parent.mkdir()
+            profile_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "checks": [
+                            {
+                                "id": "blocking-fail",
+                                "kind": "path_touched",
+                                "severity": "blocking",
+                                "when": {"kind": "always"},
+                                "paths": ["docs/**"],
+                            },
+                            {
+                                "id": "advisory-fail",
+                                "kind": "path_touched",
+                                "severity": "advisory",
+                                "when": {"kind": "always"},
+                                "paths": ["guide/**"],
+                            },
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            session = {
+                "run_id": "project-profile-failure-test",
+                "branch": "feature",
+                "start_head": base,
+                "project_base_ref": base,
+                "plan_path": "plan.md",
+                "batches": [
+                    {
+                        "id": "B0",
+                        "status": "complete",
+                        "acceptance": [
+                            {
+                                "id": "B0-A1",
+                                "criterion": "Profile ready",
+                                "met": True,
+                                "evidence": "focused test",
+                            }
+                        ],
+                    }
+                ],
+                "master_acceptance": [
+                    {
+                        "id": "M-A1",
+                        "criterion": "Landing ready",
+                        "met": True,
+                        "evidence": "focused test",
+                    }
+                ],
+            }
+            session_path = root / ".elves-session.json"
+            session_path.write_text(json.dumps(session), encoding="utf-8")
+            subprocess.run(
+                ["git", "add", "plan.md", ".elves/landing-profile.json", ".elves-session.json"],
+                cwd=root,
+                check=True,
+            )
+            subprocess.run(["git", "commit", "-qm", "profile"], cwd=root, check=True)
+
+            report = self.mod.run_checks(
+                self.mod.parse_args(
+                    ["--repo-root", str(root), "--session", str(session_path)]
+                )
+            )
+
+        self.assertIn(
+            "project_landing_blocking_failed", {finding.code for finding in report.errors}
+        )
+        self.assertIn(
+            "project_landing_advisory_failed", {finding.code for finding in report.warnings}
+        )
+
     def test_stable_batch_ids_cannot_be_swapped(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             tmp = Path(raw)

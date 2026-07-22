@@ -8,6 +8,7 @@ post-merge checklist items; they never supply executable content.  The thin
 from __future__ import annotations
 
 import errno
+import functools
 import hashlib
 import json
 import os
@@ -28,6 +29,7 @@ MAX_STRING_CHARS = 512
 MAX_JSON_DEPTH = 32
 MAX_CHANGED_PATHS = 10_000
 MAX_GIT_OUTPUT_BYTES = 1024 * 1024
+MAX_GLOB_WORK_UNITS = 10_000_000
 GIT_TIMEOUT_SECONDS = 30
 PROFILE_SCHEMA_VERSION = 1
 
@@ -692,32 +694,93 @@ def validate_landing_profile(
     return ValidatedProfile(PROFILE_SCHEMA_VERSION, tuple(checks)), ()
 
 
-def _glob_regex(pattern: str) -> re.Pattern[str]:
-    pieces = ["^"]
+@functools.lru_cache(maxsize=MAX_CHECKS * MAX_PATTERNS_PER_CHECK * 2)
+def _glob_tokens(pattern: str) -> tuple[tuple[str, str], ...]:
+    """Tokenize the deliberately small separator-aware glob language."""
+
+    tokens: list[tuple[str, str]] = []
     index = 0
     while index < len(pattern):
-        char = pattern[index]
-        if char == "*":
-            if index + 1 < len(pattern) and pattern[index + 1] == "*":
-                index += 2
-                if index < len(pattern) and pattern[index] == "/":
-                    pieces.append("(?:.*/)?")
-                    index += 1
-                else:
-                    pieces.append(".*")
-                continue
-            pieces.append("[^/]*")
-        elif char == "?":
-            pieces.append("[^/]")
+        if pattern.startswith("**/", index):
+            tokens.append(("globstar_dir", ""))
+            index += 3
+        elif pattern.startswith("**", index):
+            tokens.append(("globstar", ""))
+            index += 2
+        elif pattern[index] == "*":
+            tokens.append(("star", ""))
+            index += 1
+        elif pattern[index] == "?":
+            tokens.append(("question", ""))
+            index += 1
         else:
-            pieces.append(re.escape(char))
-        index += 1
-    pieces.append("$")
-    return re.compile("".join(pieces))
+            tokens.append(("literal", pattern[index]))
+            index += 1
+    return tuple(tokens)
+
+
+def _glob_matches(path: str, pattern: str) -> bool:
+    """Match in O(len(path) * len(pattern)) without regex backtracking."""
+
+    tokens = _glob_tokens(pattern)
+    path_length = len(path)
+    next_slash = [-1] * (path_length + 1)
+    nearest = -1
+    for path_index in range(path_length - 1, -1, -1):
+        if path[path_index] == "/":
+            nearest = path_index
+        next_slash[path_index] = nearest
+
+    # `next_row[j]` means the already-processed token suffix matches path[j:].
+    next_row = [False] * (path_length + 1)
+    next_row[path_length] = True
+    for kind, literal in reversed(tokens):
+        current = [False] * (path_length + 1)
+        for path_index in range(path_length, -1, -1):
+            if kind == "literal":
+                current[path_index] = (
+                    path_index < path_length
+                    and path[path_index] == literal
+                    and next_row[path_index + 1]
+                )
+            elif kind == "question":
+                current[path_index] = (
+                    path_index < path_length
+                    and path[path_index] != "/"
+                    and next_row[path_index + 1]
+                )
+            elif kind == "star":
+                current[path_index] = next_row[path_index] or (
+                    path_index < path_length
+                    and path[path_index] != "/"
+                    and current[path_index + 1]
+                )
+            elif kind == "globstar":
+                current[path_index] = next_row[path_index] or (
+                    path_index < path_length and current[path_index + 1]
+                )
+            else:
+                # `**/` consumes zero or more complete path segments. Jumping
+                # only through a slash preserves the optional-directory
+                # semantics without a greedy/backtracking regular expression.
+                slash = next_slash[path_index]
+                current[path_index] = next_row[path_index] or (
+                    slash >= 0 and current[slash + 1]
+                )
+        next_row = current
+    return next_row[0]
 
 
 def path_matches_any(path: str, patterns: Sequence[str]) -> bool:
-    return any(_glob_regex(pattern).fullmatch(path) is not None for pattern in patterns)
+    return any(_glob_matches(path, pattern) for pattern in patterns)
+
+
+def _glob_work_units(paths: Sequence[str], patterns: Sequence[str]) -> int:
+    """Conservatively bound dynamic-programming cells before evaluation."""
+
+    return sum(len(path) + 1 for path in paths) * sum(
+        len(pattern) + 1 for pattern in patterns
+    )
 
 
 @dataclass(frozen=True)
@@ -763,7 +826,7 @@ def _run_git(
             stderr=subprocess.STDOUT,
             shell=False,
         )
-    except OSError as exc:
+    except (OSError, ValueError) as exc:
         message = f"git launch failed: {type(exc).__name__}".encode("utf-8")
         return _BoundedGitResult(127, message, False)
 
@@ -1025,6 +1088,26 @@ def evaluate_landing_profile(
             diagnostics=_schema_diagnostic(
                 "profile_diff_out_of_bounds",
                 "Landing profile changed-path delta exceeds safe bounds.",
+            ),
+        )
+
+    glob_work_units = 0
+    for check in profile.checks:
+        glob_work_units += _glob_work_units(changed_paths, check.condition.patterns)
+        glob_work_units += _glob_work_units(changed_paths, check.paths)
+    if glob_work_units > MAX_GLOB_WORK_UNITS:
+        return ProjectLandingResult(
+            "invalid",
+            False,
+            True,
+            head=head,
+            base_commit=base_commit,
+            merge_base=merge_base,
+            profile_content_sha256=loaded.content_sha256,
+            changed_paths=changed_paths,
+            diagnostics=_schema_diagnostic(
+                "profile_evaluation_too_complex",
+                "Landing profile glob evaluation exceeds the deterministic work budget.",
             ),
         )
 

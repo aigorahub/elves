@@ -21,7 +21,7 @@
           "met": false
         },
         {
-          "criterion": "Project landing state is a distinct host-owned readiness input that workers cannot assert or mutate, and it never grants merge, tag, release, protected-ref, or posting authority.",
+          "criterion": "Project landing state is a distinct host-evaluated readiness input whose live green/digest cannot be set or overridden by worker reports, and it never grants merge, tag, release, protected-ref, or posting authority.",
           "evidence": "",
           "id": "B1-A4",
           "met": false

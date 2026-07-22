@@ -41,7 +41,9 @@ deterministic co-change and freshness rules without interpreting content. Execut
 `command`, `argv`, shell, environment, working-directory, and timeout shapes are unsupported and
 fail closed with `profile_executable_check_unsupported`. Schema v1 never launches a
 profile-directed subprocess. The runner's fixed internal local Git reads resolve identity and
-changed paths; they are not profile-configurable gates.
+changed paths; they are not profile-configurable gates. Glob matching uses bounded dynamic
+programming rather than backtracking, and a conservative total-work budget fails closed before an
+oversized profile/delta combination is evaluated.
 
 `post_merge_checklist` has a bounded `description` and no severity. An applicable item is emitted
 as declarative follow-through only; the runner never executes it.

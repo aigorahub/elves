@@ -217,6 +217,10 @@ class LandingProfileSchemaTests(unittest.TestCase):
         self.assertTrue(path_matches_any("README.md", ["*.md"]))
         self.assertFalse(path_matches_any("docs/README.md", ["*.md"]))
         self.assertTrue(path_matches_any("docs/README.md", ["**/*.md"]))
+        repeated = "**/" * 64
+        deep_path = "segment/" * 64
+        self.assertTrue(path_matches_any(deep_path + "target.md", [repeated + "target.md"]))
+        self.assertFalse(path_matches_any(deep_path + "miss.md", [repeated + "target.md"]))
 
         parsed, issues = validate_landing_profile(profile(path_check(paths=["../README.md"])))
         self.assertIsNone(parsed)
@@ -295,6 +299,15 @@ class LandingProfileEvaluationTests(unittest.TestCase):
         self.assertEqual(result.status, "failed")
         self.assertEqual(result.checks[0].code, "required_path_not_touched")
 
+    def test_glob_evaluation_work_budget_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root, base = self._repo(raw, profile(path_check()))
+            with mock.patch.object(landing_profile_module, "MAX_GLOB_WORK_UNITS", 1):
+                result = evaluate_landing_profile(root, base_ref=base)
+
+        self.assertEqual(result.status, "invalid")
+        self.assertEqual(result.diagnostics[0].code, "profile_evaluation_too_complex")
+
     def test_digest_is_deterministic_and_binds_head_base_profile_and_outcomes(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root, base = self._repo(raw, profile(path_check()))
@@ -327,6 +340,14 @@ class LandingProfileEvaluationTests(unittest.TestCase):
 
         self.assertEqual(mismatch.status, "invalid")
         self.assertEqual(mismatch.diagnostics[0].code, "profile_head_mismatch")
+
+    def test_nul_bearing_base_ref_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root, _ = self._repo(raw, profile(path_check()))
+            result = evaluate_landing_profile(root, base_ref="bad\0ref")
+
+        self.assertEqual(result.status, "invalid")
+        self.assertEqual(result.diagnostics[0].code, "profile_base_unresolved")
 
     def test_executable_profile_is_rejected_before_any_process_launch(self) -> None:
         executable = profile(

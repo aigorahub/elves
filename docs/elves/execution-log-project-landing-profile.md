@@ -76,3 +76,20 @@ push, and PR creation.
   passed on Linux 3.10/3.14 and macOS 3.12.
 - Next: commit/push the contract amendment, re-drive the same worker for the bounded correction,
   then repeat focused, broad, and independent exact-head review.
+
+## Terminal review correction: 2026-07-22 EDT
+
+- The bounded worker correction removed executable profile gates and passed the exact-head
+  canonical verifier at `18a4336` with 1,352 tests.
+- Fresh cumulative and security review confirmed the command, detached-descendant, secure-open,
+  and live-digest blockers were closed, then found three adapter/evaluator edge cases: a stale
+  `outcome.output` access on failed declarative checks, exponential repeated-globstar regex
+  backtracking, and an uncaught NUL-bearing base ref.
+- Driver reconciliation removes the stale field, uses a bounded dynamic-programming glob matcher
+  with an explicit total-work budget, catches invalid fixed-Git launch arguments, and adds blocking,
+  advisory, adversarial-glob, and bad-base regressions.
+- B1-A4 wording now matches the documented same-user trust boundary: strict landing recomputes
+  live project state and ignores worker-report overrides; it does not claim a new OS privilege
+  boundary.
+- Next: focused and broad validation, a Review commit/push, then fresh exact-tip cumulative and
+  security review.
