@@ -15,6 +15,7 @@ import re
 import signal
 import stat
 import subprocess
+import tempfile
 import threading
 import time
 from dataclasses import asdict, dataclass
@@ -57,10 +58,27 @@ _SHELL_EXECUTABLES = frozenset(
         "zsh",
     }
 )
+_NETWORK_AUTHORITY_EXECUTABLES = frozenset(
+    {"curl", "gh", "glab", "hub", "scp", "ssh", "twurl", "wget"}
+)
+_READ_ONLY_GIT_SUBCOMMANDS = frozenset(
+    {
+        "cat-file",
+        "describe",
+        "diff",
+        "for-each-ref",
+        "grep",
+        "log",
+        "ls-files",
+        "merge-base",
+        "rev-parse",
+        "show",
+        "status",
+    }
+)
 _PROFILE_ENV_ALLOWLIST = frozenset(
     {
         "PATH",
-        "HOME",
         "USER",
         "LOGNAME",
         "LANG",
@@ -282,10 +300,10 @@ def load_landing_profile(repo_root: Path) -> ProfileLoadResult:
         )
     try:
         parsed = json.loads(text, object_pairs_hook=_reject_duplicate_keys)
-    except _DuplicateKeyError as exc:
+    except _DuplicateKeyError:
         return _invalid(
             "profile_duplicate_key",
-            f"Landing profile contains a duplicate JSON key: {exc.args[0]!r}.",
+            "Landing profile contains a duplicate JSON key.",
             size_bytes=len(payload),
         )
     except json.JSONDecodeError:
@@ -391,7 +409,8 @@ class CheckOutcome:
             payload["exit_code"] = self.exit_code
         if include_output and self.output:
             payload["output"] = self.output
-            payload["output_truncated"] = self.output_truncated
+        if self.output_truncated:
+            payload["output_truncated"] = True
         return payload
 
 
@@ -569,7 +588,7 @@ def _parse_check(
         if set(value) - allowed:
             return None, ProfileDiagnostic(
                 "profile_unsupported_key",
-                f"{label} contains unsupported keys: {', '.join(sorted(set(value) - allowed))}.",
+                f"{label} contains unsupported keys.",
             )
         severity = value.get("severity")
         if severity not in {"blocking", "advisory"}:
@@ -589,6 +608,27 @@ def _parse_check(
             return None, ProfileDiagnostic(
                 "profile_shell_forbidden",
                 f"{label}.argv must not invoke a command shell.",
+            )
+        executable = Path(argv[0]).name.lower()
+        if executable in _NETWORK_AUTHORITY_EXECUTABLES:
+            return None, ProfileDiagnostic(
+                "profile_authority_command_forbidden",
+                f"{label}.argv must not invoke a network or hosting authority client.",
+            )
+        if executable == "git" and (
+            len(argv) < 2 or argv[1].lower() not in _READ_ONLY_GIT_SUBCOMMANDS
+        ):
+            return None, ProfileDiagnostic(
+                "profile_authority_command_forbidden",
+                f"{label}.argv may invoke only an allowlisted read-only Git subcommand.",
+            )
+        if any(
+            Path(item).name in {"elves_landing_check.py", "landing_profile.py"}
+            for item in argv[1:]
+        ):
+            return None, ProfileDiagnostic(
+                "profile_recursive_command_forbidden",
+                f"{label}.argv must not recursively invoke a landing checker.",
             )
         for arg_index, item in enumerate(argv):
             if _argv_item_unsafe(item):
@@ -626,7 +666,7 @@ def _parse_check(
         if set(value) - allowed:
             return None, ProfileDiagnostic(
                 "profile_unsupported_key",
-                f"{label} contains unsupported keys: {', '.join(sorted(set(value) - allowed))}.",
+                f"{label} contains unsupported keys.",
             )
         severity = value.get("severity")
         if severity not in {"blocking", "advisory"}:
@@ -656,7 +696,7 @@ def _parse_check(
     if set(value) - allowed:
         return None, ProfileDiagnostic(
             "profile_unsupported_key",
-            f"{label} contains unsupported keys: {', '.join(sorted(set(value) - allowed))}.",
+            f"{label} contains unsupported keys.",
         )
     description, issue = _safe_string(
         value.get("description"), label=f"{label}.description"
@@ -680,18 +720,9 @@ def validate_landing_profile(
     """Validate the deliberately small, extension-hostile schema v1."""
 
     if set(profile) != {"schema_version", "checks"}:
-        extras = sorted(set(profile) - {"schema_version", "checks"})
-        missing = sorted({"schema_version", "checks"} - set(profile))
-        detail = []
-        if extras:
-            detail.append("unsupported=" + ",".join(extras))
-        if missing:
-            detail.append("missing=" + ",".join(missing))
         return None, _schema_diagnostic(
             "profile_unsupported_key",
-            "Landing profile top-level keys are invalid"
-            + (f" ({'; '.join(detail)})" if detail else "")
-            + ".",
+            "Landing profile top-level keys are invalid.",
         )
     if profile.get("schema_version") != PROFILE_SCHEMA_VERSION:
         return None, _schema_diagnostic(
@@ -832,16 +863,25 @@ def _run_bounded(
     )
 
 
-def _child_environment() -> dict[str, str]:
+def _child_environment(*, isolated_home: Path | None = None) -> dict[str, str]:
     scrubbed = scrub_environment(os.environ, allowlist=_PROFILE_ENV_ALLOWLIST)
     env = dict(scrubbed.env)
     env.update(
         {
+            "GIT_CONFIG_COUNT": "1",
+            "GIT_CONFIG_KEY_0": "credential.helper",
+            "GIT_CONFIG_VALUE_0": "",
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_CONFIG_GLOBAL": os.devnull,
             "GIT_TERMINAL_PROMPT": "0",
             "PYTHONDONTWRITEBYTECODE": "1",
             "PYTHONNOUSERSITE": "1",
         }
     )
+    if isolated_home is not None:
+        env["HOME"] = str(isolated_home)
+    else:
+        env.pop("HOME", None)
     return env
 
 
@@ -877,6 +917,24 @@ def _resolve_commit(repo_root: Path, ref: str) -> str | None:
         return None
     resolved = result.output.decode("ascii", errors="ignore").strip().lower()
     return resolved if _EXACT_COMMIT_RE.fullmatch(resolved) is not None else None
+
+
+def _repository_state_digest(repo_root: Path) -> str | None:
+    commands = (
+        ("status", "--porcelain=v1", "-z", "--untracked-files=all"),
+        ("for-each-ref", "--format=%(refname)%00%(objectname)%00"),
+        ("remote", "-v"),
+    )
+    digest = hashlib.sha256()
+    for command in commands:
+        result = _run_git(repo_root, *command)
+        if result.returncode != 0 or result.output_truncated:
+            return None
+        digest.update(command[0].encode("ascii"))
+        digest.update(b"\0")
+        digest.update(result.output)
+        digest.update(b"\0")
+    return digest.hexdigest()
 
 
 def _condition_applies(condition: ProfileCondition, changed_paths: Sequence[str]) -> bool:
@@ -1089,7 +1147,24 @@ def evaluate_landing_profile(
 
     outcomes: list[CheckOutcome] = []
     deadline = time.monotonic() + MAX_TOTAL_COMMAND_SECONDS
-    environment = _child_environment()
+    repository_state_before = _repository_state_digest(root)
+    if repository_state_before is None:
+        return ProjectLandingResult(
+            "invalid",
+            False,
+            True,
+            head=head,
+            base_commit=base_commit,
+            merge_base=merge_base,
+            profile_content_sha256=loaded.content_sha256,
+            changed_paths=changed_paths,
+            diagnostics=_schema_diagnostic(
+                "profile_repository_state_unavailable",
+                "Repository mutation guard could not capture its initial state.",
+            ),
+        )
+    temporary_home = tempfile.TemporaryDirectory(prefix="elves-landing-profile-home-")
+    environment = _child_environment(isolated_home=Path(temporary_home.name))
     exact_secret_values = _secret_values()
     for check in profile.checks:
         applies = _condition_applies(check.condition, changed_paths)
@@ -1189,6 +1264,8 @@ def evaluate_landing_profile(
             )
         )
 
+    temporary_home.cleanup()
+
     current_head = _resolve_commit(root, "HEAD")
     if current_head != head:
         return ProjectLandingResult(
@@ -1204,6 +1281,23 @@ def evaluate_landing_profile(
             diagnostics=_schema_diagnostic(
                 "profile_head_changed",
                 "Repository HEAD changed while project landing checks were running.",
+            ),
+        )
+    repository_state_after = _repository_state_digest(root)
+    if repository_state_after is None or repository_state_after != repository_state_before:
+        return ProjectLandingResult(
+            "invalid",
+            False,
+            True,
+            head=head,
+            base_commit=base_commit,
+            merge_base=merge_base,
+            profile_content_sha256=loaded.content_sha256,
+            changed_paths=changed_paths,
+            checks=tuple(outcomes),
+            diagnostics=_schema_diagnostic(
+                "profile_repository_mutated",
+                "Repository worktree, refs, or remotes changed while project checks were running.",
             ),
         )
 

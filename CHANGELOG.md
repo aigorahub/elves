@@ -13,7 +13,9 @@ All notable changes to the Elves skill are documented here.
   malformed, unsupported, or blocking-failed profiles fail closed.
 - Bind deterministic results to exact profile bytes, HEAD, resolved base and merge base, and
   normalized outcomes. Commands use argv without a shell, closed stdin, a scrubbed environment,
-  hard timeouts, bounded redacted output, and an overall process budget.
+  isolated temporary home, hard timeouts, bounded redacted output, an overall process budget, and
+  repository-mutation detection; direct hosting/network authority clients and write-capable Git
+  subcommands are rejected.
 - Make project green/digest state a distinct host-owned landing-authority input that workers cannot
   assert and that never grants merge, tag, release, protected-ref, connector, secret, or posting
   authority. Ship the CLI/runtime in both installed host bundles.

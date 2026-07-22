@@ -172,6 +172,9 @@ class LandingProfileSchemaTests(unittest.TestCase):
             (profile(command_check(severity="optional")), "profile_severity_invalid"),
             (profile(command_check(argv=["sh", "-c", "true"])), "profile_shell_forbidden"),
             (profile(command_check(argv=["python3", "../outside.py"])), "profile_path_unsafe"),
+            (profile(command_check(argv=["git", "push", "origin", "main"])), "profile_authority_command_forbidden"),
+            (profile(command_check(argv=["gh", "release", "create", "v1"])), "profile_authority_command_forbidden"),
+            (profile(command_check(argv=["python3", "scripts/elves_landing_check.py"])), "profile_recursive_command_forbidden"),
         )
         for raw, expected in cases:
             with self.subTest(expected=expected):
@@ -360,6 +363,24 @@ class LandingProfileEvaluationTests(unittest.TestCase):
             self.assertFalse(dirty.green)
             self.assertEqual(dirty.diagnostics[0].code, "profile_differs_from_head")
 
+    def test_digest_excludes_bounded_raw_output(self) -> None:
+        code = "from pathlib import Path; print(Path('runtime-output.txt').read_text())"
+        with tempfile.TemporaryDirectory() as raw:
+            root, base = self._repo(
+                raw,
+                profile(command_check(argv=["python3", "-c", code])),
+            )
+            runtime_output = root / "runtime-output.txt"
+            runtime_output.write_text("first\n", encoding="utf-8")
+            first = evaluate_landing_profile(root, base_ref=base)
+            runtime_output.write_text("second\n", encoding="utf-8")
+            second = evaluate_landing_profile(root, base_ref=base)
+
+        self.assertEqual(first.status, "passed")
+        self.assertEqual(second.status, "passed")
+        self.assertNotEqual(first.checks[0].output, second.checks[0].output)
+        self.assertEqual(first.digest, second.digest)
+
     def test_expected_head_mismatch_and_head_move_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root, base = self._repo(raw, profile(command_check()))
@@ -371,13 +392,28 @@ class LandingProfileEvaluationTests(unittest.TestCase):
             self.assertEqual(mismatch.diagnostics[0].code, "profile_head_mismatch")
 
         with tempfile.TemporaryDirectory() as raw:
-            moving = command_check(
-                argv=["git", "commit", "--allow-empty", "-m", "profile moved head"]
+            moving_code = (
+                "import subprocess; subprocess.run("
+                "['git', 'commit', '--allow-empty', '-m', 'profile moved head'], check=True)"
             )
+            moving = command_check(argv=["python3", "-c", moving_code])
             root, base = self._repo(raw, profile(moving))
             moved = evaluate_landing_profile(root, base_ref=base)
             self.assertEqual(moved.status, "invalid")
             self.assertEqual(moved.diagnostics[0].code, "profile_head_changed")
+
+        with tempfile.TemporaryDirectory() as raw:
+            mutating = command_check(
+                argv=[
+                    "python3",
+                    "-c",
+                    "from pathlib import Path; Path('created.txt').write_text('changed')",
+                ]
+            )
+            root, base = self._repo(raw, profile(mutating))
+            mutated = evaluate_landing_profile(root, base_ref=base)
+            self.assertEqual(mutated.status, "invalid")
+            self.assertEqual(mutated.diagnostics[0].code, "profile_repository_mutated")
 
     def test_thin_cli_emits_deterministic_json_from_unrelated_cwd(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

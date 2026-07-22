@@ -37,9 +37,11 @@ lowercase slugs. Every check has a `when` condition:
 Pre-land kinds require `severity` (`blocking` or `advisory`):
 
 - `command` has a non-empty `argv` array and optional bounded `timeout_seconds`. It runs with
-  `shell=False`, closed stdin, a minimal scrubbed environment, a hard timeout, and bounded redacted
-  combined output. Shell executables, secret-like arguments, traversal, absolute paths, unsafe
-  profile files, and unsupported shapes are rejected.
+  `shell=False`, closed stdin, an isolated temporary home plus minimal scrubbed environment, a hard
+  timeout, and bounded redacted combined output. Shell/hosting/network clients, write-capable Git
+  subcommands, secret-like arguments, traversal, absolute paths, unsafe profile files, and
+  unsupported shapes are rejected. A before/after worktree/ref/remote snapshot also fails the run
+  if an indirectly invoked helper mutates repository state.
 - `path_touched` has repository-relative `paths` globs and passes when at least one changed path
   matches. It expresses deterministic co-change and freshness rules without interpreting content.
 
