@@ -61,3 +61,18 @@ push, and PR creation.
 - Branch `codex/project-landing-profile` is pushed and clean.
 - Draft PR #189 is the early review surface.
 - Next: GPT-5.6-high guide checkpoint, then same-worker `Continue.` execution.
+
+## Independent security review and replan: 2026-07-22 EDT
+
+- The exact-session worker pushed implementation/validation commits through `9a80bf8`; its final
+  exact-head verifier passed 1,350 tests.
+- Two independent reviews found arbitrary argv execution is not contained by environment
+  scrubbing, direct-client blacklists, process groups, or post-hoc repository snapshots.
+- A reviewer reproduced a detached child writing after the profile had returned green.
+- The authoritative B1 contract is amended to declarative `path_touched` plus
+  `post_merge_checklist` checks only. Executable gates are deferred until Elves can require a
+  qualified recursive kernel boundary.
+- GitHub's Ubuntu Python 3.12 failure is an unrelated 50 ms Manus timeout-test race; profile tests
+  passed on Linux 3.10/3.14 and macOS 3.12.
+- Next: commit/push the contract amendment, re-drive the same worker for the bounded correction,
+  then repeat focused, broad, and independent exact-head review.

@@ -9,7 +9,7 @@
           "met": false
         },
         {
-          "criterion": "Schema-v1 blocking, advisory, skipped, command, and path-touched results are deterministic and structured; commands use argv without a shell, closed stdin, a scrubbed environment, bounded output, and a hard timeout.",
+          "criterion": "A schema-v1 profile supports deterministic blocking, advisory, skipped, and path-touched outcomes plus declarative post-merge items, rejects executable or command checks as unsupported, and performs no profile-directed subprocess execution.",
           "evidence": "",
           "id": "B1-A2",
           "met": false
@@ -52,7 +52,7 @@
   "branch": "codex/project-landing-profile",
   "collision_tripwire": "35449718c173f737a7b0dad209accfe86b55b5a9",
   "continuation_guard": {
-    "next_required_action": "Launch the GPT-5.6-high guide checkpoint with the staged packet, validate it, then resume the same worker with Continue.",
+    "next_required_action": "Commit and push the security amendment, then re-drive the same GPT-5.6-high worker to remove executable profile checks and prove the declarative-only revision.",
     "remaining_batches": [
       "B1"
     ],
@@ -71,7 +71,7 @@
       "met": false
     },
     {
-      "criterion": "Independent cumulative and revision-delta review reports no unresolved actionable findings, including security and authority review of project-declared commands.",
+      "criterion": "Independent cumulative and revision-delta review reports no unresolved actionable findings, including security and authority review of project-declared policy.",
       "evidence": "",
       "id": "M-A2",
       "met": false

@@ -70,21 +70,21 @@ cumulative landing and installed-bundle contracts remain unproved.
 
 ## Current Phase
 
-- **Status:** staged; guide launch ready
+- **Status:** independent review complete; security correction staged
 - **Active batch:** B1
-- **What was just finished:** validated and pushed the run contract and opened draft PR #189
-- **Single next action:** launch the GPT-5.6-high guide checkpoint
+- **What was just finished:** two independent reviewers rejected arbitrary profile subprocesses and the host amended B1 to declarative-only
+- **Single next action:** commit/push the amendment, then re-drive the same GPT-5.6-high worker
 
 ## Active Compute
 
-No implementation worker is active yet; launch is the next action.
+No worker is active; the bounded review-correction turn is next.
 
 ## Next Exact Batch
 
 - **Batch:** B1 — ship and dogfood exact-HEAD project landing profiles
 - **Scope:** criteria B1-A1 through B1-A7 in the authoritative plan/session/packet
 - **Acceptance criteria:** exact criteria B1-A1 through B1-A7, with host-owned M-A1 through M-A4
-- **Risk:** high — exact merge readiness plus repository-declared commands
+- **Risk:** high — exact merge readiness; executable profile checks were removed after adversarial review proved they cannot be safely contained by policy checks
 
 ## Post-Checkpoint Control Loop
 
@@ -123,15 +123,17 @@ restaging completed work.
 
 ## Current State
 
-Draft PR #189 contains the validated run contract on a branch that started exactly at released
-`v2.12.0`. Planning reviews agree on a one-batch v2.13.0 MVP:
-pure profile core, thin CLI, landing/authority integration, dogfood rules, installed shipment, and
-declarative post-merge release/X follow-through. Observation and promotion remain future work.
+Draft PR #189 contains the run contract on a branch that started exactly at released `v2.12.0`.
+The GPT-5.6-high implementation is pushed. Independent review found that arbitrary argv plus
+environment scrubbing/process groups is not an OS boundary and reproduced a detached-child escape;
+the revised one-batch v2.13.0 MVP is declarative-only. Observation, promotion, executable gates,
+and posting remain future work.
 
 ## Next Exact Action
 
-Launch the GPT-5.6-high guide turn with the staged packet once. Validate its private TODO,
-meaningful first edit, narrow check, and exact checkpoint before sending exactly `Continue.`.
+Commit and push the host-owned security amendment, then send the bounded review correction to the
+same GPT-5.6-high worker. Require removal of executable profile gates, regression proof, and a
+clean pushed handback before terminal re-review.
 
 ## Recovery Order
 

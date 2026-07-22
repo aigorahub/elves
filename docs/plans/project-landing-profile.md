@@ -27,10 +27,10 @@ preserved there; this file is the authoritative acceptance contract for this run
 ### In scope
 
 - A pure project-profile core plus a thin installed `landing_profile.py check` CLI.
-- Minimal schema v1 with deterministic `command` and `path_touched` checks, blocking/advisory
-  severity, `always`/`any_path_glob` conditions, and declarative `post_merge_checklist` entries.
-- Exact-HEAD/base/profile result binding, bounded shell-free subprocess execution, structured JSON,
-  and stable diagnostics.
+- Minimal schema v1 with deterministic `path_touched` checks, blocking/advisory severity,
+  `always`/`any_path_glob` conditions, and declarative `post_merge_checklist` entries.
+- Exact-HEAD/base/profile result binding, structured JSON, and stable diagnostics without executing
+  profile-directed subprocesses.
 - Automatic integration with `elves_landing_check.py` and distinct host-owned project-readiness
   state in `landing_authority.py`.
 - Installed Claude/Codex bundle shipment and hermetic regression coverage.
@@ -44,6 +44,8 @@ preserved there; this file is the authoritative acceptance contract for this run
 - Observation capture, candidate generation, promotion UX, auto-promotion, or learned policy.
 - Waivers, global preference keys, free-form LLM rubrics, or expensive-result caching.
 - Richer `when` predicates, package publishing, deployment automation, or X posting.
+- Executable/`command` profile gates until a later run can require a qualified recursive kernel
+  boundary with read-only input, no network/procfs/host-home access, and complete descendant cleanup.
 - Any worker ability to set readiness, merge, tag, release, post, mutate protected refs, or edit
   host-owned run memory.
 
@@ -52,8 +54,6 @@ preserved there; this file is the authoritative acceptance contract for this run
 - `scripts/elves_landing_check.py` for exact session/plan/evidence validation and final reporting.
 - `scripts/cobbler_runtime/landing_authority.py` for host-owned exact-HEAD readiness and invalidation.
 - `scripts/release_checklist.py` for structured release findings and JSON output.
-- `scripts/verify_repo.py` and `scripts/cobbler_runtime/context.py` for bounded subprocess,
-  environment-scrubbing, and redaction patterns.
 - `scripts/sync_installed_skills.py` and installed-bundle smokes for shipment identity.
 
 ## Batch 1 [B1]: Ship and dogfood exact-HEAD project landing profiles
@@ -61,7 +61,7 @@ preserved there; this file is the authoritative acceptance contract for this run
 **Tasks:**
 
 - [ ] Define and validate schema v1; implement deterministic diff selection and result digests.
-- [ ] Add bounded, closed-stdin, shell-free command execution and `path_touched` evaluation.
+- [ ] Add `path_touched` evaluation and fail closed on executable/`command` profile kinds.
 - [ ] Integrate live project checks with landing validation and host-owned readiness attestation.
 - [ ] Ship the CLI/runtime in both installed host bundles with focused and integration tests.
 - [ ] Track an Elves landing profile and preserve ignored runtime state under `.elves/runtime/`.
@@ -71,7 +71,7 @@ preserved there; this file is the authoritative acceptance contract for this run
 **Acceptance criteria:**
 
 - [ ] [B1-A1] A repository with no landing profile retains generic landing behavior, while a present malformed, symlinked, irregular, oversized, or unsupported profile fails closed with a stable diagnostic.
-- [ ] [B1-A2] Schema-v1 blocking, advisory, skipped, command, and path-touched results are deterministic and structured; commands use argv without a shell, closed stdin, a scrubbed environment, bounded output, and a hard timeout.
+- [ ] [B1-A2] A schema-v1 profile supports deterministic blocking, advisory, skipped, and path-touched outcomes plus declarative post-merge items, rejects executable or command checks as unsupported, and performs no profile-directed subprocess execution.
 - [ ] [B1-A3] Project results and their canonical digest bind profile bytes, exact `HEAD`, resolved base commit, and normalized check outcomes; a moved head, changed base, changed profile, or stale digest cannot satisfy readiness.
 - [ ] [B1-A4] Project landing state is a distinct host-owned readiness input that workers cannot assert or mutate, and it never grants merge, tag, release, protected-ref, or posting authority.
 - [ ] [B1-A5] The tracked Elves profile automatically exercises documentation freshness, public-guide freshness, changelog honesty, and Claude/Codex parity on applicable diffs, while preserving generic behavior for projects without a profile.
@@ -83,15 +83,15 @@ landing authority, focused tests, install shipment/smokes, SKILL, AGENTS, README
 landing/schema/runtime references, and durable `.ai-docs` guidance.
 
 **Forbidden surfaces:** observation/promotion machinery, preferences, worker routing, provider
-shortcuts, merge methods, protected refs, release/post APIs inside the runner, shell command strings,
-and unrelated TODO items.
+shortcuts, merge methods, protected refs, release/post APIs inside the runner, executable profile
+checks, and unrelated TODO items.
 
-**Risk:** high — this changes the exact gate used immediately before merge and introduces
-repository-declared command execution.
+**Risk:** high — this changes the exact gate used immediately before merge; review proved arbitrary
+profile subprocesses cannot be made safe with string validation or post-hoc mutation checks.
 
-**Review focus:** path/symlink confinement, schema bounds, subprocess isolation, deterministic
-digests, exact-base invalidation, worker immutability, missing-profile compatibility, installed
-runtime imports, and authority wording.
+**Review focus:** path/symlink confinement, schema bounds, absence of profile-directed process
+launch, deterministic digests, exact-base invalidation, worker immutability, missing-profile
+compatibility, installed runtime imports, and authority wording.
 
 **Focused tests:** `tests.test_landing_profile`, `tests.test_elves_landing_check`,
 `tests.test_landing_authority`, installed-bundle/sync tests, consistency, release checklist, and
@@ -102,7 +102,7 @@ the canonical verifier.
 ## Master Acceptance
 
 - [ ] [M-A1] The authoritative plan, session, and worker packet retain exact stable-id/criterion parity, and every B1 criterion carries exact-head evidence before landing.
-- [ ] [M-A2] Independent cumulative and revision-delta review reports no unresolved actionable findings, including security and authority review of project-declared commands.
+- [ ] [M-A2] Independent cumulative and revision-delta review reports no unresolved actionable findings, including security and authority review of project-declared policy.
 - [ ] [M-A3] The canonical repository verifier and landing check pass on the exact reviewed pull-request head against the unchanged immutable base.
 - [ ] [M-A4] The pull request is mergeable by a regular merge commit with required checks green, clean worktree identity, and no unresolved review feedback.
 
@@ -122,5 +122,15 @@ announcement draft containing the value and release link. Do not post it.
 - The user-authorized landing method is a regular merge commit only; never squash or rebase.
 - The coordinator owns run memory, PR state, terminal review, merge, release, and X draft.
 - The GPT-5.6-high worker owns only the implementation surfaces and its assigned feature branch.
-- No secret-bearing or shell-interpreted profile commands.
+- No profile-directed subprocess execution in schema v1.
 - No claim that this run behaviorally qualifies the repo's native-worker prewalk transport.
+
+## Security review amendment
+
+The staged design originally included arbitrary argv checks. Independent review demonstrated a
+detached-child escape and showed that environment scrubbing, executable-name blacklists, process
+groups, and repository mutation snapshots cannot prevent same-user filesystem reads, network
+effects, or post-check descendants. The authoritative B1 contract therefore removes executable
+checks instead of documenting an unsafe boundary. A later version may add them only behind a
+qualified recursive kernel sandbox; host-run release/consistency verification remains outside the
+profile and inside the ordinary reviewed landing ceremony.

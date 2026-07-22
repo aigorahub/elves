@@ -42,8 +42,6 @@ not evidence that the repository's native-worker transport is behaviorally quali
 - `scripts/cobbler_runtime/landing_authority.py`: distinct readiness fields, digest inputs,
   invalidation, and merge guard.
 - `scripts/release_checklist.py`: structured findings and JSON output.
-- `scripts/verify_repo.py` and `scripts/cobbler_runtime/context.py`: bounded subprocess,
-  environment allowlisting/scrubbing, output bounding, and redaction patterns.
 - `scripts/acceptance_contract.py`: thin installed CLI/runtime separation pattern.
 - `scripts/sync_installed_skills.py` and `scripts/installed_bundle_smoke.py`: installed shipment.
 - Existing tests: `test_elves_landing_check.py`, `test_landing_authority.py`,
@@ -56,16 +54,16 @@ not evidence that the repository's native-worker transport is behaviorally quali
 - Put pure reusable logic in `scripts/cobbler_runtime/landing_profile.py` and a thin installed CLI
   in `scripts/landing_profile.py` with a `check` command and deterministic JSON output.
 - Minimal schema v1:
-  - check kinds `command`, `path_touched`, and declarative-only `post_merge_checklist`;
+  - check kinds `path_touched` and declarative-only `post_merge_checklist`;
   - severity `blocking` or `advisory` for pre-land checks;
-  - conditions `always` and `any_path_glob`;
-  - commands are argv arrays, never shell strings.
+  - conditions `always` and `any_path_glob`.
 - Resolve `HEAD` and base to exact commits. Compute the merge-base/delta deterministically and
   verify the head remains unchanged after checks.
-- Bound profile size/shape/counts/strings, output, time, and subprocesses. Reject symlinked or
-  irregular profiles, unsafe paths, unsupported keys/kinds, and malformed UTF-8/JSON.
-- Run commands with `shell=False`, closed stdin, a scrubbed minimal environment, a hard timeout,
-  and bounded/redacted diagnostics. Do not expose secrets through profile args or output.
+- Bound profile size/shape/counts/strings. Reject symlinked or irregular profiles, unsafe paths,
+  unsupported keys/kinds (including executable/`command` checks), and malformed UTF-8/JSON.
+- Do not launch a profile-directed process. Independent review proved that scrubbed environments,
+  name blacklists, process groups, and post-hoc mutation checks do not contain arbitrary same-user
+  code or detached descendants.
 - Make the canonical digest cover profile content, exact head, resolved base/merge-base identity,
   and normalized outcomes. Exclude timestamps, absolute paths, and raw output.
 - Missing profile is neutral. Present-invalid or blocking-failed is not green. Advisory failures
@@ -82,11 +80,12 @@ not evidence that the repository's native-worker transport is behaviorally quali
 
 Encode deterministic Elves checks for:
 
-- documentation freshness on shipped behavior changes, requiring a real explanatory surface and
-  running repository consistency;
+- documentation freshness on shipped behavior changes, requiring a real explanatory surface;
 - `guide/index.html` freshness for public workflow/invocation changes;
-- honest changelog/release alignment using the existing release checklist;
-- Claude/Codex host parity using repository consistency and co-change rules where useful;
+- honest changelog/release alignment through deterministic co-change rules; the host still runs the
+  existing release checklist during ordinary landing verification;
+- Claude/Codex host parity through deterministic co-change rules; the host still runs repository
+  consistency during ordinary landing verification;
 - declarative post-merge steps: if this reviewed change carries a release bump, verify the matching
   immutable GitHub tag/release after host-authorized merge and draft a <=280-character X
   announcement with value plus link. Never post it.
@@ -117,7 +116,7 @@ invokes the profile again.
 ## Acceptance identity
 
 - **B1-A1:** A repository with no landing profile retains generic landing behavior, while a present malformed, symlinked, irregular, oversized, or unsupported profile fails closed with a stable diagnostic.
-- **B1-A2:** Schema-v1 blocking, advisory, skipped, command, and path-touched results are deterministic and structured; commands use argv without a shell, closed stdin, a scrubbed environment, bounded output, and a hard timeout.
+- **B1-A2:** A schema-v1 profile supports deterministic blocking, advisory, skipped, and path-touched outcomes plus declarative post-merge items, rejects executable or command checks as unsupported, and performs no profile-directed subprocess execution.
 - **B1-A3:** Project results and their canonical digest bind profile bytes, exact `HEAD`, resolved base commit, and normalized check outcomes; a moved head, changed base, changed profile, or stale digest cannot satisfy readiness.
 - **B1-A4:** Project landing state is a distinct host-owned readiness input that workers cannot assert or mutate, and it never grants merge, tag, release, protected-ref, or posting authority.
 - **B1-A5:** The tracked Elves profile automatically exercises documentation freshness, public-guide freshness, changelog honesty, and Claude/Codex parity on applicable diffs, while preserving generic behavior for projects without a profile.
@@ -131,9 +130,9 @@ independent review, exact PR state, and mergeability.
 
 - Profile missing vs invalid are accidentally treated the same.
 - Base branch movement silently changes the evaluated delta or leaves a stale attestation green.
-- A symlink/path traversal or shell string executes outside repository policy.
-- Commands inherit credentials or leak unbounded output.
-- Raw output/timestamps/absolute paths make result digests nondeterministic.
+- A symlink/path traversal escapes repository policy.
+- An executable profile kind or argv slips through schema validation.
+- Timestamps or absolute paths make result digests nondeterministic.
 - Advisory checks block, blocking checks warn, or skipped checks disappear from the report.
 - A worker-provided session field forges host readiness.
 - Installed bundles omit the CLI or depend on repo-only helpers at runtime.
