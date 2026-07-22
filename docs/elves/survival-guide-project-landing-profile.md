@@ -39,7 +39,7 @@ without posting it.
 - **Worker merge authority:** false
 - **Staging acceptance validation:** PASS — plan/session validation and staging preflight green
 - **High-risk checkpoints:** first meaningful profile edit; authority integration; terminal review
-- **Re-drive budget:** one bounded worker correction turn after review
+- **Re-drive budget:** consumed by the bounded declarative-only worker correction
 - **Continuation harness:** same collaboration worker identity
 - **Continuation rule:** send the packet once for the guide phase; after a valid checkpoint send only `Continue.`
 - **Checkpoint rule:** the checkpoint is delivery-only; log it and continue while the Stop Gate is closed
@@ -49,8 +49,8 @@ without posting it.
 
 - **Planned batches remaining:** 1
 - **Stop allowed right now:** no
-- **Why:** staging, guide checkpoint, implementation, validation, review, PR landing, release verification, and X draft remain
-- **Next required action:** launch the GPT-5.6-high guide phase with the packet once, validate its checkpoint, then resume the same worker with `Continue.`
+- **Why:** fresh exact-tip review, final acceptance/readiness proof, PR landing, release verification, and X draft remain
+- **Next required action:** push the terminal-review correction tip, then obtain clean cumulative and security review at that exact revision
 
 ## Effort Standard
 
@@ -70,14 +70,15 @@ cumulative landing and installed-bundle contracts remain unproved.
 
 ## Current Phase
 
-- **Status:** independent review complete; security correction staged
+- **Status:** terminal review corrections locally green and committed
 - **Active batch:** B1
-- **What was just finished:** two independent reviewers rejected arbitrary profile subprocesses and the host amended B1 to declarative-only
-- **Single next action:** commit/push the amendment, then re-drive the same GPT-5.6-high worker
+- **What was just finished:** the driver fixed all three terminal-review findings with 104 focused tests, repository consistency, release checks, contract parity, and randomized glob-semantics proof green
+- **Single next action:** push the correction tip and re-run both independent reviews against its exact commit
 
 ## Active Compute
 
-No worker is active; the bounded review-correction turn is next.
+No implementation worker is active. The cumulative and security reviewers will be reactivated only
+after the correction commit is pushed and its exact identity is frozen.
 
 ## Next Exact Batch
 
@@ -123,17 +124,18 @@ restaging completed work.
 
 ## Current State
 
-Draft PR #189 contains the run contract on a branch that started exactly at released `v2.12.0`.
-The GPT-5.6-high implementation is pushed. Independent review found that arbitrary argv plus
-environment scrubbing/process groups is not an OS boundary and reproduced a detached-child escape;
-the revised one-batch v2.13.0 MVP is declarative-only. Observation, promotion, executable gates,
-and posting remain future work.
+Draft PR #189 contains the declarative-only v2.13.0 implementation on a branch that started exactly
+at released `v2.12.0`. The GPT-5.6-high worker correction is pushed through `18a4336`. Fresh review
+then found a stale failed-outcome field, exponential repeated-globstar matching, and an invalid Git
+argument escape. The driver correction at `fe6977f` removes all three, adds a deterministic glob
+work budget and end-to-end regressions, and is locally green pending push and exact-tip re-review.
+Observation, promotion, executable gates, and posting remain future work.
 
 ## Next Exact Action
 
-Commit and push the host-owned security amendment, then send the bounded review correction to the
-same GPT-5.6-high worker. Require removal of executable profile gates, regression proof, and a
-clean pushed handback before terminal re-review.
+Push the terminal-review corrections and refreshed run control, re-read this guide, then reactivate
+the cumulative and security reviewers against the new exact remote-matched tip. Do not close B1 or
+attest landing readiness until both return with no actionable findings.
 
 ## Recovery Order
 

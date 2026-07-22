@@ -52,7 +52,7 @@
   "branch": "codex/project-landing-profile",
   "collision_tripwire": "35449718c173f737a7b0dad209accfe86b55b5a9",
   "continuation_guard": {
-    "next_required_action": "Commit and push the security amendment, then re-drive the same GPT-5.6-high worker to remove executable profile checks and prove the declarative-only revision.",
+    "next_required_action": "Push the terminal review corrections, obtain fresh clean cumulative and security review at the new exact tip, then record final acceptance evidence and landing readiness.",
     "remaining_batches": [
       "B1"
     ],
