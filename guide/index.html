@@ -512,7 +512,7 @@
     <div class="masthead-inner">
       <div class="brand-row">
         <a class="wordmark" href="https://github.com/aigorahub/elves">Elves</a>
-        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.13.0 source and releases on GitHub</a>
+        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.14.0 source and releases on GitHub</a>
       </div>
       <h1>Using Elves</h1>
       <p class="intro">Plan with the main agent, hand implementation to a separate worker, then
@@ -980,7 +980,10 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" \
           present profile at the exact HEAD and resolved base, records a host-owned digest, and
           shows advisory and post-merge checklist items. Worker reports cannot override that live
           result. A missing profile changes nothing. A profile can block readiness, but it cannot
-          authorize merge, tags, releases, protected refs, connectors, secrets, or posting.</p>
+          authorize merge, tags, releases, protected refs, connectors, secrets, or posting.
+          Hosts may also record observations, synthesize candidates, and explicitly promote checks,
+          or waive one blocking check at the exact HEAD; learning state stays under
+          <code>.elves/runtime/landing-profile/</code> and never auto-promotes.</p>
 
         <h3>If you asked Elves not to merge</h3>
         <p>The run stops with a reviewed, landable PR. You can inspect it and merge it yourself.</p>

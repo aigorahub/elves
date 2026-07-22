@@ -98,10 +98,11 @@
   at a landable PR. A `merge-on-green`, chat-to-land, or reviewed-PR landing opt-in authorizes only
   a regular merge commit (never a squash) after the Final Readiness Review passes.
 - Keep repository-specific deterministic landing rituals in tracked
-  `.elves/landing-profile.json`, while `.elves/runtime/`, candidates, observations, and session
-  artifacts stay ignored. Schema-v1 profiles are declarative and cannot launch commands. Profile
-  checks can block host readiness but cannot grant merge, release, tag, protected-ref, connector,
-  secret, or posting authority.
+  `.elves/landing-profile.json`, while `.elves/runtime/` (including
+  `.elves/runtime/landing-profile/` observations, candidates, and waivers) and session artifacts
+  stay ignored. Schema-v1 profiles are declarative and cannot launch commands. Only explicit host
+  `promote` rewrites the tracked profile. Profile checks can block host readiness but cannot grant
+  merge, release, tag, protected-ref, connector, secret, or posting authority.
 
 
 ## v2.1.0 full-run note

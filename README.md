@@ -8,7 +8,7 @@ plans and reviews; a subscription-native (or optional external) worker implement
 files let the work survive context compaction. You write the plan and own the merge decision. The
 agent does the middle.
 
-**Current release: v2.13.0** — see [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.14.0** — see [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 **New to Elves?** Use the [practical user guide](https://aigorahub.github.io/elves/) — especially
@@ -133,7 +133,8 @@ Projects with deterministic repository-specific landing rituals may track
 HEAD/base/merge-base and bound to a host-owned digest; schema v1 rejects executable checks and
 never launches profile-directed processes. Missing profiles are neutral; profiles can block
 readiness but never grant merge, tag, release, protected-ref, secret, connector, or posting
-authority. See
+authority. Hosts may `observe` landings, `propose` candidates, explicitly `promote` into the tracked
+profile, and apply exact-HEAD `waive` entries — with no auto-promotion. See
 [`references/project-landing-profiles.md`](references/project-landing-profiles.md).
 
 ---
@@ -382,12 +383,12 @@ exactly one file below; other docs link instead of restating.
 
 ```bash
 # Elves source checkout:
-python3 scripts/verify_repo.py --version 2.13.0
+python3 scripts/verify_repo.py --version 2.14.0
 # before operational-artifact cleanup, from a clean worktree:
-python3 scripts/verify_repo.py --version 2.13.0 --final-readiness \
+python3 scripts/verify_repo.py --version 2.14.0 --final-readiness \
   --session .elves-session.json
 # after the narrow operational-artifact cleanup commit, on its clean current tip:
-python3 scripts/verify_repo.py --ci --version 2.13.0 --base-ref origin/main
+python3 scripts/verify_repo.py --ci --version 2.14.0 --base-ref origin/main
 test -z "$(git status --porcelain)"
 ```
 
@@ -408,6 +409,10 @@ The standalone installed command is:
 python3 "$ELVES_SKILL_ROOT/scripts/landing_profile.py" check \
   --repo-root . --base origin/main --json
 ```
+
+Learning commands (`observe`, `propose`, `candidates`, `promote`, `waive`, `clear-waiver`) use the
+same CLI. Only `promote` rewrites the tracked profile; runtime learning state stays under
+`.elves/runtime/landing-profile/`.
 
 Intentional source-checkout public-API breaks must be declared in the tracked
 `api-break-approvals.json` for the exact `--version`. Every entry names one surface, a non-empty

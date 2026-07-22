@@ -223,7 +223,9 @@ checks. Strict landing recomputes them from the tracked declarative profile and 
 identity; worker reports cannot assert, mutate, or override them. Same-user worker isolation is the
 landing-authority protocol trust model, not a signed profile authority channel. A missing profile
 requires no new session fields and preserves generic behavior; stale project fields after profile
-removal fail closed.
+removal fail closed. Exact-HEAD waivers are host-owned runtime state bound into the live digest for
+one check id at one HEAD; they never grant merge. Observation/candidate ledgers are not session
+readiness fields and never auto-promote into the tracked profile.
 See [`project-landing-profiles.md`](project-landing-profiles.md).
 
 ## Optional session `lanes` key (advisory in v1)

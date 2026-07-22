@@ -26,6 +26,46 @@ present, host readiness must record both `project_landing_checks_green: true` an
 `project_landing_checks_digest`. The host recomputes the live result from the tracked profile and
 exact repository identities; `worker_report` fields cannot set, replace, or override either value.
 
+## Learning loop (observe → propose → promote)
+
+Host-owned learning state lives under gitignored `.elves/runtime/landing-profile/`. It is not
+readiness authority and never auto-writes the tracked profile.
+
+```bash
+# Record an exact-HEAD observation, optionally with an explicit candidate proposal.
+python3 "$ELVES_SKILL_ROOT/scripts/landing_profile.py" observe \
+  --repo-root . --base origin/main \
+  --note "docs always move with scripts" \
+  --propose-id docs-with-scripts \
+  --propose-when 'scripts/**' \
+  --propose-paths 'docs/**' \
+  --propose-severity advisory
+
+# Synthesize candidates from explicit statements and co-occurrence (min support default 2).
+python3 "$ELVES_SKILL_ROOT/scripts/landing_profile.py" propose --repo-root . --json
+
+# Promote one candidate into tracked .elves/landing-profile.json (operator commits the result).
+python3 "$ELVES_SKILL_ROOT/scripts/landing_profile.py" promote \
+  --repo-root . --id docs-with-scripts --severity advisory
+```
+
+There is no auto-promotion. Candidates must be schema-v1 check shapes. Executable/`command` shapes
+remain unsupported. Co-occurrence proposals default to advisory severity; choose severity at
+promote time.
+
+### Exact-HEAD waivers
+
+A host may waive one blocking check at the exact current HEAD:
+
+```bash
+python3 "$ELVES_SKILL_ROOT/scripts/landing_profile.py" waive \
+  --repo-root . --id docs-required \
+  --reason "temporary docs lag on this head only"
+```
+
+A waived blocking failure becomes `status=waived` and is bound into the result digest. Moving HEAD
+invalidates the waiver. Waivers never authorize merge, tag, release, or posting.
+
 ## Schema v1
 
 The profile has exactly `schema_version` and `checks`. Unknown keys fail closed. IDs are unique

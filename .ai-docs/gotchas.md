@@ -39,10 +39,12 @@
 - `.elves-session.json` is ignored by default in the repo baseline, but live Elves runs may need to
   force-add it so the branch carries structured session state during the run.
 - `.elves/landing-profile.json` is the deliberate exception to the ignored `.elves/*` runtime
-  tree. Do not broaden that exception: observations, candidates, sessions, and private prewalk
-  checkpoints remain untracked. A present invalid profile fails closed; a missing profile is
-  neutral. Schema v1 rejects executable/argv shapes; repository consistency and release checks
-  stay host-run ordinary verification rather than profile subprocesses.
+  tree. Do not broaden that exception: observations, candidates, waivers, sessions, and private
+  prewalk checkpoints remain untracked under `.elves/runtime/`. A present invalid profile fails
+  closed; a missing profile is neutral. Schema v1 rejects executable/argv shapes; repository
+  consistency and release checks stay host-run ordinary verification rather than profile
+  subprocesses. Exact-HEAD waivers clear only the named check at the named HEAD and never authorize
+  merge.
 - Local project installs can quietly shadow global installs. When behavior differs from what the
   user expects, check `scripts/install_doctor.py --doctor` before assuming the upgrade failed.
 - PR review automation only becomes useful once the branch is pushed and the PR exists. Opening the
