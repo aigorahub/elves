@@ -50,7 +50,7 @@ without posting it.
 - **Planned batches remaining:** 1
 - **Stop allowed right now:** no
 - **Why:** staging, guide checkpoint, implementation, validation, review, PR landing, release verification, and X draft remain
-- **Next required action:** finish the staged packet/session contract, commit and push it, create the PR, then launch the GPT-5.6-high guide phase
+- **Next required action:** launch the GPT-5.6-high guide phase with the packet once, validate its checkpoint, then resume the same worker with `Continue.`
 
 ## Effort Standard
 
@@ -70,14 +70,14 @@ cumulative landing and installed-bundle contracts remain unproved.
 
 ## Current Phase
 
-- **Status:** staging
+- **Status:** staged; guide launch ready
 - **Active batch:** B1
-- **What was just finished:** audited Grok's design, current landing authority, prewalk capability, and release conventions; created an isolated branch/worktree
-- **Single next action:** validate and commit the run contract
+- **What was just finished:** validated and pushed the run contract and opened draft PR #189
+- **Single next action:** launch the GPT-5.6-high guide checkpoint
 
 ## Active Compute
 
-No implementation worker is active yet.
+No implementation worker is active yet; launch is the next action.
 
 ## Next Exact Batch
 
@@ -109,7 +109,7 @@ restaging completed work.
 - [x] Main checkout's untracked Grok draft preserved.
 - [x] User merge/release authority and no-post boundary recorded.
 - [x] Plan/session/packet stable identity validates.
-- [ ] Contract commit pushed and PR created.
+- [x] Contract commit pushed and PR #189 created.
 
 ## Cobbler Session State
 
@@ -123,14 +123,15 @@ restaging completed work.
 
 ## Current State
 
-The branch starts exactly at released `v2.12.0`. Planning reviews agree on a one-batch v2.13.0 MVP:
+Draft PR #189 contains the validated run contract on a branch that started exactly at released
+`v2.12.0`. Planning reviews agree on a one-batch v2.13.0 MVP:
 pure profile core, thin CLI, landing/authority integration, dogfood rules, installed shipment, and
 declarative post-merge release/X follow-through. Observation and promotion remain future work.
 
 ## Next Exact Action
 
-Validate the plan/session/packet contract, run staging preflight and baseline checks, then commit
-and push the Contract slice.
+Launch the GPT-5.6-high guide turn with the staged packet once. Validate its private TODO,
+meaningful first edit, narrow check, and exact checkpoint before sending exactly `Continue.`.
 
 ## Recovery Order
 

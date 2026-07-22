@@ -52,7 +52,7 @@
   "branch": "codex/project-landing-profile",
   "collision_tripwire": "35449718c173f737a7b0dad209accfe86b55b5a9",
   "continuation_guard": {
-    "next_required_action": "Validate and push the Contract slice, create the PR, then launch the GPT-5.6-high guide checkpoint.",
+    "next_required_action": "Launch the GPT-5.6-high guide checkpoint with the staged packet, validate it, then resume the same worker with Continue.",
     "remaining_batches": [
       "B1"
     ],
@@ -90,6 +90,7 @@
     }
   ],
   "plan_path": "docs/plans/project-landing-profile.md",
+  "pr_number": 189,
   "prewalk": {
     "actual_transport": "collaboration_exact_session",
     "continuation_message": "Continue.",

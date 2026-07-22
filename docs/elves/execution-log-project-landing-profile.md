@@ -7,7 +7,7 @@
 - **Active batch:** B1 — ship and dogfood exact-HEAD project landing profiles
 - **Last completed batch:** none
 - **Next exact batch:** B1
-- **Active PR:** not created yet
+- **Active PR:** #189 (draft)
 - **Docs promoted this run:** none yet
 - **Latest Elves Report:** not generated yet
 
@@ -54,3 +54,10 @@ push, and PR creation.
 - Baseline focused landing/authority/release/install suite passed 91 tests.
 - Baseline repository consistency and v2.12.0 release checklist passed.
 - Next: commit/push Contract staging, create the PR, then launch the guide checkpoint.
+
+## Contract push and PR: 2026-07-22 EDT
+
+- Commit `4787b75` staged the plan, session, recovery guide, execution log, and worker packet.
+- Branch `codex/project-landing-profile` is pushed and clean.
+- Draft PR #189 is the early review surface.
+- Next: GPT-5.6-high guide checkpoint, then same-worker `Continue.` execution.
