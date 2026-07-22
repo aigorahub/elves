@@ -47,10 +47,10 @@ without posting it.
 
 ## Stop Gate
 
-- **Planned batches remaining:** 1
+- **Planned batches remaining:** 0
 - **Stop allowed right now:** no
-- **Why:** fresh exact-tip review, final acceptance/readiness proof, PR landing, release verification, and X draft remain
-- **Next required action:** complete clean exact-delta review and required checks after pushed timing-stabilization commit `3452e72`
+- **Why:** strict landing, operational cleanup, final-tip checks, PR landing, release verification, and X draft remain
+- **Next required action:** run strict landing and exact-tip readiness review at the committed B1 evidence tip
 
 ## Effort Standard
 
@@ -70,16 +70,15 @@ cumulative landing and installed-bundle contracts remain unproved.
 
 ## Current Phase
 
-- **Status:** timing-envelope stabilization validated and pushed; exact-delta review/CI in progress
-- **Active batch:** B1
-- **What was just finished:** five consecutive focused tests and the full 39-test provider-shortcut module passed; test-only stabilization commit `3452e72` is pushed and its implementation review is clean
-- **Single next action:** finish review of the run-control-only refresh and wait for required checks, then record acceptance evidence
+- **Status:** B1 acceptance complete; strict landing and cleanup remain
+- **Active batch:** none
+- **What was just finished:** all B1/Master criteria received one-to-one proof after full local verification, clean independent reviews, and green GitHub run `29925065981`
+- **Single next action:** run strict landing and exact-tip readiness review at the committed evidence tip
 
 ## Active Compute
 
-No implementation worker is active. The read-only timing reviewer confirmed the production
-deadline is unchanged and the pushed test stabilization is correct; only this run-control refresh
-remains to attest.
+No implementation worker or reviewer is active. The next compute is the host-owned strict landing
+check followed by one exact-tip readiness review.
 
 ## Next Exact Batch
 
@@ -127,16 +126,18 @@ restaging completed work.
 
 Draft PR #189 contains the declarative-only v2.13.0 implementation on a branch that started exactly
 at released `v2.12.0`. Product/security review and the local 1,355-test verifier are clean at
-`6d9acbc`. Linux and Socket checks are green. macOS exposed a pre-existing Fugu whole-wrapper timing
+`6d9acbc`. macOS exposed a pre-existing Fugu whole-wrapper timing
 assertion that failed twice by at most 40.6 ms even though the production two-second provider
 deadline is correctly enforced. The isolated test-only four-second envelope is validated and pushed
-as `3452e72`; its new GitHub matrix and the run-control-only delta review are in progress.
+as `3452e72`; exact-delta review is clean. The refreshed run at `9876a4f` is fully green across
+Linux, macOS, aggregate matrix, and Socket checks. B1 acceptance evidence is complete.
 Observation, promotion, executable gates, and posting remain future work.
 
 ## Next Exact Action
 
-Complete exact-delta review of this run-control-only refresh and wait for required checks after
-pushed stabilization `3452e72`. Do not close B1 or attest landing readiness until both are green.
+Run strict landing and exact-tip readiness review at the committed evidence tip. Only after both
+pass, remove the operational session, packet, survival guide, and execution log in one cleanup
+commit, then attest the cleanup-only final tip.
 
 ## Recovery Order
 

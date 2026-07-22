@@ -60,23 +60,23 @@ preserved there; this file is the authoritative acceptance contract for this run
 
 **Tasks:**
 
-- [ ] Define and validate schema v1; implement deterministic diff selection and result digests.
-- [ ] Add `path_touched` evaluation and fail closed on executable/`command` profile kinds.
-- [ ] Integrate live project checks with landing validation and host-owned readiness attestation.
-- [ ] Ship the CLI/runtime in both installed host bundles with focused and integration tests.
-- [ ] Track an Elves landing profile and preserve ignored runtime state under `.elves/runtime/`.
-- [ ] Document the generic contract and Elves' post-merge release/X-draft rules.
-- [ ] Align the public release as v2.13.0 and run focused plus broad verification.
+- [x] Define and validate schema v1; implement deterministic diff selection and result digests.
+- [x] Add `path_touched` evaluation and fail closed on executable/`command` profile kinds.
+- [x] Integrate live project checks with landing validation and host-owned readiness attestation.
+- [x] Ship the CLI/runtime in both installed host bundles with focused and integration tests.
+- [x] Track an Elves landing profile and preserve ignored runtime state under `.elves/runtime/`.
+- [x] Document the generic contract and Elves' post-merge release/X-draft rules.
+- [x] Align the public release as v2.13.0 and run focused plus broad verification.
 
 **Acceptance criteria:**
 
-- [ ] [B1-A1] A repository with no landing profile retains generic landing behavior, while a present malformed, symlinked, irregular, oversized, or unsupported profile fails closed with a stable diagnostic.
-- [ ] [B1-A2] A schema-v1 profile supports deterministic blocking, advisory, skipped, and path-touched outcomes plus declarative post-merge items, rejects executable or command checks as unsupported, and performs no profile-directed subprocess execution.
-- [ ] [B1-A3] Project results and their canonical digest bind profile bytes, exact `HEAD`, resolved base commit, and normalized check outcomes; a moved head, changed base, changed profile, or stale digest cannot satisfy readiness.
-- [ ] [B1-A4] Project landing state is a distinct host-evaluated readiness input whose live green/digest cannot be set or overridden by worker reports, and it never grants merge, tag, release, protected-ref, or posting authority.
-- [ ] [B1-A5] The tracked Elves profile automatically exercises documentation freshness, public-guide freshness, changelog honesty, and Claude/Codex parity on applicable diffs, while preserving generic behavior for projects without a profile.
-- [ ] [B1-A6] Both installed host bundles contain and can execute the new CLI, focused profile/landing/authority/shipment tests pass, and the canonical repository verifier passes at the exact pull-request head against the immutable base.
-- [ ] [B1-A7] SKILL, AGENTS, README, guide, changelog, landing references, and durable AI docs align at v2.13.0 and state that an appropriate authorized merge is followed by a matching immutable GitHub tag/release plus a short X announcement draft, never an automatic post.
+- [x] [B1-A1] A repository with no landing profile retains generic landing behavior, while a present malformed, symlinked, irregular, oversized, or unsupported profile fails closed with a stable diagnostic.
+- [x] [B1-A2] A schema-v1 profile supports deterministic blocking, advisory, skipped, and path-touched outcomes plus declarative post-merge items, rejects executable or command checks as unsupported, and performs no profile-directed subprocess execution.
+- [x] [B1-A3] Project results and their canonical digest bind profile bytes, exact `HEAD`, resolved base commit, and normalized check outcomes; a moved head, changed base, changed profile, or stale digest cannot satisfy readiness.
+- [x] [B1-A4] Project landing state is a distinct host-evaluated readiness input whose live green/digest cannot be set or overridden by worker reports, and it never grants merge, tag, release, protected-ref, or posting authority.
+- [x] [B1-A5] The tracked Elves profile automatically exercises documentation freshness, public-guide freshness, changelog honesty, and Claude/Codex parity on applicable diffs, while preserving generic behavior for projects without a profile.
+- [x] [B1-A6] Both installed host bundles contain and can execute the new CLI, focused profile/landing/authority/shipment tests pass, and the canonical repository verifier passes at the exact pull-request head against the immutable base.
+- [x] [B1-A7] SKILL, AGENTS, README, guide, changelog, landing references, and durable AI docs align at v2.13.0 and state that an appropriate authorized merge is followed by a matching immutable GitHub tag/release plus a short X announcement draft, never an automatic post.
 
 **Owned surfaces:** `.gitignore`, `.elves/landing-profile.json`, profile runtime/CLI, landing check,
 landing authority, focused tests, install shipment/smokes, SKILL, AGENTS, README, CHANGELOG, guide,
@@ -101,10 +101,10 @@ the canonical verifier.
 
 ## Master Acceptance
 
-- [ ] [M-A1] The authoritative plan, session, and worker packet retain exact stable-id/criterion parity, and every B1 criterion carries exact-head evidence before landing.
-- [ ] [M-A2] Independent cumulative and revision-delta review reports no unresolved actionable findings, including security and authority review of project-declared policy.
-- [ ] [M-A3] The canonical repository verifier and landing check pass on the exact reviewed pull-request head against the unchanged immutable base.
-- [ ] [M-A4] The pull request is mergeable by a regular merge commit with required checks green, clean worktree identity, and no unresolved review feedback.
+- [x] [M-A1] The authoritative plan, session, and worker packet retain exact stable-id/criterion parity, and every B1 criterion carries exact-head evidence before landing.
+- [x] [M-A2] Independent cumulative and revision-delta review reports no unresolved actionable findings, including security and authority review of project-declared policy.
+- [x] [M-A3] The canonical repository verifier and landing check pass on the exact reviewed pull-request head against the unchanged immutable base.
+- [x] [M-A4] The pull request is mergeable by a regular merge commit with required checks green, clean worktree identity, and no unresolved review feedback.
 
 ## Future roadmap (not acceptance for this run)
 

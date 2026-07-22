@@ -3,10 +3,10 @@
 ## Run Digest
 
 - **Last updated:** 2026-07-22 EDT
-- **Current phase:** Staging
-- **Active batch:** B1 — ship and dogfood exact-HEAD project landing profiles
-- **Last completed batch:** none
-- **Next exact batch:** B1
+- **Current phase:** Final readiness
+- **Active batch:** none
+- **Last completed batch:** B1 — ship and dogfood exact-HEAD project landing profiles
+- **Next exact batch:** operational cleanup after strict landing
 - **Active PR:** #189 (draft)
 - **Docs promoted this run:** none yet
 - **Latest Elves Report:** not generated yet
@@ -113,3 +113,29 @@ push, and PR creation.
   review caught only stale recovery wording, corrected by the following run-control refresh.
 - Next: complete exact-delta review and required checks at the refreshed tip, then resume
   acceptance close.
+
+## Batch 1 close: 2026-07-22 EDT
+
+**Validate for batch 1:**
+
+- Focused profile/landing/authority/install validation passed 104 tests after terminal corrections;
+  the isolated Fugu proof passed five consecutive runs and the full 39-test provider module.
+- Canonical local verification at the reviewed product tip passed 1,355 tests plus compile, shell,
+  JSON, consistency, release, installed bundles, public API, links, secret scan, and cumulative diff.
+- Exact-head dogfood at `9876a4f` passed six blocking checks with two declarative post-merge items;
+  digest `e57a221cd098a830ad08e7168c87aef670cc0265975326ba4d6660a22f6ad294` binds immutable base
+  `35449718c173f737a7b0dad209accfe86b55b5a9`.
+- Independent cumulative and security reviews are clean, including the terminal correction,
+  timing-proof implementation, and run-control-only closure deltas.
+- GitHub run `29925065981` is green on Ubuntu 3.10/3.12/3.14 and macOS 3.12; aggregate matrix and
+  both Socket checks pass. PR #189 is mergeable with no comments or reviews.
+- `acceptance_contract.py validate` reports exact plan/session identity with no issues or warnings.
+
+**Acceptance evidence:** B1-A1 through B1-A7 and M-A1 through M-A4 are checked in the authoritative
+plan and carry one-to-one proof in `.elves-session.json`.
+
+**Residual boundary:** same-user worker isolation remains inherited protocol trust, path co-change
+checks prove presence rather than semantic content, and post-merge release/X items remain host-only.
+
+**Next:** commit this evidence tip, run strict landing plus exact-tip readiness review, then remove
+the operational session/packet/survival/execution files and attest the cleanup-only final tip.
