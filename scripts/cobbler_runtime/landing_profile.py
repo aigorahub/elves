@@ -7,6 +7,7 @@ post-merge checklist items; they never supply executable content.  The thin
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 import os
@@ -159,10 +160,21 @@ def _read_bounded_profile(
             "profile_secure_open_unsupported",
             "Landing profile secure no-follow opening is unsupported on this platform.",
         )
-    except OSError:
+    except OSError as exc:
         if parent_descriptor is not None:
             os.close(parent_descriptor)
             parent_descriptor = None
+        unsupported_errors = {
+            errno.EINVAL,
+            errno.ENOSYS,
+            getattr(errno, "ENOTSUP", errno.EINVAL),
+            getattr(errno, "EOPNOTSUPP", errno.EINVAL),
+        }
+        if exc.errno in unsupported_errors:
+            return _invalid(
+                "profile_secure_open_unsupported",
+                "Landing profile secure no-follow opening is unsupported on this platform.",
+            )
         return _invalid(
             "profile_open_failed",
             "Landing profile could not be opened as a regular non-symlink file.",

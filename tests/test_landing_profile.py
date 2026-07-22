@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import io
 import json
 import os
@@ -129,6 +130,29 @@ class LandingProfileLoaderTests(unittest.TestCase):
             path.parent.mkdir()
             path.write_text(json.dumps(profile(path_check())), encoding="utf-8")
             with mock.patch.object(os, "supports_dir_fd", frozenset()):
+                result = load_landing_profile(root)
+
+        self.assertEqual(result.status, "invalid")
+        self.assertEqual(result.diagnostic.code, "profile_secure_open_unsupported")
+
+    def test_secure_open_platform_error_fails_with_same_stable_diagnostic(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            path = root / ".elves" / "landing-profile.json"
+            path.parent.mkdir()
+            path.write_text(json.dumps(profile(path_check())), encoding="utf-8")
+            with (
+                mock.patch.object(
+                    landing_profile_module.os,
+                    "open",
+                    side_effect=OSError(errno.ENOTSUP, "unsupported"),
+                ) as secure_open,
+                mock.patch.object(
+                    landing_profile_module.os,
+                    "supports_dir_fd",
+                    {secure_open},
+                ),
+            ):
                 result = load_landing_profile(root)
 
         self.assertEqual(result.status, "invalid")
