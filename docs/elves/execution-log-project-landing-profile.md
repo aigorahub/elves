@@ -107,5 +107,9 @@ push, and PR creation.
 - The isolated correction gives the whole-wrapper test a four-second loaded-runner envelope, still
   below the fake process's five-second ignored-signal sleep, so failure to SIGKILL/reap remains
   detectable. Production timeout behavior is unchanged.
-- Next: repeat the focused test, commit/push the isolated stabilization, obtain exact-delta review,
-  then resume acceptance close.
+- Five consecutive focused timeout regressions passed in 10.753 seconds, and the complete
+  39-test provider-shortcut module passed in 29.563 seconds.
+- The isolated test stabilization is pushed as `3452e72`. Its implementation review is clean;
+  review caught only stale recovery wording, corrected by the following run-control refresh.
+- Next: complete exact-delta review and required checks at the refreshed tip, then resume
+  acceptance close.

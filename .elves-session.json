@@ -52,7 +52,7 @@
   "branch": "codex/project-landing-profile",
   "collision_tripwire": "35449718c173f737a7b0dad209accfe86b55b5a9",
   "continuation_guard": {
-    "next_required_action": "Validate and push the isolated macOS timing-envelope test stabilization, obtain exact-delta review, then record final acceptance evidence and landing readiness.",
+    "next_required_action": "Complete exact-delta review and required checks after pushed timing-stabilization commit 3452e72, then record final acceptance evidence and landing readiness.",
     "remaining_batches": [
       "B1"
     ],

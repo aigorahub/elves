@@ -50,7 +50,7 @@ without posting it.
 - **Planned batches remaining:** 1
 - **Stop allowed right now:** no
 - **Why:** fresh exact-tip review, final acceptance/readiness proof, PR landing, release verification, and X draft remain
-- **Next required action:** validate and push the isolated macOS timing-envelope test stabilization, then obtain clean exact-delta review
+- **Next required action:** complete clean exact-delta review and required checks after pushed timing-stabilization commit `3452e72`
 
 ## Effort Standard
 
@@ -70,15 +70,16 @@ cumulative landing and installed-bundle contracts remain unproved.
 
 ## Current Phase
 
-- **Status:** exact-tip product review clean; required-check timing-envelope correction in progress
+- **Status:** timing-envelope stabilization validated and pushed; exact-delta review/CI in progress
 - **Active batch:** B1
-- **What was just finished:** two macOS runs failed only because a whole-wrapper Fugu test exceeded its three-second envelope by 40.6 ms and 7.7 ms; independent diagnosis proved the production two-second process-group deadline remains correctly bounded
-- **Single next action:** validate the test-only loaded-runner margin, commit/push it, and review that exact delta
+- **What was just finished:** five consecutive focused tests and the full 39-test provider-shortcut module passed; test-only stabilization commit `3452e72` is pushed and its implementation review is clean
+- **Single next action:** finish review of the run-control-only refresh and wait for required checks, then record acceptance evidence
 
 ## Active Compute
 
-No implementation worker is active. One read-only diagnostic agent confirmed the required-check
-failure is a pre-existing test-envelope flake rather than production deadline leakage.
+No implementation worker is active. The read-only timing reviewer confirmed the production
+deadline is unchanged and the pushed test stabilization is correct; only this run-control refresh
+remains to attest.
 
 ## Next Exact Batch
 
@@ -128,14 +129,14 @@ Draft PR #189 contains the declarative-only v2.13.0 implementation on a branch t
 at released `v2.12.0`. Product/security review and the local 1,355-test verifier are clean at
 `6d9acbc`. Linux and Socket checks are green. macOS exposed a pre-existing Fugu whole-wrapper timing
 assertion that failed twice by at most 40.6 ms even though the production two-second provider
-deadline is correctly enforced; an isolated test-only four-second envelope is pending validation.
+deadline is correctly enforced. The isolated test-only four-second envelope is validated and pushed
+as `3452e72`; its new GitHub matrix and the run-control-only delta review are in progress.
 Observation, promotion, executable gates, and posting remain future work.
 
 ## Next Exact Action
 
-Repeat the focused Fugu timeout test, commit and push the isolated test-envelope stabilization with
-this refreshed run control, re-read this guide, then obtain exact-delta review. Do not close B1 or
-attest landing readiness until that review and required checks are green.
+Complete exact-delta review of this run-control-only refresh and wait for required checks after
+pushed stabilization `3452e72`. Do not close B1 or attest landing readiness until both are green.
 
 ## Recovery Order
 
