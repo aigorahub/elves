@@ -147,3 +147,8 @@ the launcher leader unreaped until all group signals are attempted, tolerates Da
 after a prior successful group signal, fails closed when bounded reap cannot be confirmed, and
 widens the fake provider witness instead of extending any production wall deadline. It does not
 change provider models, routing, permissions, default limits, or the Batch 1 landing-profile design.
+The next exact-tip macOS run confirmed that the positive timeout witnesses' 10–40 ms cleanup
+reservations were still scheduler-sensitive even though production correctly returned the
+fail-closed status. Those two witnesses now use two-second finite deadlines against five- and
+ten-second sleepers, leaving a realistic bounded reap window; the deliberately unproved cleanup
+witnesses retain their smaller deadlines and exact status-125 assertions.

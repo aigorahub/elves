@@ -621,7 +621,7 @@ class LocalCliRunnerTests(unittest.TestCase):
             env = {
                 "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
                 "SAKANA_API_KEY": "test-sakana-key",
-                "SAKANA_FUGU_MAX_WAIT_SECONDS": "0.05",
+                "SAKANA_FUGU_MAX_WAIT_SECONDS": "2",
             }
             started = time.monotonic()
             timed_out = run_script("run_fugu.sh", "review", env=env, cwd=repo)
@@ -664,7 +664,7 @@ class LocalCliRunnerTests(unittest.TestCase):
                     "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
                     "PYTHONPATH": str(hook_dir),
                     "SAKANA_API_KEY": "test-sakana-key",
-                    "SAKANA_FUGU_MAX_WAIT_SECONDS": "0.2",
+                    "SAKANA_FUGU_MAX_WAIT_SECONDS": "2",
                 },
                 cwd=repo,
             )
