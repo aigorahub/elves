@@ -70,6 +70,7 @@ class LandingProfileLoaderTests(unittest.TestCase):
             (b'{"schema_version":1,"schema_version":1}', "profile_duplicate_key"),
             (b"[]", "profile_root_not_object"),
             (b"\xff", "profile_invalid_utf8"),
+            (b'{"x":' + (b"[" * 40) + b"0" + (b"]" * 40) + b"}", "profile_json_too_deep"),
         )
         for payload, expected in cases:
             with self.subTest(expected=expected), tempfile.TemporaryDirectory() as raw:
@@ -166,6 +167,7 @@ class LandingProfileSchemaTests(unittest.TestCase):
     def test_unsupported_keys_kinds_conditions_severity_and_shell_fail(self) -> None:
         cases = (
             ({**profile(command_check()), "future": True}, "profile_unsupported_key"),
+            ({"schema_version": True, "checks": [command_check()]}, "profile_schema_version_unsupported"),
             (profile({**command_check(), "future": True}), "profile_unsupported_key"),
             (profile({**command_check(), "kind": "llm_rubric"}), "profile_check_kind_unsupported"),
             (profile(command_check(when={"kind": "branch"})), "profile_condition_unsupported"),
@@ -175,6 +177,17 @@ class LandingProfileSchemaTests(unittest.TestCase):
             (profile(command_check(argv=["git", "push", "origin", "main"])), "profile_authority_command_forbidden"),
             (profile(command_check(argv=["gh", "release", "create", "v1"])), "profile_authority_command_forbidden"),
             (profile(command_check(argv=["python3", "scripts/elves_landing_check.py"])), "profile_recursive_command_forbidden"),
+            (
+                profile(
+                    {
+                        "id": "secret-description",
+                        "kind": "post_merge_checklist",
+                        "when": always(),
+                        "description": "token=super-secret-material-12345",
+                    }
+                ),
+                "profile_string_secret_like",
+            ),
         )
         for raw, expected in cases:
             with self.subTest(expected=expected):

@@ -31,6 +31,7 @@ MAX_CHECKS = 64
 MAX_PATTERNS_PER_CHECK = 64
 MAX_ARGV_ITEMS = 64
 MAX_STRING_CHARS = 512
+MAX_JSON_DEPTH = 32
 MAX_CHANGED_PATHS = 10_000
 MAX_GIT_OUTPUT_BYTES = 1024 * 1024
 MAX_COMMAND_OUTPUT_BYTES = 64 * 1024
@@ -153,19 +154,58 @@ def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
-def _read_bounded_profile(path: Path, before: os.stat_result) -> bytes | ProfileLoadResult:
-    flags = os.O_RDONLY
-    flags |= getattr(os, "O_CLOEXEC", 0)
-    flags |= getattr(os, "O_NOFOLLOW", 0)
+def _json_depth_within_bound(value: Any) -> bool:
+    stack: list[tuple[Any, int]] = [(value, 1)]
+    while stack:
+        item, depth = stack.pop()
+        if depth > MAX_JSON_DEPTH:
+            return False
+        if isinstance(item, dict):
+            stack.extend((child, depth + 1) for child in item.values())
+        elif isinstance(item, list):
+            stack.extend((child, depth + 1) for child in item)
+    return True
+
+
+def _read_bounded_profile(
+    path: Path,
+    before: os.stat_result,
+    parent_before: os.stat_result,
+) -> bytes | ProfileLoadResult:
+    common_flags = getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    parent_flags = os.O_RDONLY | common_flags | getattr(os, "O_DIRECTORY", 0)
+    parent_descriptor: int | None = None
+    descriptor: int | None = None
     try:
-        descriptor = os.open(path, flags)
+        parent_descriptor = os.open(path.parent, parent_flags)
+        opened_parent = os.fstat(parent_descriptor)
+        if (
+            not stat.S_ISDIR(opened_parent.st_mode)
+            or (opened_parent.st_dev, opened_parent.st_ino)
+            != (parent_before.st_dev, parent_before.st_ino)
+        ):
+            os.close(parent_descriptor)
+            parent_descriptor = None
+            return _invalid(
+                "profile_parent_changed_during_open",
+                "Landing profile directory changed while it was being opened.",
+            )
+        descriptor = os.open(
+            path.name,
+            os.O_RDONLY | common_flags,
+            dir_fd=parent_descriptor,
+        )
     except OSError:
+        if parent_descriptor is not None:
+            os.close(parent_descriptor)
+            parent_descriptor = None
         return _invalid(
             "profile_open_failed",
             "Landing profile could not be opened as a regular non-symlink file.",
         )
 
     try:
+        assert descriptor is not None
         opened = os.fstat(descriptor)
         if not stat.S_ISREG(opened.st_mode):
             return _invalid(
@@ -226,7 +266,10 @@ def _read_bounded_profile(path: Path, before: os.stat_result) -> bytes | Profile
             "Landing profile could not be read safely.",
         )
     finally:
-        os.close(descriptor)
+        if descriptor is not None:
+            os.close(descriptor)
+        if parent_descriptor is not None:
+            os.close(parent_descriptor)
 
 
 def load_landing_profile(repo_root: Path) -> ProfileLoadResult:
@@ -287,7 +330,7 @@ def load_landing_profile(repo_root: Path) -> ProfileLoadResult:
             size_bytes=profile_info.st_size,
         )
 
-    payload = _read_bounded_profile(profile_path, profile_info)
+    payload = _read_bounded_profile(profile_path, profile_info, parent_info)
     if isinstance(payload, ProfileLoadResult):
         return payload
     try:
@@ -306,7 +349,7 @@ def load_landing_profile(repo_root: Path) -> ProfileLoadResult:
             "Landing profile contains a duplicate JSON key.",
             size_bytes=len(payload),
         )
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, RecursionError, ValueError):
         return _invalid(
             "profile_invalid_json",
             "Landing profile must contain valid JSON.",
@@ -316,6 +359,12 @@ def load_landing_profile(repo_root: Path) -> ProfileLoadResult:
         return _invalid(
             "profile_root_not_object",
             "Landing profile JSON root must be an object.",
+            size_bytes=len(payload),
+        )
+    if not _json_depth_within_bound(parsed):
+        return _invalid(
+            "profile_json_too_deep",
+            f"Landing profile exceeds the maximum JSON depth of {MAX_JSON_DEPTH}.",
             size_bytes=len(payload),
         )
 
@@ -464,6 +513,11 @@ def _safe_string(value: Any, *, label: str) -> tuple[str | None, ProfileDiagnost
         return None, ProfileDiagnostic(
             "profile_string_control_character",
             f"{label} contains a forbidden control character.",
+        )
+    if redact_text(value).text != value:
+        return None, ProfileDiagnostic(
+            "profile_string_secret_like",
+            f"{label} contains secret-like material.",
         )
     return value, None
 
@@ -724,7 +778,12 @@ def validate_landing_profile(
             "profile_unsupported_key",
             "Landing profile top-level keys are invalid.",
         )
-    if profile.get("schema_version") != PROFILE_SCHEMA_VERSION:
+    raw_schema_version = profile.get("schema_version")
+    if (
+        isinstance(raw_schema_version, bool)
+        or not isinstance(raw_schema_version, int)
+        or raw_schema_version != PROFILE_SCHEMA_VERSION
+    ):
         return None, _schema_diagnostic(
             "profile_schema_version_unsupported",
             f"Landing profile schema_version must be {PROFILE_SCHEMA_VERSION}.",
