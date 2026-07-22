@@ -80,11 +80,12 @@ preserved there; this file is the authoritative acceptance contract for this run
 
 **Owned surfaces:** `.gitignore`, `.elves/landing-profile.json`, profile runtime/CLI, landing check,
 landing authority, focused tests, install shipment/smokes, SKILL, AGENTS, README, CHANGELOG, guide,
-landing/schema/runtime references, and durable `.ai-docs` guidance.
+landing/schema/runtime references, durable `.ai-docs` guidance, and the narrow final-matrix Fugu
+timeout cleanup repair recorded below.
 
 **Forbidden surfaces:** observation/promotion machinery, preferences, worker routing, provider
-shortcuts, merge methods, protected refs, release/post APIs inside the runner, executable profile
-checks, and unrelated TODO items.
+shortcuts beyond the narrow final-matrix timeout cleanup repair, merge methods, protected refs,
+release/post APIs inside the runner, executable profile checks, and unrelated TODO items.
 
 **Risk:** high — this changes the exact gate used immediately before merge; review proved arbitrary
 profile subprocesses cannot be made safe with string validation or post-hoc mutation checks.
@@ -134,3 +135,15 @@ effects, or post-check descendants. The authoritative B1 contract therefore remo
 checks instead of documenting an unsafe boundary. A later version may add them only behind a
 qualified recursive kernel sandbox; host-run release/consistency verification remains outside the
 profile and inside the ordinary reviewed landing ceremony.
+
+## Final-matrix validation repair amendment
+
+The cleanup-only exact-tip matrix exposed a pre-existing Darwin `EPERM` race in Fugu's bounded
+process-group reaping plus a bootstrap-inclusive timing assertion with too little separation from
+its fake provider's natural completion. Because exact-tip verification is a non-waivable landing
+gate, the coordinator reopened only `scripts/run_fugu.sh`, its focused provider-shortcut test, this
+plan, `references/provider-shortcuts.md`, and the v2.13.0 changelog during Review. The repair keeps
+the launcher leader unreaped until all group signals are attempted, tolerates Darwin `EPERM` only
+after a prior successful group signal, fails closed when bounded reap cannot be confirmed, and
+widens the fake provider witness instead of extending any production wall deadline. It does not
+change provider models, routing, permissions, default limits, or the Batch 1 landing-profile design.

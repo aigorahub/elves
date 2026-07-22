@@ -163,8 +163,10 @@ Relevant official surfaces: [Wide Research behavior](https://help.manus.im/en/ar
 `SAKANA_FUGU_MAX_WAIT_SECONDS` can replace a profile's wall limit with another finite, positive
 number of seconds. For Ultra only, `SAKANA_FUGU_ULTRA_EXPLORE_SECONDS` can replace the exploration
 phase, but it must be finite, positive, and low enough that the dynamically reported cleanup and
-synthesis reserves still fit inside the total. A timeout terminates the entire launcher process
-group and returns exit 124.
+synthesis reserves still fit inside the total. A timeout attempts bounded whole-group cleanup
+inside that same wall budget. Exit 124 means the provider or phase timed out and group cleanup
+reaped the launcher; exit 125 means cleanup authority or reap could not be proven without exceeding
+the budget, so the shortcut fails closed instead of reporting an ordinary completed timeout.
 The runner intentionally does not use a direct API fallback: `codex-fugu` owns Sakana transport,
 stream resilience, project instructions, and model-catalog compatibility. Official launcher
 installation and command details are at

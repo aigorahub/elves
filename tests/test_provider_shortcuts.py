@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import signal
 import subprocess
 import sys
 import tempfile
@@ -156,6 +157,45 @@ class LocalCliRunnerTests(unittest.TestCase):
         binary.chmod(0o755)
         return binary
 
+    def make_killpg_hook(
+        self,
+        root: Path,
+        *,
+        forced_signal: signal.Signals,
+    ) -> tuple[Path, Path, Path]:
+        hook_dir = root / "python-hook"
+        hook_dir.mkdir()
+        signal_log = root / "killpg-signals.log"
+        leader_kill_log = root / "leader-kill.log"
+        (hook_dir / "sitecustomize.py").write_text(
+            "import errno\n"
+            "import os\n"
+            "import signal\n"
+            "import subprocess\n"
+            f"_signal_log = {str(signal_log)!r}\n"
+            f"_leader_kill_log = {str(leader_kill_log)!r}\n"
+            f"_forced_signal = {int(forced_signal)}\n"
+            "_real_killpg = os.killpg\n"
+            "_real_popen_kill = subprocess.Popen.kill\n"
+            "_forced = False\n"
+            "def _killpg(pgid, signum):\n"
+            "    global _forced\n"
+            "    with open(_signal_log, 'a', encoding='utf-8') as handle:\n"
+            "        handle.write(f'{signum}\\n')\n"
+            "    if not _forced and signum == _forced_signal:\n"
+            "        _forced = True\n"
+            "        raise PermissionError(errno.EPERM, 'forced Darwin reap race')\n"
+            "    return _real_killpg(pgid, signum)\n"
+            "def _popen_kill(process):\n"
+            "    with open(_leader_kill_log, 'a', encoding='utf-8') as handle:\n"
+            "        handle.write(f'{process.pid}\\n')\n"
+            "    return _real_popen_kill(process)\n"
+            "os.killpg = _killpg\n"
+            "subprocess.Popen.kill = _popen_kill\n",
+            encoding="utf-8",
+        )
+        return hook_dir, signal_log, leader_kill_log
+
     def make_fugu_capture_fake(self, root: Path) -> Path:
         binary = root / "codex-fugu"
         binary.write_text(
@@ -265,7 +305,7 @@ class LocalCliRunnerTests(unittest.TestCase):
             "while IFS= read -r LINE || [ -n \"$LINE\" ]; do :; done\n"
             "if [ \"$IS_RESUME\" = 1 ]; then\n"
             "  trap '' INT TERM\n"
-            "  sleep 5\n"
+            "  sleep 10\n"
             "  exit 0\n"
             "fi\n"
             "printf '{\"type\":\"thread.started\",\"thread_id\":\"019f0000-0000-7000-8000-000000000004\"}\\n'\n"
@@ -473,10 +513,11 @@ class LocalCliRunnerTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 124, result.stderr)
         # Elapsed includes tracked-snapshot and sandbox bootstrap outside the
-        # provider process-group deadline; allow loaded macOS runner overhead.
+        # provider process-group deadline; allow loaded macOS runner overhead
+        # while staying below the fake resume process's ten-second sleep.
         self.assertLess(
             elapsed,
-            4.0,
+            8.0,
             f"bounded Ultra shutdown took {elapsed:.3f}s",
         )
         self.assertIn("staged wall budget", result.stderr)
@@ -571,7 +612,7 @@ class LocalCliRunnerTests(unittest.TestCase):
             bin_dir = root / "bin"
             bin_dir.mkdir()
             sleeper = bin_dir / "codex-fugu"
-            sleeper.write_text("#!/bin/sh\nsleep 5\n", encoding="utf-8")
+            sleeper.write_text("#!/bin/sh\nsleep 10\n", encoding="utf-8")
             sleeper.chmod(0o755)
             self.make_fake(bin_dir, "codex")
             repo = root / "repo"
@@ -589,10 +630,116 @@ class LocalCliRunnerTests(unittest.TestCase):
             non_finite = run_script("run_fugu.sh", "review", env=env, cwd=repo)
 
         self.assertEqual(timed_out.returncode, 124, timed_out.stderr)
-        self.assertLess(elapsed, 2)
+        # The wrapper includes tracked-snapshot and sandbox bootstrap time,
+        # but must still finish well before the fake's ten-second sleep.
+        self.assertLess(elapsed, 8.0)
         self.assertIn("terminating it", timed_out.stderr)
         self.assertNotEqual(non_finite.returncode, 0)
         self.assertIn("must be finite and positive", non_finite.stderr)
+
+    @unittest.skipUnless(
+        sys.platform == "darwin" and HAS_FS_SANDBOX,
+        "Darwin filesystem sandbox unavailable",
+    )
+    def test_fugu_timeout_tolerates_darwin_eperm_reap_race(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            sleeper = bin_dir / "codex-fugu"
+            sleeper.write_text("#!/bin/sh\nsleep 5\n", encoding="utf-8")
+            sleeper.chmod(0o755)
+            self.make_fake(bin_dir, "codex")
+            hook_dir, signal_log, leader_kill_log = self.make_killpg_hook(
+                root,
+                forced_signal=signal.SIGTERM,
+            )
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "review",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "PYTHONPATH": str(hook_dir),
+                    "SAKANA_API_KEY": "test-sakana-key",
+                    "SAKANA_FUGU_MAX_WAIT_SECONDS": "0.2",
+                },
+                cwd=repo,
+            )
+            attempted_signals = [
+                int(raw)
+                for raw in signal_log.read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(result.returncode, 124, result.stderr)
+        self.assertIn("terminating it", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+        self.assertEqual(
+            attempted_signals,
+            [signal.SIGINT, signal.SIGTERM, signal.SIGKILL],
+        )
+        self.assertFalse(leader_kill_log.exists())
+
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    def test_fugu_unproved_timeout_cleanup_returns_125(self) -> None:
+        for profile_args, max_wait, explore_wait, expected_message in (
+            ((), "0.2", None, "Fugu timeout cleanup could not reap"),
+            (
+                ("--ultra",),
+                "0.4",
+                "0.1",
+                "Fugu Ultra exploration could not be reaped",
+            ),
+        ):
+            with self.subTest(profile=profile_args or ("regular",)):
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    root = Path(tmpdir)
+                    bin_dir = root / "bin"
+                    bin_dir.mkdir()
+                    sleeper = bin_dir / "codex-fugu"
+                    sleeper.write_text("#!/bin/sh\nsleep 5\n", encoding="utf-8")
+                    sleeper.chmod(0o755)
+                    self.make_fake(bin_dir, "codex")
+                    hook_dir, signal_log, leader_kill_log = self.make_killpg_hook(
+                        root,
+                        forced_signal=signal.SIGINT,
+                    )
+                    repo = root / "repo"
+                    repo.mkdir()
+                    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+                    env = {
+                        "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                        "PYTHONPATH": str(hook_dir),
+                        "SAKANA_API_KEY": "test-sakana-key",
+                        "SAKANA_FUGU_MAX_WAIT_SECONDS": max_wait,
+                    }
+                    if explore_wait is not None:
+                        env["SAKANA_FUGU_ULTRA_EXPLORE_SECONDS"] = explore_wait
+                    result = run_script(
+                        "run_fugu.sh",
+                        *profile_args,
+                        "review",
+                        env=env,
+                        cwd=repo,
+                    )
+                    attempted_signals = [
+                        int(raw)
+                        for raw in signal_log.read_text(encoding="utf-8").splitlines()
+                    ]
+                    leader_kills = leader_kill_log.read_text(
+                        encoding="utf-8"
+                    ).splitlines()
+
+                self.assertEqual(result.returncode, 125, result.stderr)
+                self.assertIn(expected_message, result.stderr)
+                self.assertNotIn("Traceback", result.stderr)
+                self.assertEqual(
+                    attempted_signals,
+                    [signal.SIGINT, signal.SIGTERM, signal.SIGKILL],
+                )
+                self.assertEqual(len(leader_kills), 1)
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
     def test_grok_uses_read_only_checked_key_scrubbed_non_bypass_mode(self) -> None:

@@ -108,6 +108,7 @@ fi
 TODAY=$(date +%F)
 exec python3 - "$MAX_WAIT" "$REPO_ROOT" "$MODEL" "$EFFORT" "$TASK" "$TODAY" "$SCRIPT_DIR" <<'PY'
 import ast
+import errno
 import json
 import math
 import os
@@ -523,24 +524,50 @@ say exactly \"No actionable findings\" and list only residual verification risks
         ) -> bool:
             """Stop and reap a process group without crossing the caller's deadline."""
             signals = (signal.SIGINT, signal.SIGTERM, signal.SIGKILL)
+            sent_group_signal = False
+            cleanup_unproved = False
             for index, sig in enumerate(signals):
-                if process.poll() is not None:
-                    return True
                 try:
                     os.killpg(process.pid, sig)
-                except ProcessLookupError:
-                    return True
+                    signaled = True
+                    sent_group_signal = True
+                except OSError as exc:
+                    # Darwin can report EPERM when a previous signal removed
+                    # the group's last signalable member while the unreaped
+                    # leader still pins the PGID. Tolerate that race only
+                    # after this cleanup has successfully signaled the group;
+                    # an initial EPERM means cleanup authority is unproved.
+                    tolerated_eperm = (
+                        exc.errno == errno.EPERM
+                        and sys.platform == "darwin"
+                        and sent_group_signal
+                    )
+                    if exc.errno != errno.ESRCH and not tolerated_eperm:
+                        cleanup_unproved = True
+                    signaled = False
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     continue
                 stages_left = len(signals) - index
-                wait_seconds = remaining if sig == signal.SIGKILL else remaining / stages_left
+                if signaled and sig != signal.SIGKILL:
+                    time.sleep(remaining / stages_left)
+
+            # Reap only after the final group signal. Until this point the
+            # direct child pins process.pid == PGID against identity reuse.
+            # If group authority was ever unproved, make one last best-effort
+            # direct-leader kill while that known Popen identity is still
+            # pinned, but retain the unproved result even if reap succeeds.
+            if cleanup_unproved:
                 try:
-                    process.wait(timeout=wait_seconds)
-                    return True
-                except subprocess.TimeoutExpired:
+                    process.kill()
+                except OSError:
                     pass
-            return process.poll() is not None
+            remaining = max(0.0, deadline - time.monotonic())
+            try:
+                process.wait(timeout=remaining)
+                return not cleanup_unproved
+            except subprocess.TimeoutExpired:
+                return False
 
         common = [
             launcher,
@@ -582,7 +609,13 @@ say exactly \"No actionable findings\" and list only residual verification risks
             try:
                 active_wait = deadline - time.monotonic() - shutdown_budget
                 if active_wait <= 0:
-                    terminate_group(process, deadline=deadline)
+                    if not terminate_group(process, deadline=deadline):
+                        print(
+                            "Error: Fugu timeout cleanup could not reap the launcher "
+                            "within the hard wall budget.",
+                            file=sys.stderr,
+                        )
+                        raise SystemExit(125)
                     raise SystemExit(124)
                 process.communicate(prompt, timeout=active_wait)
             except subprocess.TimeoutExpired:
@@ -591,7 +624,13 @@ say exactly \"No actionable findings\" and list only residual verification risks
                     f"{max_wait:g}s; terminating it.",
                     file=sys.stderr,
                 )
-                terminate_group(process, deadline=deadline)
+                if not terminate_group(process, deadline=deadline):
+                    print(
+                        "Error: Fugu timeout cleanup could not reap the launcher "
+                        "within the hard wall budget.",
+                        file=sys.stderr,
+                    )
+                    raise SystemExit(125)
                 raise SystemExit(124)
             raise SystemExit(process.returncode)
 
@@ -720,7 +759,15 @@ say exactly \"No actionable findings\" and list only residual verification risks
                     - synthesis_floor,
                 )
                 if active_explore_wait <= 0:
-                    terminate_group(process, deadline=total_deadline - synthesis_floor)
+                    if not terminate_group(
+                        process, deadline=total_deadline - synthesis_floor
+                    ):
+                        print(
+                            "Error: Fugu Ultra exploration cleanup could not reap the "
+                            "launcher within its reserved wall budget.",
+                            file=sys.stderr,
+                        )
+                        raise SystemExit(125)
                     raise SystemExit(124)
                 process.communicate(prompt, timeout=active_explore_wait)
             except subprocess.TimeoutExpired:
@@ -735,7 +782,7 @@ say exactly \"No actionable findings\" and list only residual verification risks
                         "reserved shutdown budget.",
                         file=sys.stderr,
                     )
-                    raise SystemExit(124)
+                    raise SystemExit(125)
         if process.returncode == 0 and emit_final():
             raise SystemExit(0)
         if not exploration_cutoff and process.returncode != 0:
@@ -809,16 +856,29 @@ residual verification risks. Do not narrate your process."""
             try:
                 synthesis_wait = total_deadline - time.monotonic() - shutdown_budget
                 if synthesis_wait <= 0:
-                    terminate_group(process, deadline=total_deadline)
+                    if not terminate_group(process, deadline=total_deadline):
+                        print(
+                            "Error: Fugu Ultra synthesis cleanup could not reap the "
+                            "launcher within the staged wall budget.",
+                            file=sys.stderr,
+                        )
+                        raise SystemExit(125)
                     raise SystemExit(124)
                 process.communicate(synthesis_prompt, timeout=synthesis_wait)
             except subprocess.TimeoutExpired:
-                terminate_group(process, deadline=total_deadline)
+                cleanup_complete = terminate_group(process, deadline=total_deadline)
                 print(
                     f"Error: codex-fugu {model}/{effort} review exceeded its "
                     f"{max_wait:g}s staged wall budget.",
                     file=sys.stderr,
                 )
+                if not cleanup_complete:
+                    print(
+                        "Error: Fugu Ultra synthesis cleanup could not reap the "
+                        "launcher within the staged wall budget.",
+                        file=sys.stderr,
+                    )
+                    raise SystemExit(125)
                 raise SystemExit(124)
         if process.returncode != 0:
             raise SystemExit(process.returncode)

@@ -22,6 +22,10 @@ All notable changes to the Elves skill are documented here.
   freshness. For a host-authorized release-worthy merge, require verification of the matching
   immutable GitHub tag/release and a <=280-character X announcement draft with value and link;
   never post it automatically.
+- Harden Fugu's bounded process-group cleanup against Darwin's `EPERM` zombie-leader race without
+  extending the provider wall deadline, fail closed with a distinct status when reap remains
+  unproved, and keep its bootstrap-inclusive macOS timing proof below the fake provider's unbounded
+  completion time.
 
 ## [2.12.0] - 2026-07-21
 
