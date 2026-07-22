@@ -1,0 +1,115 @@
+{
+  "batches": [
+    {
+      "acceptance": [
+        {
+          "criterion": "A repository with no landing profile retains generic landing behavior, while a present malformed, symlinked, irregular, oversized, or unsupported profile fails closed with a stable diagnostic.",
+          "evidence": "tests.test_landing_profile proves missing-profile neutrality and stable malformed, duplicate, symlink, irregular, oversized, UTF-8, schema, and unsupported secure-open failures; the focused exact-tip suite is green at 59bd63812bf191705ac3cf6fb6257d34f56db367.",
+          "id": "B1-A1",
+          "met": true
+        },
+        {
+          "criterion": "A schema-v1 profile supports deterministic blocking, advisory, skipped, and path-touched outcomes plus declarative post-merge items, rejects executable or command checks as unsupported, and performs no profile-directed subprocess execution.",
+          "evidence": "Declarative outcome, executable-shape rejection-before-spawn, failed-check integration, adversarial glob, and work-budget regressions pass; exact-tip security review is CLEAN at 59bd63812bf191705ac3cf6fb6257d34f56db367.",
+          "id": "B1-A2",
+          "met": true
+        },
+        {
+          "criterion": "Project results and their canonical digest bind profile bytes, exact `HEAD`, resolved base commit, and normalized check outcomes; a moved head, changed base, changed profile, or stale digest cannot satisfy readiness.",
+          "evidence": "Digest/head/base/profile invalidation tests pass; live dogfood at 59bd63812bf191705ac3cf6fb6257d34f56db367 is green with digest 4368bb515e0a920c613d3c7d3c40772be79898870e9681381b68f0b1b4e09ae3 and immutable base 35449718c173f737a7b0dad209accfe86b55b5a9.",
+          "id": "B1-A3",
+          "met": true
+        },
+        {
+          "criterion": "Project landing state is a distinct host-evaluated readiness input whose live green/digest cannot be set or overridden by worker reports, and it never grants merge, tag, release, protected-ref, or posting authority.",
+          "evidence": "Landing-authority and integration tests prove live recomputation and worker-report stripping; exact-tip security/authority review is CLEAN and the tracked contract preserves host-only merge/release/posting authority.",
+          "id": "B1-A4",
+          "met": true
+        },
+        {
+          "criterion": "The tracked Elves profile automatically exercises documentation freshness, public-guide freshness, changelog honesty, and Claude/Codex parity on applicable diffs, while preserving generic behavior for projects without a profile.",
+          "evidence": "The tracked dogfood profile reports all six blocking co-change checks passed and both declarative post-merge items applicable at exact HEAD 59bd63812bf191705ac3cf6fb6257d34f56db367; missing-profile neutrality is independently covered.",
+          "id": "B1-A5",
+          "met": true
+        },
+        {
+          "criterion": "Both installed host bundles contain and can execute the new CLI, focused profile/landing/authority/shipment tests pass, and the canonical repository verifier passes at the exact pull-request head against the immutable base.",
+          "evidence": "The exact-tip local canonical verifier reports VERIFY OK with 1,357 tests plus installed smokes; GitHub run 29932198149 is green on Ubuntu 3.10/3.12/3.14, macOS 3.12, aggregate check, and both Socket checks at 59bd63812bf191705ac3cf6fb6257d34f56db367.",
+          "id": "B1-A6",
+          "met": true
+        },
+        {
+          "criterion": "SKILL, AGENTS, README, guide, changelog, landing references, and durable AI docs align at v2.13.0 and state that an appropriate authorized merge is followed by a matching immutable GitHub tag/release plus a short X announcement draft, never an automatic post.",
+          "evidence": "Repository consistency and the v2.13.0 release checklist pass; exact-tip review confirms aligned SKILL, AGENTS, README, guide, changelog, references, durable docs, immutable-release follow-through, and never-post X-draft wording.",
+          "id": "B1-A7",
+          "met": true
+        }
+      ],
+      "id": "B1",
+      "status": "complete"
+    }
+  ],
+  "branch": "codex/project-landing-profile",
+  "collision_tripwire": "35449718c173f737a7b0dad209accfe86b55b5a9",
+  "continuation_guard": {
+    "next_required_action": "Merge PR #189 by regular merge commit, publish and verify v2.13.0 at the exact merge result if still appropriate, draft but do not post the short X announcement, then reclaim the merged worktree.",
+    "remaining_batches": [],
+    "stop_allowed": false
+  },
+  "delegation_scope": "full_run",
+  "driver_authorized": true,
+  "e2e_mode": "chat-to-land",
+  "git_mode": "branch_progress",
+  "landing": {
+    "authorized_by": "user_explicit_chat_to_land",
+    "driver_authorized": true,
+    "outcome": "complete_and_merge",
+    "worker_merge_authority": false
+  },
+  "landing_outcome": "authorized_merge",
+  "master_acceptance": [
+    {
+      "criterion": "The authoritative plan, session, and worker packet retain exact stable-id/criterion parity, and every B1 criterion carries exact-head evidence before landing.",
+      "evidence": "The authoritative plan and final operational session retain exact B1-A1..A7 criterion parity; the staged worker packet remains recoverable from Git history and every final session row carries exact-head proof.",
+      "id": "M-A1",
+      "met": true
+    },
+    {
+      "criterion": "Independent cumulative and revision-delta review reports no unresolved actionable findings, including security and authority review of project-declared policy.",
+      "evidence": "Independent exact-tip terminal and security/contract reviews are CLEAN at 59bd63812bf191705ac3cf6fb6257d34f56db367; the final two-file timing-witness delta is CLEAN and no PR comments, reviews, or review comments remain.",
+      "id": "M-A2",
+      "met": true
+    },
+    {
+      "criterion": "The canonical repository verifier and landing check pass on the exact reviewed pull-request head against the unchanged immutable base.",
+      "evidence": "The local canonical verifier reports VERIFY OK with 1,357 tests at 59bd63812bf191705ac3cf6fb6257d34f56db367; exact-head GitHub run 29932198149 and both Socket checks are green against unchanged base 35449718c173f737a7b0dad209accfe86b55b5a9.",
+      "id": "M-A3",
+      "met": true
+    },
+    {
+      "criterion": "The pull request is mergeable by a regular merge commit with required checks green, clean worktree identity, and no unresolved review feedback.",
+      "evidence": "PR #189 is MERGEABLE/CLEAN at exact branch head 59bd63812bf191705ac3cf6fb6257d34f56db367 and base 35449718c173f737a7b0dad209accfe86b55b5a9; all seven reported checks pass, the worktree and remote identity are clean, and comments/reviews/review-comments are empty.",
+      "id": "M-A4",
+      "met": true
+    }
+  ],
+  "plan_path": "docs/plans/project-landing-profile.md",
+  "pr_number": 189,
+  "prewalk": {
+    "actual_transport": "collaboration_exact_session",
+    "continuation_message": "Continue.",
+    "native_worker_qualified": false,
+    "qualification_claim": false,
+    "requested": "required"
+  },
+  "project_base_ref": "origin/main",
+  "run_id": "project-landing-profile-20260722",
+  "start_head": "35449718c173f737a7b0dad209accfe86b55b5a9",
+  "work_driver": "codex-gpt-5.6-high",
+  "worker_packet_path": ".elves/runtime/project-landing-profile-worker.md",
+  "worker_route": {
+    "effort": "high",
+    "model": "gpt-5.6-sol"
+  },
+  "worktree_path": "/Users/john/aigora/dev/elves-project-landing-profile"
+}
