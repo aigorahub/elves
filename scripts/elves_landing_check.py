@@ -54,6 +54,7 @@ from cobbler_runtime.landing_authority import (
     strip_worker_authority_claims,
     terminal_action,
 )
+from cobbler_runtime.landing_profile import evaluate_landing_profile
 
 
 DEFAULT_SESSION = ".elves-session.json"
@@ -126,6 +127,7 @@ class Finding:
 class Report:
     findings: list[Finding] = field(default_factory=list)
     landing: dict[str, Any] | None = None
+    project_landing: dict[str, Any] | None = None
 
     def error(self, code: str, message: str) -> None:
         self.findings.append(Finding("ERROR", code, message))
@@ -194,6 +196,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "Repository root for strict landing provenance. When set, the session "
             "and plan must be ordinary, tracked files in this worktree and session "
             "branch/run identity is verified against Git."
+        ),
+    )
+    parser.add_argument(
+        "--project-base",
+        default=None,
+        help=(
+            "Optional project-profile base ref. Defaults to session project_base_ref "
+            "and then origin/main; it is resolved once to an exact commit."
         ),
     )
     parser.add_argument(
@@ -1240,6 +1250,38 @@ def _landing_control_from_session(
     return control, readiness
 
 
+def _check_project_landing_profile(
+    session: dict[str, Any],
+    repo_root: Path,
+    report: Report,
+    *,
+    base_ref: str | None,
+) -> None:
+    configured_base = base_ref or session.get("project_base_ref") or "origin/main"
+    if not isinstance(configured_base, str) or not configured_base.strip():
+        report.error(
+            "project_landing_base_invalid",
+            "Project landing base must be a non-empty Git ref.",
+        )
+        return
+    result = evaluate_landing_profile(repo_root, base_ref=configured_base)
+    report.project_landing = result.to_dict()
+    for diagnostic in result.diagnostics:
+        report.error(diagnostic.code, diagnostic.message)
+    for outcome in result.checks:
+        if outcome.status != "failed":
+            continue
+        message = (
+            f"Project landing check {outcome.id!r} failed"
+            + (f": {outcome.code}" if outcome.code else "")
+            + (f"\n{outcome.output}" if outcome.output else "")
+        )
+        if outcome.severity == "advisory":
+            report.warn("project_landing_advisory_failed", message)
+        else:
+            report.error("project_landing_blocking_failed", message)
+
+
 def _check_host_landing_control(
     session: dict[str, Any], repo_root: Path, report: Report
 ) -> None:
@@ -1301,6 +1343,47 @@ def _check_host_landing_control(
         report.landing = terminal_action(control, current_head=current_head)
         return
 
+    project_result = report.project_landing
+    project_green = True
+    project_digest: str | None = None
+    if project_result is not None and project_result.get("profile_present") is True:
+        live_digest = project_result.get("digest")
+        attested_digest = readiness.get("project_landing_checks_digest")
+        attested_green = readiness.get("project_landing_checks_green") is True
+        if not attested_green:
+            report.error(
+                "project_landing_attestation_missing",
+                "Present project landing profile requires host-owned "
+                "project_landing_checks_green:true readiness evidence.",
+            )
+        if (
+            not isinstance(attested_digest, str)
+            or re.fullmatch(r"[0-9a-fA-F]{64}", attested_digest) is None
+        ):
+            report.error(
+                "project_landing_digest_invalid",
+                "Present project landing profile requires a 64-character host-owned digest.",
+            )
+        elif not isinstance(live_digest, str) or attested_digest.lower() != live_digest.lower():
+            report.error(
+                "project_landing_digest_mismatch",
+                "Host project landing digest does not match the live exact-HEAD result.",
+            )
+        project_green = (
+            project_result.get("green") is True
+            and attested_green
+            and isinstance(live_digest, str)
+            and isinstance(attested_digest, str)
+            and live_digest.lower() == attested_digest.lower()
+        )
+        project_digest = live_digest if project_green else None
+    elif "project_landing_checks_green" in readiness or "project_landing_checks_digest" in readiness:
+        report.error(
+            "project_landing_attestation_stale",
+            "Readiness carries project landing evidence but the tracked profile is missing.",
+        )
+        project_green = False
+
     updated, attestation = attest_readiness(
         control,
         head=current_head,
@@ -1310,6 +1393,8 @@ def _check_host_landing_control(
         required_checks_green=readiness.get("required_checks_green") is True,
         worktree_clean=readiness.get("worktree_clean") is True,
         inputs_digest=inputs_digest,
+        project_landing_checks_green=project_green,
+        project_landing_checks_digest=project_digest,
     )
     if not attestation.ready:
         report.error(
@@ -1457,6 +1542,12 @@ def run_checks(args: argparse.Namespace) -> Report:
             )
 
     if repo_root is not None:
+        _check_project_landing_profile(
+            session,
+            repo_root,
+            report,
+            base_ref=args.project_base,
+        )
         _check_host_landing_control(session, repo_root, report)
 
     # One-line policy reminder when anything failed
@@ -1501,6 +1592,7 @@ def print_json(report: Report, session_path: Path) -> None:
             "landable is plan Acceptance with proof."
         ),
         "landing": report.landing,
+        "project_landing": report.project_landing,
     }
     print(json.dumps(payload, indent=2, sort_keys=True))
 

@@ -13,6 +13,7 @@ from unittest import mock
 
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
+CLI = SCRIPTS / "landing_profile.py"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
@@ -377,6 +378,49 @@ class LandingProfileEvaluationTests(unittest.TestCase):
             moved = evaluate_landing_profile(root, base_ref=base)
             self.assertEqual(moved.status, "invalid")
             self.assertEqual(moved.diagnostics[0].code, "profile_head_changed")
+
+    def test_thin_cli_emits_deterministic_json_from_unrelated_cwd(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root, base = self._repo(raw, profile(command_check()))
+            command = [
+                sys.executable,
+                str(CLI),
+                "check",
+                "--repo-root",
+                str(root),
+                "--base",
+                base,
+                "--head",
+                self._run(root, "rev-parse", "HEAD"),
+                "--json",
+            ]
+            env = dict(os.environ)
+            env.pop("PYTHONPATH", None)
+            first = subprocess.run(
+                command,
+                cwd=root.parent,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            second = subprocess.run(
+                command,
+                cwd=root.parent,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+
+        self.assertEqual(first.returncode, 0, first.stderr)
+        self.assertEqual(first.stdout, second.stdout)
+        payload = json.loads(first.stdout)
+        self.assertTrue(payload["green"])
+        self.assertEqual(payload["status"], "passed")
+        self.assertNotIn(str(root), first.stdout)
 
 
 if __name__ == "__main__":

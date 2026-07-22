@@ -1394,6 +1394,140 @@ class ElvesLandingCheckTests(unittest.TestCase):
         self.assertIn("worker_merge_authority_invalid", {item.code for item in report.errors})
         self.assertIn("worker_authority_claims_ignored", {item.code for item in report.warnings})
 
+    def test_project_landing_profile_is_live_digest_bound_and_host_owned(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw) / "repo"
+            root.mkdir()
+            subprocess.run(["git", "init", "-q", "-b", "feature"], cwd=root, check=True)
+            subprocess.run(["git", "config", "user.email", "tests@example.invalid"], cwd=root, check=True)
+            subprocess.run(["git", "config", "user.name", "Elves Tests"], cwd=root, check=True)
+            (root / "README.md").write_text("base\n", encoding="utf-8")
+            subprocess.run(["git", "add", "README.md"], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-qm", "base"], cwd=root, check=True)
+            base = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=root,
+                text=True,
+                capture_output=True,
+                check=True,
+            ).stdout.strip()
+
+            (root / "plan.md").write_text(
+                "### Batch 0: Complete\n\n**Acceptance criteria:**\n"
+                "- [x] B0-A1: Profile ready\n\n"
+                "## Master Acceptance\n\n- [x] M-A1: Landing ready\n",
+                encoding="utf-8",
+            )
+            profile_path = root / ".elves" / "landing-profile.json"
+            profile_path.parent.mkdir()
+            profile_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "checks": [
+                            {
+                                "id": "profile-pass",
+                                "kind": "path_touched",
+                                "severity": "blocking",
+                                "when": {"kind": "always"},
+                                "paths": ["plan.md"],
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            session = {
+                "run_id": "project-profile-test",
+                "branch": "feature",
+                "start_head": base,
+                "project_base_ref": base,
+                "plan_path": "plan.md",
+                "batches": [
+                    {
+                        "id": "B0",
+                        "status": "complete",
+                        "acceptance": [
+                            {
+                                "id": "B0-A1",
+                                "criterion": "Profile ready",
+                                "met": True,
+                                "evidence": "focused test",
+                            }
+                        ],
+                    }
+                ],
+                "master_acceptance": [
+                    {
+                        "id": "M-A1",
+                        "criterion": "Landing ready",
+                        "met": True,
+                        "evidence": "focused test",
+                    }
+                ],
+            }
+            session_path = root / ".elves-session.json"
+            session_path.write_text(json.dumps(session), encoding="utf-8")
+            subprocess.run(
+                ["git", "add", "plan.md", ".elves/landing-profile.json", ".elves-session.json"],
+                cwd=root,
+                check=True,
+            )
+            subprocess.run(["git", "commit", "-qm", "profile"], cwd=root, check=True)
+            head = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=root,
+                text=True,
+                capture_output=True,
+                check=True,
+            ).stdout.strip()
+            live = self.mod.evaluate_landing_profile(root, base_ref=base)
+            self.assertTrue(live.green)
+            session["landing"] = {
+                "outcome": "landable_pr",
+                "driver_authorized": False,
+                "worker_merge_authority": False,
+                "readiness": {
+                    "head": head,
+                    "inputs_digest": "d" * 64,
+                    "acceptance_complete": True,
+                    "blockers_resolved": True,
+                    "exact_tip_review_clean": True,
+                    "required_checks_green": True,
+                    "project_landing_checks_green": True,
+                    "project_landing_checks_digest": live.digest,
+                    "worktree_clean": True,
+                },
+            }
+            session_path.write_text(json.dumps(session), encoding="utf-8")
+            args = self.mod.parse_args(
+                ["--repo-root", str(root), "--session", str(session_path)]
+            )
+
+            green = self.mod.run_checks(args)
+            self.assertEqual(green.errors, [])
+            self.assertTrue(green.project_landing["green"])
+            self.assertTrue(green.landing["ready"])
+
+            session["landing"]["readiness"]["project_landing_checks_digest"] = "0" * 64
+            session_path.write_text(json.dumps(session), encoding="utf-8")
+            stale = self.mod.run_checks(args)
+            self.assertIn(
+                "project_landing_digest_mismatch",
+                {finding.code for finding in stale.errors},
+            )
+            self.assertFalse(stale.landing["ready"])
+
+            session["worker_report"] = {
+                "project_landing_checks_green": True,
+                "project_landing_checks_digest": live.digest,
+            }
+            session_path.write_text(json.dumps(session), encoding="utf-8")
+            hostile = self.mod.run_checks(args)
+            self.assertIn(
+                "worker_authority_claims_ignored",
+                {finding.code for finding in hostile.warnings},
+            )
     def test_stable_batch_ids_cannot_be_swapped(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             tmp = Path(raw)

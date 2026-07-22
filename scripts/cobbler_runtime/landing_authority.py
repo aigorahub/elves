@@ -37,6 +37,8 @@ WORKER_IMMUTABLE_HOST_FIELDS: frozenset[str] = frozenset(
         "readiness_attested_at",
         "host_merge_authorized",
         "driver_merge_authorized",
+        "project_landing_checks_green",
+        "project_landing_checks_digest",
     }
 )
 
@@ -54,6 +56,8 @@ class LandingControl:
     blockers_resolved: bool = False
     exact_tip_review_clean: bool = False
     required_checks_green: bool = False
+    project_landing_checks_green: bool = False
+    project_landing_checks_digest: str | None = None
     worktree_clean: bool = False
     not_draft: bool = True
     notes: tuple[str, ...] = ()
@@ -70,6 +74,8 @@ class ReadinessAttestation:
     blockers_resolved: bool
     exact_tip_review_clean: bool
     required_checks_green: bool
+    project_landing_checks_green: bool
+    project_landing_checks_digest: str | None
     worktree_clean: bool
     ready: bool
     invalidated_scopes: tuple[str, ...] = ()
@@ -205,6 +211,8 @@ def grant_driver_authorization(
         blockers_resolved=control.blockers_resolved,
         exact_tip_review_clean=control.exact_tip_review_clean,
         required_checks_green=control.required_checks_green,
+        project_landing_checks_green=control.project_landing_checks_green,
+        project_landing_checks_digest=control.project_landing_checks_digest,
         worktree_clean=control.worktree_clean,
         not_draft=control.not_draft,
         notes=tuple(notes),
@@ -218,6 +226,8 @@ def compute_readiness_inputs_digest(
     blocker_ids: Sequence[str] | None = None,
     review_evidence_id: str | None = None,
     required_check_digest: str | None = None,
+    project_landing_checks_green: bool = True,
+    project_landing_checks_digest: str | None = None,
     proof_scopes: Mapping[str, str] | None = None,
 ) -> str:
     payload = {
@@ -236,6 +246,8 @@ def compute_readiness_inputs_digest(
         "blockers": sorted(str(b) for b in (blocker_ids or ())),
         "review_evidence_id": review_evidence_id or "",
         "required_check_digest": required_check_digest or "",
+        "project_landing_checks_green": bool(project_landing_checks_green),
+        "project_landing_checks_digest": project_landing_checks_digest or "",
         "proof_scopes": dict(sorted((proof_scopes or {}).items())),
     }
     material = json.dumps(payload, sort_keys=True, separators=(",", ":"))
@@ -252,6 +264,8 @@ def attest_readiness(
     required_checks_green: bool,
     worktree_clean: bool,
     inputs_digest: str,
+    project_landing_checks_green: bool = True,
+    project_landing_checks_digest: str | None = None,
     previous_digest: str | None = None,
     changed_input_scopes: Sequence[str] | None = None,
 ) -> tuple[LandingControl, ReadinessAttestation]:
@@ -271,18 +285,34 @@ def attest_readiness(
         reasons.append("exact_tip_review_not_clean")
     if not required_checks_green:
         reasons.append("required_checks_not_green")
+    if not project_landing_checks_green:
+        reasons.append("project_landing_checks_not_green")
     if not worktree_clean:
         reasons.append("worktree_dirty")
 
     invalidated = tuple(sorted(set(changed_input_scopes or ())))
     if previous_digest and previous_digest != inputs_digest and not invalidated:
         # Conservative: unknown change scope invalidates all readiness proof.
-        invalidated = ("acceptance", "review", "checks", "worktree")
+        invalidated = (
+            "acceptance",
+            "review",
+            "checks",
+            "project_landing",
+            "worktree",
+        )
         reasons.append("inputs_changed_without_scope_map")
 
     ready = not reasons and not (
         invalidated and any(
-            scope in {"acceptance", "review", "checks", "worktree", "all"}
+            scope
+            in {
+                "acceptance",
+                "review",
+                "checks",
+                "project_landing",
+                "worktree",
+                "all",
+            }
             for scope in invalidated
         )
         and (
@@ -290,6 +320,7 @@ def attest_readiness(
             or not blockers_resolved
             or not exact_tip_review_clean
             or not required_checks_green
+            or not project_landing_checks_green
             or not worktree_clean
         )
     )
@@ -304,6 +335,8 @@ def attest_readiness(
         blockers_resolved=blockers_resolved,
         exact_tip_review_clean=exact_tip_review_clean,
         required_checks_green=required_checks_green,
+        project_landing_checks_green=project_landing_checks_green,
+        project_landing_checks_digest=project_landing_checks_digest,
         worktree_clean=worktree_clean,
         ready=ready,
         invalidated_scopes=invalidated,
@@ -319,6 +352,10 @@ def attest_readiness(
         blockers_resolved=blockers_resolved,
         exact_tip_review_clean=exact_tip_review_clean,
         required_checks_green=required_checks_green,
+        project_landing_checks_green=project_landing_checks_green,
+        project_landing_checks_digest=(
+            project_landing_checks_digest if project_landing_checks_green else None
+        ),
         worktree_clean=worktree_clean,
         not_draft=control.not_draft,
         notes=control.notes + (("readiness_attested",) if ready else ("readiness_incomplete",)),
@@ -344,6 +381,8 @@ def invalidate_on_head_change(
         blockers_resolved=control.blockers_resolved,
         exact_tip_review_clean=False,
         required_checks_green=False,
+        project_landing_checks_green=False,
+        project_landing_checks_digest=None,
         worktree_clean=control.worktree_clean,
         not_draft=control.not_draft,
         notes=control.notes + ("readiness_invalidated_head_changed",),
@@ -360,6 +399,8 @@ def invalidate_scopes(
     blockers = control.blockers_resolved
     review = control.exact_tip_review_clean
     checks = control.required_checks_green
+    project_landing = control.project_landing_checks_green
+    project_landing_digest = control.project_landing_checks_digest
     worktree = control.worktree_clean
     if scopes_set & {"acceptance", "all"}:
         acceptance = False
@@ -369,10 +410,19 @@ def invalidate_scopes(
         review = False
     if scopes_set & {"checks", "all"}:
         checks = False
+    if scopes_set & {"project_landing", "all"}:
+        project_landing = False
+        project_landing_digest = None
     if scopes_set & {"worktree", "all"}:
         worktree = False
     still_ready = (
-        acceptance and blockers and review and checks and worktree and control.ready
+        acceptance
+        and blockers
+        and review
+        and checks
+        and project_landing
+        and worktree
+        and control.ready
     )
     return LandingControl(
         landing_outcome=control.landing_outcome,
@@ -384,6 +434,8 @@ def invalidate_scopes(
         blockers_resolved=blockers,
         exact_tip_review_clean=review,
         required_checks_green=checks,
+        project_landing_checks_green=project_landing,
+        project_landing_checks_digest=project_landing_digest,
         worktree_clean=worktree,
         not_draft=control.not_draft,
         notes=control.notes + (f"invalidated:{','.join(sorted(scopes_set))}",),
@@ -395,6 +447,7 @@ MERGE_GUARD_REQUIREMENTS: tuple[str, ...] = (
     "blockers_resolved",
     "exact_tip_review_clean",
     "required_checks_green",
+    "project_landing_checks_green",
     "worktree_clean",
     "not_draft",
     "ready",
@@ -419,6 +472,8 @@ def evaluate_merge_guard(
         missing.append("exact_tip_review_clean")
     if not control.required_checks_green:
         missing.append("required_checks_green")
+    if not control.project_landing_checks_green:
+        missing.append("project_landing_checks_green")
     if not control.worktree_clean:
         missing.append("worktree_clean")
     if not control.not_draft:

@@ -1,0 +1,170 @@
+{
+  "schema_version": 1,
+  "checks": [
+    {
+      "id": "documentation-freshness",
+      "kind": "path_touched",
+      "severity": "blocking",
+      "when": {
+        "kind": "any_path_glob",
+        "patterns": [
+          "scripts/landing_profile.py",
+          "scripts/elves_landing_check.py",
+          "scripts/cobbler_runtime/landing_profile.py",
+          "scripts/cobbler_runtime/landing_authority.py",
+          "scripts/sync_installed_skills.py",
+          "scripts/installed_bundle_smoke.py"
+        ]
+      },
+      "paths": [
+        "README.md",
+        "SKILL.md",
+        "references/project-landing-profiles.md",
+        ".ai-docs/**"
+      ]
+    },
+    {
+      "id": "public-guide-freshness",
+      "kind": "path_touched",
+      "severity": "blocking",
+      "when": {
+        "kind": "any_path_glob",
+        "patterns": [
+          "SKILL.md",
+          "AGENTS.md",
+          "README.md",
+          "references/project-landing-profiles.md",
+          "scripts/landing_profile.py",
+          "scripts/elves_landing_check.py"
+        ]
+      },
+      "paths": [
+        "guide/index.html"
+      ]
+    },
+    {
+      "id": "changelog-freshness",
+      "kind": "path_touched",
+      "severity": "blocking",
+      "when": {
+        "kind": "any_path_glob",
+        "patterns": [
+          "scripts/landing_profile.py",
+          "scripts/elves_landing_check.py",
+          "scripts/cobbler_runtime/landing_profile.py",
+          "scripts/cobbler_runtime/landing_authority.py"
+        ]
+      },
+      "paths": [
+        "CHANGELOG.md"
+      ]
+    },
+    {
+      "id": "release-alignment",
+      "kind": "command",
+      "severity": "blocking",
+      "when": {
+        "kind": "any_path_glob",
+        "patterns": [
+          "SKILL.md",
+          "AGENTS.md",
+          "README.md",
+          "CHANGELOG.md"
+        ]
+      },
+      "argv": [
+        "python3",
+        "scripts/release_checklist.py",
+        "--version",
+        "2.13.0",
+        "--base",
+        "origin/main",
+        "--json"
+      ],
+      "timeout_seconds": 60
+    },
+    {
+      "id": "repository-consistency",
+      "kind": "command",
+      "severity": "blocking",
+      "when": {
+        "kind": "any_path_glob",
+        "patterns": [
+          "SKILL.md",
+          "AGENTS.md",
+          "README.md",
+          "CHANGELOG.md",
+          "guide/**",
+          "references/**",
+          ".ai-docs/**",
+          "scripts/landing_profile.py",
+          "scripts/elves_landing_check.py",
+          "scripts/cobbler_runtime/landing_profile.py",
+          "scripts/cobbler_runtime/landing_authority.py"
+        ]
+      },
+      "argv": [
+        "python3",
+        "scripts/check_repo_consistency.py"
+      ],
+      "timeout_seconds": 60
+    },
+    {
+      "id": "codex-adapter-parity",
+      "kind": "path_touched",
+      "severity": "blocking",
+      "when": {
+        "kind": "any_path_glob",
+        "patterns": [
+          "SKILL.md",
+          "references/project-landing-profiles.md",
+          "scripts/landing_profile.py",
+          "scripts/elves_landing_check.py"
+        ]
+      },
+      "paths": [
+        "AGENTS.md"
+      ]
+    },
+    {
+      "id": "canonical-skill-parity",
+      "kind": "path_touched",
+      "severity": "blocking",
+      "when": {
+        "kind": "any_path_glob",
+        "patterns": [
+          "AGENTS.md"
+        ]
+      },
+      "paths": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "id": "immutable-release-follow-through",
+      "kind": "post_merge_checklist",
+      "when": {
+        "kind": "any_path_glob",
+        "patterns": [
+          "SKILL.md",
+          "AGENTS.md",
+          "CHANGELOG.md"
+        ]
+      },
+      "description": "After a host-authorized release-worthy merge, verify the matching immutable GitHub tag and release at the merged result; this runner never tags or releases."
+    },
+    {
+      "id": "x-announcement-draft",
+      "kind": "post_merge_checklist",
+      "when": {
+        "kind": "any_path_glob",
+        "patterns": [
+          "SKILL.md",
+          "AGENTS.md",
+          "CHANGELOG.md"
+        ]
+      },
+      "description": "Draft a <=280-character X announcement containing the release value and link; never post it automatically."
+    }
+  ]
+}
