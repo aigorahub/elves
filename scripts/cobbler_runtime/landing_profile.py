@@ -1,9 +1,8 @@
-"""Pure loading primitives for tracked project landing profiles.
+"""Deterministic evaluation for tracked project landing profiles.
 
-The executable profile evaluator lives in this module too as it grows, while
-``scripts/landing_profile.py`` remains a thin installed CLI.  Loading is kept
-separate from Git and subprocess work so a missing profile can stay neutral and
-a present unsafe or malformed profile can fail closed with stable diagnostics.
+Schema v1 is deliberately declarative.  Profiles select changed paths and emit
+post-merge checklist items; they never supply executable content.  The thin
+``scripts/landing_profile.py`` CLI delegates to this module.
 """
 
 from __future__ import annotations
@@ -12,87 +11,29 @@ import hashlib
 import json
 import os
 import re
-import signal
 import stat
 import subprocess
-import tempfile
 import threading
-import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Literal, Mapping, Sequence
-
-from .context import is_secret_env_name, redact_text, scrub_environment
 
 
 PROFILE_RELATIVE_PATH = Path(".elves/landing-profile.json")
 MAX_PROFILE_BYTES = 64 * 1024
 MAX_CHECKS = 64
 MAX_PATTERNS_PER_CHECK = 64
-MAX_ARGV_ITEMS = 64
 MAX_STRING_CHARS = 512
 MAX_JSON_DEPTH = 32
 MAX_CHANGED_PATHS = 10_000
 MAX_GIT_OUTPUT_BYTES = 1024 * 1024
-MAX_COMMAND_OUTPUT_BYTES = 64 * 1024
-MAX_DIAGNOSTIC_CHARS = 4_000
-MAX_COMMAND_TIMEOUT_SECONDS = 120
-MAX_TOTAL_COMMAND_SECONDS = 600
-DEFAULT_COMMAND_TIMEOUT_SECONDS = 60
+GIT_TIMEOUT_SECONDS = 30
 PROFILE_SCHEMA_VERSION = 1
 
 _CHECK_ID_RE = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
 _EXACT_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
-_SHELL_EXECUTABLES = frozenset(
-    {
-        "bash",
-        "cmd",
-        "cmd.exe",
-        "csh",
-        "dash",
-        "fish",
-        "ksh",
-        "powershell",
-        "pwsh",
-        "sh",
-        "tcsh",
-        "zsh",
-    }
-)
-_NETWORK_AUTHORITY_EXECUTABLES = frozenset(
-    {"curl", "gh", "glab", "hub", "scp", "ssh", "twurl", "wget"}
-)
-_READ_ONLY_GIT_SUBCOMMANDS = frozenset(
-    {
-        "cat-file",
-        "describe",
-        "diff",
-        "for-each-ref",
-        "grep",
-        "log",
-        "ls-files",
-        "merge-base",
-        "rev-parse",
-        "show",
-        "status",
-    }
-)
-_PROFILE_ENV_ALLOWLIST = frozenset(
-    {
-        "PATH",
-        "USER",
-        "LOGNAME",
-        "LANG",
-        "LC_ALL",
-        "LC_CTYPE",
-        "TMPDIR",
-        "TEMP",
-        "TMP",
-        "TERM",
-        "TZ",
-        "SYSTEMROOT",
-        "COMSPEC",
-    }
+_EXECUTABLE_PROFILE_KEYS = frozenset(
+    {"argv", "command", "cwd", "env", "executable", "shell", "timeout_seconds"}
 )
 
 
@@ -172,8 +113,23 @@ def _read_bounded_profile(
     before: os.stat_result,
     parent_before: os.stat_result,
 ) -> bytes | ProfileLoadResult:
-    common_flags = getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
-    parent_flags = os.O_RDONLY | common_flags | getattr(os, "O_DIRECTORY", 0)
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    directory = getattr(os, "O_DIRECTORY", None)
+    supports_dir_fd = getattr(os, "supports_dir_fd", frozenset())
+    if (
+        not isinstance(nofollow, int)
+        or not isinstance(directory, int)
+        or not nofollow
+        or not directory
+        or os.open not in supports_dir_fd
+    ):
+        return _invalid(
+            "profile_secure_open_unsupported",
+            "Landing profile secure no-follow opening is unsupported on this platform.",
+        )
+
+    common_flags = getattr(os, "O_CLOEXEC", 0) | nofollow
+    parent_flags = os.O_RDONLY | common_flags | directory
     parent_descriptor: int | None = None
     descriptor: int | None = None
     try:
@@ -194,6 +150,14 @@ def _read_bounded_profile(
             path.name,
             os.O_RDONLY | common_flags,
             dir_fd=parent_descriptor,
+        )
+    except (TypeError, NotImplementedError):
+        if parent_descriptor is not None:
+            os.close(parent_descriptor)
+            parent_descriptor = None
+        return _invalid(
+            "profile_secure_open_unsupported",
+            "Landing profile secure no-follow opening is unsupported on this platform.",
         )
     except OSError:
         if parent_descriptor is not None:
@@ -391,13 +355,11 @@ class ProfileCondition:
 @dataclass(frozen=True)
 class ProfileCheck:
     id: str
-    kind: Literal["command", "path_touched", "post_merge_checklist"]
+    kind: Literal["path_touched", "post_merge_checklist"]
     condition: ProfileCondition
     severity: Literal["blocking", "advisory"] | None = None
-    argv: tuple[str, ...] = ()
     paths: tuple[str, ...] = ()
     description: str | None = None
-    timeout_seconds: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -407,14 +369,10 @@ class ProfileCheck:
         }
         if self.severity is not None:
             payload["severity"] = self.severity
-        if self.argv:
-            payload["argv"] = list(self.argv)
         if self.paths:
             payload["paths"] = list(self.paths)
         if self.description is not None:
             payload["description"] = self.description
-        if self.timeout_seconds is not None:
-            payload["timeout_seconds"] = self.timeout_seconds
         return payload
 
 
@@ -438,11 +396,8 @@ class CheckOutcome:
     severity: str | None = None
     code: str | None = None
     message: str | None = None
-    exit_code: int | None = None
-    output: str | None = None
-    output_truncated: bool = False
 
-    def to_dict(self, *, include_output: bool = True) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "id": self.id,
             "kind": self.kind,
@@ -454,12 +409,6 @@ class CheckOutcome:
             payload["code"] = self.code
         if self.message is not None:
             payload["message"] = self.message
-        if self.exit_code is not None:
-            payload["exit_code"] = self.exit_code
-        if include_output and self.output:
-            payload["output"] = self.output
-        if self.output_truncated:
-            payload["output_truncated"] = True
         return payload
 
 
@@ -513,11 +462,6 @@ def _safe_string(value: Any, *, label: str) -> tuple[str | None, ProfileDiagnost
         return None, ProfileDiagnostic(
             "profile_string_control_character",
             f"{label} contains a forbidden control character.",
-        )
-    if redact_text(value).text != value:
-        return None, ProfileDiagnostic(
-            "profile_string_secret_like",
-            f"{label} contains secret-like material.",
         )
     return value, None
 
@@ -602,12 +546,6 @@ def _parse_condition(
     )
 
 
-def _argv_item_unsafe(value: str) -> bool:
-    if value.startswith(("/", "~")):
-        return True
-    return any(part == ".." for part in value.replace("\\", "/").split("/"))
-
-
 def _parse_check(
     value: Any,
     *,
@@ -619,6 +557,12 @@ def _parse_check(
             "profile_schema_invalid",
             f"{label} must be an object.",
         )
+    kind = value.get("kind")
+    if kind == "command" or _EXECUTABLE_PROFILE_KEYS.intersection(value):
+        return None, ProfileDiagnostic(
+            "profile_executable_check_unsupported",
+            "Landing profile schema v1 does not support executable checks.",
+        )
     check_id, issue = _safe_string(value.get("id"), label=f"{label}.id")
     if issue is not None or check_id is None:
         return None, issue
@@ -627,8 +571,7 @@ def _parse_check(
             "profile_check_id_invalid",
             f"{label}.id must match {_CHECK_ID_RE.pattern!r}.",
         )
-    kind = value.get("kind")
-    if kind not in {"command", "path_touched", "post_merge_checklist"}:
+    if kind not in {"path_touched", "post_merge_checklist"}:
         return None, ProfileDiagnostic(
             "profile_check_kind_unsupported",
             f"{label}.kind is unsupported.",
@@ -636,84 +579,6 @@ def _parse_check(
     condition, issue = _parse_condition(value.get("when"), label=f"{label}.when")
     if issue is not None or condition is None:
         return None, issue
-
-    if kind == "command":
-        allowed = {"id", "kind", "severity", "when", "argv", "timeout_seconds"}
-        if set(value) - allowed:
-            return None, ProfileDiagnostic(
-                "profile_unsupported_key",
-                f"{label} contains unsupported keys.",
-            )
-        severity = value.get("severity")
-        if severity not in {"blocking", "advisory"}:
-            return None, ProfileDiagnostic(
-                "profile_severity_invalid",
-                f"{label}.severity must be 'blocking' or 'advisory'.",
-            )
-        argv, issue = _parse_string_list(value.get("argv"), label=f"{label}.argv")
-        if issue is not None or argv is None:
-            return None, issue
-        if len(argv) > MAX_ARGV_ITEMS:
-            return None, ProfileDiagnostic(
-                "profile_argv_too_large",
-                f"{label}.argv exceeds the {MAX_ARGV_ITEMS}-item limit.",
-            )
-        if Path(argv[0]).name.lower() in _SHELL_EXECUTABLES:
-            return None, ProfileDiagnostic(
-                "profile_shell_forbidden",
-                f"{label}.argv must not invoke a command shell.",
-            )
-        executable = Path(argv[0]).name.lower()
-        if executable in _NETWORK_AUTHORITY_EXECUTABLES:
-            return None, ProfileDiagnostic(
-                "profile_authority_command_forbidden",
-                f"{label}.argv must not invoke a network or hosting authority client.",
-            )
-        if executable == "git" and (
-            len(argv) < 2 or argv[1].lower() not in _READ_ONLY_GIT_SUBCOMMANDS
-        ):
-            return None, ProfileDiagnostic(
-                "profile_authority_command_forbidden",
-                f"{label}.argv may invoke only an allowlisted read-only Git subcommand.",
-            )
-        if any(
-            Path(item).name in {"elves_landing_check.py", "landing_profile.py"}
-            for item in argv[1:]
-        ):
-            return None, ProfileDiagnostic(
-                "profile_recursive_command_forbidden",
-                f"{label}.argv must not recursively invoke a landing checker.",
-            )
-        for arg_index, item in enumerate(argv):
-            if _argv_item_unsafe(item):
-                return None, ProfileDiagnostic(
-                    "profile_path_unsafe",
-                    f"{label}.argv[{arg_index}] contains an unsafe path.",
-                )
-            if redact_text(item).text != item:
-                return None, ProfileDiagnostic(
-                    "profile_argument_secret_like",
-                    f"{label}.argv[{arg_index}] contains secret-like material.",
-                )
-        timeout = value.get("timeout_seconds", DEFAULT_COMMAND_TIMEOUT_SECONDS)
-        if isinstance(timeout, bool) or not isinstance(timeout, int) or not (
-            1 <= timeout <= MAX_COMMAND_TIMEOUT_SECONDS
-        ):
-            return None, ProfileDiagnostic(
-                "profile_timeout_invalid",
-                f"{label}.timeout_seconds must be an integer from 1 to {MAX_COMMAND_TIMEOUT_SECONDS}.",
-            )
-        return (
-            ProfileCheck(
-                id=check_id,
-                kind="command",
-                condition=condition,
-                severity=severity,
-                argv=argv,
-                timeout_seconds=timeout,
-            ),
-            None,
-        )
 
     if kind == "path_touched":
         allowed = {"id", "kind", "severity", "when", "paths"}
@@ -844,45 +709,51 @@ def path_matches_any(path: str, patterns: Sequence[str]) -> bool:
 
 
 @dataclass(frozen=True)
-class _BoundedProcessResult:
+class _BoundedGitResult:
     returncode: int
     output: bytes
-    timed_out: bool
     output_truncated: bool
 
 
-def _terminate_process_group(process: subprocess.Popen[bytes]) -> None:
+def _kill_fixed_git(process: subprocess.Popen[bytes]) -> None:
+    """Best-effort cross-platform cleanup for one fixed-argv local Git call."""
+
     try:
-        os.killpg(process.pid, signal.SIGKILL)
-    except (OSError, ProcessLookupError):
-        try:
-            process.kill()
-        except OSError:
-            pass
+        process.kill()
+    except OSError:
+        pass
 
 
-def _run_bounded(
-    argv: Sequence[str],
-    *,
-    cwd: Path,
-    env: Mapping[str, str],
-    timeout_seconds: float,
-    output_limit: int,
-) -> _BoundedProcessResult:
+def _run_git(
+    repo_root: Path,
+    *args: str,
+    output_limit: int = MAX_GIT_OUTPUT_BYTES,
+) -> _BoundedGitResult:
+    """Run an internal fixed-argv local Git identity query with bounded output."""
+
+    env = dict(os.environ)
+    env.update(
+        {
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_CONFIG_GLOBAL": os.devnull,
+            "GIT_PAGER": "cat",
+            "GIT_TERMINAL_PROMPT": "0",
+            "LC_ALL": "C",
+        }
+    )
     try:
         process = subprocess.Popen(
-            list(argv),
-            cwd=str(cwd),
-            env=dict(env),
+            ["git", "-c", "credential.helper=", *args],
+            cwd=str(repo_root),
+            env=env,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             shell=False,
-            start_new_session=True,
         )
     except OSError as exc:
-        message = f"process launch failed: {type(exc).__name__}".encode("utf-8")
-        return _BoundedProcessResult(127, message, False, False)
+        message = f"git launch failed: {type(exc).__name__}".encode("utf-8")
+        return _BoundedGitResult(127, message, False)
 
     captured = bytearray()
     total_bytes = 0
@@ -891,7 +762,10 @@ def _run_bounded(
         nonlocal total_bytes
         assert process.stdout is not None
         while True:
-            chunk = process.stdout.read(8192)
+            try:
+                chunk = process.stdout.read(8192)
+            except (OSError, ValueError):
+                return
             if not chunk:
                 return
             total_bytes += len(chunk)
@@ -899,74 +773,30 @@ def _run_bounded(
             if remaining > 0:
                 captured.extend(chunk[:remaining])
 
-    reader = threading.Thread(target=drain, name="landing-profile-output", daemon=True)
+    reader = threading.Thread(target=drain, name="landing-profile-fixed-git", daemon=True)
     reader.start()
     timed_out = False
     try:
-        process.wait(timeout=timeout_seconds)
+        process.wait(timeout=GIT_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired:
         timed_out = True
-        _terminate_process_group(process)
-        process.wait(timeout=5)
+        _kill_fixed_git(process)
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            pass
     reader.join(timeout=5)
     if reader.is_alive():
-        _terminate_process_group(process)
+        _kill_fixed_git(process)
+        if process.stdout is not None:
+            process.stdout.close()
         reader.join(timeout=1)
-    if process.stdout is not None:
+    elif process.stdout is not None:
         process.stdout.close()
-    return _BoundedProcessResult(
+    return _BoundedGitResult(
         124 if timed_out else int(process.returncode or 0),
         bytes(captured),
-        timed_out,
         total_bytes > output_limit,
-    )
-
-
-def _child_environment(*, isolated_home: Path | None = None) -> dict[str, str]:
-    scrubbed = scrub_environment(os.environ, allowlist=_PROFILE_ENV_ALLOWLIST)
-    env = dict(scrubbed.env)
-    env.update(
-        {
-            "GIT_CONFIG_COUNT": "1",
-            "GIT_CONFIG_KEY_0": "credential.helper",
-            "GIT_CONFIG_VALUE_0": "",
-            "GIT_CONFIG_NOSYSTEM": "1",
-            "GIT_CONFIG_GLOBAL": os.devnull,
-            "GIT_TERMINAL_PROMPT": "0",
-            "PYTHONDONTWRITEBYTECODE": "1",
-            "PYTHONNOUSERSITE": "1",
-        }
-    )
-    if isolated_home is not None:
-        env["HOME"] = str(isolated_home)
-    else:
-        env.pop("HOME", None)
-    return env
-
-
-def _secret_values() -> frozenset[str]:
-    return frozenset(
-        value
-        for name, value in os.environ.items()
-        if is_secret_env_name(name) and len(value) >= 8
-    )
-
-
-def _bounded_redacted_output(raw: bytes, *, truncated: bool) -> tuple[str, bool]:
-    text = raw.decode("utf-8", errors="replace")
-    redacted = redact_text(text, exact_values=_secret_values()).text
-    if len(redacted) > MAX_DIAGNOSTIC_CHARS:
-        return redacted[:MAX_DIAGNOSTIC_CHARS] + "…", True
-    return redacted, truncated
-
-
-def _run_git(repo_root: Path, *args: str, output_limit: int = MAX_GIT_OUTPUT_BYTES) -> _BoundedProcessResult:
-    return _run_bounded(
-        ["git", *args],
-        cwd=repo_root,
-        env=_child_environment(),
-        timeout_seconds=30,
-        output_limit=output_limit,
     )
 
 
@@ -976,24 +806,6 @@ def _resolve_commit(repo_root: Path, ref: str) -> str | None:
         return None
     resolved = result.output.decode("ascii", errors="ignore").strip().lower()
     return resolved if _EXACT_COMMIT_RE.fullmatch(resolved) is not None else None
-
-
-def _repository_state_digest(repo_root: Path) -> str | None:
-    commands = (
-        ("status", "--porcelain=v1", "-z", "--untracked-files=all"),
-        ("for-each-ref", "--format=%(refname)%00%(objectname)%00"),
-        ("remote", "-v"),
-    )
-    digest = hashlib.sha256()
-    for command in commands:
-        result = _run_git(repo_root, *command)
-        if result.returncode != 0 or result.output_truncated:
-            return None
-        digest.update(command[0].encode("ascii"))
-        digest.update(b"\0")
-        digest.update(result.output)
-        digest.update(b"\0")
-    return digest.hexdigest()
 
 
 def _condition_applies(condition: ProfileCondition, changed_paths: Sequence[str]) -> bool:
@@ -1016,7 +828,7 @@ def _normalized_digest_payload(
         "head": head,
         "base_commit": base_commit,
         "merge_base": merge_base,
-        "outcomes": [check.to_dict(include_output=False) for check in checks],
+        "outcomes": [check.to_dict() for check in checks],
     }
 
 
@@ -1038,8 +850,8 @@ def evaluate_landing_profile(
 ) -> ProjectLandingResult:
     """Evaluate the tracked profile at the exact current HEAD.
 
-    Missing profiles are neutral. Every present profile is required to be the
-    ordinary tracked bytes at ``HEAD`` before any declared command executes.
+    Missing profiles are neutral. Every present profile must match the ordinary
+    tracked bytes at ``HEAD``. Profiles never provide executable content.
     """
 
     root = Path(repo_root).resolve()
@@ -1205,26 +1017,6 @@ def evaluate_landing_profile(
         )
 
     outcomes: list[CheckOutcome] = []
-    deadline = time.monotonic() + MAX_TOTAL_COMMAND_SECONDS
-    repository_state_before = _repository_state_digest(root)
-    if repository_state_before is None:
-        return ProjectLandingResult(
-            "invalid",
-            False,
-            True,
-            head=head,
-            base_commit=base_commit,
-            merge_base=merge_base,
-            profile_content_sha256=loaded.content_sha256,
-            changed_paths=changed_paths,
-            diagnostics=_schema_diagnostic(
-                "profile_repository_state_unavailable",
-                "Repository mutation guard could not capture its initial state.",
-            ),
-        )
-    temporary_home = tempfile.TemporaryDirectory(prefix="elves-landing-profile-home-")
-    environment = _child_environment(isolated_home=Path(temporary_home.name))
-    exact_secret_values = _secret_values()
     for check in profile.checks:
         applies = _condition_applies(check.condition, changed_paths)
         if not applies:
@@ -1262,69 +1054,6 @@ def evaluate_landing_profile(
             )
             continue
 
-        assert check.kind == "command" and check.timeout_seconds is not None
-        if any(
-            redact_text(item, exact_values=exact_secret_values).text != item
-            for item in check.argv
-        ):
-            outcomes.append(
-                CheckOutcome(
-                    id=check.id,
-                    kind=check.kind,
-                    severity=check.severity,
-                    status="failed",
-                    code="command_argument_secret_like",
-                    message="Command arguments contain secret-like material.",
-                )
-            )
-            continue
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            outcomes.append(
-                CheckOutcome(
-                    id=check.id,
-                    kind=check.kind,
-                    severity=check.severity,
-                    status="failed",
-                    code="command_total_timeout",
-                    message="Landing profile command budget was exhausted.",
-                    exit_code=124,
-                )
-            )
-            continue
-        result = _run_bounded(
-            check.argv,
-            cwd=root,
-            env=environment,
-            timeout_seconds=min(float(check.timeout_seconds), remaining),
-            output_limit=MAX_COMMAND_OUTPUT_BYTES,
-        )
-        output, output_truncated = _bounded_redacted_output(
-            result.output,
-            truncated=result.output_truncated,
-        )
-        passed = result.returncode == 0 and not result.timed_out
-        outcomes.append(
-            CheckOutcome(
-                id=check.id,
-                kind=check.kind,
-                severity=check.severity,
-                status="passed" if passed else "failed",
-                code=(
-                    "command_passed"
-                    if passed
-                    else "command_timed_out"
-                    if result.timed_out
-                    else "command_failed"
-                ),
-                exit_code=result.returncode,
-                output=output or None,
-                output_truncated=output_truncated,
-            )
-        )
-
-    temporary_home.cleanup()
-
     current_head = _resolve_commit(root, "HEAD")
     if current_head != head:
         return ProjectLandingResult(
@@ -1342,24 +1071,6 @@ def evaluate_landing_profile(
                 "Repository HEAD changed while project landing checks were running.",
             ),
         )
-    repository_state_after = _repository_state_digest(root)
-    if repository_state_after is None or repository_state_after != repository_state_before:
-        return ProjectLandingResult(
-            "invalid",
-            False,
-            True,
-            head=head,
-            base_commit=base_commit,
-            merge_base=merge_base,
-            profile_content_sha256=loaded.content_sha256,
-            changed_paths=changed_paths,
-            checks=tuple(outcomes),
-            diagnostics=_schema_diagnostic(
-                "profile_repository_mutated",
-                "Repository worktree, refs, or remotes changed while project checks were running.",
-            ),
-        )
-
     blocking_failed = any(
         outcome.status == "failed" and outcome.severity == "blocking"
         for outcome in outcomes
