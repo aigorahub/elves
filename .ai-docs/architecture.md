@@ -12,6 +12,8 @@ templates, and small support scripts:
 - `guide/index.html`: task-first public user guide, published by GitHub Pages
 - `.github/workflows/pages.yml`: dependency-free guide deployment from the same repository
 - `scripts/*`: supporting operator utilities, such as preflight
+- `.elves/landing-profile.json`: the tracked repository-specific exact-HEAD readiness policy;
+  other `.elves/*` content remains ignored runtime state
 - `docs/plans/*` and `docs/elves/*`: run-specific working memory during an active Elves session
 
 ## Coordination hierarchy
@@ -132,6 +134,14 @@ records instruction fidelity as `pruned`, `turn_scoped`, `retained_safe`, or `un
 current persisted-instruction path activates only `retained_safe`; the other usable-sounding states
 require a future, separately proven delivery mechanism. The driver retains all canonical memory,
 terminal review, PR, and landing authority. Normative detail lives in `references/prewalk.md`.
+
+Project landing profiles are a separate pure/runtime seam:
+`scripts/cobbler_runtime/landing_profile.py` loads and validates the bounded tracked profile,
+resolves exact Git identities, evaluates declarative path co-change rules, and computes normalized
+digests; executable profile checks are rejected. `scripts/landing_profile.py` is the installed CLI;
+`elves_landing_check.py` recomputes and binds the live result to distinct host-owned readiness state
+that worker reports cannot override. Profiles may block but never grant authority. Same-user worker
+isolation remains the inherited landing-authority protocol trust model, not a profile sandbox.
 Hard external subprocess lanes require a recursive boundary acquired atomically with the child.
 The current Python runtime cannot prove that boundary on Linux or Darwin—even when Linux has a
 bubblewrap PID namespace—so optional routes fall back host-native and required routes block before

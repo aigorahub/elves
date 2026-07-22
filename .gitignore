@@ -1,6 +1,7 @@
 # Elves runtime artifacts (generated during sessions)
 config.json
-.elves/
+.elves/*
+!.elves/landing-profile.json
 
 # Elves ephemeral artifacts
 .playwright-mcp/

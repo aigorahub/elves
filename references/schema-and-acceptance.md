@@ -213,6 +213,19 @@ fields may remain alongside it.
 The plan is authoritative. Session criteria match it verbatim by stable ID. `sync-session` should
 create the rows before launch so the driver adds evidence later instead of hand-copying criteria.
 
+### Optional project landing readiness
+
+A repository may track `.elves/landing-profile.json`. When present, strict landing evaluates it
+live and the host-owned `landing.readiness` object records
+`project_landing_checks_green: true` plus the matching 64-character
+`project_landing_checks_digest`. Those fields are distinct from generic acceptance and required
+checks. Strict landing recomputes them from the tracked declarative profile and exact repository
+identity; worker reports cannot assert, mutate, or override them. Same-user worker isolation is the
+landing-authority protocol trust model, not a signed profile authority channel. A missing profile
+requires no new session fields and preserves generic behavior; stale project fields after profile
+removal fail closed.
+See [`project-landing-profiles.md`](project-landing-profiles.md).
+
 ## Optional session `lanes` key (advisory in v1)
 
 A session for a run that uses Parallelves lanes (`references/parallelves.md`) may carry a

@@ -8,7 +8,7 @@ plans and reviews; a subscription-native (or optional external) worker implement
 files let the work survive context compaction. You write the plan and own the merge decision. The
 agent does the middle.
 
-**Current release: v2.12.0** — see [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.13.0** — see [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 **New to Elves?** Use the [practical user guide](https://aigorahub.github.io/elves/) — especially
@@ -127,6 +127,14 @@ For a machine-checked cold handoff, the session may opt into explicit handoff v1
 acceptance ownership, branch/HEAD, and a matching bounded Markdown or JSON packet capsule. The
 ordinary v2.8 path remains advisory when this schema is absent. The capsule is not prewalk continuity proof.
 See [`references/schema-and-acceptance.md`](references/schema-and-acceptance.md).
+
+Projects with deterministic repository-specific landing rituals may track
+`.elves/landing-profile.json`. Its declarative path co-change checks are evaluated at the exact
+HEAD/base/merge-base and bound to a host-owned digest; schema v1 rejects executable checks and
+never launches profile-directed processes. Missing profiles are neutral; profiles can block
+readiness but never grant merge, tag, release, protected-ref, secret, connector, or posting
+authority. See
+[`references/project-landing-profiles.md`](references/project-landing-profiles.md).
 
 ---
 
@@ -342,6 +350,8 @@ exactly one file below; other docs link instead of restating.
 - [`references/provider-shortcuts.md`](references/provider-shortcuts.md) — focused Fugu,
   Manus, Grok Build, and Devin command routes
 - [`references/host-parity.md`](references/host-parity.md) — Claude Code / Codex parity
+- [`references/project-landing-profiles.md`](references/project-landing-profiles.md) — tracked
+  repository-specific exact-HEAD readiness checks
 
 **Quality and proof**
 - [`references/proof-and-review.md`](references/proof-and-review.md) — impact-selected proof,
@@ -372,12 +382,12 @@ exactly one file below; other docs link instead of restating.
 
 ```bash
 # Elves source checkout:
-python3 scripts/verify_repo.py --version 2.12.0
+python3 scripts/verify_repo.py --version 2.13.0
 # before operational-artifact cleanup, from a clean worktree:
-python3 scripts/verify_repo.py --version 2.12.0 --final-readiness \
+python3 scripts/verify_repo.py --version 2.13.0 --final-readiness \
   --session .elves-session.json
 # after the narrow operational-artifact cleanup commit, on its clean current tip:
-python3 scripts/verify_repo.py --ci --version 2.12.0 --base-ref origin/main
+python3 scripts/verify_repo.py --ci --version 2.13.0 --base-ref origin/main
 test -z "$(git status --porcelain)"
 ```
 
@@ -389,6 +399,14 @@ global skill install. Installed runs use their target project's gates plus the i
 ```bash
 python3 "$ELVES_SKILL_ROOT/scripts/elves_landing_check.py" \
   --session <session-path> --repo-root .
+```
+
+When the target tracks `.elves/landing-profile.json`, the landing check evaluates it automatically.
+The standalone installed command is:
+
+```bash
+python3 "$ELVES_SKILL_ROOT/scripts/landing_profile.py" check \
+  --repo-root . --base origin/main --json
 ```
 
 Intentional source-checkout public-API breaks must be declared in the tracked

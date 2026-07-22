@@ -64,6 +64,7 @@ class InstalledBundleSmokeTests(unittest.TestCase):
                     result["notes"],
                 )
                 self.assertIn("landing-check-help=ok", result["notes"])
+                self.assertIn("landing-profile-check-missing=ok", result["notes"])
                 self.assertTrue(result["skill_present"])
                 self.assertTrue(result["agents_present"])
 

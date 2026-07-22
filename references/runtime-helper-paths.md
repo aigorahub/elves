@@ -35,10 +35,17 @@ helper's `--repo-root <target-repository>` option where supported.
 ## Staging and final-readiness tools
 
 The installed bundle ships `scripts/acceptance_contract.py` for prelaunch plan/session validation
-and proof-preserving session scaffolding, plus `scripts/elves_landing_check.py` for final readiness.
+and proof-preserving session scaffolding, `scripts/landing_profile.py` for deterministic project
+checks, plus `scripts/elves_landing_check.py` for final readiness.
 Invoke both from the active skill root. Generic Elves runs combine final acceptance checking with
 the target project's own broad gates: tests, lint, type checking, builds, links, secret scanning,
 API checks, or other checks appropriate to that repository.
+
+Repositories may track `.elves/landing-profile.json`; run it directly with
+`python3 "$ELVES_SKILL_ROOT/scripts/landing_profile.py" check --repo-root . --base origin/main
+--json`. Strict landing runs it automatically and binds any present profile to exact HEAD, resolved
+base/merge-base identity, normalized results, and host-owned readiness evidence. Schema v1 accepts
+only declarative path checks and post-merge checklist items; it never runs profile-supplied commands.
 
 Repository-maintenance helpers such as `scripts/verify_repo.py`, `scripts/release_checklist.py`,
 and `scripts/check_repo_consistency.py` are intentionally not part of an installed bundle. Use one

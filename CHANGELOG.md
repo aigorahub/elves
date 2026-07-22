@@ -4,6 +4,29 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.13.0] - 2026-07-22
+
+### Exact-HEAD project landing profiles
+
+- Add tracked `.elves/landing-profile.json` schema v1 with bounded `path_touched` and declarative
+  `post_merge_checklist` checks; missing profiles remain neutral while unsafe, malformed,
+  unsupported, executable, or blocking-failed profiles fail closed.
+- Bind deterministic results to exact profile bytes, HEAD, resolved base and merge base, and
+  normalized outcomes. Schema v1 rejects `command`, `argv`, and other executable shapes before any
+  profile-directed process launch; fixed internal local Git reads provide repository identity and
+  changed paths only.
+- Make project green/digest state a distinct host-owned landing-authority input that workers cannot
+  assert and that never grants merge, tag, release, protected-ref, connector, secret, or posting
+  authority. Ship the CLI/runtime in both installed host bundles.
+- Dogfood the profile for documentation, guide, changelog/release, and Claude/Codex parity
+  freshness. For a host-authorized release-worthy merge, require verification of the matching
+  immutable GitHub tag/release and a <=280-character X announcement draft with value and link;
+  never post it automatically.
+- Harden Fugu's bounded process-group cleanup against Darwin's `EPERM` zombie-leader race without
+  extending the provider wall deadline, fail closed with a distinct status when reap remains
+  unproved, and keep its bootstrap-inclusive macOS timing proof below the fake provider's unbounded
+  completion time.
+
 ## [2.12.0] - 2026-07-21
 
 ### Optional provider convenience shortcuts

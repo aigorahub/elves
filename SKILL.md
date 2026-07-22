@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.12.0"
+  version: "2.13.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -62,7 +62,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.12.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.13.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
@@ -536,6 +536,14 @@ python3 "$ELVES_SKILL_ROOT/scripts/elves_landing_check.py" \
 Session `plan_path` is authoritative; explicit `--plan` is only an equality assertion. An installed
 Elves bundle never requires a repo-only helper.
 
+A repository may track `.elves/landing-profile.json` for bounded declarative project-specific
+checks. Schema v1 accepts path co-change checks and post-merge declarations but rejects executable
+checks. A missing profile is neutral; a present invalid or blocking-failed profile blocks
+readiness. The host recomputes live results and binds exact profile bytes, HEAD, resolved base and
+merge base, and normalized outcomes to a host-owned digest; worker reports cannot override them.
+Profiles never grant merge, tag, release, protected-ref, connector, secret, or posting authority.
+See `references/project-landing-profiles.md`.
+
 ## Constitution and the Legality Check
 
 Correctness (gates) ≠ plan compliance (review) ≠ legality (judge). The human owns constitutional
@@ -556,8 +564,9 @@ See `references/proof-and-review.md`.
 
 ## Readiness Gate
 
-Branch-level: execution log current, local proof green on current tip, preview/artifact proof when
-applicable, plan Acceptance with proof, landing check clean, final cumulative review clean, PR
+Branch-level: execution log current, local proof green on current tip, project landing checks green
+at the current tip when a profile is present, preview/artifact proof when applicable, plan
+Acceptance with proof, landing check clean, final cumulative review clean, PR
 comments/checks polled, legality clean, strategic forgetting done, git clean.
 
 Complete-without-merge and complete-and-merge share **one** readiness pipeline.

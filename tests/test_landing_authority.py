@@ -35,12 +35,16 @@ class LandingAuthorityTests(unittest.TestCase):
             "driver_authorized": True,
             "landing_outcome": "complete_and_merge",
             "ready": True,
+            "project_landing_checks_green": True,
+            "project_landing_checks_digest": "f" * 64,
             "status": "complete",
         }
         stripped = strip_worker_authority_claims(host, hostile)
         self.assertIn("merge_authority", stripped.stripped)
         self.assertIn("driver_authorized", stripped.stripped)
         self.assertIn("landing_outcome", stripped.stripped)
+        self.assertIn("project_landing_checks_green", stripped.stripped)
+        self.assertIn("project_landing_checks_digest", stripped.stripped)
         self.assertFalse(stripped.control.driver_authorized)
         self.assertFalse(stripped.control.ready)
         self.assertEqual(stripped.control.landing_outcome, "landable_pr")
@@ -118,6 +122,44 @@ class LandingAuthorityTests(unittest.TestCase):
         self.assertFalse(partial.required_checks_green)
         self.assertTrue(partial.acceptance_complete)
         self.assertFalse(partial.ready)
+
+        project_invalidated = invalidate_scopes(control, ["project_landing"])
+        self.assertFalse(project_invalidated.project_landing_checks_green)
+        self.assertIsNone(project_invalidated.project_landing_checks_digest)
+        self.assertFalse(project_invalidated.ready)
+
+    def test_project_landing_state_is_distinct_and_digest_bound(self) -> None:
+        generic = compute_readiness_inputs_digest(head=self.HEAD_A)
+        project = compute_readiness_inputs_digest(
+            head=self.HEAD_A,
+            project_landing_checks_green=True,
+            project_landing_checks_digest="f" * 64,
+        )
+        failed = compute_readiness_inputs_digest(
+            head=self.HEAD_A,
+            project_landing_checks_green=False,
+            project_landing_checks_digest="f" * 64,
+        )
+        self.assertNotEqual(generic, project)
+        self.assertNotEqual(project, failed)
+
+        control, attestation = attest_readiness(
+            initial_control(landing_outcome="complete_and_merge"),
+            head=self.HEAD_A,
+            acceptance_complete=True,
+            blockers_resolved=True,
+            exact_tip_review_clean=True,
+            required_checks_green=True,
+            worktree_clean=True,
+            inputs_digest=failed,
+            project_landing_checks_green=False,
+            project_landing_checks_digest="f" * 64,
+        )
+        self.assertFalse(control.ready)
+        self.assertFalse(attestation.ready)
+        self.assertIn("project_landing_checks_not_green", attestation.reasons)
+        decision = evaluate_merge_guard(control, current_head=self.HEAD_A)
+        self.assertIn("missing:project_landing_checks_green", decision.reasons)
 
     def test_merge_guard_requires_all_host_conditions(self) -> None:
         control = initial_control(landing_outcome="complete_and_merge")

@@ -51,7 +51,7 @@
   `SKILL.md`, `AGENTS.md` (Codex), `config.json.example`, `references/`,
   `scripts/preflight.sh`, `scripts/preflight_worktree.py`, `scripts/notify.sh`,
   `scripts/install_doctor.py`, `scripts/validate_survival_guide.py`,
-  `scripts/acceptance_contract.py`, `scripts/elves_landing_check.py`,
+  `scripts/acceptance_contract.py`, `scripts/elves_landing_check.py`, `scripts/landing_profile.py`,
   `scripts/cobbler_agents.py`, `scripts/openrouter_lens.py`, and `scripts/workspace_guard.py` plus
   `scripts/cobbler_runtime/` when those runtime modules exist.
   Repo-only maintenance helpers stay in the checkout.
@@ -97,6 +97,11 @@
 - Merge policy: the user owns whether Elves may merge. Without an explicit opt-in the agent stops
   at a landable PR. A `merge-on-green`, chat-to-land, or reviewed-PR landing opt-in authorizes only
   a regular merge commit (never a squash) after the Final Readiness Review passes.
+- Keep repository-specific deterministic landing rituals in tracked
+  `.elves/landing-profile.json`, while `.elves/runtime/`, candidates, observations, and session
+  artifacts stay ignored. Schema-v1 profiles are declarative and cannot launch commands. Profile
+  checks can block host readiness but cannot grant merge, release, tag, protected-ref, connector,
+  secret, or posting authority.
 
 
 ## v2.1.0 full-run note
