@@ -76,8 +76,9 @@ provider usage, but not merge, protected-ref, secret, or approval-bypass authori
   `python3 "$ELVES_SKILL_ROOT/scripts/elves_landing_check.py" --session <session-path> --repo-root .`
   (session `plan_path` is authoritative; explicit `--plan` is only an equality assertion)
 - **Project landing profiles:** a tracked `.elves/landing-profile.json` may add bounded,
-  deterministic exact-HEAD readiness checks. Missing is neutral; present invalid or blocking-failed
-  is red; results are host-owned digest inputs and never authority
+  declarative exact-HEAD path co-change checks. Executable checks are unsupported; missing is
+  neutral; present invalid or blocking-failed is red; live results are recomputed host-owned digest
+  inputs that worker reports cannot override, and never authority
   (`references/project-landing-profiles.md`)
 - **Helper paths:** `python3 scripts/...` is **source-checkout shorthand**; installed skills
   (`~/.claude/skills/elves` or `~/.codex/skills/elves`) resolve helpers from the

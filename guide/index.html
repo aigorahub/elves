@@ -975,10 +975,12 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" \
 
         <h3>Project-specific landing checks</h3>
         <p>A repository can track <code>.elves/landing-profile.json</code> for bounded deterministic
-          documentation, release, or parity checks. Elves evaluates a present profile at the exact
-          HEAD and resolved base, records a host-owned digest, and shows advisory and post-merge
-          checklist items. A missing profile changes nothing. A profile can block readiness, but it
-          cannot authorize merge, tags, releases, protected refs, connectors, secrets, or posting.</p>
+          documentation, release, or parity co-change checks. Schema v1 is declarative: executable
+          checks are rejected and no profile-directed process is launched. Elves recomputes a
+          present profile at the exact HEAD and resolved base, records a host-owned digest, and
+          shows advisory and post-merge checklist items. Worker reports cannot override that live
+          result. A missing profile changes nothing. A profile can block readiness, but it cannot
+          authorize merge, tags, releases, protected refs, connectors, secrets, or posting.</p>
 
         <h3>If you asked Elves not to merge</h3>
         <p>The run stops with a reviewed, landable PR. You can inspect it and merge it yourself.</p>

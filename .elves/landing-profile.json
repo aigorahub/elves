@@ -60,8 +60,8 @@
       ]
     },
     {
-      "id": "release-alignment",
-      "kind": "command",
+      "id": "release-metadata-cochange",
+      "kind": "path_touched",
       "severity": "blocking",
       "when": {
         "kind": "any_path_glob",
@@ -69,45 +69,12 @@
           "SKILL.md",
           "AGENTS.md",
           "README.md",
-          "CHANGELOG.md"
+          "guide/index.html"
         ]
       },
-      "argv": [
-        "python3",
-        "scripts/release_checklist.py",
-        "--version",
-        "2.13.0",
-        "--base",
-        "origin/main",
-        "--json"
-      ],
-      "timeout_seconds": 60
-    },
-    {
-      "id": "repository-consistency",
-      "kind": "command",
-      "severity": "blocking",
-      "when": {
-        "kind": "any_path_glob",
-        "patterns": [
-          "SKILL.md",
-          "AGENTS.md",
-          "README.md",
-          "CHANGELOG.md",
-          "guide/**",
-          "references/**",
-          ".ai-docs/**",
-          "scripts/landing_profile.py",
-          "scripts/elves_landing_check.py",
-          "scripts/cobbler_runtime/landing_profile.py",
-          "scripts/cobbler_runtime/landing_authority.py"
-        ]
-      },
-      "argv": [
-        "python3",
-        "scripts/check_repo_consistency.py"
-      ],
-      "timeout_seconds": 60
+      "paths": [
+        "CHANGELOG.md"
+      ]
     },
     {
       "id": "codex-adapter-parity",

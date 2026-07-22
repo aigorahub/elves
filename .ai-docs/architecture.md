@@ -137,9 +137,11 @@ terminal review, PR, and landing authority. Normative detail lives in `reference
 
 Project landing profiles are a separate pure/runtime seam:
 `scripts/cobbler_runtime/landing_profile.py` loads and validates the bounded tracked profile,
-resolves exact Git identities, executes shell-free scrubbed commands, and computes normalized
-digests; `scripts/landing_profile.py` is the installed CLI; `elves_landing_check.py` binds the live
-result to distinct host-owned readiness state. Profiles may block but never grant authority.
+resolves exact Git identities, evaluates declarative path co-change rules, and computes normalized
+digests; executable profile checks are rejected. `scripts/landing_profile.py` is the installed CLI;
+`elves_landing_check.py` recomputes and binds the live result to distinct host-owned readiness state
+that worker reports cannot override. Profiles may block but never grant authority. Same-user worker
+isolation remains the inherited landing-authority protocol trust model, not a profile sandbox.
 Hard external subprocess lanes require a recursive boundary acquired atomically with the child.
 The current Python runtime cannot prove that boundary on Linux or Darwin—even when Linux has a
 bubblewrap PID namespace—so optional routes fall back host-native and required routes block before

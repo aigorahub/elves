@@ -536,11 +536,13 @@ python3 "$ELVES_SKILL_ROOT/scripts/elves_landing_check.py" \
 Session `plan_path` is authoritative; explicit `--plan` is only an equality assertion. An installed
 Elves bundle never requires a repo-only helper.
 
-A repository may track `.elves/landing-profile.json` for bounded deterministic project-specific
+A repository may track `.elves/landing-profile.json` for bounded declarative project-specific
+checks. Schema v1 accepts path co-change checks and post-merge declarations but rejects executable
 checks. A missing profile is neutral; a present invalid or blocking-failed profile blocks
-readiness. Live results bind exact profile bytes, HEAD, resolved base and merge base, and normalized
-outcomes to a host-owned digest. Profiles never grant merge, tag, release, protected-ref, connector,
-secret, or posting authority. See `references/project-landing-profiles.md`.
+readiness. The host recomputes live results and binds exact profile bytes, HEAD, resolved base and
+merge base, and normalized outcomes to a host-owned digest; worker reports cannot override them.
+Profiles never grant merge, tag, release, protected-ref, connector, secret, or posting authority.
+See `references/project-landing-profiles.md`.
 
 ## Constitution and the Legality Check
 

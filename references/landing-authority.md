@@ -21,7 +21,10 @@ Machine source: `scripts/cobbler_runtime/landing_authority.py`.
 Readiness is attested to an exact commit SHA with an inputs digest. Changing HEAD invalidates
 readiness but not authorization. Scoped invalidation can clear only acceptance, review, checks, or
 project-landing, or worktree proof. A present `.elves/landing-profile.json` requires live green
-results plus a matching host-owned canonical digest; a missing profile is neutral. See
+results plus a matching host-owned canonical digest; strict landing recomputes those results and
+strips any worker-reported project green/digest fields. Same-user worker isolation remains this
+protocol's explicit trust model rather than a profile sandbox or signed authority boundary. A
+missing profile is neutral. See
 [`project-landing-profiles.md`](project-landing-profiles.md).
 
 ## Chat-to-work vs chat-to-land

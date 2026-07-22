@@ -8,14 +8,13 @@ All notable changes to the Elves skill are documented here.
 
 ### Exact-HEAD project landing profiles
 
-- Add tracked `.elves/landing-profile.json` schema v1 with bounded `command`, `path_touched`, and
-  declarative `post_merge_checklist` checks; missing profiles remain neutral while unsafe,
-  malformed, unsupported, or blocking-failed profiles fail closed.
+- Add tracked `.elves/landing-profile.json` schema v1 with bounded `path_touched` and declarative
+  `post_merge_checklist` checks; missing profiles remain neutral while unsafe, malformed,
+  unsupported, executable, or blocking-failed profiles fail closed.
 - Bind deterministic results to exact profile bytes, HEAD, resolved base and merge base, and
-  normalized outcomes. Commands use argv without a shell, closed stdin, a scrubbed environment,
-  isolated temporary home, hard timeouts, bounded redacted output, an overall process budget, and
-  repository-mutation detection; direct hosting/network authority clients and write-capable Git
-  subcommands are rejected.
+  normalized outcomes. Schema v1 rejects `command`, `argv`, and other executable shapes before any
+  profile-directed process launch; fixed internal local Git reads provide repository identity and
+  changed paths only.
 - Make project green/digest state a distinct host-owned landing-authority input that workers cannot
   assert and that never grants merge, tag, release, protected-ref, connector, secret, or posting
   authority. Ship the CLI/runtime in both installed host bundles.

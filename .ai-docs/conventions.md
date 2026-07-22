@@ -99,8 +99,9 @@
   a regular merge commit (never a squash) after the Final Readiness Review passes.
 - Keep repository-specific deterministic landing rituals in tracked
   `.elves/landing-profile.json`, while `.elves/runtime/`, candidates, observations, and session
-  artifacts stay ignored. Profile checks can block host readiness but cannot grant merge, release,
-  tag, protected-ref, connector, secret, or posting authority.
+  artifacts stay ignored. Schema-v1 profiles are declarative and cannot launch commands. Profile
+  checks can block host readiness but cannot grant merge, release, tag, protected-ref, connector,
+  secret, or posting authority.
 
 
 ## v2.1.0 full-run note

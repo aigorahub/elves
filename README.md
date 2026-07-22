@@ -129,10 +129,11 @@ ordinary v2.8 path remains advisory when this schema is absent. The capsule is n
 See [`references/schema-and-acceptance.md`](references/schema-and-acceptance.md).
 
 Projects with deterministic repository-specific landing rituals may track
-`.elves/landing-profile.json`. Its bounded shell-free commands and path co-change checks are
-evaluated at the exact HEAD/base/merge-base and bound to a host-owned digest. Missing profiles are
-neutral; profiles can block readiness but never grant merge, tag, release, protected-ref, secret,
-connector, or posting authority. See
+`.elves/landing-profile.json`. Its declarative path co-change checks are evaluated at the exact
+HEAD/base/merge-base and bound to a host-owned digest; schema v1 rejects executable checks and
+never launches profile-directed processes. Missing profiles are neutral; profiles can block
+readiness but never grant merge, tag, release, protected-ref, secret, connector, or posting
+authority. See
 [`references/project-landing-profiles.md`](references/project-landing-profiles.md).
 
 ---

@@ -219,8 +219,11 @@ A repository may track `.elves/landing-profile.json`. When present, strict landi
 live and the host-owned `landing.readiness` object records
 `project_landing_checks_green: true` plus the matching 64-character
 `project_landing_checks_digest`. Those fields are distinct from generic acceptance and required
-checks. Worker reports cannot assert or mutate them. A missing profile requires no new session
-fields and preserves generic behavior; stale project fields after profile removal fail closed.
+checks. Strict landing recomputes them from the tracked declarative profile and exact repository
+identity; worker reports cannot assert, mutate, or override them. Same-user worker isolation is the
+landing-authority protocol trust model, not a signed profile authority channel. A missing profile
+requires no new session fields and preserves generic behavior; stale project fields after profile
+removal fail closed.
 See [`project-landing-profiles.md`](project-landing-profiles.md).
 
 ## Optional session `lanes` key (advisory in v1)
