@@ -52,7 +52,7 @@
   "branch": "codex/project-landing-profile",
   "collision_tripwire": "35449718c173f737a7b0dad209accfe86b55b5a9",
   "continuation_guard": {
-    "next_required_action": "Merge PR #189 by regular merge commit, publish and verify v2.13.0 at the exact merge result if still appropriate, draft but do not post the short X announcement, then reclaim the merged worktree.",
+    "next_required_action": "At the current committed evidence tip, finish exact-head checks, add the host readiness attestation, run strict landing and terminal review, remove .elves-session.json in the cleanup commit, attest that cleanup-only tip, then merge by regular merge commit, publish and verify v2.13.0 if still appropriate, draft but do not post the X announcement, and reclaim the merged worktree.",
     "remaining_batches": [],
     "stop_allowed": false
   },

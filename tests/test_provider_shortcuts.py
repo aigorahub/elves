@@ -504,7 +504,7 @@ class LocalCliRunnerTests(unittest.TestCase):
                 env={
                     "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
                     "SAKANA_API_KEY": "test-sakana-key",
-                    "SAKANA_FUGU_MAX_WAIT_SECONDS": "2",
+                    "SAKANA_FUGU_MAX_WAIT_SECONDS": "4",
                     "SAKANA_FUGU_ULTRA_EXPLORE_SECONDS": "0.8",
                 },
                 cwd=repo,

@@ -152,3 +152,7 @@ reservations were still scheduler-sensitive even though production correctly ret
 fail-closed status. Those two witnesses now use two-second finite deadlines against five- and
 ten-second sleepers, leaving a realistic bounded reap window; the deliberately unproved cleanup
 witnesses retain their smaller deadlines and exact status-125 assertions.
+A later evidence-tip macOS run showed that the staged Ultra witness's two-second deadline still
+left too little post-`SIGKILL` reap time under severe hosted-runner contention. That positive
+witness now uses a four-second finite deadline against its ten-second resume sleeper. Production
+deadlines, cleanup semantics, and every deliberately unproved status-125 witness remain unchanged.
