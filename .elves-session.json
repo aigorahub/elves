@@ -1,0 +1,109 @@
+{
+  "batches": [
+    {
+      "acceptance": [
+        {
+          "criterion": "A repository with no landing profile retains generic landing behavior, while a present malformed, symlinked, irregular, oversized, or unsupported profile fails closed with a stable diagnostic.",
+          "evidence": "",
+          "id": "B1-A1",
+          "met": false
+        },
+        {
+          "criterion": "Schema-v1 blocking, advisory, skipped, command, and path-touched results are deterministic and structured; commands use argv without a shell, closed stdin, a scrubbed environment, bounded output, and a hard timeout.",
+          "evidence": "",
+          "id": "B1-A2",
+          "met": false
+        },
+        {
+          "criterion": "Project results and their canonical digest bind profile bytes, exact `HEAD`, resolved base commit, and normalized check outcomes; a moved head, changed base, changed profile, or stale digest cannot satisfy readiness.",
+          "evidence": "",
+          "id": "B1-A3",
+          "met": false
+        },
+        {
+          "criterion": "Project landing state is a distinct host-owned readiness input that workers cannot assert or mutate, and it never grants merge, tag, release, protected-ref, or posting authority.",
+          "evidence": "",
+          "id": "B1-A4",
+          "met": false
+        },
+        {
+          "criterion": "The tracked Elves profile automatically exercises documentation freshness, public-guide freshness, changelog honesty, and Claude/Codex parity on applicable diffs, while preserving generic behavior for projects without a profile.",
+          "evidence": "",
+          "id": "B1-A5",
+          "met": false
+        },
+        {
+          "criterion": "Both installed host bundles contain and can execute the new CLI, focused profile/landing/authority/shipment tests pass, and the canonical repository verifier passes at the exact pull-request head against the immutable base.",
+          "evidence": "",
+          "id": "B1-A6",
+          "met": false
+        },
+        {
+          "criterion": "SKILL, AGENTS, README, guide, changelog, landing references, and durable AI docs align at v2.13.0 and state that an appropriate authorized merge is followed by a matching immutable GitHub tag/release plus a short X announcement draft, never an automatic post.",
+          "evidence": "",
+          "id": "B1-A7",
+          "met": false
+        }
+      ],
+      "id": "B1",
+      "status": "pending"
+    }
+  ],
+  "branch": "codex/project-landing-profile",
+  "collision_tripwire": "35449718c173f737a7b0dad209accfe86b55b5a9",
+  "continuation_guard": {
+    "next_required_action": "Validate and push the Contract slice, create the PR, then launch the GPT-5.6-high guide checkpoint.",
+    "remaining_batches": [
+      "B1"
+    ],
+    "stop_allowed": false
+  },
+  "delegation_scope": "full_run",
+  "driver_authorized": true,
+  "e2e_mode": "chat-to-land",
+  "git_mode": "branch_progress",
+  "landing_outcome": "authorized_merge",
+  "master_acceptance": [
+    {
+      "criterion": "The authoritative plan, session, and worker packet retain exact stable-id/criterion parity, and every B1 criterion carries exact-head evidence before landing.",
+      "evidence": "",
+      "id": "M-A1",
+      "met": false
+    },
+    {
+      "criterion": "Independent cumulative and revision-delta review reports no unresolved actionable findings, including security and authority review of project-declared commands.",
+      "evidence": "",
+      "id": "M-A2",
+      "met": false
+    },
+    {
+      "criterion": "The canonical repository verifier and landing check pass on the exact reviewed pull-request head against the unchanged immutable base.",
+      "evidence": "",
+      "id": "M-A3",
+      "met": false
+    },
+    {
+      "criterion": "The pull request is mergeable by a regular merge commit with required checks green, clean worktree identity, and no unresolved review feedback.",
+      "evidence": "",
+      "id": "M-A4",
+      "met": false
+    }
+  ],
+  "plan_path": "docs/plans/project-landing-profile.md",
+  "prewalk": {
+    "actual_transport": "collaboration_exact_session",
+    "continuation_message": "Continue.",
+    "native_worker_qualified": false,
+    "qualification_claim": false,
+    "requested": "required"
+  },
+  "run_id": "project-landing-profile-20260722",
+  "start_head": "35449718c173f737a7b0dad209accfe86b55b5a9",
+  "work_driver": "codex-gpt-5.6-high",
+  "worker_packet_path": ".elves/runtime/project-landing-profile-worker.md",
+  "worker_route": {
+    "effort": "high",
+    "model": "gpt-5.6-sol"
+  },
+  "worktree_path": "/Users/john/aigora/dev/elves-project-landing-profile"
+}
