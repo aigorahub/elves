@@ -52,7 +52,7 @@
   "branch": "codex/fugu-general-tasks",
   "collision_tripwire": "1d90246b97b5e11211525e71b6a9ff5091c6cc10",
   "continuation_guard": {
-    "next_required_action": "Validate and push the staged Contract slice, create the draft PR, then launch the native implementation worker.",
+    "next_required_action": "Launch the native implementation worker for Batch B1 and park until terminal or material wake.",
     "remaining_batches": [
       "B1"
     ],
@@ -96,6 +96,7 @@
     }
   ],
   "plan_path": "docs/plans/fugu-general-tasks.md",
+  "pr_number": 193,
   "prewalk": {
     "actual": "off",
     "qualification_claim": false,

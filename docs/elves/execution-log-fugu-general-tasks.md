@@ -3,11 +3,11 @@
 ## Run digest
 
 - **Last updated:** 2026-07-23 EDT
-- **Current phase:** staging
+- **Current phase:** launch-ready
 - **Active batch:** B1
 - **Last completed batch:** none
-- **Next exact action:** validate staging and baseline, commit/push Contract, create draft PR
-- **Active PR:** not created
+- **Next exact action:** launch the native implementation worker and park
+- **Active PR:** #193
 - **Elves Report:** not generated
 
 ## Session setup — 2026-07-23 EDT
@@ -46,3 +46,4 @@
   with eight expected platform/capability skips.
 - Repository consistency and the v2.14.1 release checklist passed at immutable start head
   `1d90246b97b5e11211525e71b6a9ff5091c6cc10`.
+- Contract commit `8631491` was pushed and draft PR #193 was created against `main`.

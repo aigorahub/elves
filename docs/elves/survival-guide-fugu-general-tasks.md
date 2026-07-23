@@ -61,7 +61,7 @@ draft—but never post—the X announcement.
 - **Planned batches remaining:** 1
 - **Stop allowed right now:** no
 - **Why:** staging, implementation, review, landing, release, and cleanup remain.
-- **Next required action:** validate and commit the staged contract, create the PR, then launch the implementation worker.
+- **Next required action:** launch the native implementation worker for Batch B1 and park until terminal or material wake.
 
 ## Effort Standard
 
@@ -79,14 +79,14 @@ draft—but never post—the X announcement.
 
 ## Current Phase
 
-- **Status:** staging
+- **Status:** launch-ready
 - **Active batch:** B1
-- **What was just finished:** exact plan/session acceptance validation, preflight, and green baseline proof
-- **Single next action:** commit and push the Contract slice, create the draft PR, then launch the implementation worker.
+- **What was just finished:** Contract staging, push, and draft PR #193 creation
+- **Single next action:** launch the native implementation worker with the staged packet.
 
 ## Active Compute
 
-- No implementation worker or Fugu process is active.
+- No implementation worker or Fugu process is active yet; PR #193 is the active draft.
 
 ## Next Exact Batch
 
@@ -115,4 +115,4 @@ draft—but never post—the X announcement.
 - [x] Prewalk recorded as off.
 - [x] Plan/session/packet acceptance mappings validated.
 - [x] Baseline proof green.
-- [ ] Contract commit pushed and draft PR created.
+- [x] Contract commit pushed and draft PR created.
