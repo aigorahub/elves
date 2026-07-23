@@ -67,7 +67,6 @@ SECTION_REQUIREMENTS = {
     ],
     "Effort Standard": [
         "Work as hard as you can",
-        "Do not be lazy",
         "minimum acceptable change",
         "next highest-value action",
     ],

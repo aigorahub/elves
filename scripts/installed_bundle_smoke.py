@@ -42,6 +42,8 @@ CLAUDE_ALIAS_MARKER = "<!-- elves-managed-alias: claude-skill-alias v1 -->"
 
 # This is an independent installed-artifact contract, not a reflection of the
 # sync allowlist. If sync drops a required helper, this smoke must still fail.
+# Call-site deps (worktree_gc, provider_supervisor) must stay listed here even
+# if someone later trims the sync list — smoke is the installed product gate.
 REQUIRED_TOP_LEVEL_RUNTIME_PATHS = (
     "scripts/preflight.sh",
     "scripts/preflight_worktree.py",
@@ -54,10 +56,18 @@ REQUIRED_TOP_LEVEL_RUNTIME_PATHS = (
     "scripts/cobbler_agents.py",
     "scripts/openrouter_lens.py",
     "scripts/workspace_guard.py",
+    "scripts/worktree_gc.py",
+    "scripts/provider_supervisor.py",
     "scripts/run_fugu.sh",
     "scripts/run_manus.sh",
     "scripts/run_grok.sh",
     "scripts/run_devin.sh",
+)
+
+# Must never appear under an installed skill root (source-checkout archives).
+FORBIDDEN_INSTALLED_ARCHIVE_PATHS = (
+    "docs/plans",
+    "docs/elves",
 )
 
 # These helpers maintain this source repository and must not become mandatory
@@ -422,6 +432,11 @@ def smoke_host(
         for relative in REPO_ONLY_HELPER_PATHS:
             if (bundle_root / relative).exists():
                 failures.append(f"repo-only helper leaked into installed bundle {relative}")
+        for relative in FORBIDDEN_INSTALLED_ARCHIVE_PATHS:
+            if (bundle_root / relative).exists():
+                failures.append(
+                    f"source-only archive leaked into installed bundle {relative}"
+                )
         if not package.is_dir():
             failures.append("missing cobbler_runtime package in installed bundle")
         # Removing any shipped runtime module must be detectable: assert at least

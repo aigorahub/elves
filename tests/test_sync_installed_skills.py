@@ -268,6 +268,51 @@ class SyncInstalledSkillsTests(unittest.TestCase):
             "scripts/workspace_guard.py",
             self.sync.TOP_LEVEL_RUNTIME_SCRIPT_PATHS,
         )
+        for relative in self.sync.TOP_LEVEL_RUNTIME_CALLSITE_DEPS:
+            self.assertIn(relative, self.sync.TOP_LEVEL_RUNTIME_SCRIPT_PATHS)
+
+    def test_callsite_runtime_deps_are_shipped_and_referenced(self) -> None:
+        """preflight/full_run call sites must stay on the installed ship list."""
+        preflight = (REPO_ROOT / "scripts" / "preflight.sh").read_text(encoding="utf-8")
+        full_run = (
+            REPO_ROOT / "scripts" / "cobbler_runtime" / "full_run.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("worktree_gc.py", preflight)
+        self.assertIn("provider_supervisor.py", full_run)
+        self.assertEqual(
+            self.sync.TOP_LEVEL_RUNTIME_CALLSITE_DEPS,
+            [
+                "scripts/worktree_gc.py",
+                "scripts/provider_supervisor.py",
+            ],
+        )
+        for relative in self.sync.TOP_LEVEL_RUNTIME_CALLSITE_DEPS:
+            self.assertIn(relative, self.sync.TOP_LEVEL_RUNTIME_SCRIPT_PATHS)
+            self.assertTrue((REPO_ROOT / relative).is_file())
+
+    def test_source_only_archives_are_not_managed_install_paths(self) -> None:
+        for host in ("claude", "codex"):
+            managed = self.sync.build_targets(REPO_ROOT)[host]["managed_paths"]
+            for archive in self.sync.SOURCE_ONLY_ARCHIVE_PATHS:
+                self.assertNotIn(archive, managed)
+                self.assertFalse(
+                    any(
+                        path == archive or path.startswith(f"{archive}/")
+                        for path in managed
+                    ),
+                    msg=f"{host} managed_paths must not include {archive}",
+                )
+
+    def test_apply_installs_callsite_runtime_deps(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            _repo, home = self.configure_temp_repo(tmpdir)
+            problems = self.sync.apply_target("codex")
+            self.assertEqual(problems, [])
+            installed = home / ".codex" / "skills" / "elves"
+            self.assertTrue((installed / "scripts" / "worktree_gc.py").is_file())
+            self.assertTrue((installed / "scripts" / "provider_supervisor.py").is_file())
+            self.assertFalse((installed / "docs" / "plans").exists())
+            self.assertFalse((installed / "docs" / "elves").exists())
 
     def test_exactly_eleven_claude_aliases(self) -> None:
         self.assertEqual(len(self.sync.CLAUDE_ALIAS_NAMES), 11)

@@ -211,7 +211,8 @@ class ReleaseChecklistTests(unittest.TestCase):
         self.assertIn(
             (
                 "Alias inventory (11) + required runtime helpers "
-                "(acceptance_contract.py, openrouter_lens.py, workspace_guard.py) "
+                "(acceptance_contract.py, openrouter_lens.py, workspace_guard.py, "
+                "worktree_gc.py, provider_supervisor.py) "
                 "+ recursive compile smoke: OK"
             ),
             result.notes,

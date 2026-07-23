@@ -30,6 +30,14 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
+# Top-level helpers that other shipped entrypoints exec or load by relative path
+# (outside the recursive cobbler_runtime package). Tests assert these basenames
+# still appear at the preflight/full_run call sites and stay on the ship list.
+TOP_LEVEL_RUNTIME_CALLSITE_DEPS = [
+    "scripts/worktree_gc.py",  # preflight.sh --gc-worktrees
+    "scripts/provider_supervisor.py",  # full_run.py provider child supervisor
+]
+
 # Top-level helpers that must ship with installed skill bundles.
 TOP_LEVEL_RUNTIME_SCRIPT_PATHS = [
     "scripts/preflight.sh",
@@ -43,11 +51,18 @@ TOP_LEVEL_RUNTIME_SCRIPT_PATHS = [
     "scripts/cobbler_agents.py",
     "scripts/openrouter_lens.py",
     "scripts/workspace_guard.py",
+    *TOP_LEVEL_RUNTIME_CALLSITE_DEPS,
     "scripts/run_fugu.sh",
     "scripts/run_manus.sh",
     "scripts/run_grok.sh",
     "scripts/run_devin.sh",
 ]
+
+# Source-checkout archives that must never appear in an installed skill bundle.
+SOURCE_ONLY_ARCHIVE_PATHS = (
+    "docs/plans",
+    "docs/elves",
+)
 
 # Entire package is shipped recursively — no per-module allowlist.
 RUNTIME_PACKAGE_PATH = "scripts/cobbler_runtime"
