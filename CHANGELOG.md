@@ -4,6 +4,29 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.15.0] - 2026-07-23
+
+### General Fugu tasks and explicit review mode
+
+- Separate provider choice from task type. Plain `/fugu <task>`, `$elves fugu <task>`, and natural
+  “use Fugu” requests now return task-appropriate analysis, design, investigation, or other
+  deliverables without forcing review severities or a clean verdict. `fugu review <scope>` retains
+  the read-only base/change review with ordered P0-P3 findings and exact file/line evidence.
+- Replace Fugu's tracked-only context with a bounded Git-enumerated snapshot of policy-admitted
+  tracked and non-ignored untracked files. Repeatable `--include <path>` records exact host-selected
+  context, while ignored dependency/cache/build trees, credentials, Git/Elves state, executable
+  agent configuration, unsafe file types/links, ownership violations, repository escapes, and
+  count/size overflow remain excluded or fail closed with visible bounded diagnostics.
+- Add user-authorized `--write` for general tasks only. Fugu may modify only its disposable
+  kernel-isolated snapshot; a host-side before/after digest audit rejects protected, credential,
+  unsafe, or oversized output and exports accepted regular files/deletions as an inert temporary
+  handoff. The host checkout is never mutated and the handoff is never applied automatically.
+- Preserve regular `fugu/high`, deep `fugu/xhigh`, and `fugu-ultra/high` behavior across task
+  modes, including closed input, credential scrubbing, no Linux procfs, qualified macOS/Linux
+  filesystem boundaries, hard-wall cleanup, and exact-session Ultra synthesis.
+- Update the Claude alias, Codex adapter, README, guide, provider reference, installed bundles,
+  consistency policy, hermetic provider/isolation coverage, and release examples for v2.15.0.
+
 ## [2.14.1] - 2026-07-23
 
 ### Install ship-list correctness and audit hygiene

@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 import signal
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -225,6 +226,11 @@ class LocalCliRunnerTests(unittest.TestCase):
             "    printf 'evidence=<%s>\\n' \"$line\"\n"
             "  done < _elves_review/change-context.txt\n"
             "fi\n"
+            "if [ -f untracked-context.txt ]; then\n"
+            "  while IFS= read -r line || [ -n \"$line\" ]; do\n"
+            "    printf 'context-file=<%s>\\n' \"$line\"\n"
+            "  done < untracked-context.txt\n"
+            "fi\n"
             "if printf 'forbidden\\n' > \"$PWD/fugu-write-attempt\" 2>/dev/null; then\n"
             "  printf 'snapshot-write=<allowed>\\n'\n"
             "else\n"
@@ -355,11 +361,156 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertIn("arg=<--skip-git-repo-check>", result.stdout)
         self.assertIn("arg=<--ephemeral>", result.stdout)
         self.assertIn("arg=<->", result.stdout)
-        self.assertIn("prompt=<Review task: review the auth flow>", result.stdout)
-        self.assertIn("prompt=<do not ask the caller to paste files", result.stdout)
+        self.assertIn("prompt=<Review task: the auth flow>", result.stdout)
+        self.assertIn("do not ask the caller to paste files", result.stdout)
         self.assertIn("proc-parent-key=<hidden>", result.stdout)
         self.assertIn("snapshot-write=<blocked>", result.stdout)
         self.assertNotIn("arg=<fugu-ultra>", result.stdout)
+
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    def test_fugu_general_task_uses_task_appropriate_read_only_prompt(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_capture_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "design a safer parser migration",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "SAKANA_API_KEY": "test-sakana-key",
+                },
+                cwd=repo,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(
+            "prompt=<You are Sakana Fugu performing a bounded repository task.",
+            result.stdout,
+        )
+        self.assertIn("prompt=<Task: design a safer parser migration>", result.stdout)
+        self.assertIn("snapshot-write=<blocked>", result.stdout)
+        self.assertNotIn("Return actionable findings first", result.stdout)
+        self.assertNotIn('say exactly "No actionable findings"', result.stdout)
+
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    def test_fugu_authorized_write_exports_audited_handoff_without_host_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            temp_root = root / "tmp"
+            temp_root.mkdir()
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_capture_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            (repo / "source.txt").write_text("host source\n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(repo), "add", "source.txt"], check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(repo),
+                    "-c",
+                    "user.name=Test",
+                    "-c",
+                    "user.email=test@example.com",
+                    "commit",
+                    "-q",
+                    "-m",
+                    "source",
+                ],
+                check=True,
+            )
+            result = run_script(
+                "run_fugu.sh",
+                "--write",
+                "implement the requested change",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "SAKANA_API_KEY": "test-sakana-key",
+                    "TMPDIR": str(temp_root),
+                },
+                cwd=repo,
+            )
+            handoff_line = next(
+                line
+                for line in result.stderr.splitlines()
+                if line.startswith("Fugu isolated-write handoff: ")
+            )
+            handoff = Path(
+                handoff_line.removeprefix("Fugu isolated-write handoff: ").split(
+                    " (", 1
+                )[0]
+            )
+            manifest = json.loads(
+                (handoff / "manifest.json").read_text(encoding="utf-8")
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("snapshot-write=<allowed>", result.stdout)
+            self.assertIn("not automatically applied", handoff_line)
+            self.assertEqual(manifest["kind"], "elves-fugu-isolated-write-handoff")
+            self.assertFalse(manifest["automatically_applied"])
+            self.assertEqual(manifest["metadata"]["mode"], "task")
+            self.assertEqual(
+                [(item["path"], item["status"]) for item in manifest["changes"]],
+                [("fugu-write-attempt", "added")],
+            )
+            self.assertEqual(
+                (handoff / "files" / "fugu-write-attempt").read_text(
+                    encoding="utf-8"
+                ),
+                "forbidden\n",
+            )
+            self.assertFalse((repo / "fugu-write-attempt").exists())
+            self.assertEqual(
+                (repo / "source.txt").read_text(encoding="utf-8"), "host source\n"
+            )
+            shutil.rmtree(handoff)
+
+    def test_fugu_mode_and_context_errors_fail_before_provider_work(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_capture_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            (repo / ".env.local").write_text("SECRET=1\n", encoding="utf-8")
+            env = {
+                "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                "SAKANA_API_KEY": "test-sakana-key",
+            }
+
+            missing_task = run_script("run_fugu.sh", env=env, cwd=repo)
+            review_write = run_script(
+                "run_fugu.sh", "--write", "review", env=env, cwd=repo
+            )
+            forbidden_context = run_script(
+                "run_fugu.sh",
+                "--include",
+                ".env.local",
+                "inspect context",
+                env=env,
+                cwd=repo,
+            )
+
+        self.assertEqual(missing_task.returncode, 2)
+        self.assertIn("a general Fugu task is required", missing_task.stderr)
+        self.assertEqual(review_write.returncode, 2)
+        self.assertIn("review mode is always read-only", review_write.stderr)
+        self.assertEqual(forbidden_context.returncode, 2)
+        self.assertIn("isolation_requested_path_forbidden", forbidden_context.stderr)
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
     def test_fugu_profiles_select_regular_deep_or_ultra_high(self) -> None:
@@ -404,7 +555,8 @@ class LocalCliRunnerTests(unittest.TestCase):
             result = run_script(
                 "run_fugu.sh",
                 "--ultra",
-                "review exact resume",
+                "review",
+                "exact resume",
                 env={
                     "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
                     "SAKANA_API_KEY": "test-sakana-key",
@@ -422,7 +574,9 @@ class LocalCliRunnerTests(unittest.TestCase):
             result.stdout,
         )
         self.assertIn("synthesis=<The bounded exploration phase is over", result.stdout)
-        self.assertIn("synthesis=<run commands, or inspect more files", result.stdout)
+        self.assertIn(
+            "synthesis=<browse, run commands, or inspect more files", result.stdout
+        )
         self.assertIn("Fugu Ultra exploration phase: up to 0.8s", result.stderr)
         self.assertIn("Fugu Ultra exact-session synthesis phase", result.stderr)
         self.assertNotIn("--last", result.stdout + result.stderr)
@@ -483,7 +637,7 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertEqual(result.stdout, "")
         self.assertNotIn("STALE_EXPLORATION_MESSAGE", result.stdout)
         self.assertNotIn("STALE_EVENT_MESSAGE", result.stdout)
-        self.assertIn("completed without a final review message", result.stderr)
+        self.assertIn("completed without a final message", result.stderr)
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
     def test_fugu_ultra_resume_timeout_includes_bounded_shutdown(self) -> None:
@@ -557,7 +711,8 @@ class LocalCliRunnerTests(unittest.TestCase):
             deleted_excluded.unlink()
             result = run_script(
                 "run_fugu.sh",
-                "review filtered changes",
+                "review",
+                "filtered changes",
                 env={
                     "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
                     "SAKANA_API_KEY": "test-sakana-key",
@@ -576,7 +731,7 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertNotIn("diff --git a/.netrc", result.stdout)
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
-    def test_fugu_legacy_file_is_focus_hint_not_copied_content(self) -> None:
+    def test_fugu_selected_untracked_context_is_available_without_prompt_copy(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             bin_dir = root / "bin"
@@ -586,11 +741,13 @@ class LocalCliRunnerTests(unittest.TestCase):
             repo = root / "repo"
             repo.mkdir()
             subprocess.run(["git", "init", "-q", str(repo)], check=True)
-            target = repo / "review me.md"
-            target.write_text("SENSITIVE_SENTINEL_MUST_NOT_BE_COPIED\n", encoding="utf-8")
+            target = repo / "untracked-context.txt"
+            target.write_text("SELECTED_UNTRACKED_CONTEXT\n", encoding="utf-8")
             result = run_script(
                 "run_fugu.sh",
+                "--include",
                 str(target),
+                "analyze the selected context",
                 env={
                     "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
                     "SAKANA_API_KEY": "test-sakana-key",
@@ -599,11 +756,10 @@ class LocalCliRunnerTests(unittest.TestCase):
             )
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertRegex(
-            result.stdout,
-            r"prompt=<Review task: Review .*elves-iso-[^>]+/snapshot/review me\.md",
-        )
-        self.assertNotIn("SENSITIVE_SENTINEL_MUST_NOT_BE_COPIED", result.stdout)
+        self.assertIn("context-file=<SELECTED_UNTRACKED_CONTEXT>", result.stdout)
+        self.assertIn("prompt=<Task: analyze the selected context>", result.stdout)
+        self.assertNotIn("prompt=<SELECTED_UNTRACKED_CONTEXT>", result.stdout)
+        self.assertIn("1 non-ignored untracked", result.stderr)
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
     def test_fugu_enforces_finite_hard_wall_clock(self) -> None:

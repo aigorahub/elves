@@ -175,6 +175,13 @@ DEFAULT_CONTEXT_MAX_FILES = 20_000
 DEFAULT_CONTEXT_MAX_BYTES = 512 * 1024 * 1024
 DEFAULT_CONTEXT_MAX_FILE_BYTES = 16 * 1024 * 1024
 MAX_CONTEXT_DIAGNOSTICS = 200
+DEFAULT_HANDOFF_MAX_FILES = 2_000
+DEFAULT_HANDOFF_MAX_BYTES = 64 * 1024 * 1024
+_HANDOFF_PROTECTED_PREFIXES: tuple[str, ...] = (
+    "_elves_context/",
+    "_elves_review/",
+    "_instruction_evidence/",
+)
 
 # Argv flags that embed a repo/cwd path which must point at the snapshot.
 _REPO_PATH_FLAGS: frozenset[str] = frozenset(
@@ -244,6 +251,18 @@ class IsolatedLane:
 
     def cleanup(self) -> None:
         _remove_tree_strict(self.root)
+
+
+@dataclass(frozen=True)
+class SnapshotFileRecord:
+    sha256: str
+    size: int
+
+
+@dataclass(frozen=True)
+class SnapshotState:
+    files: Mapping[str, SnapshotFileRecord]
+    directories: frozenset[str]
 
 
 def _git_tracked_files(repo_root: Path) -> list[str]:
@@ -649,6 +668,282 @@ def _copy_tracked_regular_file(
             path=str(destination),
         ) from exc
     return True
+
+
+def _snapshot_file_records(
+    root: Path,
+    *,
+    max_files: int,
+    max_bytes: int,
+    max_file_bytes: int,
+    forbidden_values: Sequence[str] = (),
+) -> SnapshotState:
+    if max_files <= 0 or max_bytes <= 0 or max_file_bytes <= 0:
+        raise ValidationIssue(
+            "invalid_isolation_handoff_limits",
+            "Isolation handoff file and byte limits must be positive",
+        )
+    records: dict[str, SnapshotFileRecord] = {}
+    directory_paths: set[str] = set()
+    total_bytes = 0
+    forbidden = tuple(
+        value.encode("utf-8") for value in forbidden_values if isinstance(value, str) and value
+    )
+    for current, directories, files in os.walk(root, topdown=True, followlinks=False):
+        directories.sort()
+        files.sort()
+        current_path = Path(current)
+        for name in directories:
+            directory = current_path / name
+            try:
+                info = directory.lstat()
+            except OSError as exc:
+                raise ValidationIssue(
+                    "isolation_handoff_directory_unreadable",
+                    f"Cannot audit isolated output directory: {directory}",
+                    path=str(directory),
+                ) from exc
+            if directory.is_symlink() or not stat.S_ISDIR(info.st_mode):
+                raise ValidationIssue(
+                    "isolation_handoff_nonregular",
+                    f"Isolated output contains a symlink or special directory: {directory}",
+                    path=str(directory),
+                )
+            if info.st_uid != os.geteuid():
+                raise ValidationIssue(
+                    "isolation_handoff_owner",
+                    f"Isolated output directory is not owned by the current user: {directory}",
+                    path=str(directory),
+                )
+            directory_paths.add(directory.relative_to(root).as_posix())
+            if len(directory_paths) > max_files:
+                raise ValidationIssue(
+                    "isolation_handoff_directory_limit",
+                    f"Isolated output exceeds the {max_files}-directory limit",
+                    path=str(root),
+                )
+        for name in files:
+            path = current_path / name
+            rel = path.relative_to(root).as_posix()
+            opened = _open_tracked_regular_fd(root, rel)
+            if opened is None:
+                raise ValidationIssue(
+                    "isolation_handoff_missing",
+                    f"Isolated output disappeared during audit: {rel}",
+                    path=str(path),
+                )
+            descriptor, info = opened
+            try:
+                if info.st_size > max_file_bytes:
+                    raise ValidationIssue(
+                        "isolation_handoff_file_too_large",
+                        f"Isolated output exceeds the {max_file_bytes}-byte per-file limit: {rel}",
+                        path=str(path),
+                    )
+                with os.fdopen(descriptor, "rb", closefd=True) as source:
+                    descriptor = -1
+                    data = source.read(max_file_bytes + 1)
+                if len(data) != info.st_size:
+                    raise ValidationIssue(
+                        "isolation_handoff_file_changed",
+                        f"Isolated output changed while it was audited: {rel}",
+                        path=str(path),
+                    )
+                if any(value in data for value in forbidden):
+                    raise ValidationIssue(
+                        "isolation_handoff_credential",
+                        f"Isolated output contains a granted credential value: {rel}",
+                        path=str(path),
+                    )
+                records[rel] = SnapshotFileRecord(
+                    sha256=hashlib.sha256(data).hexdigest(),
+                    size=len(data),
+                )
+            finally:
+                if descriptor >= 0:
+                    os.close(descriptor)
+            if len(records) > max_files:
+                raise ValidationIssue(
+                    "isolation_handoff_file_limit",
+                    f"Isolated output exceeds the {max_files}-file limit",
+                    path=str(root),
+                )
+            total_bytes += info.st_size
+            if total_bytes > max_bytes:
+                raise ValidationIssue(
+                    "isolation_handoff_byte_limit",
+                    f"Isolated output exceeds the {max_bytes}-byte total limit",
+                    path=str(root),
+                )
+    return SnapshotState(files=records, directories=frozenset(directory_paths))
+
+
+def capture_snapshot_state(
+    lane: IsolatedLane,
+) -> SnapshotState:
+    """Capture a bounded digest-only baseline before an isolated writer starts."""
+    return _snapshot_file_records(
+        lane.snapshot,
+        max_files=DEFAULT_CONTEXT_MAX_FILES,
+        max_bytes=DEFAULT_CONTEXT_MAX_BYTES,
+        max_file_bytes=DEFAULT_CONTEXT_MAX_FILE_BYTES,
+    )
+
+
+def _handoff_path_forbidden(rel: str) -> bool:
+    return (
+        any(
+            rel == prefix.rstrip("/") or rel.startswith(prefix)
+            for prefix in _HANDOFF_PROTECTED_PREFIXES
+        )
+        or _should_exclude(rel)
+        or _is_executable_agent_config(rel)
+        or _is_instruction_surface(rel)
+    )
+
+
+def export_snapshot_handoff(
+    lane: IsolatedLane,
+    baseline: SnapshotState,
+    *,
+    metadata: Mapping[str, Any] | None = None,
+    forbidden_values: Sequence[str] = (),
+    max_files: int = DEFAULT_HANDOFF_MAX_FILES,
+    max_bytes: int = DEFAULT_HANDOFF_MAX_BYTES,
+    max_file_bytes: int = DEFAULT_CONTEXT_MAX_FILE_BYTES,
+) -> Path:
+    """Audit isolated writes and export inert files without touching the host checkout."""
+    if not lane.snapshot_writable:
+        raise ValidationIssue(
+            "isolation_handoff_read_only",
+            "Cannot export a write handoff from a read-only isolated lane",
+            path=str(lane.snapshot),
+        )
+    after = _snapshot_file_records(
+        lane.snapshot,
+        max_files=DEFAULT_CONTEXT_MAX_FILES,
+        max_bytes=DEFAULT_CONTEXT_MAX_BYTES,
+        max_file_bytes=max_file_bytes,
+        forbidden_values=forbidden_values,
+    )
+    for rel in sorted(after.directories - baseline.directories):
+        if _handoff_path_forbidden(rel):
+            raise ValidationIssue(
+                "isolation_handoff_forbidden_path",
+                f"Isolated output created a protected or excluded directory: {rel}",
+                path=str(lane.snapshot / rel),
+            )
+    changed_paths = sorted(
+        rel
+        for rel in set(baseline.files) | set(after.files)
+        if baseline.files.get(rel) != after.files.get(rel)
+    )
+    if len(changed_paths) > max_files:
+        raise ValidationIssue(
+            "isolation_handoff_change_file_limit",
+            f"Isolated handoff exceeds the {max_files}-changed-file limit",
+            path=str(lane.snapshot),
+        )
+    changed_bytes = sum(
+        after.files[rel].size for rel in changed_paths if rel in after.files
+    )
+    if changed_bytes > max_bytes:
+        raise ValidationIssue(
+            "isolation_handoff_change_byte_limit",
+            f"Isolated handoff exceeds the {max_bytes}-changed-byte limit",
+            path=str(lane.snapshot),
+        )
+    for rel in changed_paths:
+        if _handoff_path_forbidden(rel):
+            raise ValidationIssue(
+                "isolation_handoff_forbidden_path",
+                f"Isolated output changed a protected or excluded path: {rel}",
+                path=str(lane.snapshot / rel),
+            )
+
+    handoff_parent = Path("/tmp").resolve()
+    if not handoff_parent.is_dir():
+        raise ValidationIssue(
+            "isolation_handoff_parent",
+            "The fixed system temporary handoff directory is unavailable",
+            path=str(handoff_parent),
+        )
+    destination = Path(
+        tempfile.mkdtemp(prefix="elves-fugu-handoff-", dir=str(handoff_parent))
+    ).resolve()
+    try:
+        destination.chmod(0o700)
+        files_root = destination / "files"
+        files_root.mkdir(mode=0o700)
+        changes: list[dict[str, Any]] = []
+        for rel in changed_paths:
+            before = baseline.files.get(rel)
+            current = after.files.get(rel)
+            status = "added" if before is None else "deleted" if current is None else "modified"
+            item: dict[str, Any] = {
+                "path": rel,
+                "status": status,
+                "before_sha256": before.sha256 if before else None,
+                "before_bytes": before.size if before else None,
+                "after_sha256": current.sha256 if current else None,
+                "after_bytes": current.size if current else None,
+            }
+            changes.append(item)
+            if current is None:
+                continue
+            source = lane.snapshot.joinpath(*PurePosixPath(rel).parts)
+            target = files_root.joinpath(*PurePosixPath(rel).parts)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.parent.chmod(0o700)
+            opened = _open_tracked_regular_fd(lane.snapshot, rel)
+            if opened is None:
+                raise ValidationIssue(
+                    "isolation_handoff_missing",
+                    f"Isolated output disappeared during export: {rel}",
+                    path=str(source),
+                )
+            descriptor, info = opened
+            try:
+                with os.fdopen(descriptor, "rb", closefd=True) as input_file:
+                    descriptor = -1
+                    data = input_file.read(max_file_bytes + 1)
+                if (
+                    len(data) != info.st_size
+                    or hashlib.sha256(data).hexdigest() != current.sha256
+                ):
+                    raise ValidationIssue(
+                        "isolation_handoff_file_changed",
+                        f"Isolated output changed while it was exported: {rel}",
+                        path=str(source),
+                    )
+                with target.open("xb") as output_file:
+                    output_file.write(data)
+                    os.fchmod(output_file.fileno(), 0o600)
+            finally:
+                if descriptor >= 0:
+                    os.close(descriptor)
+
+        manifest = {
+            "schema_version": 1,
+            "kind": "elves-fugu-isolated-write-handoff",
+            "automatically_applied": False,
+            "changed_files": len(changes),
+            "changed_bytes": changed_bytes,
+            "metadata": dict(metadata or {}),
+            "changes": changes,
+        }
+        manifest_path = destination / "manifest.json"
+        with manifest_path.open("x", encoding="utf-8") as handle:
+            json.dump(manifest, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+            os.fchmod(handle.fileno(), 0o600)
+        return destination
+    except BaseException as original:
+        try:
+            _remove_tree_strict(destination)
+        except ValidationIssue as cleanup_issue:
+            raise cleanup_issue from original
+        raise
 
 
 def build_isolated_env(

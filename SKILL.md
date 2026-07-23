@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.14.1"
+  version: "2.15.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -62,7 +62,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.14.1):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.15.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
@@ -208,19 +208,25 @@ When an explicit request matches one of these provider tags, resolve the runner 
 Elves skill root**, keep the target repository as the working directory, validate its arguments and
 required capability, then execute it without an extra confirmation prompt:
 
-- `/fugu [--deep|--ultra] <task>` or `fugu review <task>` →
-  `scripts/run_fugu.sh [--deep|--ultra] <task>` for a bounded, read-only
-  `codex-fugu` repository review over a tracked-only snapshot and required kernel filesystem
-  sandbox. Host-generated diff evidence is restricted to paths that survived the same snapshot
-  policy, and the Linux boundary omits procfs so model-directed commands cannot inspect the
-  credential-bearing parent environment. Codex runs in its documented externally-sandboxed mode
-  so macOS does not attempt a forbidden nested sandbox; the already-proven outer boundary remains
-  the read/write authority. The default is regular `fugu/high`; `--deep` selects `fugu/xhigh`, and
-  `--ultra` selects `fugu-ultra/high`. Regular and deep are ephemeral one-shot sessions. Ultra is
-  a compact high-value route: it starts with bounded host evidence, reserves part of the total wall
-  budget for synthesis, and if needed resumes the exact captured session id with further tools
-  forbidden. It never guesses a “last” session, and its raw events and resumable state remain only
-  inside the disposable isolated lane.
+- `/fugu [--deep|--ultra] <task>` or “use Fugu …” →
+  `scripts/run_fugu.sh [--deep|--ultra] <task>` for a bounded general `codex-fugu` task whose
+  output follows the request rather than a forced review rubric. `/fugu … review <scope>`, `$elves
+  fugu review <scope>`, or “do a Fugu review …” selects the explicit read-only review contract.
+  Both use a Git-enumerated snapshot containing policy-admitted tracked and non-ignored untracked
+  files; `--include <path>` records exact host-selected context while immutable safety policy
+  rejects ignored, credential, operational, executable-agent, symlink, hard-link, special, and
+  out-of-repository paths with bounded diagnostics. General tasks are read-only unless the
+  surrounding request independently authorizes implementation and the host passes `--write`.
+  That route may edit only the disposable kernel-isolated snapshot and exports a bounded, audited,
+  inert handoff for host inspection; it never edits the checkout or applies the handoff.
+  The required outer filesystem sandbox remains the read/write authority, and the Linux boundary
+  omits procfs so model-directed commands cannot inspect the credential-bearing parent environment.
+  Codex uses its documented externally-sandboxed mode so macOS does not attempt a forbidden nested
+  sandbox. The default is regular `fugu/high`; `--deep` selects `fugu/xhigh`, and `--ultra`
+  selects `fugu-ultra/high`. Regular and deep are ephemeral one-shot sessions. Ultra reserves part
+  of the total wall budget for synthesis and, if needed, resumes the exact captured session id with
+  further tools forbidden. It never guesses a “last” session, and raw events/resumable state remain
+  only inside the disposable lane.
 - `/manus <topic>` → `scripts/run_manus.sh <topic>` for one private, bounded Manus deep-web task.
   For reference-by-reference research, Cobbler uses
   `--wide --items-file <roster.json> [--file <source>] <goal>`: request native Wide Research,

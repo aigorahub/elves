@@ -35,7 +35,9 @@ from cobbler_runtime.isolation import (  # noqa: E402
     _macos_executable_access,
     _macos_dynamic_dependencies,
     _narrow_runtime_root,
+    capture_snapshot_state,
     create_tracked_snapshot,
+    export_snapshot_handoff,
     prepare_fs_sandbox,
     resolve_fs_sandbox_backend,
     rewrite_argv_repo_paths,
@@ -811,6 +813,137 @@ class IsolationSnapshotRegressionTests(unittest.TestCase):
                     )
                 )
             self.assertEqual(ctx.exception.code, "isolation_context_byte_limit")
+
+    def test_writable_snapshot_exports_audited_inert_handoff(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo = root / "repo"
+            repo.mkdir()
+            _init_repo(repo)
+            (repo / "modified.txt").write_text("before\n", encoding="utf-8")
+            (repo / "deleted.txt").write_text("delete me\n", encoding="utf-8")
+            _commit_all(repo)
+            lane = create_tracked_snapshot(
+                IsolationSpec(
+                    repo_root=repo,
+                    lane_id="write-handoff",
+                    snapshot_writable=True,
+                )
+            )
+            try:
+                baseline = capture_snapshot_state(lane)
+                (lane.snapshot / "modified.txt").write_text("after\n", encoding="utf-8")
+                (lane.snapshot / "deleted.txt").unlink()
+                (lane.snapshot / "added.txt").write_text("new\n", encoding="utf-8")
+                destination = root / "handoff"
+
+                with mock.patch(
+                    "cobbler_runtime.isolation.tempfile.mkdtemp",
+                    side_effect=lambda **_kwargs: str(
+                        destination.mkdir() or destination
+                    ),
+                ):
+                    handoff = export_snapshot_handoff(
+                        lane,
+                        baseline,
+                        metadata={"mode": "task", "model": "fugu"},
+                    )
+
+                manifest = json.loads(
+                    (handoff / "manifest.json").read_text(encoding="utf-8")
+                )
+                self.assertFalse(manifest["automatically_applied"])
+                self.assertEqual(manifest["changed_files"], 3)
+                self.assertEqual(
+                    [(item["path"], item["status"]) for item in manifest["changes"]],
+                    [
+                        ("added.txt", "added"),
+                        ("deleted.txt", "deleted"),
+                        ("modified.txt", "modified"),
+                    ],
+                )
+                self.assertEqual(
+                    (handoff / "files" / "modified.txt").read_text(encoding="utf-8"),
+                    "after\n",
+                )
+                self.assertEqual(
+                    (handoff / "files" / "added.txt").read_text(encoding="utf-8"),
+                    "new\n",
+                )
+                self.assertFalse((handoff / "files" / "deleted.txt").exists())
+                self.assertEqual(
+                    (repo / "modified.txt").read_text(encoding="utf-8"), "before\n"
+                )
+                self.assertTrue((repo / "deleted.txt").is_file())
+                self.assertFalse((repo / "added.txt").exists())
+            finally:
+                lane.cleanup()
+
+    def test_writable_handoff_rejects_protected_credential_and_unsafe_outputs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo = root / "repo"
+            repo.mkdir()
+            _init_repo(repo)
+            (repo / "source.txt").write_text("source\n", encoding="utf-8")
+            _commit_all(repo)
+
+            cases = [
+                "protected",
+                "credential",
+                "symlink",
+                "hardlink",
+                "unsafe-directory",
+            ]
+            if hasattr(os, "mkfifo"):
+                cases.append("special")
+            for case in cases:
+                with self.subTest(case=case):
+                    lane = create_tracked_snapshot(
+                        IsolationSpec(
+                            repo_root=repo,
+                            lane_id=f"write-reject-{case}",
+                            snapshot_writable=True,
+                        )
+                    )
+                    try:
+                        baseline = capture_snapshot_state(lane)
+                        if case == "protected":
+                            (lane.snapshot / "_elves_context" / "manifest.json").write_text(
+                                "{}\n", encoding="utf-8"
+                            )
+                        elif case == "credential":
+                            (lane.snapshot / "output.txt").write_text(
+                                "granted-value\n", encoding="utf-8"
+                            )
+                        elif case == "symlink":
+                            (lane.snapshot / "output.txt").symlink_to("/etc/passwd")
+                        elif case == "hardlink":
+                            os.link(
+                                lane.snapshot / "source.txt",
+                                lane.snapshot / "output.txt",
+                            )
+                        elif case == "unsafe-directory":
+                            (lane.snapshot / ".git").mkdir()
+                        else:
+                            os.mkfifo(lane.snapshot / "output.pipe")
+                        with self.assertRaises(ValidationIssue) as ctx:
+                            export_snapshot_handoff(
+                                lane,
+                                baseline,
+                                forbidden_values=("granted-value",),
+                            )
+                        expected = {
+                            "protected": "isolation_handoff_forbidden_path",
+                            "credential": "isolation_handoff_credential",
+                            "symlink": "isolation_tracked_symlink",
+                            "hardlink": "isolation_tracked_hardlink",
+                            "unsafe-directory": "isolation_handoff_forbidden_path",
+                            "special": "isolation_tracked_nonregular",
+                        }[case]
+                        self.assertEqual(ctx.exception.code, expected)
+                    finally:
+                        lane.cleanup()
 
     def test_non_git_workspace_fails_closed_and_cleans_partial_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1696,6 +1829,23 @@ class IsolationSandboxRegressionTests(unittest.TestCase):
             self.assertIn("--unshare-all", argv)
             self.assertIn(("--dev", "/dev"), pairs)
 
+    def test_bwrap_writable_lane_binds_only_snapshot_read_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            executable = _write_tool_stub(root / "fake-agent")
+            lane = self._lane(root / "lane", backend="bwrap")
+            lane.snapshot_writable = True
+            lane.env["PATH"] = f"{root}:/usr/bin:/bin"
+
+            argv = wrap_argv_with_sandbox(
+                [str(executable), "--version"], lane, mount_proc=False
+            )
+            triples = list(zip(argv, argv[1:], argv[2:]))
+            snapshot = str(lane.snapshot)
+            self.assertIn(("--bind", snapshot, snapshot), triples)
+            self.assertNotIn(("--ro-bind", snapshot, snapshot), triples)
+            self.assertNotIn(("--proc", "/proc"), list(zip(argv, argv[1:])))
+
     def test_standalone_codex_runtime_root_is_one_versioned_release(self) -> None:
         executable = Path(
             "/Users/fixture/.codex/packages/standalone/releases/"
@@ -1811,6 +1961,42 @@ class IsolationSandboxRegressionTests(unittest.TestCase):
                         qualified_backend=selected,
                     )
             self.assertEqual(caught.exception.code, "isolation_sandbox_unusable")
+
+    def test_sandbox_exec_writable_lane_allows_only_snapshot_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lane = self._lane(root / "lane", backend="sandbox-exec")
+            lane.snapshot_writable = True
+            selected = QualifiedSandboxBackend(
+                "sandbox-exec", Path("/usr/bin/sandbox-exec")
+            )
+            with mock.patch(
+                "cobbler_runtime.isolation._validate_qualified_backend",
+                return_value=selected,
+            ), mock.patch(
+                "cobbler_runtime.isolation._probe_fs_sandbox_backend",
+                return_value=True,
+            ), mock.patch(
+                "cobbler_runtime.isolation._resolve_macos_supervisor",
+                return_value=Path("/bin/ps"),
+            ):
+                backend, profile_path = prepare_fs_sandbox(
+                    lane,
+                    required=True,
+                    qualified_backend=selected,
+                )
+
+            self.assertEqual(backend, "sandbox-exec")
+            assert profile_path is not None
+            profile = Path(profile_path).read_text(encoding="utf-8")
+            self.assertIn(
+                f'(allow file-write* (subpath "{lane.snapshot.resolve()}"))',
+                profile,
+            )
+            self.assertNotIn(
+                f'(allow file-write* (subpath "{root.resolve()}"))',
+                profile,
+            )
 
     def test_sandbox_exec_profile_records_narrow_child_tool_access(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
