@@ -650,6 +650,168 @@ class IsolationSnapshotRegressionTests(unittest.TestCase):
             finally:
                 lane.cleanup()
 
+    def test_safe_worktree_snapshot_admits_nonignored_untracked_with_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            repo.mkdir()
+            _init_repo(repo)
+            (repo / "tracked.py").write_text("tracked\n", encoding="utf-8")
+            _commit_all(repo)
+            (repo / "new_test.py").write_text("untracked\n", encoding="utf-8")
+            (repo / ".gitignore").write_text("node_modules/\n*.pem\n", encoding="utf-8")
+            (repo / "node_modules").mkdir()
+            (repo / "node_modules" / "package.js").write_text("ignored\n", encoding="utf-8")
+            (repo / "server.pem").write_text("PRIVATE\n", encoding="utf-8")
+
+            lane = create_tracked_snapshot(
+                IsolationSpec(
+                    repo_root=repo,
+                    lane_id="safe-worktree",
+                    include_untracked=True,
+                    include_paths=("new_test.py",),
+                )
+            )
+            try:
+                self.assertEqual(lane.tracked_file_count, 1)
+                self.assertEqual(lane.untracked_file_count, 2)  # .gitignore + new_test.py
+                self.assertTrue((lane.snapshot / "tracked.py").is_file())
+                self.assertTrue((lane.snapshot / "new_test.py").is_file())
+                self.assertFalse((lane.snapshot / "node_modules").exists())
+                self.assertFalse((lane.snapshot / "server.pem").exists())
+                manifest = json.loads(
+                    (lane.snapshot / "_elves_context" / "manifest.json").read_text(
+                        encoding="utf-8"
+                    )
+                )
+                self.assertEqual(manifest["requested_paths"], ["new_test.py"])
+                self.assertEqual(manifest["untracked_files"], 2)
+            finally:
+                lane.cleanup()
+
+    def test_requested_context_rejects_ignored_forbidden_and_outside_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo = root / "repo"
+            repo.mkdir()
+            _init_repo(repo)
+            (repo / ".gitignore").write_text("generated/\n", encoding="utf-8")
+            (repo / "generated").mkdir()
+            (repo / "generated" / "bundle.js").write_text("ignored\n", encoding="utf-8")
+            (repo / ".env.local").write_text("SECRET=1\n", encoding="utf-8")
+            outside = root / "outside.txt"
+            outside.write_text("outside\n", encoding="utf-8")
+
+            cases = (
+                ("generated/bundle.js", "isolation_requested_path_ignored"),
+                (".env.local", "isolation_requested_path_forbidden"),
+                (str(outside), "isolation_include_path_escape"),
+            )
+            for requested, expected in cases:
+                with self.subTest(requested=requested), self.assertRaises(
+                    ValidationIssue
+                ) as ctx:
+                    create_tracked_snapshot(
+                        IsolationSpec(
+                            repo_root=repo,
+                            lane_id="requested-reject",
+                            include_paths=(requested,),
+                        )
+                    )
+                self.assertEqual(ctx.exception.code, expected)
+
+    def test_safe_worktree_snapshot_rejects_untracked_symlink_and_hardlink(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo = root / "repo"
+            repo.mkdir()
+            _init_repo(repo)
+            outside = root / "outside.txt"
+            outside.write_text("outside\n", encoding="utf-8")
+            (repo / "link.txt").symlink_to(outside)
+
+            with self.assertRaises(ValidationIssue) as symlink_ctx:
+                create_tracked_snapshot(
+                    IsolationSpec(
+                        repo_root=repo,
+                        lane_id="untracked-symlink",
+                        include_untracked=True,
+                    )
+                )
+            self.assertIn(
+                symlink_ctx.exception.code,
+                {"isolation_tracked_symlink", "isolation_tracked_open_failed"},
+            )
+
+            (repo / "link.txt").unlink()
+            os.link(outside, repo / "hardlink.txt")
+            with self.assertRaises(ValidationIssue) as hardlink_ctx:
+                create_tracked_snapshot(
+                    IsolationSpec(
+                        repo_root=repo,
+                        lane_id="untracked-hardlink",
+                        include_untracked=True,
+                    )
+                )
+            self.assertEqual(hardlink_ctx.exception.code, "isolation_tracked_hardlink")
+
+    def test_context_limits_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            repo.mkdir()
+            _init_repo(repo)
+            (repo / "large.txt").write_text("12345", encoding="utf-8")
+            with self.assertRaises(ValidationIssue) as ctx:
+                create_tracked_snapshot(
+                    IsolationSpec(
+                        repo_root=repo,
+                        lane_id="file-limit",
+                        include_untracked=True,
+                        max_context_file_bytes=4,
+                    )
+                )
+            self.assertEqual(ctx.exception.code, "isolation_context_file_too_large")
+
+    def test_context_special_file_fails_closed_without_blocking(self) -> None:
+        if not hasattr(os, "mkfifo"):
+            self.skipTest("FIFO creation is unavailable")
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            repo.mkdir()
+            _init_repo(repo)
+            os.mkfifo(repo / "untracked.pipe")
+
+            started = time.monotonic()
+            with self.assertRaises(ValidationIssue) as ctx:
+                create_tracked_snapshot(
+                    IsolationSpec(
+                        repo_root=repo,
+                        lane_id="special-file",
+                        include_untracked=True,
+                        include_paths=("untracked.pipe",),
+                    )
+                )
+            self.assertEqual(ctx.exception.code, "isolation_tracked_nonregular")
+            self.assertLess(time.monotonic() - started, 2.0)
+
+    def test_instruction_evidence_counts_toward_context_limits(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            repo.mkdir()
+            _init_repo(repo)
+            (repo / "AGENTS.md").write_text("instructions\n", encoding="utf-8")
+            _commit_all(repo)
+
+            with self.assertRaises(ValidationIssue) as ctx:
+                create_tracked_snapshot(
+                    IsolationSpec(
+                        repo_root=repo,
+                        lane_id="instruction-limit",
+                        include_instructions_as_data=True,
+                        max_context_bytes=4,
+                    )
+                )
+            self.assertEqual(ctx.exception.code, "isolation_context_byte_limit")
+
     def test_non_git_workspace_fails_closed_and_cleans_partial_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

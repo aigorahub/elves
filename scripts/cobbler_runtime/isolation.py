@@ -1,7 +1,9 @@
-"""External read-only lane isolation: disposable tracked snapshots + optional FS sandbox.
+"""External lane isolation: disposable policy-filtered snapshots + optional FS sandbox.
 
-Creates a disposable work directory containing only tracked source files with
-isolated HOME/TMP/XDG. Adapter argv must target the snapshot (not the host repo).
+Creates a disposable work directory containing policy-admitted source files with isolated
+HOME/TMP/XDG. Callers choose whether safe non-ignored untracked files are relevant; immutable
+credential, instruction, file-type, and repository-boundary checks remain host-owned. Adapter argv
+must target the snapshot (not the host repo).
 Where available, a platform filesystem sandbox (sandbox-exec / bwrap) blocks
 absolute host-home and sibling paths; otherwise optional external attempts are
 skipped and required routes block.
@@ -12,6 +14,7 @@ from __future__ import annotations
 import errno
 import fnmatch
 import hashlib
+import json
 import os
 import secrets
 import shlex
@@ -152,8 +155,26 @@ DEFAULT_EXCLUDED_FILE_NAMES: frozenset[str] = frozenset(
         ".netrc",
         ".npmrc",
         ".pypirc",
+        "credentials",
+        "credentials.json",
+        "service-account.json",
+        "id_rsa",
+        "id_ed25519",
     }
 )
+
+DEFAULT_EXCLUDED_FILE_GLOBS: tuple[str, ...] = (
+    "*.pem",
+    "*.key",
+    "*.p12",
+    "*.pfx",
+    "*.keystore",
+)
+
+DEFAULT_CONTEXT_MAX_FILES = 20_000
+DEFAULT_CONTEXT_MAX_BYTES = 512 * 1024 * 1024
+DEFAULT_CONTEXT_MAX_FILE_BYTES = 16 * 1024 * 1024
+MAX_CONTEXT_DIAGNOSTICS = 200
 
 # Argv flags that embed a repo/cwd path which must point at the snapshot.
 _REPO_PATH_FLAGS: frozenset[str] = frozenset(
@@ -176,6 +197,12 @@ class IsolationSpec:
     lane_id: str
     include_instructions_as_data: bool = False
     extra_exclude_globs: tuple[str, ...] = ()
+    include_untracked: bool = False
+    include_paths: tuple[str, ...] = ()
+    max_context_files: int = DEFAULT_CONTEXT_MAX_FILES
+    max_context_bytes: int = DEFAULT_CONTEXT_MAX_BYTES
+    max_context_file_bytes: int = DEFAULT_CONTEXT_MAX_FILE_BYTES
+    snapshot_writable: bool = False
     credential_grants: dict[str, str] = field(default_factory=dict)
     base_env: dict[str, str] = field(default_factory=dict)
     require_fs_sandbox: bool = False
@@ -202,6 +229,11 @@ class IsolatedLane:
     xdg_data: Path
     env: dict[str, str]
     tracked_file_count: int
+    untracked_file_count: int = 0
+    context_bytes: int = 0
+    context_diagnostics: list[dict[str, str]] = field(default_factory=list)
+    context_manifest_path: str | None = None
+    snapshot_writable: bool = False
     instruction_data_files: list[str] = field(default_factory=list)
     sandbox_backend: str | None = None  # sandbox-exec | bwrap | none
     sandbox_executable: str | None = None
@@ -227,14 +259,101 @@ def _git_tracked_files(repo_root: Path) -> list[str]:
                 continue
             files.append(os.fsdecode(item))
         return files
-    # External isolation is deliberately tracked-only. Walking a non-git tree
-    # risks copying nested hidden credentials such as .aws/credentials.
+    # External isolation is Git-enumerated rather than a raw filesystem walk.
+    # Callers may separately opt into Git's non-ignored untracked set without
+    # risking nested ignored credentials such as .aws/credentials.
     stderr = result.stderr.decode("utf-8", errors="replace").strip()
     raise ValidationIssue(
         "isolation_git_ls_files_failed",
         "Unable to list tracked files for isolation snapshot"
         + (f": {stderr}" if stderr else ""),
         path=str(repo_root),
+    )
+
+
+def _git_untracked_nonignored_files(repo_root: Path) -> list[str]:
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo_root),
+            "ls-files",
+            "--others",
+            "--exclude-standard",
+            "-z",
+        ],
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode == 0:
+        return [os.fsdecode(item) for item in result.stdout.split(b"\0") if item]
+    stderr = result.stderr.decode("utf-8", errors="replace").strip()
+    raise ValidationIssue(
+        "isolation_git_untracked_files_failed",
+        "Unable to list non-ignored untracked files for isolation snapshot"
+        + (f": {stderr}" if stderr else ""),
+        path=str(repo_root),
+    )
+
+
+def _normalize_include_paths(repo_root: Path, paths: Sequence[str]) -> tuple[str, ...]:
+    normalized: list[str] = []
+    for raw_value in paths:
+        raw = str(raw_value).strip()
+        if not raw:
+            raise ValidationIssue(
+                "invalid_isolation_include_path",
+                "Isolation include paths must not be empty",
+            )
+        candidate = Path(raw).expanduser()
+        if candidate.is_absolute():
+            try:
+                candidate = candidate.resolve(strict=False).relative_to(repo_root)
+            except (OSError, ValueError) as exc:
+                raise ValidationIssue(
+                    "isolation_include_path_escape",
+                    f"Isolation include path is outside the repository: {raw!r}",
+                    path=raw,
+                ) from exc
+        normalized_value = candidate.as_posix()
+        while normalized_value.startswith("./"):
+            normalized_value = normalized_value[2:]
+        posix = PurePosixPath(normalized_value)
+        if (
+            not normalized_value
+            or normalized_value == "."
+            or posix.is_absolute()
+            or ".." in posix.parts
+            or normalized_value != posix.as_posix()
+        ):
+            raise ValidationIssue(
+                "invalid_isolation_include_path",
+                f"Isolation include path must name one normalized repository file: {raw!r}",
+                path=raw,
+            )
+        if normalized_value not in normalized:
+            normalized.append(normalized_value)
+    return tuple(normalized)
+
+
+def _git_path_is_ignored(repo_root: Path, rel: str) -> bool:
+    result = subprocess.run(
+        ["git", "-C", str(repo_root), "check-ignore", "-q", "--no-index", "--", rel],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if result.returncode == 0:
+        return True
+    if result.returncode == 1:
+        return False
+    stderr = result.stderr.decode("utf-8", errors="replace").strip()
+    raise ValidationIssue(
+        "isolation_git_check_ignore_failed",
+        f"Unable to determine whether requested context is ignored: {rel}"
+        + (f": {stderr}" if stderr else ""),
+        path=str(repo_root / rel),
     )
 
 
@@ -275,6 +394,8 @@ def _should_exclude(rel: str, *, extra_globs: Sequence[str] = ()) -> bool:
         return True
     name = Path(rel).name
     if name in DEFAULT_EXCLUDED_FILE_NAMES:
+        return True
+    if any(fnmatch.fnmatchcase(name.lower(), pattern) for pattern in DEFAULT_EXCLUDED_FILE_GLOBS):
         return True
     if rel.startswith(".elves/") or rel.startswith(".git/"):
         return True
@@ -427,7 +548,12 @@ def _open_tracked_regular_fd(
         )
     src = repo_root.joinpath(*posix.parts)
     directory_flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
-    file_flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    file_flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_NONBLOCK", 0)
+    )
     descriptors: list[int] = []
     source_fd: int | None = None
     try:
@@ -473,6 +599,13 @@ def _open_tracked_regular_fd(
             f"Tracked path is not a regular file: {rel}",
             path=str(src),
         )
+    if info.st_uid != os.geteuid():
+        os.close(source_fd)
+        raise ValidationIssue(
+            "isolation_tracked_owner",
+            f"Context path is not owned by the current user: {rel}",
+            path=str(src),
+        )
     if info.st_nlink != 1:
         os.close(source_fd)
         raise ValidationIssue(
@@ -483,11 +616,24 @@ def _open_tracked_regular_fd(
     return source_fd, info
 
 
-def _copy_tracked_regular_file(repo_root: Path, rel: str, destination: Path) -> bool:
+def _copy_tracked_regular_file(
+    repo_root: Path,
+    rel: str,
+    destination: Path,
+    *,
+    max_file_bytes: int = DEFAULT_CONTEXT_MAX_FILE_BYTES,
+) -> bool:
     opened = _open_tracked_regular_fd(repo_root, rel)
     if opened is None:
         return False
     source_fd, source_info = opened
+    if source_info.st_size > max_file_bytes:
+        os.close(source_fd)
+        raise ValidationIssue(
+            "isolation_context_file_too_large",
+            f"Context file exceeds the {max_file_bytes}-byte per-file limit: {rel}",
+            path=str(repo_root / rel),
+        )
     try:
         with os.fdopen(source_fd, "rb", closefd=True) as source, destination.open("xb") as target:
             shutil.copyfileobj(source, target, length=1024 * 1024)
@@ -541,6 +687,15 @@ def create_tracked_snapshot(spec: IsolationSpec) -> IsolatedLane:
         path="IsolationSpec.credential_grants",
     )
     repo_root = Path(spec.repo_root).resolve()
+    if (
+        spec.max_context_files <= 0
+        or spec.max_context_bytes <= 0
+        or spec.max_context_file_bytes <= 0
+    ):
+        raise ValidationIssue(
+            "invalid_isolation_context_limits",
+            "Isolation context file and byte limits must be positive",
+        )
     lane_digest = hashlib.sha256(str(spec.lane_id).encode("utf-8")).hexdigest()[:12]
     parent = Path(tempfile.mkdtemp(prefix=f"elves-iso-{lane_digest}-")).resolve()
     try:
@@ -563,20 +718,94 @@ def create_tracked_snapshot(spec: IsolationSpec) -> IsolatedLane:
 
         extra_globs = _normalize_extra_exclude_globs(spec.extra_exclude_globs)
         tracked = _git_tracked_files(repo_root)
+        tracked_set = set(tracked)
+        untracked = (
+            _git_untracked_nonignored_files(repo_root) if spec.include_untracked else []
+        )
+        requested = _normalize_include_paths(repo_root, spec.include_paths)
+        for rel in requested:
+            if _should_exclude(rel, extra_globs=extra_globs) or _is_executable_agent_config(rel):
+                raise ValidationIssue(
+                    "isolation_requested_path_forbidden",
+                    f"Requested context is excluded by immutable safety policy: {rel}",
+                    path=str(repo_root / rel),
+                )
+            if rel in tracked_set or rel in untracked:
+                continue
+            if _git_path_is_ignored(repo_root, rel):
+                raise ValidationIssue(
+                    "isolation_requested_path_ignored",
+                    f"Requested context is ignored and cannot be admitted: {rel}",
+                    path=str(repo_root / rel),
+                )
+            try:
+                info = (repo_root / rel).lstat()
+            except OSError as exc:
+                raise ValidationIssue(
+                    "isolation_requested_path_missing",
+                    f"Requested context file is missing or unreadable: {rel}",
+                    path=str(repo_root / rel),
+                ) from exc
+            if stat.S_ISDIR(info.st_mode):
+                raise ValidationIssue(
+                    "isolation_requested_path_directory",
+                    f"Requested context must name one file, not a directory: {rel}",
+                    path=str(repo_root / rel),
+                )
+            untracked.append(rel)
+        candidates = [(rel, True) for rel in tracked]
+        candidates.extend((rel, False) for rel in untracked if rel not in tracked_set)
         instruction_data: list[str] = []
+        diagnostics: list[dict[str, str]] = []
+        diagnostics_total = 0
+
+        def record_diagnostic(rel: str, reason: str) -> None:
+            nonlocal diagnostics_total
+            diagnostics_total += 1
+            if len(diagnostics) < MAX_CONTEXT_DIAGNOSTICS:
+                diagnostics.append(
+                    {"path": rel, "status": "excluded", "reason": reason}
+                )
+
         count = 0
-        for rel in tracked:
+        untracked_count = 0
+        copied_count = 0
+        total_bytes = 0
+        for rel, is_tracked in candidates:
             if _should_exclude(rel, extra_globs=extra_globs):
+                record_diagnostic(rel, "policy")
                 continue
             if _is_executable_agent_config(rel):
+                record_diagnostic(rel, "executable_agent_config")
                 continue
             if _is_instruction_surface(rel):
                 if not spec.include_instructions_as_data:
+                    record_diagnostic(rel, "instruction_surface")
                     continue
                 inert = snapshot / "_instruction_evidence" / f"{rel.replace('/', '__')}.txt"
                 inert.parent.mkdir(parents=True, exist_ok=True)
-                if not _copy_tracked_regular_file(repo_root, rel, inert):
+                if not _copy_tracked_regular_file(
+                    repo_root,
+                    rel,
+                    inert,
+                    max_file_bytes=spec.max_context_file_bytes,
+                ):
                     continue
+                inert_size = inert.stat().st_size
+                total_bytes += inert_size
+                copied_count += 1
+                if copied_count > spec.max_context_files:
+                    raise ValidationIssue(
+                        "isolation_context_file_limit",
+                        f"Context exceeds the {spec.max_context_files}-file limit",
+                        path=str(repo_root),
+                    )
+                if total_bytes > spec.max_context_bytes:
+                    raise ValidationIssue(
+                        "isolation_context_byte_limit",
+                        f"Context exceeds the {spec.max_context_bytes}-byte total limit",
+                        path=str(repo_root),
+                    )
                 try:
                     inert.chmod(0o600)
                 except OSError:
@@ -585,9 +814,53 @@ def create_tracked_snapshot(spec: IsolationSpec) -> IsolatedLane:
                 continue
             dest = snapshot.joinpath(*PurePosixPath(rel).parts)
             dest.parent.mkdir(parents=True, exist_ok=True)
-            if not _copy_tracked_regular_file(repo_root, rel, dest):
+            if not _copy_tracked_regular_file(
+                repo_root,
+                rel,
+                dest,
+                max_file_bytes=spec.max_context_file_bytes,
+            ):
                 continue
+            total_bytes += dest.stat().st_size
             count += 1
+            copied_count += 1
+            if not is_tracked:
+                untracked_count += 1
+            if copied_count > spec.max_context_files:
+                raise ValidationIssue(
+                    "isolation_context_file_limit",
+                    f"Context exceeds the {spec.max_context_files}-file limit",
+                    path=str(repo_root),
+                )
+            if total_bytes > spec.max_context_bytes:
+                raise ValidationIssue(
+                    "isolation_context_byte_limit",
+                    f"Context exceeds the {spec.max_context_bytes}-byte total limit",
+                    path=str(repo_root),
+                )
+
+        context_dir = snapshot / "_elves_context"
+        context_dir.mkdir(mode=0o700)
+        context_manifest = context_dir / "manifest.json"
+        context_manifest.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "tracked_files": count - untracked_count,
+                    "untracked_files": untracked_count,
+                    "instruction_files": len(instruction_data),
+                    "context_bytes": total_bytes,
+                    "diagnostics": diagnostics,
+                    "diagnostics_truncated": diagnostics_total > len(diagnostics),
+                    "requested_paths": list(requested),
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        context_manifest.chmod(0o600)
 
         lane = IsolatedLane(
             lane_id=spec.lane_id,
@@ -599,7 +872,12 @@ def create_tracked_snapshot(spec: IsolationSpec) -> IsolatedLane:
             xdg_cache=xdg_cache,
             xdg_data=xdg_data,
             env={},
-            tracked_file_count=count,
+            tracked_file_count=count - untracked_count,
+            untracked_file_count=untracked_count,
+            context_bytes=total_bytes,
+            context_diagnostics=diagnostics,
+            context_manifest_path=str(context_manifest.relative_to(snapshot)),
+            snapshot_writable=spec.snapshot_writable,
             instruction_data_files=instruction_data,
             supervision_token=secrets.token_hex(24),
         )
@@ -999,6 +1277,11 @@ def prepare_fs_sandbox(
                 ";; ELVES_EXECUTABLE_ALLOWLIST",
             ]
         )
+        if lane.snapshot_writable:
+            profile_lines.insert(
+                -1,
+                _sbpl_rule("allow file-write*", "subpath", snapshot),
+            )
         profile = "\n".join(profile_lines) + "\n"
         path = lane.root / "sandbox.sb"
         path.write_text(profile, encoding="utf-8")
@@ -1512,7 +1795,7 @@ def wrap_argv_with_sandbox(
             "--die-with-parent",
             "--unshare-all",
             "--share-net",
-            "--ro-bind",
+            "--bind" if lane.snapshot_writable else "--ro-bind",
             str(lane.snapshot),
             str(lane.snapshot),
             "--bind",
