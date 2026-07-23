@@ -15,18 +15,22 @@ All notable changes to the Elves skill are documented here.
 - Replace Fugu's tracked-only context with a bounded Git-enumerated snapshot of policy-admitted
   tracked and non-ignored untracked files. Repeatable `--include <path>` records exact host-selected
   context and fails if it cannot actually be admitted and copied, while ignored
-  dependency/cache/build trees, dotenv/credential files, reserved internal namespaces, Git/Elves
-  state, executable agent configuration, unsafe file types/links, ownership violations, repository
-  escapes, and count/size overflow remain excluded or fail closed with visible bounded diagnostics.
+  dependency/cache/build trees, both `.env.*` and `*.env` dotenv/credential families, reserved
+  internal namespaces, Git/Elves state, executable agent configuration, unsafe file types/links,
+  ownership violations, repository escapes, and count/size overflow remain excluded or fail closed
+  with visible bounded diagnostics.
 - Add user-authorized `--write` for general tasks only. Fugu may modify only its disposable
   kernel-isolated snapshot; a host-side before/after digest-and-mode audit rejects protected,
   credential, unsafe, or oversized output and exports accepted regular files/deletions as an inert
   temporary handoff. Mode-only and executable changes retain safe manifest/export semantics. The
-  host checkout is never mutated and the handoff is never applied automatically.
+  host checkout is never mutated and the handoff is never applied automatically. Writes require a
+  qualified recursive Linux bwrap PID namespace and fail before provider launch on macOS.
 - Preserve regular `fugu/high`, deep `fugu/xhigh`, and `fugu-ultra/high` behavior across task
   modes, including closed input, credential scrubbing, no Linux procfs, qualified macOS/Linux
   filesystem boundaries, hard-wall cleanup, exact-session Ultra synthesis, bounded incremental
-  event parsing, live writable-state limits, and descendant absence before success or write audit.
+  event parsing, and live writable-state limits that tolerate benign temporary-tree disappearance
+  while failing closed on other audit errors. macOS read-only cleanup is explicitly best-effort and
+  non-authoritative; polling is not recursive containment.
 - Update the Claude alias, Codex adapter, README, guide, provider reference, installed bundles,
   consistency policy, hermetic provider/isolation coverage, and release examples for v2.15.0.
 

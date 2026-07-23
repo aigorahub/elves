@@ -72,11 +72,14 @@ analysis, design, investigation, or other task; `fugu review` keeps the read-onl
 contract. Both receive a bounded snapshot of policy-admitted tracked and non-ignored untracked
 files. `--include` records an exact host-selected path but cannot override exclusions for ignored
 trees, credentials, operational state, executable agent configuration, unsafe links/file types, or
-repository escapes; the exact path must actually be admitted and copied. Dotenv variants and
-host-owned internal namespaces are always excluded. General tasks remain read-only unless the user independently authorizes
-implementation and the host selects `--write`; that route writes only the disposable
-kernel-isolated snapshot and exports a mode-aware audited inert handoff that is never applied
-automatically. Live writable-state bounds and descendant settlement finish before success or audit.
+repository escapes; the exact path must actually be admitted and copied. Both `.env.*` and
+`*.env` dotenv-name families plus host-owned internal namespaces are always excluded. General tasks
+remain read-only unless the user independently authorizes implementation and the host selects
+`--write`; that route additionally requires qualified recursive Linux bwrap PID-namespace
+containment and is unavailable on macOS today. A qualified write exports a mode-aware audited inert
+handoff that is never applied automatically. Live writable-state bounds tolerate benign temporary
+subtree disappearance and fail closed on other audit errors. macOS read-only cleanup is best-effort,
+not proof of recursive descendant absence.
 Profiles remain regular `fugu/high`, `fugu/xhigh` with `--deep`, and `fugu-ultra/high` with
 `--ultra`. Regular/deep calls are ephemeral; Ultra reserves synthesis time and resumes only the
 exact isolated session with further tools forbidden. Session state and raw events never leave the

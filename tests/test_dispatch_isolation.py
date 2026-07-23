@@ -11,6 +11,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from dataclasses import replace
@@ -708,6 +709,9 @@ class IsolationSnapshotRegressionTests(unittest.TestCase):
             )
             _commit_all(repo)
             (repo / ".env.preview").write_text("PREVIEW_SECRET=1\n", encoding="utf-8")
+            (repo / "local.env").write_text("LOCAL_SECRET=1\n", encoding="utf-8")
+            (repo / "test.ENV").write_text("TEST_SECRET=1\n", encoding="utf-8")
+            (nested / "prod.env").write_text("PROD_SECRET=1\n", encoding="utf-8")
 
             lane = create_tracked_snapshot(
                 IsolationSpec(
@@ -722,6 +726,9 @@ class IsolationSnapshotRegressionTests(unittest.TestCase):
                     ".env.staging",
                     "config/.env.development.local",
                     ".env.preview",
+                    "local.env",
+                    "test.ENV",
+                    "config/prod.env",
                 ):
                     self.assertFalse((lane.snapshot / rel).exists(), rel)
                 manifest = json.loads(
@@ -738,6 +745,9 @@ class IsolationSnapshotRegressionTests(unittest.TestCase):
                     excluded["config/.env.development.local"], "policy"
                 )
                 self.assertEqual(excluded[".env.preview"], "policy")
+                self.assertEqual(excluded["local.env"], "policy")
+                self.assertEqual(excluded["test.ENV"], "policy")
+                self.assertEqual(excluded["config/prod.env"], "policy")
             finally:
                 lane.cleanup()
 
@@ -777,6 +787,73 @@ class IsolationSnapshotRegressionTests(unittest.TestCase):
                 self.assertNotIn("repository source", manifest_path.read_text())
             finally:
                 lane.cleanup()
+
+    def test_provider_writable_usage_tolerates_concurrent_subtree_removal(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "home"
+            victim = (
+                root
+                / ".codex"
+                / ".tmp"
+                / "plugins-clone-race"
+                / "agents"
+            )
+            victim.mkdir(parents=True)
+            (victim / "agent.md").write_text("temporary\n", encoding="utf-8")
+            race_parent = victim.parent
+            race_identity = race_parent.stat()
+            real_open = isolation.os.open
+            removed = threading.Event()
+
+            def remove_before_descent(path, flags, mode=0o777, *, dir_fd=None):
+                if (
+                    path == "agents"
+                    and dir_fd is not None
+                    and os.fstat(dir_fd).st_dev == race_identity.st_dev
+                    and os.fstat(dir_fd).st_ino == race_identity.st_ino
+                    and not removed.is_set()
+                ):
+                    remover = threading.Thread(
+                        target=shutil.rmtree,
+                        args=(victim,),
+                    )
+                    remover.start()
+                    remover.join()
+                    removed.set()
+                return real_open(path, flags, mode, dir_fd=dir_fd)
+
+            with mock.patch(
+                "cobbler_runtime.isolation.os.open",
+                side_effect=remove_before_descent,
+            ):
+                entries, total_bytes, largest = (
+                    isolation.provider_writable_tree_usage((root,))
+                )
+
+            self.assertTrue(removed.is_set())
+            self.assertGreaterEqual(entries, 4)
+            self.assertEqual(total_bytes, 0)
+            self.assertIsNone(largest)
+
+    def test_provider_writable_usage_never_follows_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            root = base / "home"
+            outside = base / "outside"
+            root.mkdir()
+            outside.mkdir()
+            (outside / "large.bin").write_bytes(b"x" * 4096)
+            (root / "outside-link").symlink_to(outside, target_is_directory=True)
+
+            entries, total_bytes, largest = (
+                isolation.provider_writable_tree_usage((root,))
+            )
+
+            self.assertEqual(entries, 1)
+            self.assertEqual(total_bytes, 0)
+            self.assertIsNone(largest)
 
     def test_requested_context_rejects_ignored_forbidden_and_outside_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

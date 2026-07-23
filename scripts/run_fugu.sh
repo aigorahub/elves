@@ -19,7 +19,8 @@ Modes:
   task      The default. Follow the requested task without a review-only rubric.
   review    Read-only change review with ordered P0-P3 findings and exact locations.
   --write   Allow a general task to edit only its disposable snapshot and export an
-            audited handoff. The handoff is never applied automatically.
+            audited handoff on qualified Linux bwrap hosts. It is unavailable on
+            macOS. The handoff is never applied automatically.
 
 Safe non-ignored worktree files are eligible context by default. --include names an
 exact additional repository file for the safety layer to admit or reject. Use -- to
@@ -178,6 +179,7 @@ from cobbler_runtime.isolation import (  # noqa: E402
     capture_snapshot_state,
     export_snapshot_handoff,
     isolated_lane,
+    provider_writable_tree_usage,
     source_path_allowed_at_original_location,
     wrap_argv_with_sandbox,
 )
@@ -185,9 +187,29 @@ from cobbler_runtime.dispatch_external import (  # noqa: E402
     _DescendantSupervisor,
     _darwin_process_record,
     _require_darwin_generation_signaling,
+    _require_darwin_recursive_containment,
     _terminate_supervised_descendants,
 )
 from cobbler_runtime.schema import ValidationIssue  # noqa: E402
+
+
+if writable and sys.platform == "darwin":
+    try:
+        _require_darwin_recursive_containment()
+    except ValidationIssue as exc:
+        print(
+            f"Error: Fugu isolated writes require qualified recursive process "
+            f"containment [{exc.code}]: {exc}",
+            file=sys.stderr,
+        )
+        raise SystemExit(2) from exc
+elif writable and not sys.platform.startswith("linux"):
+    print(
+        "Error: Fugu isolated writes require a qualified Linux bwrap PID namespace; "
+        f"{sys.platform} is not supported.",
+        file=sys.stderr,
+    )
+    raise SystemExit(2)
 
 
 def positive_int_env(name: str, default: int) -> int:
@@ -288,54 +310,6 @@ def toml_string(path: Path, key: str, *, section: str | None = None) -> str:
     return ""
 
 
-def runtime_tree_usage(roots: tuple[Path, ...]) -> tuple[int, int, tuple[str, int] | None]:
-    entries = 0
-    total_bytes = 0
-    largest: tuple[str, int] | None = None
-    errors: list[OSError] = []
-
-    def record_error(exc: OSError) -> None:
-        errors.append(exc)
-
-    for root in roots:
-        for current, directories, names in os.walk(
-            root,
-            topdown=True,
-            followlinks=False,
-            onerror=record_error,
-        ):
-            directories.sort()
-            names.sort()
-            current_path = Path(current)
-            entries += len(directories)
-            for name in names:
-                path = current_path / name
-                try:
-                    info = path.lstat()
-                except FileNotFoundError:
-                    continue
-                except OSError as exc:
-                    errors.append(exc)
-                    continue
-                if not stat.S_ISREG(info.st_mode):
-                    entries += 1
-                    continue
-                entries += 1
-                total_bytes += info.st_size
-                if largest is None or info.st_size > largest[1]:
-                    try:
-                        display = path.relative_to(root).as_posix()
-                    except ValueError:
-                        display = str(path)
-                    largest = (f"{root.name}/{display}", info.st_size)
-    if errors:
-        raise ValidationIssue(
-            "fugu_runtime_monitor_failed",
-            f"Cannot audit provider-writable runtime state: {errors[0]}",
-        )
-    return entries, total_bytes, largest
-
-
 class RuntimeBudget:
     """Live bounded-growth monitor for every provider-writable lane directory."""
 
@@ -351,13 +325,16 @@ class RuntimeBudget:
         self.max_growth_files = max_growth_files
         self.max_growth_bytes = max_growth_bytes
         self.max_file_bytes = max_file_bytes
-        self.baseline_files, self.baseline_bytes, _ = runtime_tree_usage(roots)
+        self.baseline_files, self.baseline_bytes, _ = provider_writable_tree_usage(
+            roots
+        )
         self.violation: str | None = None
+        self.failure: str | None = None
         self._stop: threading.Event | None = None
         self._thread: threading.Thread | None = None
 
     def _check(self) -> None:
-        entries, total_bytes, largest = runtime_tree_usage(self.roots)
+        entries, total_bytes, largest = provider_writable_tree_usage(self.roots)
         if largest is not None and largest[1] > self.max_file_bytes:
             self.violation = (
                 f"file {largest[0]} reached {largest[1]} bytes "
@@ -374,25 +351,28 @@ class RuntimeBudget:
                 f"(limit {self.max_growth_bytes})"
             )
 
-    def start_phase(self, process: subprocess.Popen[str]) -> None:
+    def triggered(self) -> bool:
+        return self.violation is not None or self.failure is not None
+
+    def start_phase(self) -> None:
         if self._thread is not None:
             raise RuntimeError("runtime budget monitor is already active")
         stop = threading.Event()
         self._stop = stop
 
         def monitor() -> None:
-            while not stop.is_set() and self.violation is None:
+            while (
+                not stop.is_set()
+                and self.violation is None
+                and self.failure is None
+            ):
                 try:
                     self._check()
                 except BaseException as exc:
-                    self.violation = (
+                    self.failure = (
                         f"runtime monitor failed closed: {type(exc).__name__}: {exc}"
                     )
-                if self.violation is not None:
-                    try:
-                        os.killpg(process.pid, signal.SIGTERM)
-                    except OSError:
-                        pass
+                if self.triggered():
                     return
                 stop.wait(0.1)
 
@@ -404,7 +384,7 @@ class RuntimeBudget:
         self._thread = thread
         thread.start()
 
-    def stop_phase(self) -> str | None:
+    def stop_phase(self) -> tuple[str | None, str | None]:
         stop = self._stop
         thread = self._thread
         self._stop = None
@@ -413,13 +393,21 @@ class RuntimeBudget:
             stop.set()
         if thread is not None:
             thread.join(timeout=2.0)
-            if thread.is_alive() and self.violation is None:
-                self.violation = "runtime monitor could not be stopped"
-        return self.violation
+            if (
+                thread.is_alive()
+                and self.violation is None
+                and self.failure is None
+            ):
+                self.failure = "runtime monitor could not be stopped"
+        return self.violation, self.failure
+
+
+class RuntimeBudgetTriggered(RuntimeError):
+    """Wake the host wait loop so it can terminate under containment authority."""
 
 
 class PhaseContainment:
-    """Generation-safe macOS supervision; Linux relies on bwrap PID teardown."""
+    """Authoritative Linux teardown plus best-effort macOS read-only cleanup."""
 
     def __init__(self, lane) -> None:
         self.lane = lane
@@ -514,6 +502,7 @@ class PhaseContainment:
         supervisor = self.supervisor
         if supervisor is not None:
             monitor_stopped = self._stop_monitor()
+            root_generation_pinned = process.returncode is None
             try:
                 records = asyncio.run(supervisor.scan())
             except BaseException:
@@ -526,7 +515,11 @@ class PhaseContainment:
                 and pid != process.pid
                 and not record.zombie
             }
-            if force or group_descendants:
+            # A live or unreaped direct child pins PID == PGID against reuse.
+            # Group signaling is safe only while that generation remains
+            # pinned; portable macOS Pythons without waitid reap on success,
+            # so their read-only cleanup never signals a bare numeric PGID.
+            if root_generation_pinned and (force or group_descendants):
                 try:
                     if self.pgid is None:
                         raise ProcessLookupError
@@ -545,7 +538,7 @@ class PhaseContainment:
                 cleanup = {
                     "descendants_absent": False,
                     "descendants_found": [],
-                    "supervision_error": "generation-safe cleanup failed",
+                    "supervision_error": "observed-process cleanup failed",
                 }
             try:
                 records = asyncio.run(supervisor.scan())
@@ -559,7 +552,7 @@ class PhaseContainment:
                 and pid != process.pid
                 and not record.zombie
             }
-            if remaining_group:
+            if remaining_group and root_generation_pinned:
                 try:
                     if self.pgid is None:
                         raise ProcessLookupError
@@ -585,14 +578,16 @@ class PhaseContainment:
                 reaped = True
             except (subprocess.TimeoutExpired, ChildProcessError):
                 reaped = False
-            proven = bool(
+            # Darwin has no qualified recursive process boundary. This result
+            # says only that the direct launcher was reaped and any group
+            # members observed before reap were settled. It is sufficient for
+            # read-only provider output, never for a writable handoff.
+            settled = bool(
                 monitor_stopped
                 and reaped
-                and cleanup.get("descendants_absent")
-                and not cleanup.get("supervision_error")
                 and not remaining_group
             )
-            return proven, bool(
+            return settled, bool(
                 group_descendants or cleanup.get("descendants_found")
             )
 
@@ -818,6 +813,16 @@ try:
             require_fs_sandbox=True,
         )
     ) as lane:
+        if writable and not (
+            sys.platform.startswith("linux")
+            and lane.sandbox_backend == "bwrap"
+            and lane.process_containment == "pid-namespace"
+        ):
+            raise ValidationIssue(
+                "fugu_write_recursive_containment_unavailable",
+                "Fugu isolated writes require a qualified Linux bwrap PID namespace",
+                path=str(lane.snapshot),
+            )
         codex_home = lane.home / ".codex"
         codex_home.mkdir(mode=0o700)
 
@@ -1050,18 +1055,18 @@ unless the task itself explicitly requests them."""
             )
             try:
                 containment.bind(process)
-                runtime_budget.start_phase(process)
+                runtime_budget.start_phase()
             except BaseException as original:
                 runtime_budget.stop_phase()
-                proven, _ = containment.settle(
+                settled, _ = containment.settle(
                     process,
                     deadline=time.monotonic() + shutdown_budget,
                     force=True,
                 )
-                if not proven:
+                if not settled:
                     print(
-                        "Error: Fugu post-launch setup failed and descendant "
-                        "absence could not be proved.",
+                        "Error: Fugu post-launch setup failed and the launcher "
+                        "plus observed processes could not be settled.",
                         file=sys.stderr,
                     )
                     raise SystemExit(125) from original
@@ -1081,13 +1086,42 @@ unless the task itself explicitly requests them."""
                     process.stdin.close()
             except BrokenPipeError:
                 pass
-            if containment.supervisor is None:
-                process.wait(timeout=timeout)
-                return
             wait_deadline = time.monotonic() + timeout
-            wait_flags = os.WEXITED | os.WNOHANG | os.WNOWAIT
+
+            def portable_wait() -> None:
+                while True:
+                    if runtime_budget.triggered():
+                        raise RuntimeBudgetTriggered
+                    remaining = wait_deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise subprocess.TimeoutExpired(process.args, timeout)
+                    try:
+                        process.wait(timeout=min(0.05, remaining))
+                        return
+                    except subprocess.TimeoutExpired:
+                        continue
+
+            if containment.supervisor is None:
+                portable_wait()
+                return
+            waitid = getattr(os, "waitid", None)
+            wait_constants = tuple(
+                getattr(os, name, None)
+                for name in ("P_PID", "WEXITED", "WNOHANG", "WNOWAIT")
+            )
+            if waitid is None or any(value is None for value in wait_constants):
+                # Some supported macOS Python builds do not expose waitid.
+                # Reaping here is portable; PhaseContainment then avoids every
+                # bare-PGID signal and performs only best-effort, native-bound
+                # cleanup of processes already observed by the read-only lane.
+                portable_wait()
+                return
+            pid_type, exited, nohang, nowait = wait_constants
+            wait_flags = exited | nohang | nowait
             while True:
-                observed = os.waitid(os.P_PID, process.pid, wait_flags)
+                if runtime_budget.triggered():
+                    raise RuntimeBudgetTriggered
+                observed = waitid(pid_type, process.pid, wait_flags)
                 if observed is not None and observed.si_pid == process.pid:
                     return
                 if time.monotonic() >= wait_deadline:
@@ -1103,15 +1137,22 @@ unless the task itself explicitly requests them."""
             cleanup_error: str,
             reject_success_descendants: bool,
         ) -> None:
-            violation = runtime_budget.stop_phase()
-            proven, descendants_found = containment.settle(
+            violation, audit_failure = runtime_budget.stop_phase()
+            settled, descendants_found = containment.settle(
                 process,
                 deadline=deadline,
-                force=force or violation is not None,
+                force=force or violation is not None or audit_failure is not None,
             )
-            if not proven:
+            if not settled:
                 print(cleanup_error, file=sys.stderr)
                 raise SystemExit(125)
+            if audit_failure is not None:
+                print(
+                    f"Error: Fugu provider-writable runtime audit failed closed: "
+                    f"{audit_failure}.",
+                    file=sys.stderr,
+                )
+                raise SystemExit(2)
             if violation is not None:
                 print(
                     f"Error: Fugu writable runtime exceeded its live resource "
@@ -1187,8 +1228,8 @@ unless the task itself explicitly requests them."""
                         deadline=deadline,
                         force=True,
                         cleanup_error=(
-                            "Error: Fugu timeout cleanup could not prove descendant "
-                            "absence within the hard wall budget."
+                            "Error: Fugu timeout cleanup could not settle the launcher "
+                            "and observed processes within the hard wall budget."
                         ),
                         reject_success_descendants=False,
                     )
@@ -1211,8 +1252,8 @@ unless the task itself explicitly requests them."""
                     deadline=deadline,
                     force=True,
                     cleanup_error=(
-                        "Error: Fugu timeout cleanup could not prove descendant "
-                        "absence within the hard wall budget."
+                        "Error: Fugu timeout cleanup could not settle the launcher "
+                        "and observed processes within the hard wall budget."
                     ),
                     reject_success_descendants=False,
                 )
@@ -1226,7 +1267,8 @@ unless the task itself explicitly requests them."""
                     deadline=deadline,
                     force=True,
                     cleanup_error=(
-                        "Error: Fugu failure cleanup could not prove descendant absence."
+                        "Error: Fugu failure cleanup could not settle the launcher "
+                        "and observed processes."
                     ),
                     reject_success_descendants=False,
                 )
@@ -1237,7 +1279,8 @@ unless the task itself explicitly requests them."""
                 deadline=deadline,
                 force=False,
                 cleanup_error=(
-                    "Error: Fugu success cleanup could not prove descendant absence."
+                    "Error: Fugu success cleanup could not settle the launcher "
+                    "and observed processes."
                 ),
                 reject_success_descendants=True,
             )
@@ -1402,8 +1445,8 @@ unless the task itself explicitly requests them."""
                         deadline=total_deadline - synthesis_floor,
                         force=True,
                         cleanup_error=(
-                            "Error: Fugu Ultra exploration cleanup could not prove "
-                            "descendant absence within its reserved wall budget."
+                            "Error: Fugu Ultra exploration cleanup could not settle the "
+                            "launcher and observed processes within its reserved wall budget."
                         ),
                         reject_success_descendants=False,
                     )
@@ -1426,8 +1469,8 @@ unless the task itself explicitly requests them."""
                     deadline=stop_deadline,
                     force=True,
                     cleanup_error=(
-                        "Error: Fugu Ultra exploration could not prove descendant "
-                        "absence within its reserved shutdown budget."
+                        "Error: Fugu Ultra exploration could not settle the launcher "
+                        "and observed processes within its reserved shutdown budget."
                     ),
                     reject_success_descendants=False,
                 )
@@ -1444,7 +1487,7 @@ unless the task itself explicitly requests them."""
                     force=True,
                     cleanup_error=(
                         "Error: Fugu Ultra exploration failure cleanup could not "
-                        "prove descendant absence."
+                        "settle the launcher and observed processes."
                     ),
                     reject_success_descendants=False,
                 )
@@ -1460,7 +1503,7 @@ unless the task itself explicitly requests them."""
                     force=False,
                     cleanup_error=(
                         "Error: Fugu Ultra exploration success cleanup could not "
-                        "prove descendant absence."
+                        "settle the launcher and observed processes."
                     ),
                     reject_success_descendants=True,
                 )
@@ -1546,8 +1589,8 @@ process."""
                         deadline=total_deadline,
                         force=True,
                         cleanup_error=(
-                            "Error: Fugu Ultra synthesis cleanup could not prove "
-                            "descendant absence within the staged wall budget."
+                            "Error: Fugu Ultra synthesis cleanup could not complete "
+                            "launcher settlement within the staged wall budget."
                         ),
                         reject_success_descendants=False,
                     )
@@ -1570,8 +1613,8 @@ process."""
                     deadline=total_deadline,
                     force=True,
                     cleanup_error=(
-                        "Error: Fugu Ultra synthesis cleanup could not prove "
-                        "descendant absence within the staged wall budget."
+                        "Error: Fugu Ultra synthesis cleanup could not complete "
+                        "launcher settlement within the staged wall budget."
                     ),
                     reject_success_descendants=False,
                 )
@@ -1586,7 +1629,7 @@ process."""
                     force=True,
                     cleanup_error=(
                         "Error: Fugu Ultra synthesis failure cleanup could not "
-                        "prove descendant absence."
+                        "settle the launcher and observed processes."
                     ),
                     reject_success_descendants=False,
                 )
@@ -1599,7 +1642,7 @@ process."""
                     force=False,
                     cleanup_error=(
                         "Error: Fugu Ultra synthesis success cleanup could not "
-                        "prove descendant absence."
+                        "settle the launcher and observed processes."
                     ),
                     reject_success_descendants=True,
                 )

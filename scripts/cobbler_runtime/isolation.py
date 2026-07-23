@@ -165,6 +165,7 @@ DEFAULT_EXCLUDED_FILE_NAMES: frozenset[str] = frozenset(
 
 DEFAULT_EXCLUDED_FILE_GLOBS: tuple[str, ...] = (
     ".env.*",
+    "*.env",
     "*.pem",
     "*.key",
     "*.p12",
@@ -799,6 +800,141 @@ def capture_snapshot_state(
         max_bytes=DEFAULT_CONTEXT_MAX_BYTES,
         max_file_bytes=DEFAULT_CONTEXT_MAX_FILE_BYTES,
     )
+
+
+def provider_writable_tree_usage(
+    roots: Sequence[Path],
+) -> tuple[int, int, tuple[str, int] | None]:
+    """Audit live provider-writable trees without following any link generation.
+
+    Temporary directories may disappear or be atomically replaced between
+    enumeration and descent. Those stale generations are benign; every opened
+    generation is still validated by descriptor for type and ownership.
+    """
+
+    entries = 0
+    total_bytes = 0
+    largest: tuple[str, int] | None = None
+    expected_uid = os.geteuid()
+    directory_flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+
+    def audit_error(exc: OSError, path: Path) -> ValidationIssue:
+        return ValidationIssue(
+            "fugu_runtime_monitor_failed",
+            f"Cannot audit provider-writable runtime state: {exc}",
+            path=str(path),
+        )
+
+    def inspect_entry(
+        path: Path,
+        root: Path,
+        info: os.stat_result,
+    ) -> None:
+        nonlocal entries, total_bytes, largest
+        if info.st_uid != expected_uid:
+            raise ValidationIssue(
+                "fugu_runtime_owner",
+                "Provider-writable runtime entry is not owned by the current user",
+                path=str(path),
+            )
+        entries += 1
+        if stat.S_ISREG(info.st_mode):
+            total_bytes += info.st_size
+            try:
+                display = path.relative_to(root).as_posix()
+            except ValueError:
+                display = str(path)
+            candidate = (f"{root.name}/{display}", info.st_size)
+            if largest is None or candidate[1] > largest[1]:
+                largest = candidate
+            return
+        if stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode):
+            return
+        raise ValidationIssue(
+            "fugu_runtime_type",
+            "Provider-writable runtime entry has an unsupported file type",
+            path=str(path),
+        )
+
+    def scan_directory(
+        descriptor: int,
+        *,
+        root: Path,
+        relative: PurePosixPath,
+    ) -> None:
+        try:
+            with os.scandir(descriptor) as iterator:
+                children = sorted(iterator, key=lambda entry: entry.name)
+        except OSError as exc:
+            raise audit_error(exc, root.joinpath(*relative.parts)) from exc
+
+        for child in children:
+            child_relative = relative / child.name
+            child_path = root.joinpath(*child_relative.parts)
+            try:
+                info = child.stat(follow_symlinks=False)
+            except OSError as exc:
+                if exc.errno in {errno.ENOENT, errno.ENOTDIR}:
+                    continue
+                raise audit_error(exc, child_path) from exc
+            inspect_entry(child_path, root, info)
+            if not stat.S_ISDIR(info.st_mode):
+                continue
+            try:
+                child_descriptor = os.open(
+                    child.name,
+                    directory_flags,
+                    dir_fd=descriptor,
+                )
+            except OSError as exc:
+                if exc.errno in {errno.ENOENT, errno.ENOTDIR, errno.ELOOP}:
+                    # The enumerated directory generation was removed or
+                    # replaced before descent. O_NOFOLLOW guarantees that a
+                    # replacement link was not traversed.
+                    continue
+                raise audit_error(exc, child_path) from exc
+            try:
+                opened = os.fstat(child_descriptor)
+                if (
+                    not stat.S_ISDIR(opened.st_mode)
+                    or opened.st_uid != expected_uid
+                ):
+                    raise ValidationIssue(
+                        "fugu_runtime_directory",
+                        "Provider-writable runtime directory generation is unsafe",
+                        path=str(child_path),
+                    )
+                scan_directory(
+                    child_descriptor,
+                    root=root,
+                    relative=child_relative,
+                )
+            finally:
+                os.close(child_descriptor)
+
+    for raw_root in roots:
+        root = Path(raw_root)
+        try:
+            descriptor = os.open(root, directory_flags)
+        except OSError as exc:
+            raise audit_error(exc, root) from exc
+        try:
+            info = os.fstat(descriptor)
+            if not stat.S_ISDIR(info.st_mode) or info.st_uid != expected_uid:
+                raise ValidationIssue(
+                    "fugu_runtime_directory",
+                    "Provider-writable runtime root is unsafe",
+                    path=str(root),
+                )
+            scan_directory(descriptor, root=root, relative=PurePosixPath())
+        finally:
+            os.close(descriptor)
+    return entries, total_bytes, largest
 
 
 def _handoff_path_forbidden(rel: str) -> bool:

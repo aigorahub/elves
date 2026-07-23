@@ -347,7 +347,7 @@ class LocalCliRunnerTests(unittest.TestCase):
             f"{action}\n"
             "CHILD=$!\n"
             "printf 'descendant-pid=<%s>\\n' \"$CHILD\"\n"
-            + ("/bin/sleep 0.5\n" if setsid else "")
+            + ("/bin/sleep 0.5\n" if setsid else "/bin/sleep 0.2\n")
             +
             "exit 0\n",
             encoding="utf-8",
@@ -367,6 +367,75 @@ class LocalCliRunnerTests(unittest.TestCase):
         )
         binary.chmod(0o755)
         return binary
+
+    def make_fugu_runtime_special_file_fake(self, root: Path) -> Path:
+        binary = root / "codex-fugu"
+        binary.write_text(
+            "#!/bin/sh\n"
+            "while IFS= read -r _LINE || [ -n \"$_LINE\" ]; do :; done\n"
+            "/usr/bin/mkfifo \"$HOME/provider-runtime.pipe\"\n"
+            "/bin/sleep 5\n",
+            encoding="utf-8",
+        )
+        binary.chmod(0o755)
+        return binary
+
+    def make_fugu_adversarial_escape_fake(self, root: Path) -> Path:
+        binary = root / "codex-fugu"
+        binary.write_text(
+            "#!/bin/sh\n"
+            "printf 'provider-launched\\n'\n"
+            "(/usr/bin/env -i /usr/bin/perl -MPOSIX -e "
+            "'exit if fork(); POSIX::setsid(); exit if fork(); sleep 2') &\n"
+            "exit 0\n",
+            encoding="utf-8",
+        )
+        binary.chmod(0o755)
+        return binary
+
+    def make_runtime_disappearance_hook(self, root: Path) -> Path:
+        hook_dir = root / "runtime-race-hook"
+        hook_dir.mkdir()
+        (hook_dir / "sitecustomize.py").write_text(
+            "import os\n"
+            "import shutil\n"
+            "import threading\n"
+            "from pathlib import Path\n"
+            "_real_open = os.open\n"
+            "_race_identity = None\n"
+            "_victim = None\n"
+            "_removed = False\n"
+            "def _open(path, flags, mode=0o777, *, dir_fd=None):\n"
+            "    global _race_identity, _victim, _removed\n"
+            "    candidate = Path(path) if dir_fd is None else None\n"
+            "    if _race_identity is None and candidate is not None and candidate.name == 'home':\n"
+            "        _victim = candidate / '.codex' / '.tmp' / 'plugins-clone-race' / 'agents'\n"
+            "        _victim.mkdir(parents=True, exist_ok=True)\n"
+            "        parent_info = _victim.parent.stat()\n"
+            "        _race_identity = (parent_info.st_dev, parent_info.st_ino)\n"
+            "    if path == 'agents' and dir_fd is not None and not _removed:\n"
+            "        parent_info = os.fstat(dir_fd)\n"
+            "        if (parent_info.st_dev, parent_info.st_ino) == _race_identity:\n"
+            "            remover = threading.Thread(target=shutil.rmtree, args=(_victim,))\n"
+            "            remover.start()\n"
+            "            remover.join()\n"
+            "            _removed = True\n"
+            "    return _real_open(path, flags, mode, dir_fd=dir_fd)\n"
+            "os.open = _open\n",
+            encoding="utf-8",
+        )
+        return hook_dir
+
+    def make_missing_waitid_hook(self, root: Path) -> Path:
+        hook_dir = root / "missing-waitid-hook"
+        hook_dir.mkdir()
+        (hook_dir / "sitecustomize.py").write_text(
+            "import os\n"
+            "if hasattr(os, 'waitid'):\n"
+            "    del os.waitid\n",
+            encoding="utf-8",
+        )
+        return hook_dir
 
     def make_fugu_oversized_event_line_fake(self, root: Path) -> Path:
         binary = root / "codex-fugu"
@@ -478,7 +547,40 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertNotIn("Return actionable findings first", result.stdout)
         self.assertNotIn('say exactly "No actionable findings"', result.stdout)
 
-    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    @unittest.skipUnless(
+        sys.platform == "darwin" and HAS_FS_SANDBOX,
+        "Darwin filesystem sandbox unavailable",
+    )
+    def test_fugu_read_only_success_is_portable_without_os_waitid(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_capture_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
+            hook_dir = self.make_missing_waitid_hook(root)
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "inspect portable read-only settlement",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "PYTHONPATH": str(hook_dir),
+                    "SAKANA_API_KEY": "test-sakana-key",
+                },
+                cwd=repo,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("AttributeError", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
+    @unittest.skipUnless(
+        HAS_FS_SANDBOX and sys.platform.startswith("linux"),
+        "qualified writable Linux bwrap sandbox unavailable",
+    )
     def test_fugu_authorized_write_exports_audited_handoff_without_host_mutation(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -594,7 +696,7 @@ class LocalCliRunnerTests(unittest.TestCase):
         sys.platform == "darwin" and HAS_FS_SANDBOX,
         "Darwin filesystem sandbox unavailable",
     )
-    def test_fugu_setsid_descendant_is_generation_safely_reaped(self) -> None:
+    def test_fugu_setsid_descendant_is_observed_and_reaped(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             bin_dir = root / "bin"
@@ -624,16 +726,15 @@ class LocalCliRunnerTests(unittest.TestCase):
         with self.assertRaises(ProcessLookupError):
             os.kill(descendant_pid, 0)
 
-    @unittest.skipUnless(
-        sys.platform == "darwin" and HAS_FS_SANDBOX,
-        "Darwin filesystem sandbox unavailable",
-    )
-    def test_fugu_write_reaps_descendant_before_handoff_audit(self) -> None:
+    @unittest.skipUnless(sys.platform == "darwin", "Darwin-only containment policy")
+    def test_fugu_write_refuses_fast_scrubbed_double_fork_before_provider_launch(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             bin_dir = root / "bin"
             bin_dir.mkdir()
-            self.make_fugu_descendant_fake(bin_dir, delayed_write=True)
+            self.make_fugu_adversarial_escape_fake(bin_dir)
             self.make_fake(bin_dir, "codex")
             repo = root / "repo"
             repo.mkdir()
@@ -648,21 +749,14 @@ class LocalCliRunnerTests(unittest.TestCase):
                 },
                 cwd=repo,
             )
-            match = next(
-                line for line in result.stdout.splitlines()
-                if line.startswith("descendant-pid=<")
-            )
-            descendant_pid = int(match.removeprefix("descendant-pid=<").removesuffix(">"))
 
         self.assertEqual(result.returncode, 2, result.stderr)
-        self.assertIn("live descendants", result.stderr)
+        self.assertIn("qualified recursive process containment", result.stderr)
+        self.assertNotIn("provider-launched", result.stdout)
         self.assertNotIn("Fugu isolated-write handoff:", result.stderr)
-        self.assertFalse((repo / "late-output.txt").exists())
-        with self.assertRaises(ProcessLookupError):
-            os.kill(descendant_pid, 0)
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
-    def test_fugu_live_runtime_growth_limit_terminates_before_handoff(self) -> None:
+    def test_fugu_live_runtime_growth_limit_terminates_read_only_task(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             bin_dir = root / "bin"
@@ -674,7 +768,6 @@ class LocalCliRunnerTests(unittest.TestCase):
             subprocess.run(["git", "init", "-q", str(repo)], check=True)
             result = run_script(
                 "run_fugu.sh",
-                "--write",
                 "grow runtime state",
                 env={
                     "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
@@ -688,6 +781,59 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertIn("live resource budget", result.stderr)
         self.assertNotIn("Fugu isolated-write handoff:", result.stderr)
+
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    def test_fugu_live_runtime_scan_tolerates_concurrent_subtree_removal(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_capture_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
+            hook_dir = self.make_runtime_disappearance_hook(root)
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "inspect runtime race handling",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "PYTHONPATH": str(hook_dir),
+                    "SAKANA_API_KEY": "test-sakana-key",
+                },
+                cwd=repo,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("runtime audit failed closed", result.stderr)
+        self.assertNotIn("live resource budget", result.stderr)
+
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    def test_fugu_live_runtime_type_failure_is_not_mislabeled_as_budget(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_runtime_special_file_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "create unsupported runtime type",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "SAKANA_API_KEY": "test-sakana-key",
+                },
+                cwd=repo,
+            )
+
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("runtime audit failed closed", result.stderr)
+        self.assertIn("unsupported file type", result.stderr)
+        self.assertNotIn("exceeded its live resource budget", result.stderr)
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
     def test_fugu_ultra_event_parser_rejects_oversized_line_incrementally(self) -> None:
@@ -1038,7 +1184,9 @@ class LocalCliRunnerTests(unittest.TestCase):
         sys.platform == "darwin" and HAS_FS_SANDBOX,
         "Darwin filesystem sandbox unavailable",
     )
-    def test_fugu_timeout_avoids_reusable_numeric_process_group_signals(self) -> None:
+    def test_fugu_timeout_uses_native_cleanup_without_numeric_group_signal(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             bin_dir = root / "bin"
@@ -1076,47 +1224,34 @@ class LocalCliRunnerTests(unittest.TestCase):
         sys.platform == "darwin" and HAS_FS_SANDBOX,
         "Darwin filesystem sandbox unavailable",
     )
-    def test_fugu_unproved_timeout_cleanup_returns_125(self) -> None:
-        for profile_args, max_wait, explore_wait in (
-            ((), "0.2", None),
-            (
-                ("--ultra",),
-                "0.4",
-                "0.1",
-            ),
-        ):
-            with self.subTest(profile=profile_args or ("regular",)):
-                with tempfile.TemporaryDirectory() as tmpdir:
-                    root = Path(tmpdir)
-                    bin_dir = root / "bin"
-                    bin_dir.mkdir()
-                    sleeper = bin_dir / "codex-fugu"
-                    sleeper.write_text("#!/bin/sh\nsleep 5\n", encoding="utf-8")
-                    sleeper.chmod(0o755)
-                    self.make_fake(bin_dir, "codex")
-                    hook_dir = self.make_supervision_failure_hook(root)
-                    repo = root / "repo"
-                    repo.mkdir()
-                    subprocess.run(["git", "init", "-q", str(repo)], check=True)
-                    env = {
-                        "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
-                        "PYTHONPATH": str(hook_dir),
-                        "SAKANA_API_KEY": "test-sakana-key",
-                        "SAKANA_FUGU_MAX_WAIT_SECONDS": max_wait,
-                    }
-                    if explore_wait is not None:
-                        env["SAKANA_FUGU_ULTRA_EXPLORE_SECONDS"] = explore_wait
-                    result = run_script(
-                        "run_fugu.sh",
-                        *profile_args,
-                        "review",
-                        env=env,
-                        cwd=repo,
-                    )
+    def test_fugu_read_only_timeout_does_not_claim_recursive_containment(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            sleeper = bin_dir / "codex-fugu"
+            sleeper.write_text("#!/bin/sh\nsleep 5\n", encoding="utf-8")
+            sleeper.chmod(0o755)
+            self.make_fake(bin_dir, "codex")
+            hook_dir = self.make_supervision_failure_hook(root)
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "review",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "PYTHONPATH": str(hook_dir),
+                    "SAKANA_API_KEY": "test-sakana-key",
+                    "SAKANA_FUGU_MAX_WAIT_SECONDS": "0.2",
+                },
+                cwd=repo,
+            )
 
-                self.assertEqual(result.returncode, 125, result.stderr)
-                self.assertIn("could not prove descendant absence", result.stderr)
-                self.assertNotIn("Traceback", result.stderr)
+        self.assertEqual(result.returncode, 124, result.stderr)
+        self.assertNotIn("descendant absence", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
     def test_grok_uses_read_only_checked_key_scrubbed_non_bypass_mode(self) -> None:

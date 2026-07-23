@@ -667,13 +667,17 @@ python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup</code></pre>
             non-ignored untracked files. <code>--include</code> records an exact host-selected
             context file, but cannot override exclusions for ignored trees, credentials, Git/Elves
             state, executable agent configuration, unsafe file types/links, or repository escapes;
-            that exact path must actually be admitted and copied. Dotenv variants and host-owned
-            internal namespaces are always excluded.
+            that exact path must actually be admitted and copied. Both <code>.env.*</code> and
+            <code>*.env</code> dotenv-name families plus host-owned internal namespaces are always
+            excluded.
             General tasks are read-only unless the user separately authorizes implementation and
-            the host selects <code>--write</code>. That route edits only the disposable
-            kernel-isolated snapshot, then exports a bounded, mode-aware audited handoff for
-            inspection; it never changes the checkout or applies the handoff automatically. Live
-            writable-state limits and descendant settlement finish before success or audit. The
+            the host selects <code>--write</code>. That route also requires qualified recursive
+            Linux bwrap PID-namespace containment and is unavailable on macOS today. A qualified
+            write edits only the disposable kernel-isolated snapshot, then exports a bounded,
+            mode-aware audited handoff for inspection; it never changes the checkout or applies the
+            handoff automatically. Live writable-state limits tolerate benign disappearing
+            temporary subtrees and fail closed on other audit errors. macOS read-only cleanup is
+            best-effort and never proof of recursive containment. The
             Linux boundary omits procfs, and Codex's externally-sandboxed mode runs only inside
             Elves' mandatory outer boundary. Fugu uses regular
             <code>fugu/high</code> by default, <code>fugu/xhigh</code> with

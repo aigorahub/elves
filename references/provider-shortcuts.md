@@ -28,10 +28,10 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
   safe non-ignored untracked files. `--include <path>` records a host-selected exact file and
   requires that exact file to survive admission and copy; disappearance or rejection fails closed,
   and the manifest distinguishes requested from admitted paths. It does not override policy.
-  Ignored dependency/cache/build trees, every `.env.*` credential variant, other credential
-  names/suffixes, `.git`, `.elves`, executable agent configuration, symlinks, hard links, special
-  files, files owned by another user, out-of-repository paths, and oversized context fail closed or
-  remain excluded with bounded diagnostics. Source files cannot occupy the host-owned
+  Ignored dependency/cache/build trees, every `.env.*` and `*.env` credential-name variant, other
+  credential names/suffixes, `.git`, `.elves`, executable agent configuration, symlinks, hard
+  links, special files, files owned by another user, out-of-repository paths, and oversized context
+  fail closed or remain excluded with bounded diagnostics. Source files cannot occupy the host-owned
   `_elves_context`, `_elves_review`, `_instruction_evidence`, or `_elves_transport` namespaces.
   Prose instruction files move to inert evidence paths. Context is limited to 20,000 files, 512 MiB
   total, and 16 MiB per file. The runner does not paste repository bodies into the prompt; putting
@@ -39,11 +39,13 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
   host/Fugu task; admissibility remains the safety kernel's decision.
 
   General tasks are read-only by default. `--write` is valid only for a general task and requires
-  independent implementation authority from the surrounding user request. It changes the outer
-  boundary from a read-only to a writable mount for the disposable snapshot only. After the
-  provider exits successfully, the host first proves that the launcher and every observed
-  descendant are absent, then compares a pre-task digest-and-mode baseline with a second no-follow
-  audit. Credential-bearing, protected/ignored/instruction, symlink, hard-link, special,
+  independent implementation authority from the surrounding user request. It is enabled only when
+  the qualified outer boundary is Linux bwrap with a PID namespace that proves recursive teardown;
+  it fails before provider launch on macOS and any platform without that boundary. A qualified
+  write changes the outer boundary from read-only to writable for the disposable snapshot only.
+  After successful PID-namespace teardown, the host compares a pre-task digest-and-mode baseline
+  with a second no-follow audit. Credential-bearing, protected/ignored/instruction, symlink,
+  hard-link, special,
   unsafe-directory, unsafe-mode, over-count, or oversized output fails closed. Mode-only changes
   and new executable files are represented in the manifest; exported file bodies stay private at
   mode 0600 or owner-executable 0700. Accepted changed regular files and deletion records enter a
@@ -63,11 +65,13 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
   incrementally with bounded file and line reads. A live monitor covers snapshot, HOME, tmp, and
   XDG writable state; defaults allow at most 20,000 additional filesystem entries, 256 MiB
   aggregate growth, and 64 MiB per file before the provider is terminated and the result rejected.
-  Every profile closes input, disables launcher notices/updates, and has a hard wall-clock limit.
-  Linux uses PID-namespace teardown; macOS keeps the leader generation pinned while whole-group and
-  native-generation descendant cleanup complete. No success or write audit is reported before
-  absence is proven. If the boundary cannot be proven, the shortcut fails closed. The supported
-  profiles are:
+  Traversal tolerates only benign ENOENT/rename races from disappearing temporary generations;
+  permissions, ownership, unsupported types, and other audit failures remain fail-closed, and links
+  are never followed. Every profile closes input, disables launcher notices/updates, and has a hard
+  wall-clock limit. Linux writable mode uses authoritative PID-namespace teardown. macOS read-only
+  mode uses best-effort native-bound cleanup of observed processes; polling cannot prove recursive
+  absence and is never handoff authority. If a writable boundary cannot be proven, the shortcut
+  fails before provider launch. The supported profiles are:
 
   | Shortcut | Model / effort | Default wall limit | Use |
   |---|---|---:|---|

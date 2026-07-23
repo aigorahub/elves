@@ -47,14 +47,17 @@ assume `./scripts` belongs to the target repository and do not execute mappings 
   of a forced review rubric; review retains read-only base/change evidence and ordered findings.
   Both receive a bounded policy-admitted tracked plus non-ignored-untracked snapshot. The host may
   select exact context, but the safety kernel rejects ignored/credential/operational/configuration
-  paths (including dotenv variants and reserved internal namespaces), unsafe file types, links,
-  modes, races, and repository escapes. Exact includes must be admitted or fail. `--write` requires
-  independent user implementation authority, writes only the disposable kernel-isolated snapshot,
-  and returns a mode-aware audited inert handoff that is never applied automatically. Live
-  writable-state bounds and generation-safe descendant settlement complete before success or
-  handoff audit. No Linux procfs is mounted; Codex external-sandbox mode runs inside the mandatory
-  outer boundary. Profiles remain `fugu/high`, `fugu/xhigh` for `--deep`, and `fugu-ultra/high` for
-  `--ultra`; Ultra uses exact-session staged synthesis and bounded incremental event parsing.
+  paths (including both `.env.*` and `*.env` variants and reserved internal namespaces), unsafe
+  file types, links, modes, races, and repository escapes. Exact includes must be admitted or fail.
+  `--write` also requires independent user implementation authority and a qualified recursive
+  Linux bwrap PID-namespace boundary; it is unavailable on macOS, whose process polling cannot
+  prove recursive containment. Qualified writes return a mode-aware audited inert handoff that is
+  never applied automatically. Live writable-state bounds tolerate benign temporary-tree
+  disappearance races while failing closed on other audit errors. Read-only macOS cleanup is
+  best-effort and non-authoritative. No Linux procfs is mounted; Codex external-sandbox mode runs
+  inside the mandatory outer boundary. Profiles remain `fugu/high`, `fugu/xhigh` for `--deep`, and
+  `fugu-ultra/high` for `--ultra`; Ultra uses exact-session staged synthesis and bounded incremental
+  event parsing.
 - Manus research → `run_manus.sh <topic>` for one private bounded task, or
   `run_manus.sh --wide --items-file <roster.json> [--file <source>] <goal>` for Cobbler-managed
   native-Wide-first research with exact coverage repair; use `--fanout` for deterministic

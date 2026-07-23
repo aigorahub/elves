@@ -214,17 +214,22 @@ required capability, then execute it without an extra confirmation prompt:
   fugu review <scope>`, or “do a Fugu review …” selects the explicit read-only review contract.
   Both use a Git-enumerated snapshot containing policy-admitted tracked and non-ignored untracked
   files; `--include <path>` must admit and copy exact host-selected context or fail, while immutable
-  safety policy rejects ignored, dotenv/credential, operational/internal-namespace,
+  safety policy rejects ignored, both `.env.*` and `*.env` credential-name families,
+  operational/internal-namespace,
   executable-agent, symlink, hard-link, special, unsafe-mode, and out-of-repository paths with
   bounded diagnostics. General tasks are read-only unless the surrounding request independently
-  authorizes implementation and the host passes `--write`. That route may edit only the disposable
+  authorizes implementation and the host passes `--write`. That route additionally requires a
+  qualified recursive Linux bwrap PID-namespace boundary, so it fails before provider launch on
+  macOS and any other platform without one. A qualified write may edit only the disposable
   kernel-isolated snapshot and exports a bounded, mode-aware audited inert handoff for host
   inspection; it never edits the checkout or applies the handoff.
   The required outer filesystem sandbox remains the read/write authority, and the Linux boundary
   omits procfs so model-directed commands cannot inspect the credential-bearing parent environment.
   Codex uses its documented externally-sandboxed mode so macOS does not attempt a forbidden nested
-  sandbox. Live writable-state limits and descendant settlement complete before success or handoff
-  audit. The default is regular `fugu/high`; `--deep` selects `fugu/xhigh`, and `--ultra` selects
+  sandbox. Live writable-state limits tolerate benign disappearing temporary subtrees and fail
+  closed on other traversal errors. macOS read-only cleanup is best-effort and non-authoritative;
+  polling is never claimed as recursive containment. The default is regular `fugu/high`; `--deep`
+  selects `fugu/xhigh`, and `--ultra` selects
   `fugu-ultra/high`. Regular and deep are ephemeral one-shot sessions. Ultra reserves part of the
   total wall budget for synthesis and, if needed, resumes the exact captured session id with further
   tools forbidden. It never guesses a “last” session; raw events are parsed incrementally under a

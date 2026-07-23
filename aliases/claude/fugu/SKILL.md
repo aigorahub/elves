@@ -17,10 +17,13 @@ Load the installed `elves` skill's **Provider shortcut protocols** and
 keep the target repository as the working directory, pass through the validated mode/profile/context,
 and run it. Plain `/fugu <task>` is a general read-only task whose answer follows the request;
 `/fugu review <scope>` is the opinionated read-only review. Use `--write` only when the user's
-surrounding request independently authorizes implementation. It writes solely inside the
-disposable kernel-isolated snapshot and returns a bounded mode-aware audited handoff for host
-inspection, never an automatic checkout edit. Exact includes must be admitted and copied; live
-writable-state limits and descendant settlement finish before success or audit.
+surrounding request independently authorizes implementation and the platform provides qualified
+recursive Linux bwrap PID-namespace containment. It is unavailable on macOS today. A qualified
+write edits solely inside the disposable kernel-isolated snapshot and returns a bounded mode-aware
+audited handoff for host inspection, never an automatic checkout edit. Exact includes must be
+admitted and copied; both `.env.*` and `*.env` names are excluded. Live writable-state limits
+tolerate benign disappearing temporary subtrees and fail closed on other audit errors. macOS
+read-only cleanup remains best-effort and never claims recursive containment.
 
 The runner uses the official `codex-fugu` launcher with policy-admitted tracked and non-ignored
 untracked context, closed interactive input, and a hard wall-clock bound. It selects regular
