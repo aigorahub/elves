@@ -23,6 +23,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
+import cobbler_runtime.isolation as isolation  # noqa: E402
 from cobbler_runtime.dispatch_models import (  # noqa: E402
     AttemptResult,
     LaneResult,
@@ -686,7 +687,94 @@ class IsolationSnapshotRegressionTests(unittest.TestCase):
                     )
                 )
                 self.assertEqual(manifest["requested_paths"], ["new_test.py"])
+                self.assertEqual(
+                    manifest["admitted_requested_paths"], ["new_test.py"]
+                )
                 self.assertEqual(manifest["untracked_files"], 2)
+            finally:
+                lane.cleanup()
+
+    def test_worktree_snapshot_excludes_dotenv_variant_category(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            repo.mkdir()
+            _init_repo(repo)
+            (repo / "safe.txt").write_text("safe\n", encoding="utf-8")
+            (repo / ".env.staging").write_text("STAGING_SECRET=1\n", encoding="utf-8")
+            nested = repo / "config"
+            nested.mkdir()
+            (nested / ".env.development.local").write_text(
+                "LOCAL_SECRET=1\n", encoding="utf-8"
+            )
+            _commit_all(repo)
+            (repo / ".env.preview").write_text("PREVIEW_SECRET=1\n", encoding="utf-8")
+
+            lane = create_tracked_snapshot(
+                IsolationSpec(
+                    repo_root=repo,
+                    lane_id="dotenv-variants",
+                    include_untracked=True,
+                )
+            )
+            try:
+                self.assertTrue((lane.snapshot / "safe.txt").is_file())
+                for rel in (
+                    ".env.staging",
+                    "config/.env.development.local",
+                    ".env.preview",
+                ):
+                    self.assertFalse((lane.snapshot / rel).exists(), rel)
+                manifest = json.loads(
+                    (lane.snapshot / "_elves_context" / "manifest.json").read_text(
+                        encoding="utf-8"
+                    )
+                )
+                excluded = {
+                    item["path"]: item["reason"]
+                    for item in manifest["diagnostics"]
+                }
+                self.assertEqual(excluded[".env.staging"], "policy")
+                self.assertEqual(
+                    excluded["config/.env.development.local"], "policy"
+                )
+                self.assertEqual(excluded[".env.preview"], "policy")
+            finally:
+                lane.cleanup()
+
+    def test_snapshot_reserves_internal_namespaces_before_source_copy(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            repo.mkdir()
+            _init_repo(repo)
+            source_paths = (
+                "_elves_context/manifest.json",
+                "_elves_review/source.txt",
+                "_instruction_evidence/source.txt",
+                "_elves_transport/source.txt",
+            )
+            for rel in source_paths:
+                target = repo / rel
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(f"repository source: {rel}\n", encoding="utf-8")
+            _commit_all(repo)
+
+            lane = create_tracked_snapshot(
+                IsolationSpec(repo_root=repo, lane_id="reserved-namespaces")
+            )
+            try:
+                manifest_path = lane.snapshot / "_elves_context" / "manifest.json"
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                self.assertEqual(manifest["schema_version"], 1)
+                excluded = {
+                    item["path"]: item["reason"]
+                    for item in manifest["diagnostics"]
+                }
+                for rel in source_paths:
+                    self.assertEqual(excluded[rel], "internal_namespace")
+                self.assertFalse((lane.snapshot / "_elves_review").exists())
+                self.assertFalse((lane.snapshot / "_instruction_evidence").exists())
+                self.assertFalse((lane.snapshot / "_elves_transport").exists())
+                self.assertNotIn("repository source", manifest_path.read_text())
             finally:
                 lane.cleanup()
 
@@ -720,6 +808,44 @@ class IsolationSnapshotRegressionTests(unittest.TestCase):
                         )
                     )
                 self.assertEqual(ctx.exception.code, expected)
+
+    def test_requested_context_disappearance_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo = root / "repo"
+            repo.mkdir()
+            _init_repo(repo)
+            selected = repo / "selected.txt"
+            selected.write_text("selected\n", encoding="utf-8")
+            real_copy = isolation._copy_tracked_regular_file
+            isolation_root = root / "known-isolation-root"
+
+            def remove_before_copy(repo_root, rel, destination, **kwargs):
+                if rel == "selected.txt":
+                    selected.unlink(missing_ok=True)
+                return real_copy(repo_root, rel, destination, **kwargs)
+
+            with mock.patch(
+                "cobbler_runtime.isolation.tempfile.mkdtemp",
+                side_effect=lambda **_kwargs: str(
+                    isolation_root.mkdir() or isolation_root
+                ),
+            ), mock.patch(
+                "cobbler_runtime.isolation._copy_tracked_regular_file",
+                side_effect=remove_before_copy,
+            ), self.assertRaises(ValidationIssue) as ctx:
+                create_tracked_snapshot(
+                    IsolationSpec(
+                        repo_root=repo,
+                        lane_id="requested-disappeared",
+                        include_paths=("selected.txt",),
+                    )
+                )
+
+            self.assertEqual(
+                ctx.exception.code, "isolation_requested_path_unavailable"
+            )
+            self.assertFalse(isolation_root.exists())
 
     def test_safe_worktree_snapshot_rejects_untracked_symlink_and_hardlink(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -894,6 +1020,7 @@ class IsolationSnapshotRegressionTests(unittest.TestCase):
                 "symlink",
                 "hardlink",
                 "unsafe-directory",
+                "unsafe-mode",
             ]
             if hasattr(os, "mkfifo"):
                 cases.append("special")
@@ -925,6 +1052,11 @@ class IsolationSnapshotRegressionTests(unittest.TestCase):
                             )
                         elif case == "unsafe-directory":
                             (lane.snapshot / ".git").mkdir()
+                        elif case == "unsafe-mode":
+                            (lane.snapshot / "output.txt").write_text(
+                                "unsafe mode\n", encoding="utf-8"
+                            )
+                            (lane.snapshot / "output.txt").chmod(0o777)
                         else:
                             os.mkfifo(lane.snapshot / "output.pipe")
                         with self.assertRaises(ValidationIssue) as ctx:
@@ -939,11 +1071,67 @@ class IsolationSnapshotRegressionTests(unittest.TestCase):
                             "symlink": "isolation_tracked_symlink",
                             "hardlink": "isolation_tracked_hardlink",
                             "unsafe-directory": "isolation_handoff_forbidden_path",
+                            "unsafe-mode": "isolation_handoff_unsafe_mode",
                             "special": "isolation_tracked_nonregular",
                         }[case]
                         self.assertEqual(ctx.exception.code, expected)
                     finally:
                         lane.cleanup()
+
+    def test_writable_handoff_preserves_mode_only_and_new_executable_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo = root / "repo"
+            repo.mkdir()
+            _init_repo(repo)
+            existing = repo / "existing.sh"
+            existing.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            existing.chmod(0o644)
+            _commit_all(repo)
+            lane = create_tracked_snapshot(
+                IsolationSpec(
+                    repo_root=repo,
+                    lane_id="write-executable-modes",
+                    snapshot_writable=True,
+                )
+            )
+            try:
+                baseline = capture_snapshot_state(lane)
+                snapshot_existing = lane.snapshot / "existing.sh"
+                snapshot_existing.chmod(0o755)
+                added = lane.snapshot / "added.sh"
+                added.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+                added.chmod(0o755)
+                destination = root / "handoff"
+
+                with mock.patch(
+                    "cobbler_runtime.isolation.tempfile.mkdtemp",
+                    side_effect=lambda **_kwargs: str(
+                        destination.mkdir() or destination
+                    ),
+                ):
+                    handoff = export_snapshot_handoff(lane, baseline)
+
+                manifest = json.loads(
+                    (handoff / "manifest.json").read_text(encoding="utf-8")
+                )
+                changes = {item["path"]: item for item in manifest["changes"]}
+                self.assertEqual(set(changes), {"added.sh", "existing.sh"})
+                self.assertEqual(changes["existing.sh"]["before_mode"], 0o644)
+                self.assertEqual(changes["existing.sh"]["after_mode"], 0o755)
+                self.assertEqual(changes["existing.sh"]["export_mode"], 0o700)
+                self.assertEqual(changes["added.sh"]["after_mode"], 0o755)
+                self.assertEqual(changes["added.sh"]["export_mode"], 0o700)
+                self.assertEqual(
+                    stat.S_IMODE((handoff / "files" / "existing.sh").stat().st_mode),
+                    0o700,
+                )
+                self.assertEqual(
+                    stat.S_IMODE((handoff / "files" / "added.sh").stat().st_mode),
+                    0o700,
+                )
+            finally:
+                lane.cleanup()
 
     def test_non_git_workspace_fails_closed_and_cleans_partial_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

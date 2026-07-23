@@ -143,6 +143,7 @@ if [ "${#INCLUDE_PATHS[@]}" -gt 0 ]; then
 fi
 exec python3 - "${PYTHON_ARGS[@]}" <<'PY'
 import ast
+import asyncio
 import errno
 import json
 import math
@@ -153,6 +154,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import threading
 import time
 
 
@@ -179,7 +181,26 @@ from cobbler_runtime.isolation import (  # noqa: E402
     source_path_allowed_at_original_location,
     wrap_argv_with_sandbox,
 )
+from cobbler_runtime.dispatch_external import (  # noqa: E402
+    _DescendantSupervisor,
+    _darwin_process_record,
+    _require_darwin_generation_signaling,
+    _terminate_supervised_descendants,
+)
 from cobbler_runtime.schema import ValidationIssue  # noqa: E402
+
+
+def positive_int_env(name: str, default: int) -> int:
+    raw = parent_env.get(name) if "parent_env" in globals() else os.environ.get(name)
+    if raw in {None, ""}:
+        return default
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise SystemExit(f"Error: {name} must be a positive integer.") from exc
+    if value <= 0:
+        raise SystemExit(f"Error: {name} must be a positive integer.")
+    return value
 
 
 def secure_regular(path: Path, *, private: bool = False, max_bytes: int = 8 * 1024 * 1024) -> bool:
@@ -267,8 +288,333 @@ def toml_string(path: Path, key: str, *, section: str | None = None) -> str:
     return ""
 
 
+def runtime_tree_usage(roots: tuple[Path, ...]) -> tuple[int, int, tuple[str, int] | None]:
+    entries = 0
+    total_bytes = 0
+    largest: tuple[str, int] | None = None
+    errors: list[OSError] = []
+
+    def record_error(exc: OSError) -> None:
+        errors.append(exc)
+
+    for root in roots:
+        for current, directories, names in os.walk(
+            root,
+            topdown=True,
+            followlinks=False,
+            onerror=record_error,
+        ):
+            directories.sort()
+            names.sort()
+            current_path = Path(current)
+            entries += len(directories)
+            for name in names:
+                path = current_path / name
+                try:
+                    info = path.lstat()
+                except FileNotFoundError:
+                    continue
+                except OSError as exc:
+                    errors.append(exc)
+                    continue
+                if not stat.S_ISREG(info.st_mode):
+                    entries += 1
+                    continue
+                entries += 1
+                total_bytes += info.st_size
+                if largest is None or info.st_size > largest[1]:
+                    try:
+                        display = path.relative_to(root).as_posix()
+                    except ValueError:
+                        display = str(path)
+                    largest = (f"{root.name}/{display}", info.st_size)
+    if errors:
+        raise ValidationIssue(
+            "fugu_runtime_monitor_failed",
+            f"Cannot audit provider-writable runtime state: {errors[0]}",
+        )
+    return entries, total_bytes, largest
+
+
+class RuntimeBudget:
+    """Live bounded-growth monitor for every provider-writable lane directory."""
+
+    def __init__(
+        self,
+        roots: tuple[Path, ...],
+        *,
+        max_growth_files: int,
+        max_growth_bytes: int,
+        max_file_bytes: int,
+    ) -> None:
+        self.roots = roots
+        self.max_growth_files = max_growth_files
+        self.max_growth_bytes = max_growth_bytes
+        self.max_file_bytes = max_file_bytes
+        self.baseline_files, self.baseline_bytes, _ = runtime_tree_usage(roots)
+        self.violation: str | None = None
+        self._stop: threading.Event | None = None
+        self._thread: threading.Thread | None = None
+
+    def _check(self) -> None:
+        entries, total_bytes, largest = runtime_tree_usage(self.roots)
+        if largest is not None and largest[1] > self.max_file_bytes:
+            self.violation = (
+                f"file {largest[0]} reached {largest[1]} bytes "
+                f"(limit {self.max_file_bytes})"
+            )
+        elif entries - self.baseline_files > self.max_growth_files:
+            self.violation = (
+                f"writable state grew by {entries - self.baseline_files} entries "
+                f"(limit {self.max_growth_files})"
+            )
+        elif total_bytes - self.baseline_bytes > self.max_growth_bytes:
+            self.violation = (
+                f"writable state grew by {total_bytes - self.baseline_bytes} bytes "
+                f"(limit {self.max_growth_bytes})"
+            )
+
+    def start_phase(self, process: subprocess.Popen[str]) -> None:
+        if self._thread is not None:
+            raise RuntimeError("runtime budget monitor is already active")
+        stop = threading.Event()
+        self._stop = stop
+
+        def monitor() -> None:
+            while not stop.is_set() and self.violation is None:
+                try:
+                    self._check()
+                except BaseException as exc:
+                    self.violation = (
+                        f"runtime monitor failed closed: {type(exc).__name__}: {exc}"
+                    )
+                if self.violation is not None:
+                    try:
+                        os.killpg(process.pid, signal.SIGTERM)
+                    except OSError:
+                        pass
+                    return
+                stop.wait(0.1)
+
+        thread = threading.Thread(
+            target=monitor,
+            name="elves-fugu-runtime-budget",
+            daemon=True,
+        )
+        self._thread = thread
+        thread.start()
+
+    def stop_phase(self) -> str | None:
+        stop = self._stop
+        thread = self._thread
+        self._stop = None
+        self._thread = None
+        if stop is not None:
+            stop.set()
+        if thread is not None:
+            thread.join(timeout=2.0)
+            if thread.is_alive() and self.violation is None:
+                self.violation = "runtime monitor could not be stopped"
+        return self.violation
+
+
+class PhaseContainment:
+    """Generation-safe macOS supervision; Linux relies on bwrap PID teardown."""
+
+    def __init__(self, lane) -> None:
+        self.lane = lane
+        self.supervisor: _DescendantSupervisor | None = None
+        self.pgid: int | None = None
+        self._stop: threading.Event | None = None
+        self._thread: threading.Thread | None = None
+        if lane.process_containment == "host-supervised":
+            if (
+                sys.platform != "darwin"
+                or not lane.supervisor_executable
+                or not lane.supervision_token
+            ):
+                raise ValidationIssue(
+                    "fugu_descendant_supervision_unavailable",
+                    "Fugu host-supervised containment is not fully qualified",
+                )
+            _require_darwin_generation_signaling()
+            # Positional construction also keeps the shipped shell wrapper from
+            # looking like it contains a credential assignment to release scans.
+            self.supervisor = _DescendantSupervisor(
+                lane.supervisor_executable,
+                lane.supervision_token,
+                0,
+                {},
+            )
+
+    def bind(self, process: subprocess.Popen[str]) -> None:
+        try:
+            self.pgid = os.getpgid(process.pid)
+        except OSError:
+            self.pgid = None
+        supervisor = self.supervisor
+        if supervisor is None:
+            return
+        supervisor.root_pid = process.pid
+        supervisor.root_absence_proven = False
+        try:
+            root = _darwin_process_record(process.pid)
+        except ValidationIssue as exc:
+            supervisor.error = f"descendant_identity_failed:{exc.message}"
+            root = None
+        if root is None:
+            supervisor.root_absence_proven = True
+        else:
+            supervisor.known_pids[process.pid] = root
+        try:
+            asyncio.run(supervisor.scan())
+        except BaseException as exc:
+            supervisor.error = (
+                f"descendant_scan_failed:{type(exc).__name__}:{exc}"
+            )
+        stop = threading.Event()
+        self._stop = stop
+
+        def monitor() -> None:
+            while not stop.wait(0.1) and supervisor.error is None:
+                try:
+                    asyncio.run(supervisor.scan())
+                except BaseException as exc:
+                    supervisor.error = (
+                        f"descendant_scan_failed:{type(exc).__name__}:{exc}"
+                    )
+
+        thread = threading.Thread(
+            target=monitor,
+            name="elves-fugu-descendants",
+            daemon=True,
+        )
+        self._thread = thread
+        thread.start()
+
+    def _stop_monitor(self) -> bool:
+        stop = self._stop
+        thread = self._thread
+        self._stop = None
+        self._thread = None
+        if stop is not None:
+            stop.set()
+        if thread is not None:
+            thread.join(timeout=2.0)
+            return not thread.is_alive()
+        return True
+
+    def settle(
+        self,
+        process: subprocess.Popen[str],
+        *,
+        deadline: float,
+        force: bool,
+    ) -> tuple[bool, bool]:
+        supervisor = self.supervisor
+        if supervisor is not None:
+            monitor_stopped = self._stop_monitor()
+            try:
+                records = asyncio.run(supervisor.scan())
+            except BaseException:
+                records = {}
+            group_descendants = {
+                pid
+                for pid, record in records.items()
+                if self.pgid is not None
+                and record.pgid == self.pgid
+                and pid != process.pid
+                and not record.zombie
+            }
+            if force or group_descendants:
+                try:
+                    if self.pgid is None:
+                        raise ProcessLookupError
+                    os.killpg(self.pgid, signal.SIGTERM)
+                except OSError:
+                    pass
+            try:
+                remaining = max(0.01, deadline - time.monotonic())
+                cleanup = asyncio.run(
+                    asyncio.wait_for(
+                        _terminate_supervised_descendants(supervisor),
+                        timeout=remaining,
+                    )
+                )
+            except BaseException:
+                cleanup = {
+                    "descendants_absent": False,
+                    "descendants_found": [],
+                    "supervision_error": "generation-safe cleanup failed",
+                }
+            try:
+                records = asyncio.run(supervisor.scan())
+            except BaseException:
+                records = {}
+            remaining_group = {
+                pid
+                for pid, record in records.items()
+                if self.pgid is not None
+                and record.pgid == self.pgid
+                and pid != process.pid
+                and not record.zombie
+            }
+            if remaining_group:
+                try:
+                    if self.pgid is None:
+                        raise ProcessLookupError
+                    os.killpg(self.pgid, signal.SIGKILL)
+                except OSError:
+                    pass
+                time.sleep(min(0.05, max(0.0, deadline - time.monotonic())))
+                try:
+                    records = asyncio.run(supervisor.scan())
+                except BaseException:
+                    records = {}
+                remaining_group = {
+                    pid
+                    for pid, record in records.items()
+                    if self.pgid is not None
+                    and record.pgid == self.pgid
+                    and pid != process.pid
+                    and not record.zombie
+                }
+            remaining = max(0.0, deadline - time.monotonic())
+            try:
+                process.wait(timeout=remaining)
+                reaped = True
+            except (subprocess.TimeoutExpired, ChildProcessError):
+                reaped = False
+            proven = bool(
+                monitor_stopped
+                and reaped
+                and cleanup.get("descendants_absent")
+                and not cleanup.get("supervision_error")
+                and not remaining_group
+            )
+            return proven, bool(
+                group_descendants or cleanup.get("descendants_found")
+            )
+
+        if (
+            self.lane.process_containment == "pid-namespace"
+            and process.returncode is not None
+        ):
+            return process.returncode is not None, False
+        return terminate_group(process, deadline=deadline), False
+
+
 parent_env = dict(os.environ)
 parent_path = parent_env.get("PATH", "/usr/bin:/bin")
+runtime_max_growth_bytes = positive_int_env(
+    "SAKANA_FUGU_RUNTIME_MAX_GROWTH_BYTES", 256 * 1024 * 1024
+)
+runtime_max_growth_files = positive_int_env(
+    "SAKANA_FUGU_RUNTIME_MAX_GROWTH_FILES", 20_000
+)
+runtime_max_file_bytes = positive_int_env(
+    "SAKANA_FUGU_RUNTIME_MAX_FILE_BYTES", 64 * 1024 * 1024
+)
 sakana_env_name = "SAKANA_API_KEY"
 launcher = shutil.which("codex-fugu", path=parent_path)
 real_codex = parent_env.get("CODEX_FUGU_REAL_CODEX") or shutil.which(
@@ -607,6 +953,19 @@ Task: {mapped_task}
 unless the task itself explicitly requests them."""
 
         baseline = capture_snapshot_state(lane) if writable else {}
+        runtime_budget = RuntimeBudget(
+            (
+                lane.snapshot,
+                lane.home,
+                lane.tmp,
+                lane.xdg_config,
+                lane.xdg_cache,
+                lane.xdg_data,
+            ),
+            max_growth_files=runtime_max_growth_files,
+            max_growth_bytes=runtime_max_growth_bytes,
+            max_file_bytes=runtime_max_file_bytes,
+        )
 
         lane.env.update(
             {
@@ -672,6 +1031,102 @@ unless the task itself explicitly requests them."""
             except subprocess.TimeoutExpired:
                 return False
 
+        def start_phase(
+            command: list[str],
+            *,
+            stdout=None,
+            stderr=None,
+        ) -> tuple[subprocess.Popen[str], PhaseContainment]:
+            containment = PhaseContainment(lane)
+            process = subprocess.Popen(
+                command,
+                cwd=lane.snapshot,
+                env=lane.env,
+                stdin=subprocess.PIPE,
+                stdout=stdout,
+                stderr=stderr,
+                text=True,
+                start_new_session=True,
+            )
+            try:
+                containment.bind(process)
+                runtime_budget.start_phase(process)
+            except BaseException as original:
+                runtime_budget.stop_phase()
+                proven, _ = containment.settle(
+                    process,
+                    deadline=time.monotonic() + shutdown_budget,
+                    force=True,
+                )
+                if not proven:
+                    print(
+                        "Error: Fugu post-launch setup failed and descendant "
+                        "absence could not be proved.",
+                        file=sys.stderr,
+                    )
+                    raise SystemExit(125) from original
+                raise
+            return process, containment
+
+        def wait_phase_input(
+            process: subprocess.Popen[str],
+            containment: PhaseContainment,
+            input_text: str,
+            *,
+            timeout: float,
+        ) -> None:
+            try:
+                if process.stdin is not None:
+                    process.stdin.write(input_text)
+                    process.stdin.close()
+            except BrokenPipeError:
+                pass
+            if containment.supervisor is None:
+                process.wait(timeout=timeout)
+                return
+            wait_deadline = time.monotonic() + timeout
+            wait_flags = os.WEXITED | os.WNOHANG | os.WNOWAIT
+            while True:
+                observed = os.waitid(os.P_PID, process.pid, wait_flags)
+                if observed is not None and observed.si_pid == process.pid:
+                    return
+                if time.monotonic() >= wait_deadline:
+                    raise subprocess.TimeoutExpired(process.args, timeout)
+                time.sleep(0.02)
+
+        def settle_phase(
+            process: subprocess.Popen[str],
+            containment: PhaseContainment,
+            *,
+            deadline: float,
+            force: bool,
+            cleanup_error: str,
+            reject_success_descendants: bool,
+        ) -> None:
+            violation = runtime_budget.stop_phase()
+            proven, descendants_found = containment.settle(
+                process,
+                deadline=deadline,
+                force=force or violation is not None,
+            )
+            if not proven:
+                print(cleanup_error, file=sys.stderr)
+                raise SystemExit(125)
+            if violation is not None:
+                print(
+                    f"Error: Fugu writable runtime exceeded its live resource "
+                    f"budget: {violation}.",
+                    file=sys.stderr,
+                )
+                raise SystemExit(2)
+            if reject_success_descendants and descendants_found:
+                print(
+                    "Error: Fugu launcher exited with live descendants; Elves "
+                    "terminated them and rejected the result.",
+                    file=sys.stderr,
+                )
+                raise SystemExit(2)
+
         def finish(code: int) -> None:
             if code == 0 and writable:
                 handoff = export_snapshot_handoff(
@@ -722,40 +1177,70 @@ unless the task itself explicitly requests them."""
             )
             started = time.monotonic()
             deadline = started + max_wait
-            process = subprocess.Popen(
-                command,
-                cwd=lane.snapshot,
-                env=lane.env,
-                stdin=subprocess.PIPE,
-                text=True,
-                start_new_session=True,
-            )
+            process, containment = start_phase(command)
             try:
                 active_wait = deadline - time.monotonic() - shutdown_budget
                 if active_wait <= 0:
-                    if not terminate_group(process, deadline=deadline):
-                        print(
-                            "Error: Fugu timeout cleanup could not reap the launcher "
-                            "within the hard wall budget.",
-                            file=sys.stderr,
-                        )
-                        raise SystemExit(125)
+                    settle_phase(
+                        process,
+                        containment,
+                        deadline=deadline,
+                        force=True,
+                        cleanup_error=(
+                            "Error: Fugu timeout cleanup could not prove descendant "
+                            "absence within the hard wall budget."
+                        ),
+                        reject_success_descendants=False,
+                    )
                     raise SystemExit(124)
-                process.communicate(prompt, timeout=active_wait)
+                wait_phase_input(
+                    process,
+                    containment,
+                    prompt,
+                    timeout=active_wait,
+                )
             except subprocess.TimeoutExpired:
                 print(
                     f"Error: codex-fugu {model}/{effort} task exceeded "
                     f"{max_wait:g}s; terminating it.",
                     file=sys.stderr,
                 )
-                if not terminate_group(process, deadline=deadline):
-                    print(
-                        "Error: Fugu timeout cleanup could not reap the launcher "
-                        "within the hard wall budget.",
-                        file=sys.stderr,
-                    )
-                    raise SystemExit(125)
+                settle_phase(
+                    process,
+                    containment,
+                    deadline=deadline,
+                    force=True,
+                    cleanup_error=(
+                        "Error: Fugu timeout cleanup could not prove descendant "
+                        "absence within the hard wall budget."
+                    ),
+                    reject_success_descendants=False,
+                )
                 raise SystemExit(124)
+            except SystemExit:
+                raise
+            except BaseException:
+                settle_phase(
+                    process,
+                    containment,
+                    deadline=deadline,
+                    force=True,
+                    cleanup_error=(
+                        "Error: Fugu failure cleanup could not prove descendant absence."
+                    ),
+                    reject_success_descendants=False,
+                )
+                raise
+            settle_phase(
+                process,
+                containment,
+                deadline=deadline,
+                force=False,
+                cleanup_error=(
+                    "Error: Fugu success cleanup could not prove descendant absence."
+                ),
+                reject_success_descendants=True,
+            )
             finish(process.returncode)
 
         synthesis_floor = min(60.0, max_wait / 3.0)
@@ -784,13 +1269,54 @@ unless the task itself explicitly requests them."""
 
         raw_path = lane.tmp / "fugu-ultra-events.jsonl"
         final_path = lane.tmp / "fugu-ultra-final.txt"
+        max_event_line_bytes = min(runtime_max_file_bytes, 1024 * 1024)
+
+        def event_lines(*, offset: int = 0):
+            try:
+                info = raw_path.lstat()
+            except OSError:
+                return
+            if (
+                raw_path.is_symlink()
+                or not stat.S_ISREG(info.st_mode)
+                or info.st_uid != os.geteuid()
+                or info.st_nlink != 1
+            ):
+                raise ValidationIssue(
+                    "fugu_ultra_event_file_invalid",
+                    "Fugu Ultra event output is not a safe regular file",
+                    path=str(raw_path),
+                )
+            if info.st_size > runtime_max_file_bytes:
+                raise ValidationIssue(
+                    "fugu_ultra_event_file_limit",
+                    f"Fugu Ultra event output exceeds {runtime_max_file_bytes} bytes",
+                    path=str(raw_path),
+                )
+            if offset < 0 or offset > info.st_size:
+                raise ValidationIssue(
+                    "fugu_ultra_event_offset_invalid",
+                    "Fugu Ultra event offset is outside the bounded event file",
+                    path=str(raw_path),
+                )
+            remaining = info.st_size - offset
+            with raw_path.open("rb") as handle:
+                handle.seek(offset)
+                while remaining > 0:
+                    line = handle.readline(min(max_event_line_bytes + 1, remaining + 1))
+                    if not line:
+                        break
+                    remaining -= len(line)
+                    if len(line) > max_event_line_bytes:
+                        raise ValidationIssue(
+                            "fugu_ultra_event_line_limit",
+                            f"Fugu Ultra event line exceeds {max_event_line_bytes} bytes",
+                            path=str(raw_path),
+                        )
+                    yield line.decode("utf-8", errors="replace").rstrip("\r\n")
 
         def thread_id_from_events() -> str:
-            try:
-                lines = raw_path.read_text(encoding="utf-8", errors="replace").splitlines()
-            except OSError:
-                return ""
-            for line in lines:
+            for line in event_lines():
                 try:
                     event = json.loads(line)
                 except json.JSONDecodeError:
@@ -803,16 +1329,8 @@ unless the task itself explicitly requests them."""
             return ""
 
         def final_from_events(*, offset: int = 0) -> str:
-            try:
-                size = raw_path.stat().st_size
-                start = max(offset, size - (4 * 1024 * 1024))
-                with raw_path.open("rb") as handle:
-                    handle.seek(start)
-                    lines = handle.read().decode("utf-8", errors="replace").splitlines()
-            except OSError:
-                return ""
-            messages: list[str] = []
-            for line in lines:
+            final_message = ""
+            for line in event_lines(offset=offset):
                 try:
                     event = json.loads(line)
                 except json.JSONDecodeError:
@@ -825,8 +1343,8 @@ unless the task itself explicitly requests them."""
                     and item.get("type") == "agent_message"
                     and isinstance(item.get("text"), str)
                 ):
-                    messages.append(item["text"])
-            return messages[-1].strip() if messages else ""
+                    final_message = item["text"]
+            return final_message.strip()
 
         def emit_final(*, event_offset: int = 0) -> bool:
             final = ""
@@ -864,15 +1382,10 @@ unless the task itself explicitly requests them."""
         total_deadline = started + max_wait
         exploration_cutoff = False
         with raw_path.open("w", encoding="utf-8") as raw_handle:
-            process = subprocess.Popen(
+            process, containment = start_phase(
                 initial,
-                cwd=lane.snapshot,
-                env=lane.env,
-                stdin=subprocess.PIPE,
                 stdout=raw_handle,
                 stderr=raw_handle,
-                text=True,
-                start_new_session=True,
             )
             try:
                 active_explore_wait = min(
@@ -883,30 +1396,74 @@ unless the task itself explicitly requests them."""
                     - synthesis_floor,
                 )
                 if active_explore_wait <= 0:
-                    if not terminate_group(
-                        process, deadline=total_deadline - synthesis_floor
-                    ):
-                        print(
-                            "Error: Fugu Ultra exploration cleanup could not reap the "
-                            "launcher within its reserved wall budget.",
-                            file=sys.stderr,
-                        )
-                        raise SystemExit(125)
+                    settle_phase(
+                        process,
+                        containment,
+                        deadline=total_deadline - synthesis_floor,
+                        force=True,
+                        cleanup_error=(
+                            "Error: Fugu Ultra exploration cleanup could not prove "
+                            "descendant absence within its reserved wall budget."
+                        ),
+                        reject_success_descendants=False,
+                    )
                     raise SystemExit(124)
-                process.communicate(prompt, timeout=active_explore_wait)
+                wait_phase_input(
+                    process,
+                    containment,
+                    prompt,
+                    timeout=active_explore_wait,
+                )
             except subprocess.TimeoutExpired:
                 exploration_cutoff = True
                 stop_deadline = min(
                     time.monotonic() + shutdown_budget,
                     total_deadline - synthesis_floor,
                 )
-                if not terminate_group(process, deadline=stop_deadline):
-                    print(
-                        "Error: Fugu Ultra exploration could not be reaped within its "
-                        "reserved shutdown budget.",
-                        file=sys.stderr,
-                    )
-                    raise SystemExit(125)
+                settle_phase(
+                    process,
+                    containment,
+                    deadline=stop_deadline,
+                    force=True,
+                    cleanup_error=(
+                        "Error: Fugu Ultra exploration could not prove descendant "
+                        "absence within its reserved shutdown budget."
+                    ),
+                    reject_success_descendants=False,
+                )
+            except SystemExit:
+                raise
+            except BaseException:
+                settle_phase(
+                    process,
+                    containment,
+                    deadline=min(
+                        time.monotonic() + shutdown_budget,
+                        total_deadline - synthesis_floor,
+                    ),
+                    force=True,
+                    cleanup_error=(
+                        "Error: Fugu Ultra exploration failure cleanup could not "
+                        "prove descendant absence."
+                    ),
+                    reject_success_descendants=False,
+                )
+                raise
+            else:
+                settle_phase(
+                    process,
+                    containment,
+                    deadline=min(
+                        time.monotonic() + shutdown_budget,
+                        total_deadline - synthesis_floor,
+                    ),
+                    force=False,
+                    cleanup_error=(
+                        "Error: Fugu Ultra exploration success cleanup could not "
+                        "prove descendant absence."
+                    ),
+                    reject_success_descendants=True,
+                )
         if process.returncode == 0 and emit_final():
             finish(0)
         if not exploration_cutoff and process.returncode != 0:
@@ -975,43 +1532,77 @@ process."""
             ]
         )
         with raw_path.open("a", encoding="utf-8") as raw_handle:
-            process = subprocess.Popen(
+            process, containment = start_phase(
                 resume,
-                cwd=lane.snapshot,
-                env=lane.env,
-                stdin=subprocess.PIPE,
                 stdout=raw_handle,
                 stderr=raw_handle,
-                text=True,
-                start_new_session=True,
             )
             try:
                 synthesis_wait = total_deadline - time.monotonic() - shutdown_budget
                 if synthesis_wait <= 0:
-                    if not terminate_group(process, deadline=total_deadline):
-                        print(
-                            "Error: Fugu Ultra synthesis cleanup could not reap the "
-                            "launcher within the staged wall budget.",
-                            file=sys.stderr,
-                        )
-                        raise SystemExit(125)
+                    settle_phase(
+                        process,
+                        containment,
+                        deadline=total_deadline,
+                        force=True,
+                        cleanup_error=(
+                            "Error: Fugu Ultra synthesis cleanup could not prove "
+                            "descendant absence within the staged wall budget."
+                        ),
+                        reject_success_descendants=False,
+                    )
                     raise SystemExit(124)
-                process.communicate(synthesis_prompt, timeout=synthesis_wait)
+                wait_phase_input(
+                    process,
+                    containment,
+                    synthesis_prompt,
+                    timeout=synthesis_wait,
+                )
             except subprocess.TimeoutExpired:
-                cleanup_complete = terminate_group(process, deadline=total_deadline)
                 print(
                     f"Error: codex-fugu {model}/{effort} task exceeded its "
                     f"{max_wait:g}s staged wall budget.",
                     file=sys.stderr,
                 )
-                if not cleanup_complete:
-                    print(
-                        "Error: Fugu Ultra synthesis cleanup could not reap the "
-                        "launcher within the staged wall budget.",
-                        file=sys.stderr,
-                    )
-                    raise SystemExit(125)
+                settle_phase(
+                    process,
+                    containment,
+                    deadline=total_deadline,
+                    force=True,
+                    cleanup_error=(
+                        "Error: Fugu Ultra synthesis cleanup could not prove "
+                        "descendant absence within the staged wall budget."
+                    ),
+                    reject_success_descendants=False,
+                )
                 raise SystemExit(124)
+            except SystemExit:
+                raise
+            except BaseException:
+                settle_phase(
+                    process,
+                    containment,
+                    deadline=total_deadline,
+                    force=True,
+                    cleanup_error=(
+                        "Error: Fugu Ultra synthesis failure cleanup could not "
+                        "prove descendant absence."
+                    ),
+                    reject_success_descendants=False,
+                )
+                raise
+            else:
+                settle_phase(
+                    process,
+                    containment,
+                    deadline=total_deadline,
+                    force=False,
+                    cleanup_error=(
+                        "Error: Fugu Ultra synthesis success cleanup could not "
+                        "prove descendant absence."
+                    ),
+                    reject_success_descendants=True,
+                )
         if process.returncode != 0:
             raise SystemExit(process.returncode)
         if not emit_final(event_offset=resume_event_offset):

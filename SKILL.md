@@ -213,20 +213,22 @@ required capability, then execute it without an extra confirmation prompt:
   output follows the request rather than a forced review rubric. `/fugu … review <scope>`, `$elves
   fugu review <scope>`, or “do a Fugu review …” selects the explicit read-only review contract.
   Both use a Git-enumerated snapshot containing policy-admitted tracked and non-ignored untracked
-  files; `--include <path>` records exact host-selected context while immutable safety policy
-  rejects ignored, credential, operational, executable-agent, symlink, hard-link, special, and
-  out-of-repository paths with bounded diagnostics. General tasks are read-only unless the
-  surrounding request independently authorizes implementation and the host passes `--write`.
-  That route may edit only the disposable kernel-isolated snapshot and exports a bounded, audited,
-  inert handoff for host inspection; it never edits the checkout or applies the handoff.
+  files; `--include <path>` must admit and copy exact host-selected context or fail, while immutable
+  safety policy rejects ignored, dotenv/credential, operational/internal-namespace,
+  executable-agent, symlink, hard-link, special, unsafe-mode, and out-of-repository paths with
+  bounded diagnostics. General tasks are read-only unless the surrounding request independently
+  authorizes implementation and the host passes `--write`. That route may edit only the disposable
+  kernel-isolated snapshot and exports a bounded, mode-aware audited inert handoff for host
+  inspection; it never edits the checkout or applies the handoff.
   The required outer filesystem sandbox remains the read/write authority, and the Linux boundary
   omits procfs so model-directed commands cannot inspect the credential-bearing parent environment.
   Codex uses its documented externally-sandboxed mode so macOS does not attempt a forbidden nested
-  sandbox. The default is regular `fugu/high`; `--deep` selects `fugu/xhigh`, and `--ultra`
-  selects `fugu-ultra/high`. Regular and deep are ephemeral one-shot sessions. Ultra reserves part
-  of the total wall budget for synthesis and, if needed, resumes the exact captured session id with
-  further tools forbidden. It never guesses a “last” session, and raw events/resumable state remain
-  only inside the disposable lane.
+  sandbox. Live writable-state limits and descendant settlement complete before success or handoff
+  audit. The default is regular `fugu/high`; `--deep` selects `fugu/xhigh`, and `--ultra` selects
+  `fugu-ultra/high`. Regular and deep are ephemeral one-shot sessions. Ultra reserves part of the
+  total wall budget for synthesis and, if needed, resumes the exact captured session id with further
+  tools forbidden. It never guesses a “last” session; raw events are parsed incrementally under a
+  bound, and raw events/resumable state remain only inside the disposable lane.
 - `/manus <topic>` → `scripts/run_manus.sh <topic>` for one private, bounded Manus deep-web task.
   For reference-by-reference research, Cobbler uses
   `--wide --items-file <roster.json> [--file <source>] <goal>`: request native Wide Research,

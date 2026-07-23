@@ -18,12 +18,13 @@ keep the target repository as the working directory, pass through the validated 
 and run it. Plain `/fugu <task>` is a general read-only task whose answer follows the request;
 `/fugu review <scope>` is the opinionated read-only review. Use `--write` only when the user's
 surrounding request independently authorizes implementation. It writes solely inside the
-disposable kernel-isolated snapshot and returns a bounded audited handoff for host inspection,
-never an automatic checkout edit.
+disposable kernel-isolated snapshot and returns a bounded mode-aware audited handoff for host
+inspection, never an automatic checkout edit. Exact includes must be admitted and copied; live
+writable-state limits and descendant settlement finish before success or audit.
 
 The runner uses the official `codex-fugu` launcher with policy-admitted tracked and non-ignored
 untracked context, closed interactive input, and a hard wall-clock bound. It selects regular
 `fugu/high` by default, `fugu/xhigh` with `--deep`, or `fugu-ultra/high` with `--ultra`.
 Regular/deep sessions are ephemeral; Ultra uses exact-session staged synthesis, with its state
-confined to the disposable isolated lane.
+confined to the disposable isolated lane and its event parsing incremental and bounded.
 Do not replace it with an improvised API request or remove its sandbox and timeout controls.

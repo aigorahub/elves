@@ -164,6 +164,7 @@ DEFAULT_EXCLUDED_FILE_NAMES: frozenset[str] = frozenset(
 )
 
 DEFAULT_EXCLUDED_FILE_GLOBS: tuple[str, ...] = (
+    ".env.*",
     "*.pem",
     "*.key",
     "*.p12",
@@ -177,10 +178,11 @@ DEFAULT_CONTEXT_MAX_FILE_BYTES = 16 * 1024 * 1024
 MAX_CONTEXT_DIAGNOSTICS = 200
 DEFAULT_HANDOFF_MAX_FILES = 2_000
 DEFAULT_HANDOFF_MAX_BYTES = 64 * 1024 * 1024
-_HANDOFF_PROTECTED_PREFIXES: tuple[str, ...] = (
+_INTERNAL_SNAPSHOT_PREFIXES: tuple[str, ...] = (
     "_elves_context/",
     "_elves_review/",
     "_instruction_evidence/",
+    "_elves_transport/",
 )
 
 # Argv flags that embed a repo/cwd path which must point at the snapshot.
@@ -257,6 +259,7 @@ class IsolatedLane:
 class SnapshotFileRecord:
     sha256: str
     size: int
+    mode: int
 
 
 @dataclass(frozen=True)
@@ -421,6 +424,13 @@ def _should_exclude(rel: str, *, extra_globs: Sequence[str] = ()) -> bool:
     if _matches_extra_exclude(rel, extra_globs):
         return True
     return False
+
+
+def _is_internal_snapshot_path(rel: str) -> bool:
+    return any(
+        rel == prefix.rstrip("/") or rel.startswith(prefix)
+        for prefix in _INTERNAL_SNAPSHOT_PREFIXES
+    )
 
 
 def source_path_allowed_at_original_location(
@@ -758,6 +768,7 @@ def _snapshot_file_records(
                 records[rel] = SnapshotFileRecord(
                     sha256=hashlib.sha256(data).hexdigest(),
                     size=len(data),
+                    mode=stat.S_IMODE(info.st_mode),
                 )
             finally:
                 if descriptor >= 0:
@@ -792,14 +803,16 @@ def capture_snapshot_state(
 
 def _handoff_path_forbidden(rel: str) -> bool:
     return (
-        any(
-            rel == prefix.rstrip("/") or rel.startswith(prefix)
-            for prefix in _HANDOFF_PROTECTED_PREFIXES
-        )
+        _is_internal_snapshot_path(rel)
         or _should_exclude(rel)
         or _is_executable_agent_config(rel)
         or _is_instruction_surface(rel)
     )
+
+
+def _handoff_mode_is_safe(mode: int) -> bool:
+    special_bits = stat.S_ISUID | stat.S_ISGID | stat.S_ISVTX
+    return not mode & special_bits and not mode & 0o022
 
 
 def export_snapshot_handoff(
@@ -860,6 +873,13 @@ def export_snapshot_handoff(
                 f"Isolated output changed a protected or excluded path: {rel}",
                 path=str(lane.snapshot / rel),
             )
+        current = after.files.get(rel)
+        if current is not None and not _handoff_mode_is_safe(current.mode):
+            raise ValidationIssue(
+                "isolation_handoff_unsafe_mode",
+                f"Isolated output has unsafe permission bits: {rel}",
+                path=str(lane.snapshot / rel),
+            )
 
     handoff_parent = Path("/tmp").resolve()
     if not handoff_parent.is_dir():
@@ -885,8 +905,15 @@ def export_snapshot_handoff(
                 "status": status,
                 "before_sha256": before.sha256 if before else None,
                 "before_bytes": before.size if before else None,
+                "before_mode": before.mode if before else None,
                 "after_sha256": current.sha256 if current else None,
                 "after_bytes": current.size if current else None,
+                "after_mode": current.mode if current else None,
+                "export_mode": (
+                    0o700 if current is not None and current.mode & 0o111 else 0o600
+                )
+                if current is not None
+                else None,
             }
             changes.append(item)
             if current is None:
@@ -910,6 +937,7 @@ def export_snapshot_handoff(
                 if (
                     len(data) != info.st_size
                     or hashlib.sha256(data).hexdigest() != current.sha256
+                    or stat.S_IMODE(info.st_mode) != current.mode
                 ):
                     raise ValidationIssue(
                         "isolation_handoff_file_changed",
@@ -918,7 +946,7 @@ def export_snapshot_handoff(
                     )
                 with target.open("xb") as output_file:
                     output_file.write(data)
-                    os.fchmod(output_file.fileno(), 0o600)
+                    os.fchmod(output_file.fileno(), item["export_mode"])
             finally:
                 if descriptor >= 0:
                     os.close(descriptor)
@@ -1018,8 +1046,17 @@ def create_tracked_snapshot(spec: IsolationSpec) -> IsolatedLane:
             _git_untracked_nonignored_files(repo_root) if spec.include_untracked else []
         )
         requested = _normalize_include_paths(repo_root, spec.include_paths)
+        requested_set = set(requested)
         for rel in requested:
-            if _should_exclude(rel, extra_globs=extra_globs) or _is_executable_agent_config(rel):
+            if (
+                _should_exclude(rel, extra_globs=extra_globs)
+                or _is_executable_agent_config(rel)
+                or _is_internal_snapshot_path(rel)
+                or (
+                    _is_instruction_surface(rel)
+                    and not spec.include_instructions_as_data
+                )
+            ):
                 raise ValidationIssue(
                     "isolation_requested_path_forbidden",
                     f"Requested context is excluded by immutable safety policy: {rel}",
@@ -1066,7 +1103,11 @@ def create_tracked_snapshot(spec: IsolationSpec) -> IsolatedLane:
         untracked_count = 0
         copied_count = 0
         total_bytes = 0
+        admitted_requested: set[str] = set()
         for rel, is_tracked in candidates:
+            if _is_internal_snapshot_path(rel):
+                record_diagnostic(rel, "internal_namespace")
+                continue
             if _should_exclude(rel, extra_globs=extra_globs):
                 record_diagnostic(rel, "policy")
                 continue
@@ -1085,6 +1126,12 @@ def create_tracked_snapshot(spec: IsolationSpec) -> IsolatedLane:
                     inert,
                     max_file_bytes=spec.max_context_file_bytes,
                 ):
+                    if rel in requested_set:
+                        raise ValidationIssue(
+                            "isolation_requested_path_unavailable",
+                            f"Requested context disappeared before admission: {rel}",
+                            path=str(repo_root / rel),
+                        )
                     continue
                 inert_size = inert.stat().st_size
                 total_bytes += inert_size
@@ -1106,6 +1153,8 @@ def create_tracked_snapshot(spec: IsolationSpec) -> IsolatedLane:
                 except OSError:
                     pass
                 instruction_data.append(str(inert.relative_to(snapshot)))
+                if rel in requested_set:
+                    admitted_requested.add(rel)
                 continue
             dest = snapshot.joinpath(*PurePosixPath(rel).parts)
             dest.parent.mkdir(parents=True, exist_ok=True)
@@ -1115,12 +1164,20 @@ def create_tracked_snapshot(spec: IsolationSpec) -> IsolatedLane:
                 dest,
                 max_file_bytes=spec.max_context_file_bytes,
             ):
+                if rel in requested_set:
+                    raise ValidationIssue(
+                        "isolation_requested_path_unavailable",
+                        f"Requested context disappeared before admission: {rel}",
+                        path=str(repo_root / rel),
+                    )
                 continue
             total_bytes += dest.stat().st_size
             count += 1
             copied_count += 1
             if not is_tracked:
                 untracked_count += 1
+            if rel in requested_set:
+                admitted_requested.add(rel)
             if copied_count > spec.max_context_files:
                 raise ValidationIssue(
                     "isolation_context_file_limit",
@@ -1133,6 +1190,15 @@ def create_tracked_snapshot(spec: IsolationSpec) -> IsolatedLane:
                     f"Context exceeds the {spec.max_context_bytes}-byte total limit",
                     path=str(repo_root),
                 )
+
+        missing_requested = sorted(requested_set - admitted_requested)
+        if missing_requested:
+            rel = missing_requested[0]
+            raise ValidationIssue(
+                "isolation_requested_path_unavailable",
+                f"Requested context was not admitted into the snapshot: {rel}",
+                path=str(repo_root / rel),
+            )
 
         context_dir = snapshot / "_elves_context"
         context_dir.mkdir(mode=0o700)
@@ -1148,6 +1214,7 @@ def create_tracked_snapshot(spec: IsolationSpec) -> IsolatedLane:
                     "diagnostics": diagnostics,
                     "diagnostics_truncated": diagnostics_total > len(diagnostics),
                     "requested_paths": list(requested),
+                    "admitted_requested_paths": sorted(admitted_requested),
                 },
                 indent=2,
                 sort_keys=True,

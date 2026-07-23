@@ -322,6 +322,86 @@ class LocalCliRunnerTests(unittest.TestCase):
         binary.chmod(0o755)
         return binary
 
+    def make_fugu_descendant_fake(
+        self,
+        root: Path,
+        *,
+        delayed_write: bool = False,
+        setsid: bool = False,
+    ) -> Path:
+        binary = root / "codex-fugu"
+        if delayed_write:
+            action = (
+                "( /bin/sleep 2; printf 'late\\n' > \"$PWD/late-output.txt\" ) &"
+            )
+        elif setsid:
+            action = (
+                "/usr/bin/perl -MPOSIX -e "
+                "'POSIX::setsid(); sleep 30' &"
+            )
+        else:
+            action = "/bin/sleep 30 &"
+        binary.write_text(
+            "#!/bin/sh\n"
+            "while IFS= read -r _LINE || [ -n \"$_LINE\" ]; do :; done\n"
+            f"{action}\n"
+            "CHILD=$!\n"
+            "printf 'descendant-pid=<%s>\\n' \"$CHILD\"\n"
+            + ("/bin/sleep 0.5\n" if setsid else "")
+            +
+            "exit 0\n",
+            encoding="utf-8",
+        )
+        binary.chmod(0o755)
+        return binary
+
+    def make_fugu_runtime_growth_fake(self, root: Path) -> Path:
+        binary = root / "codex-fugu"
+        binary.write_text(
+            "#!/bin/sh\n"
+            "while IFS= read -r _LINE || [ -n \"$_LINE\" ]; do :; done\n"
+            "/bin/dd if=/dev/zero of=\"$HOME/provider-growth.bin\" "
+            "bs=4096 count=16 2>/dev/null\n"
+            "/bin/sleep 5\n",
+            encoding="utf-8",
+        )
+        binary.chmod(0o755)
+        return binary
+
+    def make_fugu_oversized_event_line_fake(self, root: Path) -> Path:
+        binary = root / "codex-fugu"
+        binary.write_text(
+            "#!/bin/sh\n"
+            "while IFS= read -r _LINE || [ -n \"$_LINE\" ]; do :; done\n"
+            "/bin/dd if=/dev/zero bs=1048577 count=1 2>/dev/null "
+            "| /usr/bin/tr '\\000' x\n"
+            "printf '\\n'\n"
+            "printf '{\"type\":\"thread.started\","
+            "\"thread_id\":\"019f0000-0000-7000-8000-000000000005\"}\\n'\n"
+            "exit 0\n",
+            encoding="utf-8",
+        )
+        binary.chmod(0o755)
+        return binary
+
+    def make_supervision_failure_hook(self, root: Path) -> Path:
+        hook_dir = root / "python-hook"
+        hook_dir.mkdir()
+        (hook_dir / "sitecustomize.py").write_text(
+            "import sys\n"
+            f"sys.path.insert(0, {str(SCRIPTS)!r})\n"
+            "import cobbler_runtime.dispatch_external as external\n"
+            "async def _fail_supervision(_supervisor):\n"
+            "    return {\n"
+            "        'descendants_absent': False,\n"
+            "        'descendants_found': [],\n"
+            "        'supervision_error': 'forced-test-failure',\n"
+            "    }\n"
+            "external._terminate_supervised_descendants = _fail_supervision\n",
+            encoding="utf-8",
+        )
+        return hook_dir
+
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
     def test_fugu_defaults_to_project_aware_regular_high_read_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -475,6 +555,167 @@ class LocalCliRunnerTests(unittest.TestCase):
                 (repo / "source.txt").read_text(encoding="utf-8"), "host source\n"
             )
             shutil.rmtree(handoff)
+
+    @unittest.skipUnless(
+        sys.platform == "darwin" and HAS_FS_SANDBOX,
+        "Darwin filesystem sandbox unavailable",
+    )
+    def test_fugu_success_descendant_is_reaped_and_result_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_descendant_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "inspect descendants",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "SAKANA_API_KEY": "test-sakana-key",
+                },
+                cwd=repo,
+            )
+            match = next(
+                line for line in result.stdout.splitlines()
+                if line.startswith("descendant-pid=<")
+            )
+            descendant_pid = int(match.removeprefix("descendant-pid=<").removesuffix(">"))
+
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("live descendants", result.stderr)
+        with self.assertRaises(ProcessLookupError):
+            os.kill(descendant_pid, 0)
+
+    @unittest.skipUnless(
+        sys.platform == "darwin" and HAS_FS_SANDBOX,
+        "Darwin filesystem sandbox unavailable",
+    )
+    def test_fugu_setsid_descendant_is_generation_safely_reaped(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_descendant_fake(bin_dir, setsid=True)
+            self.make_fake(bin_dir, "codex")
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "inspect setsid descendants",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "SAKANA_API_KEY": "test-sakana-key",
+                },
+                cwd=repo,
+            )
+            match = next(
+                line for line in result.stdout.splitlines()
+                if line.startswith("descendant-pid=<")
+            )
+            descendant_pid = int(match.removeprefix("descendant-pid=<").removesuffix(">"))
+
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("live descendants", result.stderr)
+        with self.assertRaises(ProcessLookupError):
+            os.kill(descendant_pid, 0)
+
+    @unittest.skipUnless(
+        sys.platform == "darwin" and HAS_FS_SANDBOX,
+        "Darwin filesystem sandbox unavailable",
+    )
+    def test_fugu_write_reaps_descendant_before_handoff_audit(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_descendant_fake(bin_dir, delayed_write=True)
+            self.make_fake(bin_dir, "codex")
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "--write",
+                "attempt delayed write",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "SAKANA_API_KEY": "test-sakana-key",
+                },
+                cwd=repo,
+            )
+            match = next(
+                line for line in result.stdout.splitlines()
+                if line.startswith("descendant-pid=<")
+            )
+            descendant_pid = int(match.removeprefix("descendant-pid=<").removesuffix(">"))
+
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("live descendants", result.stderr)
+        self.assertNotIn("Fugu isolated-write handoff:", result.stderr)
+        self.assertFalse((repo / "late-output.txt").exists())
+        with self.assertRaises(ProcessLookupError):
+            os.kill(descendant_pid, 0)
+
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    def test_fugu_live_runtime_growth_limit_terminates_before_handoff(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_runtime_growth_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "--write",
+                "grow runtime state",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "SAKANA_API_KEY": "test-sakana-key",
+                    "SAKANA_FUGU_RUNTIME_MAX_GROWTH_BYTES": "1024",
+                    "SAKANA_FUGU_RUNTIME_MAX_FILE_BYTES": "2048",
+                },
+                cwd=repo,
+            )
+
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("live resource budget", result.stderr)
+        self.assertNotIn("Fugu isolated-write handoff:", result.stderr)
+
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    def test_fugu_ultra_event_parser_rejects_oversized_line_incrementally(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_oversized_event_line_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "--ultra",
+                "inspect bounded events",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "SAKANA_API_KEY": "test-sakana-key",
+                    "SAKANA_FUGU_MAX_WAIT_SECONDS": "6",
+                    "SAKANA_FUGU_ULTRA_EXPLORE_SECONDS": "1",
+                    "SAKANA_FUGU_RUNTIME_MAX_FILE_BYTES": str(2 * 1024 * 1024),
+                },
+                cwd=repo,
+            )
+
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("fugu_ultra_event_line_limit", result.stderr)
 
     def test_fugu_mode_and_context_errors_fail_before_provider_work(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -797,7 +1038,7 @@ class LocalCliRunnerTests(unittest.TestCase):
         sys.platform == "darwin" and HAS_FS_SANDBOX,
         "Darwin filesystem sandbox unavailable",
     )
-    def test_fugu_timeout_tolerates_darwin_eperm_reap_race(self) -> None:
+    def test_fugu_timeout_avoids_reusable_numeric_process_group_signals(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             bin_dir = root / "bin"
@@ -824,29 +1065,24 @@ class LocalCliRunnerTests(unittest.TestCase):
                 },
                 cwd=repo,
             )
-            attempted_signals = [
-                int(raw)
-                for raw in signal_log.read_text(encoding="utf-8").splitlines()
-            ]
 
         self.assertEqual(result.returncode, 124, result.stderr)
         self.assertIn("terminating it", result.stderr)
         self.assertNotIn("Traceback", result.stderr)
-        self.assertEqual(
-            attempted_signals,
-            [signal.SIGINT, signal.SIGTERM, signal.SIGKILL],
-        )
+        self.assertFalse(signal_log.exists())
         self.assertFalse(leader_kill_log.exists())
 
-    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    @unittest.skipUnless(
+        sys.platform == "darwin" and HAS_FS_SANDBOX,
+        "Darwin filesystem sandbox unavailable",
+    )
     def test_fugu_unproved_timeout_cleanup_returns_125(self) -> None:
-        for profile_args, max_wait, explore_wait, expected_message in (
-            ((), "0.2", None, "Fugu timeout cleanup could not reap"),
+        for profile_args, max_wait, explore_wait in (
+            ((), "0.2", None),
             (
                 ("--ultra",),
                 "0.4",
                 "0.1",
-                "Fugu Ultra exploration could not be reaped",
             ),
         ):
             with self.subTest(profile=profile_args or ("regular",)):
@@ -858,10 +1094,7 @@ class LocalCliRunnerTests(unittest.TestCase):
                     sleeper.write_text("#!/bin/sh\nsleep 5\n", encoding="utf-8")
                     sleeper.chmod(0o755)
                     self.make_fake(bin_dir, "codex")
-                    hook_dir, signal_log, leader_kill_log = self.make_killpg_hook(
-                        root,
-                        forced_signal=signal.SIGINT,
-                    )
+                    hook_dir = self.make_supervision_failure_hook(root)
                     repo = root / "repo"
                     repo.mkdir()
                     subprocess.run(["git", "init", "-q", str(repo)], check=True)
@@ -880,22 +1113,10 @@ class LocalCliRunnerTests(unittest.TestCase):
                         env=env,
                         cwd=repo,
                     )
-                    attempted_signals = [
-                        int(raw)
-                        for raw in signal_log.read_text(encoding="utf-8").splitlines()
-                    ]
-                    leader_kills = leader_kill_log.read_text(
-                        encoding="utf-8"
-                    ).splitlines()
 
                 self.assertEqual(result.returncode, 125, result.stderr)
-                self.assertIn(expected_message, result.stderr)
+                self.assertIn("could not prove descendant absence", result.stderr)
                 self.assertNotIn("Traceback", result.stderr)
-                self.assertEqual(
-                    attempted_signals,
-                    [signal.SIGINT, signal.SIGTERM, signal.SIGKILL],
-                )
-                self.assertEqual(len(leader_kills), 1)
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
     def test_grok_uses_read_only_checked_key_scrubbed_non_bypass_mode(self) -> None:

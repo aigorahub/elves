@@ -25,25 +25,30 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
   P0-P3 findings with exact locations, and exactly `No actionable findings` when clean.
 
   Both modes use a disposable Git-enumerated snapshot containing policy-admitted tracked files and
-  safe non-ignored untracked files. `--include <path>` records a host-selected exact file and makes
-  its admission or rejection explicit; it does not override policy. Ignored dependency/cache/build
-  trees, credential names/suffixes, `.git`, `.elves`, executable agent configuration, symlinks,
-  hard links, special files, files owned by another user, out-of-repository paths, and oversized
-  context fail closed or remain excluded with bounded diagnostics. Prose instruction files move to
-  inert evidence paths. Context is limited to 20,000 files, 512 MiB total, and 16 MiB per file. The
-  runner does not paste repository bodies into the prompt; putting a file in the snapshot therefore
-  does not itself spend model context. Relevance belongs to the host/Fugu task; admissibility
-  remains the safety kernel's decision.
+  safe non-ignored untracked files. `--include <path>` records a host-selected exact file and
+  requires that exact file to survive admission and copy; disappearance or rejection fails closed,
+  and the manifest distinguishes requested from admitted paths. It does not override policy.
+  Ignored dependency/cache/build trees, every `.env.*` credential variant, other credential
+  names/suffixes, `.git`, `.elves`, executable agent configuration, symlinks, hard links, special
+  files, files owned by another user, out-of-repository paths, and oversized context fail closed or
+  remain excluded with bounded diagnostics. Source files cannot occupy the host-owned
+  `_elves_context`, `_elves_review`, `_instruction_evidence`, or `_elves_transport` namespaces.
+  Prose instruction files move to inert evidence paths. Context is limited to 20,000 files, 512 MiB
+  total, and 16 MiB per file. The runner does not paste repository bodies into the prompt; putting
+  a file in the snapshot therefore does not itself spend model context. Relevance belongs to the
+  host/Fugu task; admissibility remains the safety kernel's decision.
 
   General tasks are read-only by default. `--write` is valid only for a general task and requires
   independent implementation authority from the surrounding user request. It changes the outer
   boundary from a read-only to a writable mount for the disposable snapshot only. After the
-  provider exits successfully, the host compares a pre-task digest baseline with a second
-  no-follow audit. Credential-bearing, protected/ignored/instruction, symlink, hard-link, special,
-  unsafe-directory, over-count, or oversized output fails closed. Accepted changed regular files
-  and deletion records are copied mode-0600 into a fresh inert `/tmp/elves-fugu-handoff-*` bundle
-  with a JSON manifest (at most 2,000 changed files and 64 MiB). The host checkout is never edited,
-  and the handoff is never applied automatically.
+  provider exits successfully, the host first proves that the launcher and every observed
+  descendant are absent, then compares a pre-task digest-and-mode baseline with a second no-follow
+  audit. Credential-bearing, protected/ignored/instruction, symlink, hard-link, special,
+  unsafe-directory, unsafe-mode, over-count, or oversized output fails closed. Mode-only changes
+  and new executable files are represented in the manifest; exported file bodies stay private at
+  mode 0600 or owner-executable 0700. Accepted changed regular files and deletion records enter a
+  fresh inert `/tmp/elves-fugu-handoff-*` bundle with a JSON manifest (at most 2,000 changed files
+  and 64 MiB). The host checkout is never edited, and the handoff is never applied automatically.
 
   Every mode requires Elves' qualified kernel filesystem sandbox (`sandbox-exec` on macOS or
   `bwrap` on Linux), isolated HOME/CODEX_HOME, an environment containing only runtime names plus
@@ -54,9 +59,15 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
   Ultra uses a resumable session confined to the lane: it captures the exact `thread.started` id
   and reserves part of the hard wall limit for a no-more-tools synthesis turn on that exact id when
   exploration does not finish first. It never uses ambiguous `--last` state; raw events, the
-  final-message file, and session state are destroyed with the lane. Every profile closes input,
-  disables launcher notices/updates, and has a hard process-group wall-clock limit. If the boundary
-  cannot be proven, the shortcut fails closed. The supported profiles are:
+  final-message file, and session state are destroyed with the lane. Ultra event JSONL is parsed
+  incrementally with bounded file and line reads. A live monitor covers snapshot, HOME, tmp, and
+  XDG writable state; defaults allow at most 20,000 additional filesystem entries, 256 MiB
+  aggregate growth, and 64 MiB per file before the provider is terminated and the result rejected.
+  Every profile closes input, disables launcher notices/updates, and has a hard wall-clock limit.
+  Linux uses PID-namespace teardown; macOS keeps the leader generation pinned while whole-group and
+  native-generation descendant cleanup complete. No success or write audit is reported before
+  absence is proven. If the boundary cannot be proven, the shortcut fails closed. The supported
+  profiles are:
 
   | Shortcut | Model / effort | Default wall limit | Use |
   |---|---|---:|---|
