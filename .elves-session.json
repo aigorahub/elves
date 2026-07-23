@@ -1,0 +1,113 @@
+{
+  "batches": [
+    {
+      "acceptance": [
+        {
+          "criterion": "`$elves fugu <task>` and equivalent natural language execute a general Fugu task whose prompt and output contract follow the requested work rather than forcing repository-review severities or a clean-review verdict.",
+          "evidence": "",
+          "id": "B1-A1",
+          "met": false
+        },
+        {
+          "criterion": "`$elves fugu review <scope>` and equivalent natural language retain an explicit read-only review contract with base/change evidence, ordered actionable findings, exact file/line references, and a deterministic no-findings response.",
+          "evidence": "",
+          "id": "B1-A2",
+          "met": false
+        },
+        {
+          "criterion": "The Fugu context bundle safely admits regular non-ignored untracked files and exact host-selected relevant paths while continuing to exclude ignored dependency/cache/build trees, credentials, Git/Elves operational state, executable agent configuration, symlinks, hard links, special files, and out-of-repository paths with visible bounded diagnostics.",
+          "evidence": "",
+          "id": "B1-A3",
+          "met": false
+        },
+        {
+          "criterion": "A user-authorized Fugu implementation task may write only inside its disposable kernel-isolated workspace and yields a bounded, audited handoff that the host can inspect; no provider process directly mutates the host checkout or gains Git, PR, merge, tag, release, posting, secret, or protected-ref authority.",
+          "evidence": "",
+          "id": "B1-A4",
+          "met": false
+        },
+        {
+          "criterion": "Regular, deep, and Ultra profiles preserve their documented model/effort and hard-wall behavior in both task types, including exact-session Ultra synthesis, closed input, credential scrubbing, no Linux procfs, qualified macOS/Linux boundaries, and fail-closed cleanup.",
+          "evidence": "",
+          "id": "B1-A5",
+          "met": false
+        },
+        {
+          "criterion": "Focused provider/isolation tests, installed Claude/Codex bundle smokes, repository consistency, the v2.15.0 release checklist, and the canonical verifier pass at the exact pull-request head against the immutable base.",
+          "evidence": "",
+          "id": "B1-A6",
+          "met": false
+        },
+        {
+          "criterion": "SKILL, AGENTS, README, guide, changelog, provider references, installed surfaces, and durable guidance consistently explain general Fugu tasks, explicit review mode, context selection, isolated-write handoff, authority limits, and v2.15.0.",
+          "evidence": "",
+          "id": "B1-A7",
+          "met": false
+        }
+      ],
+      "id": "B1",
+      "status": "pending"
+    }
+  ],
+  "branch": "codex/fugu-general-tasks",
+  "collision_tripwire": "1d90246b97b5e11211525e71b6a9ff5091c6cc10",
+  "continuation_guard": {
+    "next_required_action": "Validate and push the staged Contract slice, create the draft PR, then launch the native implementation worker.",
+    "remaining_batches": [
+      "B1"
+    ],
+    "stop_allowed": false
+  },
+  "delegation_scope": "full_run",
+  "driver_authorized": true,
+  "e2e_mode": "chat-to-land",
+  "git_mode": "branch_progress",
+  "landing": {
+    "authorized_by": "user_explicit_chat_to_land",
+    "driver_authorized": true,
+    "outcome": "complete_and_merge",
+    "worker_merge_authority": false
+  },
+  "landing_outcome": "authorized_merge",
+  "master_acceptance": [
+    {
+      "criterion": "The authoritative plan, session, and worker packet retain exact stable-id/criterion parity, and every B1 criterion carries exact-head evidence before landing.",
+      "evidence": "",
+      "id": "M-A1",
+      "met": false
+    },
+    {
+      "criterion": "Fugu review mode and an independent cumulative reviewer report no unresolved actionable security, correctness, context-completeness, authority, or documentation findings.",
+      "evidence": "",
+      "id": "M-A2",
+      "met": false
+    },
+    {
+      "criterion": "The canonical repository verifier and strict landing check pass on the exact reviewed pull-request head against the unchanged immutable base.",
+      "evidence": "",
+      "id": "M-A3",
+      "met": false
+    },
+    {
+      "criterion": "The pull request is mergeable by a regular merge commit with required checks green, a clean worktree, no unresolved feedback, and v2.15.0 release follow-through ready.",
+      "evidence": "",
+      "id": "M-A4",
+      "met": false
+    }
+  ],
+  "plan_path": "docs/plans/fugu-general-tasks.md",
+  "prewalk": {
+    "actual": "off",
+    "qualification_claim": false,
+    "requested": "off"
+  },
+  "project_base_ref": "origin/main",
+  "run_id": "fugu-general-tasks-20260723",
+  "start_head": "1d90246b97b5e11211525e71b6a9ff5091c6cc10",
+  "work_driver": "host-native",
+  "worker_packet_path": ".elves/runtime/fugu-general-tasks-worker.md",
+  "worker_route": {
+    "transport": "codex-collaboration-worker"
+  },
+  "worktree_path": "/Users/john/aigora/dev/elves-fugu-general-tasks"
+}
