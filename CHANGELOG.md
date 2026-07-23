@@ -4,6 +4,8 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.14.1] - 2026-07-23
+
 ### Install ship-list correctness and audit hygiene
 
 - Ship `scripts/worktree_gc.py` and `scripts/provider_supervisor.py` in installed Claude Code and
@@ -12,6 +14,8 @@ All notable changes to the Elves skill are documented here.
 - Document call-site runtime deps and source-only archives (`docs/plans/`, `docs/elves/`) in
   `references/runtime-helper-paths.md`. Historical identifying past-run artifacts under
   `docs/elves/` were removed so committed examples stay non-identifying; durable learnings remain.
+- Enforce source-only archive fences in sync apply/check so managed allowlist mistakes cannot install
+  `docs/plans` or `docs/elves`.
 - Relax effort-guardrail consistency pins from exact motivational sentences to section/contract
   anchors so ordinary editorial rewording does not break CI. Survival-guide validation keeps the
   effort section concepts without requiring a byte-exact phrase.
