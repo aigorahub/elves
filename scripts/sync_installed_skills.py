@@ -59,10 +59,26 @@ TOP_LEVEL_RUNTIME_SCRIPT_PATHS = [
 ]
 
 # Source-checkout archives that must never appear in an installed skill bundle.
+# Enforced by: (1) managed_paths allowlist never listing them, (2) validate_managed
+# refuse if a path is added later, (3) check/apply reject if they exist under install,
+# (4) installed_bundle_smoke FORBIDDEN_INSTALLED_ARCHIVE_PATHS.
 SOURCE_ONLY_ARCHIVE_PATHS = (
     "docs/plans",
     "docs/elves",
 )
+
+
+def managed_paths_include_source_only_archive(managed_paths: list[str]) -> list[str]:
+    """Return managed allowlist entries that would install source-only archives."""
+    bad: list[str] = []
+    for path in managed_paths:
+        if path == "docs" or path.startswith("docs/"):
+            bad.append(path)
+            continue
+        for archive in SOURCE_ONLY_ARCHIVE_PATHS:
+            if path == archive or path.startswith(f"{archive}/"):
+                bad.append(path)
+    return sorted(set(bad))
 
 # Entire package is shipped recursively — no per-module allowlist.
 RUNTIME_PACKAGE_PATH = "scripts/cobbler_runtime"
@@ -308,6 +324,13 @@ def check_target(name: str) -> tuple[bool, list[str]]:
         problems.append(f"missing install root: {root}")
         return False, problems
 
+    for relative in managed_paths_include_source_only_archive(
+        list(TARGETS[name]["managed_paths"])
+    ):
+        problems.append(
+            f"source-only archive must not be managed install path: {relative}"
+        )
+
     for relative in TARGETS[name]["managed_paths"]:
         src = REPO_ROOT / relative
         dst = root / relative
@@ -319,6 +342,10 @@ def check_target(name: str) -> tuple[bool, list[str]]:
     for relative in TARGETS[name]["cleanup_paths"]:
         if (root / relative).exists():
             problems.append(f"unexpected repo-only helper: {relative}")
+
+    for relative in SOURCE_ONLY_ARCHIVE_PATHS:
+        if (root / relative).exists():
+            problems.append(f"source-only archive leaked into install: {relative}")
 
     alias_root = TARGETS[name].get("alias_root")
     for alias_name in TARGETS[name].get("managed_aliases", []):
@@ -431,6 +458,14 @@ def apply_target(name: str) -> list[str]:
     problems = preflight_apply_target(name)
     if problems:
         return problems
+    for relative in managed_paths_include_source_only_archive(
+        list(TARGETS[name]["managed_paths"])
+    ):
+        problems.append(
+            f"source-only archive must not be managed install path: {relative}"
+        )
+    if problems:
+        return problems
     root.mkdir(parents=True, exist_ok=True)
     for relative in TARGETS[name]["managed_paths"]:
         try:
@@ -438,6 +473,8 @@ def apply_target(name: str) -> list[str]:
         except ValueError as exc:
             problems.append(str(exc))
     for relative in TARGETS[name]["cleanup_paths"]:
+        remove_path(root / relative)
+    for relative in SOURCE_ONLY_ARCHIVE_PATHS:
         remove_path(root / relative)
 
     alias_root = TARGETS[name].get("alias_root")

@@ -293,6 +293,10 @@ class SyncInstalledSkillsTests(unittest.TestCase):
     def test_source_only_archives_are_not_managed_install_paths(self) -> None:
         for host in ("claude", "codex"):
             managed = self.sync.build_targets(REPO_ROOT)[host]["managed_paths"]
+            self.assertEqual(
+                self.sync.managed_paths_include_source_only_archive(managed),
+                [],
+            )
             for archive in self.sync.SOURCE_ONLY_ARCHIVE_PATHS:
                 self.assertNotIn(archive, managed)
                 self.assertFalse(
@@ -302,6 +306,22 @@ class SyncInstalledSkillsTests(unittest.TestCase):
                     ),
                     msg=f"{host} managed_paths must not include {archive}",
                 )
+
+    def test_apply_refuses_source_only_archive_on_managed_allowlist(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            _repo, home = self.configure_temp_repo(tmpdir)
+            self.sync.TARGETS["codex"]["managed_paths"] = [
+                *self.sync.TARGETS["codex"]["managed_paths"],
+                "docs/plans",
+            ]
+            problems = self.sync.apply_target("codex")
+            self.assertIn(
+                "source-only archive must not be managed install path: docs/plans",
+                problems,
+            )
+            self.assertFalse(
+                (home / ".codex" / "skills" / "elves" / "docs" / "plans").exists()
+            )
 
     def test_apply_installs_callsite_runtime_deps(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
