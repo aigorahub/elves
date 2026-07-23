@@ -75,25 +75,24 @@ NONSTOP_GUARDRAIL_PHRASES = {
     ],
 }
 
+# Section/contract anchors only — do not pin motivational prose byte-for-byte.
+# Editorial rewording of effort guidance must not break CI.
 EFFORT_GUARDRAIL_PHRASES = {
     "SKILL.md": [
         "## Effort Standard",
-        "Do not be lazy.",
-        "Work as hard as you can for",
+        "Work as hard as you can",
     ],
     "references/survival-guide-template.md": [
         "## Effort Standard",
-        "Do not be lazy.",
-        "Work as hard as you can for the full run.",
+        "Work as hard as you can",
     ],
     "references/kickoff-prompt-template.md": [
-        "Do not be lazy. Work as hard as you can for the entire run.",
-        "Do not coast after the first success, first green check, or first useful checkpoint.",
+        "Work as hard as you can",
+        "Do not coast after the first success",
     ],
     "references/open-ended-guide.md": [
         "## Sustain Effort",
-        "Do not be lazy.",
-        "Work as hard as you can for the full",
+        "Work as hard as you can",
     ],
 }
 
@@ -194,11 +193,16 @@ INSTALLED_HELPER_PATH_PHRASES = {
     "references/runtime-helper-paths.md": [
         "## Source checkout shorthand",
         "## Installed Claude Code or Codex skill",
+        "## Shipped call-site runtime deps",
+        "## Source-only archives",
         "target repository as the working directory",
         "$HOME/.claude/skills/elves",
         "$HOME/.codex/skills/elves",
         "scripts/acceptance_contract.py",
         "scripts/elves_landing_check.py",
+        "scripts/worktree_gc.py",
+        "scripts/provider_supervisor.py",
+        "docs/plans/",
         "Never make an ordinary installed Elves run",
         "depend on a repo-only helper",
     ],
@@ -1961,7 +1965,7 @@ if isinstance(DOMAIN_WORKFLOW_PHRASES, dict) and 'SKILL.md' in DOMAIN_WORKFLOW_P
     DOMAIN_WORKFLOW_PHRASES['SKILL.md'] = ['**Elves** is the execution system', '**Cobbler** is the default coordinator', '**Domain workflows** are specialized Cobbler-managed packs', '**Math** is the first domain workflow', '**Providers** are optional role routes', 'cobbler.default_for_session']
 if isinstance(EFFORT_GUARDRAIL_PHRASES, dict) and 'SKILL.md' in EFFORT_GUARDRAIL_PHRASES:
     EFFORT_GUARDRAIL_PHRASES = dict(EFFORT_GUARDRAIL_PHRASES)
-    EFFORT_GUARDRAIL_PHRASES['SKILL.md'] = ['## Effort Standard', 'Do not be lazy.', 'Work as hard as you can for']
+    EFFORT_GUARDRAIL_PHRASES['SKILL.md'] = ['## Effort Standard', 'Work as hard as you can']
 if isinstance(ELVES_REPORT_PHRASES, dict) and 'SKILL.md' in ELVES_REPORT_PHRASES:
     ELVES_REPORT_PHRASES = dict(ELVES_REPORT_PHRASES)
     ELVES_REPORT_PHRASES['SKILL.md'] = ['## Elves Report', 'problems found', 'lessons learned', '/tmp/elves-report-<repo-slug>-<yyyy-mm-dd>.html', 'references/elves-report-template.html', 'collapsible `<details>` sections', 'committed examples and reusable templates non-identifying', 'Elves Report path']

@@ -63,7 +63,6 @@ def valid_guide_text() -> str:
 ## Effort Standard
 
 - Work as hard as you can for the full run.
-- Do not be lazy.
 - Avoid the minimum acceptable change.
 - Take the next highest-value action.
 

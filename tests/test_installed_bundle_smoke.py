@@ -88,15 +88,27 @@ class InstalledBundleSmokeTests(unittest.TestCase):
                 self.assertEqual(problems, [])
                 self.assertTrue((dest / "scripts" / "openrouter_lens.py").is_file())
                 self.assertTrue((dest / "scripts" / "workspace_guard.py").is_file())
+                self.assertTrue((dest / "scripts" / "worktree_gc.py").is_file())
+                self.assertTrue((dest / "scripts" / "provider_supervisor.py").is_file())
                 self.assertTrue((dest / "scripts" / "cobbler_runtime" / "implement.py").is_file())
                 self.assertTrue((dest / "scripts" / "cobbler_runtime" / "onboard.py").is_file())
                 self.assertTrue((dest / "scripts" / "cobbler_runtime" / "executables.py").is_file())
                 self.assertTrue((dest / "scripts" / "cobbler_runtime" / "prewalk.py").is_file())
                 self.assertTrue((dest / "references" / "prewalk.md").is_file())
                 self.assertFalse((dest / "aliases").exists())
+                self.assertFalse((dest / "docs" / "plans").exists())
+                self.assertFalse((dest / "docs" / "elves").exists())
             finally:
                 sync.REPO_ROOT = original_root
                 sync.TARGETS = original_targets
+
+    def test_required_paths_include_callsite_runtime_deps(self) -> None:
+        for relative in (
+            "scripts/worktree_gc.py",
+            "scripts/provider_supervisor.py",
+        ):
+            self.assertIn(relative, self.smoke.REQUIRED_TOP_LEVEL_RUNTIME_PATHS)
+            self.assertTrue((REPO_ROOT / relative).is_file())
 
     def test_smoke_contract_rejects_missing_required_runtime_dependency(self) -> None:
         required = (*self.smoke.REQUIRED_TOP_LEVEL_RUNTIME_PATHS, "scripts/missing.py")

@@ -4,6 +4,22 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+### Install ship-list correctness and audit hygiene
+
+- Ship `scripts/worktree_gc.py` and `scripts/provider_supervisor.py` in installed Claude Code and
+  Codex skill bundles. Both are call-site dependencies of shipped `preflight.sh --gc-worktrees` and
+  `full_run.py` provider supervision; bundle smoke now requires them and fails if either is missing.
+- Document call-site runtime deps and source-only archives (`docs/plans/`, `docs/elves/`) in
+  `references/runtime-helper-paths.md`. Historical identifying past-run artifacts under
+  `docs/elves/` were removed so committed examples stay non-identifying; durable learnings remain.
+- Relax effort-guardrail consistency pins from exact motivational sentences to section/contract
+  anchors so ordinary editorial rewording does not break CI. Survival-guide validation keeps the
+  effort section concepts without requiring a byte-exact phrase.
+- Add an **anti-accretion** code-quality rule in `SKILL.md`: no new repo meta-tooling, coined terms,
+  or config keys without an explicit plan acceptance criterion naming overnight-run value.
+- Preserve Claude/Codex host-parity: only managed install surfaces and shared workflow docs change;
+  invocation wording is unchanged.
+
 ## [2.14.0] - 2026-07-22
 
 ### Landing profile learning loop

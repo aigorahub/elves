@@ -209,6 +209,9 @@ any unexplained tip move is a collision and a Hard Stop.
 after merge, the run's worktree is reclaimed with the separate gc helper
 (`./scripts/preflight.sh --gc-worktrees`; report by default, `--apply` removes only clean, fully
 merged, fully pushed worktrees; unregistered sibling directories are listed and never deleted).
+Installed skill bundles ship `scripts/worktree_gc.py` with that helper (and
+`scripts/provider_supervisor.py` for full-run provider supervision). Historical `docs/plans/` and
+source-repo `docs/elves/` archives stay source-checkout only — never part of the installed skill.
 
 **Unattended by construction.** Gates and helper subprocesses run with closed stdin and explicit
 timeouts — a silent hang is a failure, not progress. Worker failures split into transient

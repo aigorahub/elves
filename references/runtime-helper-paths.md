@@ -50,6 +50,24 @@ The same CLI also exposes host-owned learning commands (`observe`, `propose`, `c
 `promote`, `waive`, `clear-waiver`). Only explicit `promote` rewrites the tracked profile; runtime
 learning state stays under gitignored `.elves/runtime/landing-profile/`.
 
+## Shipped call-site runtime deps
+
+Installed bundles also ship helpers that other entrypoints exec or load by relative path (not only
+CLI entry points themselves):
+
+- `scripts/worktree_gc.py` — used by `scripts/preflight.sh --gc-worktrees`
+- `scripts/provider_supervisor.py` — used by `scripts/cobbler_runtime/full_run.py` for provider child
+  supervision
+
+If either file is missing from an installed skill root, worktree GC and trusted full-run supervision
+fail closed. Bundle smoke requires both paths.
+
+## Source-only archives
+
+`docs/plans/` (historical plan archive) and `docs/elves/` (durable learnings and run memory for this
+source repo) are **source-checkout only**. They are not part of the installed Claude Code or Codex
+skill surface. Committed examples and templates remain non-identifying.
+
 Repository-maintenance helpers such as `scripts/verify_repo.py`, `scripts/release_checklist.py`,
 and `scripts/check_repo_consistency.py` are intentionally not part of an installed bundle. Use one
 only when the target source checkout itself provides it. Never make an ordinary installed Elves run

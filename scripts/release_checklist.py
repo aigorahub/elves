@@ -79,6 +79,8 @@ REQUIRED_RUNTIME_HELPERS = (
     Path("scripts/acceptance_contract.py"),
     Path("scripts/openrouter_lens.py"),
     Path("scripts/workspace_guard.py"),
+    Path("scripts/worktree_gc.py"),
+    Path("scripts/provider_supervisor.py"),
 )
 
 
@@ -284,7 +286,8 @@ def build_release_checklist(
                         )
                 result.notes.append(
                     "Alias inventory (11) + required runtime helpers "
-                    "(acceptance_contract.py, openrouter_lens.py, workspace_guard.py) "
+                    "(acceptance_contract.py, openrouter_lens.py, workspace_guard.py, "
+                    "worktree_gc.py, provider_supervisor.py) "
                     "+ recursive compile smoke: OK"
                 )
             except py_compile.PyCompileError as exc:

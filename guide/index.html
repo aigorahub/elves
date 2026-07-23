@@ -999,7 +999,8 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" \
 
         <h3>Worktree cleanup after merge</h3>
         <p>Runs that used a dedicated git worktree reclaim it after the merge. The driver runs
-          <code>./scripts/preflight.sh --gc-worktrees</code>, which first reports and then, with
+          <code>./scripts/preflight.sh --gc-worktrees</code> (installed bundles ship
+          <code>worktree_gc.py</code> with that helper), which first reports and then, with
           <code>--apply</code>, removes only worktrees that are clean, fully merged, and fully
           pushed. Anything unmerged, dirty, or not registered as a worktree is listed and left
           alone, so parallel work and your own directories are never touched.</p>

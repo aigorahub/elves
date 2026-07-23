@@ -269,6 +269,9 @@ chats are for execution; handoff docs are for memory. Rewrite live survival-guid
 7. No unjustified hardcoded constants
 8. Runaway detection (5+ fruitless edits → stop and reframe)
 9. Favor boring technology
+10. **Anti-accretion:** no new repo meta-tooling, coined terms, or config keys without an explicit
+    plan acceptance criterion that names the user-visible overnight-run value. Prefer deleting or
+    quarantining unused surface over adding process around it.
 
 Reviewers: the current codebase is source of truth, not training data. Pass today's date to review
 subagents.
