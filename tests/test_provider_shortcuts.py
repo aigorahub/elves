@@ -34,7 +34,13 @@ class SlowBody:
         self.interval = interval
 
 
-def run_script(name: str, *args: str, env: dict[str, str] | None = None, cwd: Path = REPO_ROOT):
+def run_script(
+    name: str,
+    *args: str,
+    env: dict[str, str] | None = None,
+    cwd: Path = REPO_ROOT,
+    timeout: float = 15,
+):
     merged = os.environ.copy()
     if env:
         merged.update(env)
@@ -45,7 +51,7 @@ def run_script(name: str, *args: str, env: dict[str, str] | None = None, cwd: Pa
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        timeout=15,
+        timeout=timeout,
         check=False,
     )
 
@@ -748,6 +754,9 @@ class LocalCliRunnerTests(unittest.TestCase):
                     "SAKANA_API_KEY": "test-sakana-key",
                 },
                 cwd=repo,
+                # CI host load can stretch sandbox setup + generation-safe
+                # settlement past the default 15s hermetic budget.
+                timeout=45,
             )
             match = next(
                 line for line in result.stdout.splitlines()
@@ -782,6 +791,7 @@ class LocalCliRunnerTests(unittest.TestCase):
                     "SAKANA_API_KEY": "test-sakana-key",
                 },
                 cwd=repo,
+                timeout=45,
             )
             match = next(
                 line for line in result.stdout.splitlines()
