@@ -70,6 +70,18 @@ The initial release therefore normally reports actual mode `off`: read-only inst
 show advertised grammar, but no host — Codex, Claude, or Grok — is behaviorally qualified by this
 repository. No paid qualification is implicit.
 
+Sakana's Claude Code-compatible Fugu endpoint does not change that. A Claude Code host pointed at
+`https://api.sakana.ai` advertises the same `--resume <uuid>` grammar, but advertised grammar has
+never been the qualifying evidence here: conversation continuity, worktree binding, stream
+identity, and instruction fidelity belong to the serving gateway, and Sakana's are unproven by this
+repository. Fugu is an external provider on that route and stays `off` under `auto`, exactly like
+every other unqualified provider; a Claude-shaped CLI is an analogy, and an analogy to a native
+host never qualifies an external provider. Whenever a Fugu route is pinned — for either phase, or
+for an ordinary worker — name a current catalog slug: `fugu`, `fugu-ultra-v1.1`, or `fugu-cyber`
+on the `codex-fugu` lane, and the `[1m]` tier names on the Claude Code-compatible interface. Prefer
+the exact versioned `fugu-ultra-v1.1` over the floating `fugu-ultra` alias so a route recorded in a
+qualification artifact keeps meaning one model.
+
 Configure or inspect the preference from the active Elves skill root:
 
 ```bash

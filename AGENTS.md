@@ -1,5 +1,5 @@
 ---
-version: "2.15.0"
+version: "2.16.0"
 ---
 
 # Elves: Codex repository adapter
@@ -56,7 +56,7 @@ assume `./scripts` belongs to the target repository and do not execute mappings 
   disappearance races while failing closed on other audit errors. Read-only macOS cleanup is
   best-effort and non-authoritative. No Linux procfs is mounted; Codex external-sandbox mode runs
   inside the mandatory outer boundary. Profiles remain `fugu/high`, `fugu/xhigh` for `--deep`, and
-  `fugu-ultra/high` for `--ultra`; Ultra uses exact-session staged synthesis and bounded incremental
+  `fugu-ultra-v1.1/high` for `--ultra`; Ultra uses exact-session staged synthesis and bounded incremental
   event parsing through a host-owned pipe, pins final output to a no-follow descriptor, and runs a
   final descriptor-safe writable-state audit after settlement.
 - Manus research → `run_manus.sh <topic>` for one private bounded task, or

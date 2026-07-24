@@ -13,7 +13,7 @@ Usage:
 Profiles:
   default   fugu at high effort
   --deep    fugu at xhigh effort
-  --ultra   fugu-ultra at high effort with exact-session synthesis
+  --ultra   fugu-ultra-v1.1 at high effort with exact-session synthesis
 
 Modes:
   task      The default. Follow the requested task without a review-only rubric.
@@ -117,7 +117,7 @@ case "$PROFILE" in
     DEFAULT_MAX_WAIT="1200"
     ;;
   ultra)
-    MODEL="fugu-ultra"
+    MODEL="fugu-ultra-v1.1"
     EFFORT="high"
     DEFAULT_MAX_WAIT="1800"
     ;;
@@ -1048,7 +1048,7 @@ try:
         )
         (codex_home / "fugu.config.toml").chmod(0o600)
 
-        is_ultra = model == "fugu-ultra"
+        is_ultra = model.startswith("fugu-ultra")
         print(
             "Fugu context bundle: "
             f"{lane.tracked_file_count} tracked, {lane.untracked_file_count} non-ignored "

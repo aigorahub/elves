@@ -512,7 +512,7 @@
     <div class="masthead-inner">
       <div class="brand-row">
         <a class="wordmark" href="https://github.com/aigorahub/elves">Elves</a>
-        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.15.0 source and releases on GitHub</a>
+        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.16.0 source and releases on GitHub</a>
       </div>
       <h1>Using Elves</h1>
       <p class="intro">Plan with the main agent, hand implementation to a separate worker, then
@@ -804,9 +804,11 @@ python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup</code></pre>
         <p>“Inherit” means the exact same model, with only effort lowered: GPT-5.6
           <code>xhigh</code>/extra-high/<code>ultra</code> → GPT-5.6 <code>medium</code>;
           GPT-4.8 Max/UltraCode → GPT-4.8 <code>medium</code>; Fable 5
-          <code>max</code>/<code>ultra</code> → Fable 5 <code>low</code>. If Fable explicitly
-          routes to Opus, Elves names the cross-model route as <code>claude-opus-4-8</code> at
-          <code>medium</code>. Unlisted native routes remain plan-matched. The live driver is not
+          <code>max</code>/<code>ultra</code> → Fable 5 <code>low</code>; Opus 5
+          <code>max</code>/<code>ultracode</code> → Opus 5 <code>high</code>. Native delegation
+          stays inside one model family, so a Fable driver hands off to
+          <code>claude-fable-5</code> at <code>low</code> instead of routing to Opus.
+          Unlisted native routes remain plan-matched. The live driver is not
           downgraded. Devin CLI and other configured adapters remain optional routes, not required setup.
           Grok provider availability is independent from goal support: proven headless
           <code>/goal</code> is an enhancement, and a compatible one-packet prompt is the recorded

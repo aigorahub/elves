@@ -588,7 +588,7 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertIn("do not ask the caller to paste files", result.stdout)
         self.assertIn("proc-parent-key=<hidden>", result.stdout)
         self.assertIn("snapshot-write=<blocked>", result.stdout)
-        self.assertNotIn("arg=<fugu-ultra>", result.stdout)
+        self.assertNotIn("arg=<fugu-ultra", result.stdout)
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
     def test_fugu_general_task_uses_task_appropriate_read_only_prompt(self) -> None:
@@ -1062,7 +1062,7 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertIn("arg=<--model>\narg=<fugu>", deep.stdout)
         self.assertIn('arg=<model_reasoning_effort="xhigh">', deep.stdout)
         self.assertEqual(ultra.returncode, 0, ultra.stderr)
-        self.assertIn("arg=<--model>\narg=<fugu-ultra>", ultra.stdout)
+        self.assertIn("arg=<--model>\narg=<fugu-ultra-v1.1>", ultra.stdout)
         self.assertIn('arg=<model_reasoning_effort="high">', ultra.stdout)
         self.assertIn("arg=<--json>", ultra.stdout)
         self.assertIn("arg=<--output-last-message>", ultra.stdout)

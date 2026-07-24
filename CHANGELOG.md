@@ -4,6 +4,41 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.16.0] - 2026-07-24
+
+### Opus 5 delegation and family-local native handoffs
+
+- Add the Claude Opus 5 delegation default: a driver planning at Opus 5 `max`/`ultracode` hands off
+  to the same observed `claude-opus-5` model at `high`. Opus 5 is capable enough at `high` that the
+  worker no longer needs to match the planner's effort, and the pair keeps the existing
+  same-model/lower-effort shape.
+- Remove the Fable→Opus cross-model route. Native delegation now stays inside one model family in
+  every case: a Fable 5 `max`/`ultra` driver hands off to `claude-fable-5` at `low` rather than
+  crossing into the Opus family. The route was documentation-only, so nothing in the runtime
+  changes; `references/adaptive-worker-routing.md`, `SKILL.md`, `README.md`, `guide/index.html`,
+  `.ai-docs/architecture.md`, and the consistency policy drop it together. The one remaining
+  cross-family worker is the explicitly permitted, capability-probed Grok Build handoff, which a
+  user opts into rather than receiving as a default.
+
+### Fugu-Ultra v1.1 and the Claude Code-compatible Fugu endpoint
+
+- Pin the `/fugu --ultra` profile to the exact catalog slug `fugu-ultra-v1.1` instead of the
+  floating `fugu-ultra` alias, matching Sakana's 2026-07-24 release. Ultra-phase detection now
+  keys on the `fugu-ultra` prefix so both published versions resolve correctly.
+- Correct the documented effort facts. `max` is a genuinely distinct third effort level on
+  `fugu-ultra-v1.1` only; `fugu`, `fugu-ultra-v1.0`, and `fugu-cyber` still accept `max` as a
+  compatibility alias for `xhigh`. The shortcut still exposes no `max` lane, because `--ultra`'s
+  value is its reserved exact-session synthesis phase inside a bounded wall limit.
+- Document Sakana's Claude Code-compatible endpoints and `claude-fugu` launcher: the
+  `ANTHROPIC_BASE_URL`/`ANTHROPIC_AUTH_TOKEN` pair, the `[1m]` tier model names, and the cosmetic
+  Claude Code mismatches Sakana lists (six-stop effort slider collapsed onto the `high`/`xhigh`
+  boundary, duplicate Sonnet/Haiku picker rows, API-token billing labels). The `/fugu` shortcut
+  deliberately stays on the separately audited `codex-fugu` lane; that safety kernel is qualified
+  against Codex semantics and does not transfer to another launcher by analogy.
+- State in `references/prewalk.md` that the Claude Code-compatible Fugu route advertises the same
+  `--resume` grammar but remains an unqualified external provider, so `auto` keeps reporting actual
+  mode `off` for it, and that pinned Fugu routes must name a current catalog slug.
+
 ## [2.15.0] - 2026-07-23
 
 ### General Fugu tasks and explicit review mode

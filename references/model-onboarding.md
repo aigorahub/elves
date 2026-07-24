@@ -178,6 +178,20 @@ profile = "claude-code-labor"
 
 Same pattern with `codex-fugu-planning` / `codex-fugu-labor`.
 
+Sakana now publishes Claude Code-compatible Fugu endpoints and a `claude-fugu` launcher in
+addition to `codex-fugu`, so the same subscription can back either host family. Point Claude Code
+at `ANTHROPIC_BASE_URL="https://api.sakana.ai"` with `ANTHROPIC_AUTH_TOKEN` (a `fish_…` bearer
+token, not `ANTHROPIC_API_KEY`) and map the tiers with `ANTHROPIC_DEFAULT_OPUS_MODEL`,
+`ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_DEFAULT_HAIKU_MODEL`, the access-gated
+`ANTHROPIC_DEFAULT_FABLE_MODEL`, and `CLAUDE_CODE_SUBAGENT_MODEL`; the exact `[1m]` model names
+are in [`provider-shortcuts.md`](provider-shortcuts.md). Two consequences are worth knowing before
+you route work there. Anthropic tier names stop describing the model, so `claude-code-planning` and
+`claude-code-labor` become Fugu tiers rather than Claude tiers, and a route snapshot recorded on
+that host names Fugu models. Effort names also stop being authoritative: Sakana maps Claude Code's
+six-stop slider onto Fugu's `high`/`xhigh` boundary, so the adaptive same-family effort ladder is
+cosmetic on that route. Both are honest-reporting concerns, not blockers. Elves' own `/fugu`
+shortcut stays on the separately audited `codex-fugu` lane regardless.
+
 ### Google subscription CLIs (optional plan/review only — not main drivers)
 
 | Route | Executable (typical) | Recommended purposes |
