@@ -8,7 +8,7 @@ plans and reviews; a subscription-native (or optional external) worker implement
 files let the work survive context compaction. You write the plan and own the merge decision. The
 agent does the middle.
 
-**Current release: v2.15.0** — see [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.16.0** — see [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 **New to Elves?** Use the [practical user guide](https://aigorahub.github.io/elves/) — especially
@@ -80,7 +80,7 @@ containment and is unavailable on macOS today. A qualified write exports a mode-
 handoff that is never applied automatically. Live writable-state bounds tolerate benign temporary
 subtree disappearance and fail closed on other audit errors. macOS read-only cleanup is best-effort,
 not proof of recursive descendant absence.
-Profiles remain regular `fugu/high`, `fugu/xhigh` with `--deep`, and `fugu-ultra/high` with
+Profiles remain regular `fugu/high`, `fugu/xhigh` with `--deep`, and `fugu-ultra-v1.1/high` with
 `--ultra`. Regular/deep calls are ephemeral; Ultra reserves synthesis time and resumes only the
 exact isolated session with further tools forbidden. Session state and raw events never leave the
 lane; events cross a bounded host-owned pipe, final output remains pinned to a no-follow
@@ -168,12 +168,13 @@ Parallel implementation lanes are optional and never the default: serial stays t
 Trusted Grok implementation launches use `--always-approve` alone: Grok Build treats an explicit
 `--permission-mode auto` as an override, so the two flags must not be combined.
 
-Native delegation names both model and effort. GPT-5.6 `xhigh`/extra-high/`ultra` hands off to the
-same GPT-5.6 model at `medium`; GPT-4.8 Max/UltraCode to the same GPT-4.8 model at `medium`; Fable 5
-`max`/`ultra` to the same Fable 5 model at `low`. A Fable→Opus exception means
-`claude-opus-4-8` at `medium`, not “the same model.” A permitted Grok handoff prefers
-`grok-4.5` at explicit `high` when the live catalog returns it. Composer 2.5
-(`grok-composer-2.5-fast`) is retired and is never selected.
+Native delegation names both model and effort, and stays inside one model family. GPT-5.6
+`xhigh`/extra-high/`ultra` hands off to the same GPT-5.6 model at `medium`; GPT-4.8 Max/UltraCode to
+the same GPT-4.8 model at `medium`; Fable 5 `max`/`ultra` to the same Fable 5 model at `low`; Opus 5
+`max`/`ultracode` to the same Opus 5 model at `high`. There is no Fable→Opus route — a Fable driver
+hands off to `claude-fable-5` at `low` rather than crossing families. The one cross-family worker is
+the opt-in Grok handoff, which prefers `grok-4.5` at explicit `high` when the live catalog returns
+it. Composer 2.5 (`grok-composer-2.5-fast`) is retired and is never selected.
 
 ### Optional exact-session prewalk
 
@@ -397,12 +398,12 @@ exactly one file below; other docs link instead of restating.
 
 ```bash
 # Elves source checkout:
-python3 scripts/verify_repo.py --version 2.15.0
+python3 scripts/verify_repo.py --version 2.16.0
 # before operational-artifact cleanup, from a clean worktree:
-python3 scripts/verify_repo.py --version 2.15.0 --final-readiness \
+python3 scripts/verify_repo.py --version 2.16.0 --final-readiness \
   --session .elves-session.json
 # after the narrow operational-artifact cleanup commit, on its clean current tip:
-python3 scripts/verify_repo.py --ci --version 2.15.0 --base-ref origin/main
+python3 scripts/verify_repo.py --ci --version 2.16.0 --base-ref origin/main
 test -z "$(git status --porcelain)"
 ```
 

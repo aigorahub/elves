@@ -80,12 +80,46 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
   |---|---|---:|---|
   | `/fugu <task>` | `fugu` / `high` | 10 minutes | routine general task or explicit review |
   | `/fugu --deep <task>` | `fugu` / `xhigh` | 20 minutes | harder analysis, implementation, or review |
-  | `/fugu --ultra <task>` | `fugu-ultra` / `high` | 30 minutes total; at most 20 minutes exploring by default | compact high-stakes task with a reserved synthesis phase |
+  | `/fugu --ultra <task>` | `fugu-ultra-v1.1` / `high` | 30 minutes total; at most 20 minutes exploring by default | compact high-stakes task with a reserved synthesis phase |
 
-  Sakana documents `max` as a compatibility alias for `xhigh`, not a separate effort level. The
-  public shortcut therefore uses `xhigh` explicitly and does not market an Ultra/max lane. A
-  general invocation with no task is rejected; use `review` with no scope to review the current
-  repository changes.
+  Sakana's Fugu-Ultra v1.1 release (2026-07-24) ships at the same price as v1.0 and changes two
+  facts the shortcut depends on. The published catalog slug is now `fugu-ultra-v1.1`, and plain
+  `fugu-ultra` — the only ultra slug older bundles listed — survives just as an accepted API alias.
+  Because the runner hands the installed `fugu.json` to the isolated launcher, the `--ultra` lane
+  resolves its model against that catalog instead of hard-coding one spelling: it prefers
+  `fugu-ultra-v1.1`, accepts the equivalent `fugu-ultra` alias when a legacy bundle publishes only
+  that, and otherwise keeps `fugu-ultra-v1.1` so the provider stays authoritative over its own
+  aliases. `fugu-ultra-v1.0` is deliberately never selected — it is a different model, and silently
+  running it would misreport the lane. And `max` is a genuinely distinct third effort level **on
+  `fugu-ultra-v1.1` only** — `fugu`,
+  `fugu-ultra-v1.0`, and `fugu-cyber` still accept `max` purely as a compatibility alias that maps
+  to `xhigh`. The shortcut still exposes no `max` lane: `--ultra` stays at `high` because its value
+  is the reserved exact-session synthesis phase inside a bounded wall limit, and a `max` lane would
+  change that budget rather than the task shape. `--deep` therefore keeps naming `xhigh`
+  explicitly. A general invocation with no task is rejected; use `review` with no scope to review
+  the current repository changes.
+
+  **Claude Code-compatible Fugu endpoint.** Sakana now also fronts Fugu with Claude Code-compatible
+  endpoints and a `claude-fugu` launcher alongside `codex-fugu`. Claude Code points at it through
+  `ANTHROPIC_BASE_URL="https://api.sakana.ai"` plus `ANTHROPIC_AUTH_TOKEN` (a `fish_…` bearer
+  token, **not** `ANTHROPIC_API_KEY`), and maps Anthropic tiers onto Fugu models:
+  `ANTHROPIC_DEFAULT_OPUS_MODEL="fugu-ultra[1m]"`, `ANTHROPIC_DEFAULT_SONNET_MODEL="fugu[1m]"`,
+  `ANTHROPIC_DEFAULT_HAIKU_MODEL="fugu[1m]"`, the access-gated
+  `ANTHROPIC_DEFAULT_FABLE_MODEL="fugu-cyber[1m]"`, and `CLAUDE_CODE_SUBAGENT_MODEL="fugu[1m]"`.
+  The `[1m]` suffix is that interface's 1M-context model naming and belongs only there; the
+  `codex-fugu` lane keeps the bare catalog slugs above.
+
+  This shortcut deliberately stays on `codex-fugu`. Elves' Fugu safety kernel — the disposable
+  Git-enumerated snapshot, the isolated `CODEX_HOME`, the Codex shell policy that withholds the
+  Sakana grant from model-run commands, and the externally-sandboxed mode — is qualified against
+  Codex semantics, and none of it transfers to a different launcher by analogy. Operators may run
+  `claude-fugu` directly as their own driver; that is a host choice outside this shortcut and
+  outside Elves' audited lane. Sakana also documents cosmetic Claude Code mismatches that matter
+  when reading a run: the six-stop effort slider (`low` through `ultracode`) collapses onto Fugu's
+  `high`/`xhigh` boundary, so Elves' effort names are not authoritative on that route; Sonnet and
+  Haiku both resolve to `fugu[1m]`, so the model picker shows duplicate rows; and session-header
+  billing labels reflect API-token usage. The `claude-fugu` launcher does not auto-update, so new
+  Fugu models reach it only after a manual update.
 - **Manus:** requires `MANUS_API_KEY`. The ordinary form creates one private `manus-1.6-max` task
   through `https://api.manus.ai/v2/task.create` with `x-manus-api-key`, explicitly empty
   `message.connectors`, `message.enable_skills`, and `message.force_skills`, then polls with a

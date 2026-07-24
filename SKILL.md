@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.15.0"
+  version: "2.16.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -44,11 +44,13 @@ never a squash.
 a separate subscription-native worker normally keeps the exact observed model identity and lowers
 only its effort. The named delegation defaults are: GPT-5.6 at `xhigh`/extra-high/`ultra` → the
 same GPT-5.6 model at `medium`; GPT-4.8 Max/UltraCode → the same GPT-4.8 model at `medium`; Claude
-Fable 5 at `max`/`ultra` → the same Fable 5 model at `low`. A Fable→Opus route is an explicit
-cross-model route, never “inheritance,” and means `claude-opus-4-8` at `medium`. Grok Build is
-also cross-family: prefer `grok-4.5` at explicit `high` when the authenticated live catalog returns
-it (Composer 2.5 is retired and is never selected). Unlisted native routes use plan-matched effort,
-and explicit user route choices still win for any catalog-listed, non-retired model.
+Fable 5 at `max`/`ultra` → the same Fable 5 model at `low`; Claude Opus 5 at `max`/`ultracode` →
+the same Opus 5 model at `high`. Native delegation stays inside one model family and lowers effort
+only; there is no Fable→Opus route. Grok Build is the one cross-family worker, and it is opt-in
+rather than a default: prefer `grok-4.5` at explicit `high` when the authenticated live catalog
+returns it (Composer 2.5 is retired and is never selected). Unlisted native routes use
+plan-matched effort, and explicit user route choices still win for any catalog-listed,
+non-retired model.
 Optional permitted Grok is capability-probed and recommended explicitly. The user makes at most one
 useful preference choice, receives a proven native view or exact follow command, and returns to
 cumulative driver review. Trusted full-run delegation keeps that path
@@ -62,7 +64,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.15.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.16.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
@@ -230,7 +232,9 @@ required capability, then execute it without an extra confirmation prompt:
   closed on other traversal errors. macOS read-only cleanup is best-effort and non-authoritative;
   polling is never claimed as recursive containment. The default is regular `fugu/high`; `--deep`
   selects `fugu/xhigh`, and `--ultra` selects
-  `fugu-ultra/high`. Regular and deep are ephemeral one-shot sessions. Ultra reserves part of the
+  `fugu-ultra-v1.1/high`, resolved against the installed catalog so a legacy bundle publishing only
+  the `fugu-ultra` alias still launches and `fugu-ultra-v1.0` is never substituted.
+  Regular and deep are ephemeral one-shot sessions. Ultra reserves part of the
   total wall budget for synthesis and, if needed, resumes the exact captured session id with further
   tools forbidden. It never guesses a “last” session; raw events are parsed incrementally under a
   bounded host pipe, final output stays pinned to a no-follow descriptor, and raw

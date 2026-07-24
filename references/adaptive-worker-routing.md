@@ -81,8 +81,15 @@ the same provider label. The worker route is always described as a `(model, effo
 | GPT-5.6 at `xhigh`/extra-high/`ultra` | same observed GPT-5.6 model ID at `medium` | effort only |
 | GPT-4.8 Max/UltraCode | same observed GPT-4.8 model ID at `medium` | effort only |
 | Claude Fable 5 at `max`/`ultra` | same observed `claude-fable-5` model ID at `low` | effort only |
-| explicit or availability-driven Fable→Opus route | `claude-opus-4-8` at `medium` | model and effort; never call this inheritance |
-| permitted Grok Build handoff | `grok-4.5` at `high` when present in the live catalog | cross-family; Composer 2.5 is retired |
+| Claude Opus 5 at `max`/`ultracode` | same observed `claude-opus-5` model ID at `high` | effort only |
+| permitted Grok Build handoff | `grok-4.5` at `high` when present in the live catalog | cross-family; explicitly opted in; Composer 2.5 is retired |
+
+**Native delegation stays inside one model family.** Every native row above lowers effort on the
+exact observed driver model and never substitutes a sibling. Elves no longer defines a
+Fable→Opus route: a driver planning at Fable 5 `max`/`ultra` hands off to `claude-fable-5` at
+`low`, which is a capable implementation worker, rather than crossing into the Opus family. The
+only cross-family worker is the explicitly permitted, capability-probed Grok Build handoff, which
+a user opts into rather than receiving as a default.
 
 These named defaults apply to a separate worker and to the execution phase of an exact-session
 prewalk. An explicit user route still wins. Unlisted native routes use the plan's low/medium/high
