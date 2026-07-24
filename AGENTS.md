@@ -57,7 +57,8 @@ assume `./scripts` belongs to the target repository and do not execute mappings 
   best-effort and non-authoritative. No Linux procfs is mounted; Codex external-sandbox mode runs
   inside the mandatory outer boundary. Profiles remain `fugu/high`, `fugu/xhigh` for `--deep`, and
   `fugu-ultra/high` for `--ultra`; Ultra uses exact-session staged synthesis and bounded incremental
-  event parsing.
+  event parsing through a host-owned pipe, pins final output to a no-follow descriptor, and runs a
+  final descriptor-safe writable-state audit after settlement.
 - Manus research → `run_manus.sh <topic>` for one private bounded task, or
   `run_manus.sh --wide --items-file <roster.json> [--file <source>] <goal>` for Cobbler-managed
   native-Wide-first research with exact coverage repair; use `--fanout` for deterministic

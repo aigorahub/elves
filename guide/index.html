@@ -686,7 +686,9 @@ python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup</code></pre>
             reserves part of its total wall limit for synthesis; if
             exploration uses its phase, Elves resumes the exact captured session with further tools
             forbidden. It never guesses the “last” session, and its state and raw events remain only
-            in the disposable lane; event parsing is incremental and bounded.</li>
+            in the disposable lane. Events cross a bounded host-owned pipe, final output stays pinned
+            to a no-follow descriptor, and a final descriptor-safe writable-state audit runs after
+            each phase settles.</li>
           <li><strong>Manus</strong> creates private, bounded deep-web research and needs
             <code>MANUS_API_KEY</code>. To request one worker per paper or reference, use
             <code>/manus --wide --items-file references.json &lt;goal&gt;</code>. Cobbler requests

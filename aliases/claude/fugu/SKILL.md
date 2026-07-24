@@ -29,5 +29,7 @@ The runner uses the official `codex-fugu` launcher with policy-admitted tracked 
 untracked context, closed interactive input, and a hard wall-clock bound. It selects regular
 `fugu/high` by default, `fugu/xhigh` with `--deep`, or `fugu-ultra/high` with `--ultra`.
 Regular/deep sessions are ephemeral; Ultra uses exact-session staged synthesis, with its state
-confined to the disposable isolated lane and its event parsing incremental and bounded.
+confined to the disposable isolated lane, events carried by a bounded host-owned pipe, final
+output pinned to a no-follow descriptor, and a final descriptor-safe writable-state audit after
+each settled phase.
 Do not replace it with an improvised API request or remove its sandbox and timeout controls.

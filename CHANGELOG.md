@@ -28,9 +28,10 @@ All notable changes to the Elves skill are documented here.
 - Preserve regular `fugu/high`, deep `fugu/xhigh`, and `fugu-ultra/high` behavior across task
   modes, including closed input, credential scrubbing, no Linux procfs, qualified macOS/Linux
   filesystem boundaries, hard-wall cleanup, exact-session Ultra synthesis, bounded incremental
-  event parsing, and live writable-state limits that tolerate benign temporary-tree disappearance
-  while failing closed on other audit errors. macOS read-only cleanup is explicitly best-effort and
-  non-authoritative; polling is not recursive containment.
+  event parsing over a host-owned pipe, no-follow pinned final output, and live writable-state
+  limits that tolerate benign temporary-tree disappearance while failing closed on other audit
+  errors. Every settled phase receives a final descriptor-safe audit. macOS read-only cleanup is
+  explicitly best-effort and non-authoritative; polling is not recursive containment.
 - Update the Claude alias, Codex adapter, README, guide, provider reference, installed bundles,
   consistency policy, hermetic provider/isolation coverage, and release examples for v2.15.0.
 

@@ -83,7 +83,8 @@ not proof of recursive descendant absence.
 Profiles remain regular `fugu/high`, `fugu/xhigh` with `--deep`, and `fugu-ultra/high` with
 `--ultra`. Regular/deep calls are ephemeral; Ultra reserves synthesis time and resumes only the
 exact isolated session with further tools forbidden. Session state and raw events never leave the
-lane, and event parsing is incremental and bounded. Codex's documented externally-sandboxed mode avoids an invalid nested macOS sandbox while
+lane; events cross a bounded host-owned pipe, final output remains pinned to a no-follow
+descriptor, and every settled phase receives a final descriptor-safe writable-state audit. Codex's documented externally-sandboxed mode avoids an invalid nested macOS sandbox while
 Elves' required outer boundary remains authoritative. Manus supports a normal private
 task plus Cobbler-managed `--wide` and deterministic `--fanout` rosters, explicit `--file`
 attachments, and duplicate-safe `--resume` that retries only known-failed steps; roster manifests

@@ -61,10 +61,13 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
   Ultra uses a resumable session confined to the lane: it captures the exact `thread.started` id
   and reserves part of the hard wall limit for a no-more-tools synthesis turn on that exact id when
   exploration does not finish first. It never uses ambiguous `--last` state; raw events, the
-  final-message file, and session state are destroyed with the lane. Ultra event JSONL is parsed
-  incrementally with bounded file and line reads. A live monitor covers snapshot, HOME, tmp, and
+  final-message output, and session state are destroyed with the lane. Ultra events cross a bounded
+  host-owned pipe, and the final-message inode is opened once with no-follow semantics; host parsing,
+  reads, and truncation never reopen provider-controlled names. A live monitor covers snapshot, HOME, tmp, and
   XDG writable state; defaults allow at most 20,000 additional filesystem entries, 256 MiB
   aggregate growth, and 64 MiB per file before the provider is terminated and the result rejected.
+  After every provider phase settles, the monitor joins and a final descriptor-safe audit runs
+  before any output or handoff is accepted.
   Traversal tolerates only benign ENOENT/rename races from disappearing temporary generations;
   permissions, ownership, unsupported types, and other audit failures remain fail-closed, and links
   are never followed. Every profile closes input, disables launcher notices/updates, and has a hard

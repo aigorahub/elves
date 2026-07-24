@@ -233,7 +233,9 @@ required capability, then execute it without an extra confirmation prompt:
   `fugu-ultra/high`. Regular and deep are ephemeral one-shot sessions. Ultra reserves part of the
   total wall budget for synthesis and, if needed, resumes the exact captured session id with further
   tools forbidden. It never guesses a “last” session; raw events are parsed incrementally under a
-  bound, and raw events/resumable state remain only inside the disposable lane.
+  bounded host pipe, final output stays pinned to a no-follow descriptor, and raw
+  events/resumable state remain only inside the disposable lane. Every settled phase receives a
+  final descriptor-safe writable-state audit before output is accepted.
 - `/manus <topic>` → `scripts/run_manus.sh <topic>` for one private, bounded Manus deep-web task.
   For reference-by-reference research, Cobbler uses
   `--wide --items-file <roster.json> [--file <source>] <goal>`: request native Wide Research,

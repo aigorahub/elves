@@ -368,6 +368,24 @@ class LocalCliRunnerTests(unittest.TestCase):
         binary.chmod(0o755)
         return binary
 
+    def make_fugu_final_runtime_growth_fake(self, root: Path) -> Path:
+        binary = root / "codex-fugu"
+        binary.write_text(
+            "#!/bin/sh\n"
+            "while IFS= read -r _LINE || [ -n \"$_LINE\" ]; do :; done\n"
+            "COUNT=0\n"
+            "while [ ! -e \"$HOME/.final-audit-ready\" ] && [ \"$COUNT\" -lt 300 ]; do\n"
+            "  /bin/sleep 0.01\n"
+            "  COUNT=$((COUNT + 1))\n"
+            "done\n"
+            "/bin/dd if=/dev/zero of=\"$HOME/provider-final-growth.bin\" "
+            "bs=4096 count=1 2>/dev/null\n"
+            "exit 0\n",
+            encoding="utf-8",
+        )
+        binary.chmod(0o755)
+        return binary
+
     def make_fugu_runtime_special_file_fake(self, root: Path) -> Path:
         binary = root / "codex-fugu"
         binary.write_text(
@@ -426,6 +444,29 @@ class LocalCliRunnerTests(unittest.TestCase):
         )
         return hook_dir
 
+    def make_final_runtime_audit_hook(self, root: Path) -> Path:
+        hook_dir = root / "final-runtime-audit-hook"
+        hook_dir.mkdir()
+        (hook_dir / "sitecustomize.py").write_text(
+            "import sys\n"
+            "from pathlib import Path\n"
+            f"sys.path.insert(0, {str(SCRIPTS)!r})\n"
+            "import cobbler_runtime.isolation as isolation\n"
+            "_real_usage = isolation.provider_writable_tree_usage\n"
+            "_calls = 0\n"
+            "def _usage(roots):\n"
+            "    global _calls\n"
+            "    result = _real_usage(roots)\n"
+            "    _calls += 1\n"
+            "    if _calls == 2:\n"
+            "        home = next(Path(root) for root in roots if Path(root).name == 'home')\n"
+            "        (home / '.final-audit-ready').touch()\n"
+            "    return result\n"
+            "isolation.provider_writable_tree_usage = _usage\n",
+            encoding="utf-8",
+        )
+        return hook_dir
+
     def make_missing_waitid_hook(self, root: Path) -> Path:
         hook_dir = root / "missing-waitid-hook"
         hook_dir.mkdir()
@@ -448,6 +489,33 @@ class LocalCliRunnerTests(unittest.TestCase):
             "printf '{\"type\":\"thread.started\","
             "\"thread_id\":\"019f0000-0000-7000-8000-000000000005\"}\\n'\n"
             "exit 0\n",
+            encoding="utf-8",
+        )
+        binary.chmod(0o755)
+        return binary
+
+    def make_fugu_ultra_symlink_transport_fake(
+        self,
+        root: Path,
+        outside: Path,
+    ) -> Path:
+        binary = root / "codex-fugu"
+        binary.write_text(
+            "#!/bin/sh\n"
+            "IS_RESUME=0\n"
+            "for ARG in \"$@\"; do [ \"$ARG\" = \"resume\" ] && IS_RESUME=1; done\n"
+            "while IFS= read -r _LINE || [ -n \"$_LINE\" ]; do :; done\n"
+            f"OUTSIDE={str(outside)!r}\n"
+            "rm -f \"$TMPDIR/fugu-ultra-events.jsonl\" \"$TMPDIR/fugu-ultra-final.txt\"\n"
+            "ln -s \"$OUTSIDE\" \"$TMPDIR/fugu-ultra-events.jsonl\"\n"
+            "ln -s \"$OUTSIDE\" \"$TMPDIR/fugu-ultra-final.txt\"\n"
+            "if [ \"$IS_RESUME\" = 1 ]; then\n"
+            "  printf '%s\\n' '{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"SAFE_FINAL\"}}'\n"
+            "  exit 0\n"
+            "fi\n"
+            "printf '%s\\n' '{\"type\":\"thread.started\",\"thread_id\":\"019f0000-0000-7000-8000-000000000006\"}'\n"
+            "trap 'exit 1' INT TERM\n"
+            "while :; do sleep 1; done\n",
             encoding="utf-8",
         )
         binary.chmod(0o755)
@@ -783,6 +851,35 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertNotIn("Fugu isolated-write handoff:", result.stderr)
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    def test_fugu_final_runtime_audit_catches_growth_after_last_poll(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_final_runtime_growth_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
+            hook_dir = self.make_final_runtime_audit_hook(root)
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "write immediately before exit",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "PYTHONPATH": str(hook_dir),
+                    "SAKANA_API_KEY": "test-sakana-key",
+                    "SAKANA_FUGU_RUNTIME_MAX_GROWTH_BYTES": "1",
+                    "SAKANA_FUGU_RUNTIME_MAX_FILE_BYTES": "8192",
+                },
+                cwd=repo,
+            )
+
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("live resource budget", result.stderr)
+        self.assertIn("grew by", result.stderr)
+
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
     def test_fugu_live_runtime_scan_tolerates_concurrent_subtree_removal(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -862,6 +959,40 @@ class LocalCliRunnerTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertIn("fugu_ultra_event_line_limit", result.stderr)
+
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    def test_fugu_ultra_symlink_transport_cannot_read_or_mutate_outside_file(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            outside = root / "outside-sentinel.txt"
+            outside.write_text("OUTSIDE_SECRET_SENTINEL\n", encoding="utf-8")
+            self.make_fugu_ultra_symlink_transport_fake(bin_dir, outside)
+            self.make_fake(bin_dir, "codex")
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "--ultra",
+                "inspect adversarial output transport",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "SAKANA_API_KEY": "test-sakana-key",
+                    "SAKANA_FUGU_MAX_WAIT_SECONDS": "3",
+                    "SAKANA_FUGU_ULTRA_EXPLORE_SECONDS": "0.8",
+                },
+                cwd=repo,
+            )
+            outside_after = outside.read_text(encoding="utf-8")
+
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("fugu_ultra_output_file_invalid", result.stderr)
+        self.assertNotIn("OUTSIDE_SECRET_SENTINEL", result.stdout + result.stderr)
+        self.assertEqual(outside_after, "OUTSIDE_SECRET_SENTINEL\n")
 
     def test_fugu_mode_and_context_errors_fail_before_provider_work(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
