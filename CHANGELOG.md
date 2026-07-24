@@ -4,6 +4,37 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.15.0] - 2026-07-23
+
+### General Fugu tasks and explicit review mode
+
+- Separate provider choice from task type. Plain `/fugu <task>`, `$elves fugu <task>`, and natural
+  “use Fugu” requests now return task-appropriate analysis, design, investigation, or other
+  deliverables without forcing review severities or a clean verdict. `fugu review <scope>` retains
+  the read-only base/change review with ordered P0-P3 findings and exact file/line evidence.
+- Replace Fugu's tracked-only context with a bounded Git-enumerated snapshot of policy-admitted
+  tracked and non-ignored untracked files. Repeatable `--include <path>` records exact host-selected
+  context and fails if it cannot actually be admitted and copied, while ignored
+  dependency/cache/build trees, both `.env.*` and `*.env` dotenv/credential families, reserved
+  internal namespaces, Git/Elves state, executable agent configuration, unsafe file types/links,
+  ownership violations, repository escapes, and count/size overflow remain excluded or fail closed
+  with visible bounded diagnostics.
+- Add user-authorized `--write` for general tasks only. Fugu may modify only its disposable
+  kernel-isolated snapshot; a host-side before/after digest-and-mode audit rejects protected,
+  credential, unsafe, or oversized output and exports accepted regular files/deletions as an inert
+  temporary handoff. Mode-only and executable changes retain safe manifest/export semantics. The
+  host checkout is never mutated and the handoff is never applied automatically. Writes require a
+  qualified recursive Linux bwrap PID namespace and fail before provider launch on macOS.
+- Preserve regular `fugu/high`, deep `fugu/xhigh`, and `fugu-ultra/high` behavior across task
+  modes, including closed input, credential scrubbing, no Linux procfs, qualified macOS/Linux
+  filesystem boundaries, hard-wall cleanup, exact-session Ultra synthesis, bounded incremental
+  event parsing over a host-owned pipe, no-follow pinned final output, and live writable-state
+  limits that tolerate benign temporary-tree disappearance while failing closed on other audit
+  errors. Every settled phase receives a final descriptor-safe audit. macOS read-only cleanup is
+  explicitly best-effort and non-authoritative; polling is not recursive containment.
+- Update the Claude alias, Codex adapter, README, guide, provider reference, installed bundles,
+  consistency policy, hermetic provider/isolation coverage, and release examples for v2.15.0.
+
 ## [2.14.1] - 2026-07-23
 
 ### Install ship-list correctness and audit hygiene

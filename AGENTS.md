@@ -1,5 +1,5 @@
 ---
-version: "2.14.1"
+version: "2.15.0"
 ---
 
 # Elves: Codex repository adapter
@@ -33,7 +33,7 @@ authenticated live catalog (`references/adaptive-worker-routing.md`).
 | Cobbler | `$elves cobbler: <task>` or "Ask the Cobbler…" |
 | Cobbler Mode | `$elves cobbler-mode` or natural "Cobbler Mode: on/off" |
 | Setup | `$elves setup-cobbler` / `$elves setup-council` |
-| Provider shortcut | `$elves fugu [--deep\|--ultra] <task>`, `$elves manus [--wide\|--fanout] …`, `$elves grok <instructions>`, or `$elves devin <instructions>` |
+| Provider shortcut | `$elves fugu [--deep\|--ultra] [--write] [--include PATH] <task>` / `$elves fugu review <scope>`, `$elves manus [--wide\|--fanout] …`, `$elves grok <instructions>`, or `$elves devin <instructions>` |
 | Land PR | natural language; `\land-pr` / `/land-pr` when the host maps them |
 
 ### Provider subprocess capabilities map
@@ -42,11 +42,23 @@ For explicit provider-shortcut intent, follow SKILL.md **Provider shortcut proto
 `references/provider-shortcuts.md`. Resolve helpers from the active installed skill root; do not
 assume `./scripts` belongs to the target repository and do not execute mappings blindly:
 
-- Fugu review → `run_fugu.sh [--deep|--ultra] <task>` (project-aware `codex-fugu`, tracked-only
-  snapshot and same-policy diff evidence, including safe deletion patches, plus required kernel
-  read sandbox with no Linux procfs; Codex external-sandbox mode inside that mandatory boundary;
-  regular `fugu/high` by default, `fugu/xhigh` for `--deep`, `fugu-ultra/high` for `--ultra`;
-  Ultra uses compact evidence and exact-session staged synthesis rather than an unbounded one-shot)
+- General Fugu task → `run_fugu.sh [--deep|--ultra] [--write] [--include PATH] <task>`; explicit
+  review → `run_fugu.sh [--deep|--ultra] review <scope>`. General output follows the task instead
+  of a forced review rubric; review retains read-only base/change evidence and ordered findings.
+  Both receive a bounded policy-admitted tracked plus non-ignored-untracked snapshot. The host may
+  select exact context, but the safety kernel rejects ignored/credential/operational/configuration
+  paths (including both `.env.*` and `*.env` variants and reserved internal namespaces), unsafe
+  file types, links, modes, races, and repository escapes. Exact includes must be admitted or fail.
+  `--write` also requires independent user implementation authority and a qualified recursive
+  Linux bwrap PID-namespace boundary; it is unavailable on macOS, whose process polling cannot
+  prove recursive containment. Qualified writes return a mode-aware audited inert handoff that is
+  never applied automatically. Live writable-state bounds tolerate benign temporary-tree
+  disappearance races while failing closed on other audit errors. Read-only macOS cleanup is
+  best-effort and non-authoritative. No Linux procfs is mounted; Codex external-sandbox mode runs
+  inside the mandatory outer boundary. Profiles remain `fugu/high`, `fugu/xhigh` for `--deep`, and
+  `fugu-ultra/high` for `--ultra`; Ultra uses exact-session staged synthesis and bounded incremental
+  event parsing through a host-owned pipe, pins final output to a no-follow descriptor, and runs a
+  final descriptor-safe writable-state audit after settlement.
 - Manus research → `run_manus.sh <topic>` for one private bounded task, or
   `run_manus.sh --wide --items-file <roster.json> [--file <source>] <goal>` for Cobbler-managed
   native-Wide-first research with exact coverage repair; use `--fanout` for deterministic

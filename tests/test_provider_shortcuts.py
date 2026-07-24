@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 import signal
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -33,7 +34,13 @@ class SlowBody:
         self.interval = interval
 
 
-def run_script(name: str, *args: str, env: dict[str, str] | None = None, cwd: Path = REPO_ROOT):
+def run_script(
+    name: str,
+    *args: str,
+    env: dict[str, str] | None = None,
+    cwd: Path = REPO_ROOT,
+    timeout: float = 15,
+):
     merged = os.environ.copy()
     if env:
         merged.update(env)
@@ -44,7 +51,7 @@ def run_script(name: str, *args: str, env: dict[str, str] | None = None, cwd: Pa
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        timeout=15,
+        timeout=timeout,
         check=False,
     )
 
@@ -225,6 +232,11 @@ class LocalCliRunnerTests(unittest.TestCase):
             "    printf 'evidence=<%s>\\n' \"$line\"\n"
             "  done < _elves_review/change-context.txt\n"
             "fi\n"
+            "if [ -f untracked-context.txt ]; then\n"
+            "  while IFS= read -r line || [ -n \"$line\" ]; do\n"
+            "    printf 'context-file=<%s>\\n' \"$line\"\n"
+            "  done < untracked-context.txt\n"
+            "fi\n"
             "if printf 'forbidden\\n' > \"$PWD/fugu-write-attempt\" 2>/dev/null; then\n"
             "  printf 'snapshot-write=<allowed>\\n'\n"
             "else\n"
@@ -316,6 +328,223 @@ class LocalCliRunnerTests(unittest.TestCase):
         binary.chmod(0o755)
         return binary
 
+    def make_fugu_descendant_fake(
+        self,
+        root: Path,
+        *,
+        delayed_write: bool = False,
+        setsid: bool = False,
+    ) -> Path:
+        binary = root / "codex-fugu"
+        if delayed_write:
+            action = (
+                "( /bin/sleep 2; printf 'late\\n' > \"$PWD/late-output.txt\" ) &"
+            )
+        elif setsid:
+            action = (
+                "/usr/bin/perl -MPOSIX -e "
+                "'POSIX::setsid(); sleep 30' &"
+            )
+        else:
+            action = "/bin/sleep 30 &"
+        binary.write_text(
+            "#!/bin/sh\n"
+            "while IFS= read -r _LINE || [ -n \"$_LINE\" ]; do :; done\n"
+            f"{action}\n"
+            "CHILD=$!\n"
+            "printf 'descendant-pid=<%s>\\n' \"$CHILD\"\n"
+            + ("/bin/sleep 0.5\n" if setsid else "/bin/sleep 0.2\n")
+            +
+            "exit 0\n",
+            encoding="utf-8",
+        )
+        binary.chmod(0o755)
+        return binary
+
+    def make_fugu_runtime_growth_fake(self, root: Path) -> Path:
+        binary = root / "codex-fugu"
+        binary.write_text(
+            "#!/bin/sh\n"
+            "while IFS= read -r _LINE || [ -n \"$_LINE\" ]; do :; done\n"
+            "/bin/dd if=/dev/zero of=\"$HOME/provider-growth.bin\" "
+            "bs=4096 count=16 2>/dev/null\n"
+            "/bin/sleep 5\n",
+            encoding="utf-8",
+        )
+        binary.chmod(0o755)
+        return binary
+
+    def make_fugu_final_runtime_growth_fake(self, root: Path) -> Path:
+        binary = root / "codex-fugu"
+        binary.write_text(
+            "#!/bin/sh\n"
+            "while IFS= read -r _LINE || [ -n \"$_LINE\" ]; do :; done\n"
+            "COUNT=0\n"
+            "while [ ! -e \"$HOME/.final-audit-ready\" ] && [ \"$COUNT\" -lt 300 ]; do\n"
+            "  /bin/sleep 0.01\n"
+            "  COUNT=$((COUNT + 1))\n"
+            "done\n"
+            "/bin/dd if=/dev/zero of=\"$HOME/provider-final-growth.bin\" "
+            "bs=4096 count=1 2>/dev/null\n"
+            "exit 0\n",
+            encoding="utf-8",
+        )
+        binary.chmod(0o755)
+        return binary
+
+    def make_fugu_runtime_special_file_fake(self, root: Path) -> Path:
+        binary = root / "codex-fugu"
+        binary.write_text(
+            "#!/bin/sh\n"
+            "while IFS= read -r _LINE || [ -n \"$_LINE\" ]; do :; done\n"
+            "/usr/bin/mkfifo \"$HOME/provider-runtime.pipe\"\n"
+            "/bin/sleep 5\n",
+            encoding="utf-8",
+        )
+        binary.chmod(0o755)
+        return binary
+
+    def make_fugu_adversarial_escape_fake(self, root: Path) -> Path:
+        binary = root / "codex-fugu"
+        binary.write_text(
+            "#!/bin/sh\n"
+            "printf 'provider-launched\\n'\n"
+            "(/usr/bin/env -i /usr/bin/perl -MPOSIX -e "
+            "'exit if fork(); POSIX::setsid(); exit if fork(); sleep 2') &\n"
+            "exit 0\n",
+            encoding="utf-8",
+        )
+        binary.chmod(0o755)
+        return binary
+
+    def make_runtime_disappearance_hook(self, root: Path) -> Path:
+        hook_dir = root / "runtime-race-hook"
+        hook_dir.mkdir()
+        (hook_dir / "sitecustomize.py").write_text(
+            "import os\n"
+            "import shutil\n"
+            "import threading\n"
+            "from pathlib import Path\n"
+            "_real_open = os.open\n"
+            "_race_identity = None\n"
+            "_victim = None\n"
+            "_removed = False\n"
+            "def _open(path, flags, mode=0o777, *, dir_fd=None):\n"
+            "    global _race_identity, _victim, _removed\n"
+            "    candidate = Path(path) if dir_fd is None else None\n"
+            "    if _race_identity is None and candidate is not None and candidate.name == 'home':\n"
+            "        _victim = candidate / '.codex' / '.tmp' / 'plugins-clone-race' / 'agents'\n"
+            "        _victim.mkdir(parents=True, exist_ok=True)\n"
+            "        parent_info = _victim.parent.stat()\n"
+            "        _race_identity = (parent_info.st_dev, parent_info.st_ino)\n"
+            "    if path == 'agents' and dir_fd is not None and not _removed:\n"
+            "        parent_info = os.fstat(dir_fd)\n"
+            "        if (parent_info.st_dev, parent_info.st_ino) == _race_identity:\n"
+            "            remover = threading.Thread(target=shutil.rmtree, args=(_victim,))\n"
+            "            remover.start()\n"
+            "            remover.join()\n"
+            "            _removed = True\n"
+            "    return _real_open(path, flags, mode, dir_fd=dir_fd)\n"
+            "os.open = _open\n",
+            encoding="utf-8",
+        )
+        return hook_dir
+
+    def make_final_runtime_audit_hook(self, root: Path) -> Path:
+        hook_dir = root / "final-runtime-audit-hook"
+        hook_dir.mkdir()
+        (hook_dir / "sitecustomize.py").write_text(
+            "import sys\n"
+            "from pathlib import Path\n"
+            f"sys.path.insert(0, {str(SCRIPTS)!r})\n"
+            "import cobbler_runtime.isolation as isolation\n"
+            "_real_usage = isolation.provider_writable_tree_usage\n"
+            "_calls = 0\n"
+            "def _usage(roots):\n"
+            "    global _calls\n"
+            "    result = _real_usage(roots)\n"
+            "    _calls += 1\n"
+            "    if _calls == 2:\n"
+            "        home = next(Path(root) for root in roots if Path(root).name == 'home')\n"
+            "        (home / '.final-audit-ready').touch()\n"
+            "    return result\n"
+            "isolation.provider_writable_tree_usage = _usage\n",
+            encoding="utf-8",
+        )
+        return hook_dir
+
+    def make_missing_waitid_hook(self, root: Path) -> Path:
+        hook_dir = root / "missing-waitid-hook"
+        hook_dir.mkdir()
+        (hook_dir / "sitecustomize.py").write_text(
+            "import os\n"
+            "if hasattr(os, 'waitid'):\n"
+            "    del os.waitid\n",
+            encoding="utf-8",
+        )
+        return hook_dir
+
+    def make_fugu_oversized_event_line_fake(self, root: Path) -> Path:
+        binary = root / "codex-fugu"
+        binary.write_text(
+            "#!/bin/sh\n"
+            "while IFS= read -r _LINE || [ -n \"$_LINE\" ]; do :; done\n"
+            "/bin/dd if=/dev/zero bs=1048577 count=1 2>/dev/null "
+            "| /usr/bin/tr '\\000' x\n"
+            "printf '\\n'\n"
+            "printf '{\"type\":\"thread.started\","
+            "\"thread_id\":\"019f0000-0000-7000-8000-000000000005\"}\\n'\n"
+            "exit 0\n",
+            encoding="utf-8",
+        )
+        binary.chmod(0o755)
+        return binary
+
+    def make_fugu_ultra_symlink_transport_fake(
+        self,
+        root: Path,
+        outside: Path,
+    ) -> Path:
+        binary = root / "codex-fugu"
+        binary.write_text(
+            "#!/bin/sh\n"
+            "IS_RESUME=0\n"
+            "for ARG in \"$@\"; do [ \"$ARG\" = \"resume\" ] && IS_RESUME=1; done\n"
+            "while IFS= read -r _LINE || [ -n \"$_LINE\" ]; do :; done\n"
+            f"OUTSIDE={str(outside)!r}\n"
+            "rm -f \"$TMPDIR/fugu-ultra-events.jsonl\" \"$TMPDIR/fugu-ultra-final.txt\"\n"
+            "ln -s \"$OUTSIDE\" \"$TMPDIR/fugu-ultra-events.jsonl\"\n"
+            "ln -s \"$OUTSIDE\" \"$TMPDIR/fugu-ultra-final.txt\"\n"
+            "if [ \"$IS_RESUME\" = 1 ]; then\n"
+            "  printf '%s\\n' '{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"SAFE_FINAL\"}}'\n"
+            "  exit 0\n"
+            "fi\n"
+            "printf '%s\\n' '{\"type\":\"thread.started\",\"thread_id\":\"019f0000-0000-7000-8000-000000000006\"}'\n"
+            "trap 'exit 1' INT TERM\n"
+            "while :; do sleep 1; done\n",
+            encoding="utf-8",
+        )
+        binary.chmod(0o755)
+        return binary
+
+    def make_supervision_failure_hook(self, root: Path) -> Path:
+        hook_dir = root / "python-hook"
+        hook_dir.mkdir()
+        (hook_dir / "sitecustomize.py").write_text(
+            "import sys\n"
+            f"sys.path.insert(0, {str(SCRIPTS)!r})\n"
+            "import cobbler_runtime.dispatch_external as external\n"
+            "async def _fail_supervision(_supervisor):\n"
+            "    return {\n"
+            "        'descendants_absent': False,\n"
+            "        'descendants_found': [],\n"
+            "        'supervision_error': 'forced-test-failure',\n"
+            "    }\n"
+            "external._terminate_supervised_descendants = _fail_supervision\n",
+            encoding="utf-8",
+        )
+        return hook_dir
+
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
     def test_fugu_defaults_to_project_aware_regular_high_read_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -355,11 +584,461 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertIn("arg=<--skip-git-repo-check>", result.stdout)
         self.assertIn("arg=<--ephemeral>", result.stdout)
         self.assertIn("arg=<->", result.stdout)
-        self.assertIn("prompt=<Review task: review the auth flow>", result.stdout)
-        self.assertIn("prompt=<do not ask the caller to paste files", result.stdout)
+        self.assertIn("prompt=<Review task: the auth flow>", result.stdout)
+        self.assertIn("do not ask the caller to paste files", result.stdout)
         self.assertIn("proc-parent-key=<hidden>", result.stdout)
         self.assertIn("snapshot-write=<blocked>", result.stdout)
         self.assertNotIn("arg=<fugu-ultra>", result.stdout)
+
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    def test_fugu_general_task_uses_task_appropriate_read_only_prompt(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_capture_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "design a safer parser migration",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "SAKANA_API_KEY": "test-sakana-key",
+                },
+                cwd=repo,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(
+            "prompt=<You are Sakana Fugu performing a bounded repository task.",
+            result.stdout,
+        )
+        self.assertIn("prompt=<Task: design a safer parser migration>", result.stdout)
+        self.assertIn("snapshot-write=<blocked>", result.stdout)
+        self.assertNotIn("Return actionable findings first", result.stdout)
+        self.assertNotIn('say exactly "No actionable findings"', result.stdout)
+
+    @unittest.skipUnless(
+        sys.platform == "darwin" and HAS_FS_SANDBOX,
+        "Darwin filesystem sandbox unavailable",
+    )
+    def test_fugu_read_only_success_is_portable_without_os_waitid(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_capture_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
+            hook_dir = self.make_missing_waitid_hook(root)
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "inspect portable read-only settlement",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "PYTHONPATH": str(hook_dir),
+                    "SAKANA_API_KEY": "test-sakana-key",
+                },
+                cwd=repo,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("AttributeError", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
+    @unittest.skipUnless(
+        HAS_FS_SANDBOX and sys.platform.startswith("linux"),
+        "qualified writable Linux bwrap sandbox unavailable",
+    )
+    def test_fugu_authorized_write_exports_audited_handoff_without_host_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            temp_root = root / "tmp"
+            temp_root.mkdir()
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_capture_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            (repo / "source.txt").write_text("host source\n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(repo), "add", "source.txt"], check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(repo),
+                    "-c",
+                    "user.name=Test",
+                    "-c",
+                    "user.email=test@example.com",
+                    "commit",
+                    "-q",
+                    "-m",
+                    "source",
+                ],
+                check=True,
+            )
+            result = run_script(
+                "run_fugu.sh",
+                "--write",
+                "implement the requested change",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "SAKANA_API_KEY": "test-sakana-key",
+                    "TMPDIR": str(temp_root),
+                },
+                cwd=repo,
+            )
+            handoff_line = next(
+                line
+                for line in result.stderr.splitlines()
+                if line.startswith("Fugu isolated-write handoff: ")
+            )
+            handoff = Path(
+                handoff_line.removeprefix("Fugu isolated-write handoff: ").split(
+                    " (", 1
+                )[0]
+            )
+            manifest = json.loads(
+                (handoff / "manifest.json").read_text(encoding="utf-8")
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("snapshot-write=<allowed>", result.stdout)
+            self.assertIn("not automatically applied", handoff_line)
+            self.assertEqual(manifest["kind"], "elves-fugu-isolated-write-handoff")
+            self.assertFalse(manifest["automatically_applied"])
+            self.assertEqual(manifest["metadata"]["mode"], "task")
+            self.assertEqual(
+                [(item["path"], item["status"]) for item in manifest["changes"]],
+                [("fugu-write-attempt", "added")],
+            )
+            self.assertEqual(
+                (handoff / "files" / "fugu-write-attempt").read_text(
+                    encoding="utf-8"
+                ),
+                "forbidden\n",
+            )
+            self.assertFalse((repo / "fugu-write-attempt").exists())
+            self.assertEqual(
+                (repo / "source.txt").read_text(encoding="utf-8"), "host source\n"
+            )
+            shutil.rmtree(handoff)
+
+    @unittest.skipUnless(
+        sys.platform == "darwin" and HAS_FS_SANDBOX,
+        "Darwin filesystem sandbox unavailable",
+    )
+    def test_fugu_success_descendant_is_reaped_and_result_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_descendant_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "inspect descendants",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "SAKANA_API_KEY": "test-sakana-key",
+                },
+                cwd=repo,
+                # CI host load can stretch sandbox setup + generation-safe
+                # settlement past the default 15s hermetic budget.
+                timeout=45,
+            )
+            match = next(
+                line for line in result.stdout.splitlines()
+                if line.startswith("descendant-pid=<")
+            )
+            descendant_pid = int(match.removeprefix("descendant-pid=<").removesuffix(">"))
+
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("live descendants", result.stderr)
+        with self.assertRaises(ProcessLookupError):
+            os.kill(descendant_pid, 0)
+
+    @unittest.skipUnless(
+        sys.platform == "darwin" and HAS_FS_SANDBOX,
+        "Darwin filesystem sandbox unavailable",
+    )
+    def test_fugu_setsid_descendant_is_observed_and_reaped(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_descendant_fake(bin_dir, setsid=True)
+            self.make_fake(bin_dir, "codex")
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "inspect setsid descendants",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "SAKANA_API_KEY": "test-sakana-key",
+                },
+                cwd=repo,
+                timeout=45,
+            )
+            match = next(
+                line for line in result.stdout.splitlines()
+                if line.startswith("descendant-pid=<")
+            )
+            descendant_pid = int(match.removeprefix("descendant-pid=<").removesuffix(">"))
+
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("live descendants", result.stderr)
+        with self.assertRaises(ProcessLookupError):
+            os.kill(descendant_pid, 0)
+
+    @unittest.skipUnless(sys.platform == "darwin", "Darwin-only containment policy")
+    def test_fugu_write_refuses_fast_scrubbed_double_fork_before_provider_launch(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_adversarial_escape_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "--write",
+                "attempt delayed write",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "SAKANA_API_KEY": "test-sakana-key",
+                },
+                cwd=repo,
+            )
+
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("qualified recursive process containment", result.stderr)
+        self.assertNotIn("provider-launched", result.stdout)
+        self.assertNotIn("Fugu isolated-write handoff:", result.stderr)
+
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    def test_fugu_live_runtime_growth_limit_terminates_read_only_task(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_runtime_growth_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "grow runtime state",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "SAKANA_API_KEY": "test-sakana-key",
+                    "SAKANA_FUGU_RUNTIME_MAX_GROWTH_BYTES": "1024",
+                    "SAKANA_FUGU_RUNTIME_MAX_FILE_BYTES": "2048",
+                },
+                cwd=repo,
+            )
+
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("live resource budget", result.stderr)
+        self.assertNotIn("Fugu isolated-write handoff:", result.stderr)
+
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    def test_fugu_final_runtime_audit_catches_growth_after_last_poll(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_final_runtime_growth_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
+            hook_dir = self.make_final_runtime_audit_hook(root)
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "write immediately before exit",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "PYTHONPATH": str(hook_dir),
+                    "SAKANA_API_KEY": "test-sakana-key",
+                    "SAKANA_FUGU_RUNTIME_MAX_GROWTH_BYTES": "1",
+                    "SAKANA_FUGU_RUNTIME_MAX_FILE_BYTES": "8192",
+                },
+                cwd=repo,
+            )
+
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("live resource budget", result.stderr)
+        self.assertIn("grew by", result.stderr)
+
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    def test_fugu_live_runtime_scan_tolerates_concurrent_subtree_removal(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_capture_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
+            hook_dir = self.make_runtime_disappearance_hook(root)
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "inspect runtime race handling",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "PYTHONPATH": str(hook_dir),
+                    "SAKANA_API_KEY": "test-sakana-key",
+                },
+                cwd=repo,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("runtime audit failed closed", result.stderr)
+        self.assertNotIn("live resource budget", result.stderr)
+
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    def test_fugu_live_runtime_type_failure_is_not_mislabeled_as_budget(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_runtime_special_file_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "create unsupported runtime type",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "SAKANA_API_KEY": "test-sakana-key",
+                },
+                cwd=repo,
+            )
+
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("runtime audit failed closed", result.stderr)
+        self.assertIn("unsupported file type", result.stderr)
+        self.assertNotIn("exceeded its live resource budget", result.stderr)
+
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    def test_fugu_ultra_event_parser_rejects_oversized_line_incrementally(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_oversized_event_line_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "--ultra",
+                "inspect bounded events",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "SAKANA_API_KEY": "test-sakana-key",
+                    "SAKANA_FUGU_MAX_WAIT_SECONDS": "6",
+                    "SAKANA_FUGU_ULTRA_EXPLORE_SECONDS": "1",
+                    "SAKANA_FUGU_RUNTIME_MAX_FILE_BYTES": str(2 * 1024 * 1024),
+                },
+                cwd=repo,
+            )
+
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("fugu_ultra_event_line_limit", result.stderr)
+
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    def test_fugu_ultra_symlink_transport_cannot_read_or_mutate_outside_file(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            outside = root / "outside-sentinel.txt"
+            outside.write_text("OUTSIDE_SECRET_SENTINEL\n", encoding="utf-8")
+            self.make_fugu_ultra_symlink_transport_fake(bin_dir, outside)
+            self.make_fake(bin_dir, "codex")
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "--ultra",
+                "inspect adversarial output transport",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "SAKANA_API_KEY": "test-sakana-key",
+                    "SAKANA_FUGU_MAX_WAIT_SECONDS": "3",
+                    "SAKANA_FUGU_ULTRA_EXPLORE_SECONDS": "0.8",
+                },
+                cwd=repo,
+            )
+            outside_after = outside.read_text(encoding="utf-8")
+
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("fugu_ultra_output_file_invalid", result.stderr)
+        self.assertNotIn("OUTSIDE_SECRET_SENTINEL", result.stdout + result.stderr)
+        self.assertEqual(outside_after, "OUTSIDE_SECRET_SENTINEL\n")
+
+    def test_fugu_mode_and_context_errors_fail_before_provider_work(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_capture_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            (repo / ".env.local").write_text("SECRET=1\n", encoding="utf-8")
+            env = {
+                "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                "SAKANA_API_KEY": "test-sakana-key",
+            }
+
+            missing_task = run_script("run_fugu.sh", env=env, cwd=repo)
+            review_write = run_script(
+                "run_fugu.sh", "--write", "review", env=env, cwd=repo
+            )
+            forbidden_context = run_script(
+                "run_fugu.sh",
+                "--include",
+                ".env.local",
+                "inspect context",
+                env=env,
+                cwd=repo,
+            )
+
+        self.assertEqual(missing_task.returncode, 2)
+        self.assertIn("a general Fugu task is required", missing_task.stderr)
+        self.assertEqual(review_write.returncode, 2)
+        self.assertIn("review mode is always read-only", review_write.stderr)
+        self.assertEqual(forbidden_context.returncode, 2)
+        self.assertIn("isolation_requested_path_forbidden", forbidden_context.stderr)
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
     def test_fugu_profiles_select_regular_deep_or_ultra_high(self) -> None:
@@ -404,7 +1083,8 @@ class LocalCliRunnerTests(unittest.TestCase):
             result = run_script(
                 "run_fugu.sh",
                 "--ultra",
-                "review exact resume",
+                "review",
+                "exact resume",
                 env={
                     "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
                     "SAKANA_API_KEY": "test-sakana-key",
@@ -422,7 +1102,9 @@ class LocalCliRunnerTests(unittest.TestCase):
             result.stdout,
         )
         self.assertIn("synthesis=<The bounded exploration phase is over", result.stdout)
-        self.assertIn("synthesis=<run commands, or inspect more files", result.stdout)
+        self.assertIn(
+            "synthesis=<browse, run commands, or inspect more files", result.stdout
+        )
         self.assertIn("Fugu Ultra exploration phase: up to 0.8s", result.stderr)
         self.assertIn("Fugu Ultra exact-session synthesis phase", result.stderr)
         self.assertNotIn("--last", result.stdout + result.stderr)
@@ -483,7 +1165,7 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertEqual(result.stdout, "")
         self.assertNotIn("STALE_EXPLORATION_MESSAGE", result.stdout)
         self.assertNotIn("STALE_EVENT_MESSAGE", result.stdout)
-        self.assertIn("completed without a final review message", result.stderr)
+        self.assertIn("completed without a final message", result.stderr)
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
     def test_fugu_ultra_resume_timeout_includes_bounded_shutdown(self) -> None:
@@ -557,7 +1239,8 @@ class LocalCliRunnerTests(unittest.TestCase):
             deleted_excluded.unlink()
             result = run_script(
                 "run_fugu.sh",
-                "review filtered changes",
+                "review",
+                "filtered changes",
                 env={
                     "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
                     "SAKANA_API_KEY": "test-sakana-key",
@@ -576,7 +1259,7 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertNotIn("diff --git a/.netrc", result.stdout)
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
-    def test_fugu_legacy_file_is_focus_hint_not_copied_content(self) -> None:
+    def test_fugu_selected_untracked_context_is_available_without_prompt_copy(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             bin_dir = root / "bin"
@@ -586,11 +1269,13 @@ class LocalCliRunnerTests(unittest.TestCase):
             repo = root / "repo"
             repo.mkdir()
             subprocess.run(["git", "init", "-q", str(repo)], check=True)
-            target = repo / "review me.md"
-            target.write_text("SENSITIVE_SENTINEL_MUST_NOT_BE_COPIED\n", encoding="utf-8")
+            target = repo / "untracked-context.txt"
+            target.write_text("SELECTED_UNTRACKED_CONTEXT\n", encoding="utf-8")
             result = run_script(
                 "run_fugu.sh",
+                "--include",
                 str(target),
+                "analyze the selected context",
                 env={
                     "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
                     "SAKANA_API_KEY": "test-sakana-key",
@@ -599,11 +1284,10 @@ class LocalCliRunnerTests(unittest.TestCase):
             )
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertRegex(
-            result.stdout,
-            r"prompt=<Review task: Review .*elves-iso-[^>]+/snapshot/review me\.md",
-        )
-        self.assertNotIn("SENSITIVE_SENTINEL_MUST_NOT_BE_COPIED", result.stdout)
+        self.assertIn("context-file=<SELECTED_UNTRACKED_CONTEXT>", result.stdout)
+        self.assertIn("prompt=<Task: analyze the selected context>", result.stdout)
+        self.assertNotIn("prompt=<SELECTED_UNTRACKED_CONTEXT>", result.stdout)
+        self.assertIn("1 non-ignored untracked", result.stderr)
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
     def test_fugu_enforces_finite_hard_wall_clock(self) -> None:
@@ -641,7 +1325,9 @@ class LocalCliRunnerTests(unittest.TestCase):
         sys.platform == "darwin" and HAS_FS_SANDBOX,
         "Darwin filesystem sandbox unavailable",
     )
-    def test_fugu_timeout_tolerates_darwin_eperm_reap_race(self) -> None:
+    def test_fugu_timeout_uses_native_cleanup_without_numeric_group_signal(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             bin_dir = root / "bin"
@@ -668,78 +1354,45 @@ class LocalCliRunnerTests(unittest.TestCase):
                 },
                 cwd=repo,
             )
-            attempted_signals = [
-                int(raw)
-                for raw in signal_log.read_text(encoding="utf-8").splitlines()
-            ]
 
         self.assertEqual(result.returncode, 124, result.stderr)
         self.assertIn("terminating it", result.stderr)
         self.assertNotIn("Traceback", result.stderr)
-        self.assertEqual(
-            attempted_signals,
-            [signal.SIGINT, signal.SIGTERM, signal.SIGKILL],
-        )
+        self.assertFalse(signal_log.exists())
         self.assertFalse(leader_kill_log.exists())
 
-    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
-    def test_fugu_unproved_timeout_cleanup_returns_125(self) -> None:
-        for profile_args, max_wait, explore_wait, expected_message in (
-            ((), "0.2", None, "Fugu timeout cleanup could not reap"),
-            (
-                ("--ultra",),
-                "0.4",
-                "0.1",
-                "Fugu Ultra exploration could not be reaped",
-            ),
-        ):
-            with self.subTest(profile=profile_args or ("regular",)):
-                with tempfile.TemporaryDirectory() as tmpdir:
-                    root = Path(tmpdir)
-                    bin_dir = root / "bin"
-                    bin_dir.mkdir()
-                    sleeper = bin_dir / "codex-fugu"
-                    sleeper.write_text("#!/bin/sh\nsleep 5\n", encoding="utf-8")
-                    sleeper.chmod(0o755)
-                    self.make_fake(bin_dir, "codex")
-                    hook_dir, signal_log, leader_kill_log = self.make_killpg_hook(
-                        root,
-                        forced_signal=signal.SIGINT,
-                    )
-                    repo = root / "repo"
-                    repo.mkdir()
-                    subprocess.run(["git", "init", "-q", str(repo)], check=True)
-                    env = {
-                        "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
-                        "PYTHONPATH": str(hook_dir),
-                        "SAKANA_API_KEY": "test-sakana-key",
-                        "SAKANA_FUGU_MAX_WAIT_SECONDS": max_wait,
-                    }
-                    if explore_wait is not None:
-                        env["SAKANA_FUGU_ULTRA_EXPLORE_SECONDS"] = explore_wait
-                    result = run_script(
-                        "run_fugu.sh",
-                        *profile_args,
-                        "review",
-                        env=env,
-                        cwd=repo,
-                    )
-                    attempted_signals = [
-                        int(raw)
-                        for raw in signal_log.read_text(encoding="utf-8").splitlines()
-                    ]
-                    leader_kills = leader_kill_log.read_text(
-                        encoding="utf-8"
-                    ).splitlines()
+    @unittest.skipUnless(
+        sys.platform == "darwin" and HAS_FS_SANDBOX,
+        "Darwin filesystem sandbox unavailable",
+    )
+    def test_fugu_read_only_timeout_does_not_claim_recursive_containment(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            sleeper = bin_dir / "codex-fugu"
+            sleeper.write_text("#!/bin/sh\nsleep 5\n", encoding="utf-8")
+            sleeper.chmod(0o755)
+            self.make_fake(bin_dir, "codex")
+            hook_dir = self.make_supervision_failure_hook(root)
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "review",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "PYTHONPATH": str(hook_dir),
+                    "SAKANA_API_KEY": "test-sakana-key",
+                    "SAKANA_FUGU_MAX_WAIT_SECONDS": "0.2",
+                },
+                cwd=repo,
+            )
 
-                self.assertEqual(result.returncode, 125, result.stderr)
-                self.assertIn(expected_message, result.stderr)
-                self.assertNotIn("Traceback", result.stderr)
-                self.assertEqual(
-                    attempted_signals,
-                    [signal.SIGINT, signal.SIGTERM, signal.SIGKILL],
-                )
-                self.assertEqual(len(leader_kills), 1)
+        self.assertEqual(result.returncode, 124, result.stderr)
+        self.assertNotIn("descendant absence", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
     def test_grok_uses_read_only_checked_key_scrubbed_non_bypass_mode(self) -> None:

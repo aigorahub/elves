@@ -2,6 +2,12 @@
 
 - This repo is documentation-heavy, so regressions usually show up as drift between `SKILL.md`,
   `AGENTS.md`, templates, README, and changelog rather than broken code execution.
+- Fugu provider choice is not review intent. Plain `fugu <task>` is a general read-only task;
+  `fugu review <scope>` opts into the findings rubric, and independently authorized `--write`
+  changes only the disposable snapshot before an audited inert handoff. Let the host choose
+  relevant safe context (including non-ignored untracked files), while isolation policy keeps
+  final authority over credentials, ignored/operational/config paths, links, file types, bounds,
+  and repository escapes.
 - `README.md` repeats concepts from the skill files and often lags unless it is updated as part of
   the same batch.
 - A morning checkpoint, return time, or delivery target can look like a natural stopping point, but

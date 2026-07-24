@@ -512,7 +512,7 @@
     <div class="masthead-inner">
       <div class="brand-row">
         <a class="wordmark" href="https://github.com/aigorahub/elves">Elves</a>
-        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.14.1 source and releases on GitHub</a>
+        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.15.0 source and releases on GitHub</a>
       </div>
       <h1>Using Elves</h1>
       <p class="intro">Plan with the main agent, hand implementation to a separate worker, then
@@ -652,28 +652,43 @@ python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup</code></pre>
       <section id="shortcuts">
         <h2>Use a focused provider shortcut</h2>
         <p>A full run is unnecessary when you only want one specialist task. Claude Code installs
-          <code>/fugu [--deep|--ultra] &lt;task&gt;</code>, <code>/manus &lt;topic&gt;</code>,
+          <code>/fugu [--deep|--ultra] [--write] [--include PATH] &lt;task&gt;</code>,
+          <code>/fugu [--deep|--ultra] review &lt;scope&gt;</code>,
+          <code>/manus &lt;topic&gt;</code>,
           <code>/grok &lt;instructions&gt;</code>, and <code>/devin &lt;instructions&gt;</code>.
           In Codex, use the matching <code>$elves fugu|manus|grok|devin …</code> form or ask in
           natural language; those top-level slash aliases are Claude-specific.</p>
         <ul>
-          <li><strong>Fugu</strong> launches a bounded, project-aware
-            <code>codex-fugu</code> review over a tracked-only snapshot in a required kernel
-            filesystem sandbox. Generated diff evidence is filtered by the same snapshot policy,
-            including safe deletion patches while suppressing deleted credential paths.
-            Its Linux boundary omits procfs so model-directed commands cannot inspect the
-            credential-bearing parent environment.
-            Codex uses its documented externally-sandboxed mode so macOS does not attempt an
-            invalid nested sandbox; Elves' mandatory outer boundary still denies host reads and
-            snapshot writes.
-            It uses regular
+          <li><strong>Fugu</strong> is a provider, not always a review mode. Plain
+            <code>fugu &lt;task&gt;</code> follows the requested analysis, design, investigation,
+            or other deliverable. <code>fugu review &lt;scope&gt;</code> keeps the opinionated
+            read-only P0-P3 review with exact file/line findings and a deterministic clean verdict.
+            Both run <code>codex-fugu</code> over a bounded snapshot of policy-admitted tracked and
+            non-ignored untracked files. <code>--include</code> records an exact host-selected
+            context file, but cannot override exclusions for ignored trees, credentials, Git/Elves
+            state, executable agent configuration, unsafe file types/links, or repository escapes;
+            that exact path must actually be admitted and copied. Both <code>.env.*</code> and
+            <code>*.env</code> dotenv-name families plus host-owned internal namespaces are always
+            excluded.
+            General tasks are read-only unless the user separately authorizes implementation and
+            the host selects <code>--write</code>. That route also requires qualified recursive
+            Linux bwrap PID-namespace containment and is unavailable on macOS today. A qualified
+            write edits only the disposable kernel-isolated snapshot, then exports a bounded,
+            mode-aware audited handoff for inspection; it never changes the checkout or applies the
+            handoff automatically. Live writable-state limits tolerate benign disappearing
+            temporary subtrees and fail closed on other audit errors. macOS read-only cleanup is
+            best-effort and never proof of recursive containment. The
+            Linux boundary omits procfs, and Codex's externally-sandboxed mode runs only inside
+            Elves' mandatory outer boundary. Fugu uses regular
             <code>fugu/high</code> by default, <code>fugu/xhigh</code> with
             <code>--deep</code>, or <code>fugu-ultra/high</code> with
-            <code>--ultra</code>. Regular and deep reviews are ephemeral one-shot sessions. Ultra
-            receives compact evidence and reserves part of its total wall limit for synthesis; if
+            <code>--ultra</code>. Regular and deep calls are ephemeral one-shot sessions. Ultra
+            reserves part of its total wall limit for synthesis; if
             exploration uses its phase, Elves resumes the exact captured session with further tools
             forbidden. It never guesses the “last” session, and its state and raw events remain only
-            in the disposable lane.</li>
+            in the disposable lane. Events cross a bounded host-owned pipe, final output stays pinned
+            to a no-follow descriptor, and a final descriptor-safe writable-state audit runs after
+            each phase settles.</li>
           <li><strong>Manus</strong> creates private, bounded deep-web research and needs
             <code>MANUS_API_KEY</code>. To request one worker per paper or reference, use
             <code>/manus --wide --items-file references.json &lt;goal&gt;</code>. Cobbler requests

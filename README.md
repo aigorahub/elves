@@ -8,7 +8,7 @@ plans and reviews; a subscription-native (or optional external) worker implement
 files let the work survive context compaction. You write the plan and own the merge decision. The
 agent does the middle.
 
-**Current release: v2.14.1** — see [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.15.0** — see [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 **New to Elves?** Use the [practical user guide](https://aigorahub.github.io/elves/) — especially
@@ -64,17 +64,28 @@ Codex users should not need or expect a top-level `/cobbler` command.
 ### Optional provider shortcuts
 
 Focused provider tasks do not require a full Elves run. Claude Code gets
-`/fugu [--deep|--ultra] <task>`,
+`/fugu [--deep|--ultra] [--write] [--include PATH] <task>` and
+`/fugu [--deep|--ultra] review <scope>`,
 `/manus <topic>`, `/grok <instructions>`, and `/devin <instructions>`; Codex uses the equivalent
-`$elves fugu|manus|grok|devin …` forms or natural language. Fugu launches a bounded,
-project-aware `codex-fugu` agent against a tracked-only snapshot in a required kernel read
-sandbox: regular `fugu/high` by default, `fugu/xhigh` with `--deep`, or
-`fugu-ultra/high` with `--ultra`. Regular and deep reviews are ephemeral one-shot sessions;
-Ultra receives compact evidence and, if exploration consumes its reserved phase, resumes the exact
-same isolated session with further tool use forbidden so the remaining wall budget produces a
-verdict. Session state and raw events never leave the disposable lane. Codex's documented
-externally-sandboxed mode avoids an invalid nested macOS sandbox; Elves' required outer boundary
-still denies host reads and snapshot writes. Manus supports a normal private
+`$elves fugu|manus|grok|devin …` forms or natural language. Plain Fugu follows the requested
+analysis, design, investigation, or other task; `fugu review` keeps the read-only P0-P3 review
+contract. Both receive a bounded snapshot of policy-admitted tracked and non-ignored untracked
+files. `--include` records an exact host-selected path but cannot override exclusions for ignored
+trees, credentials, operational state, executable agent configuration, unsafe links/file types, or
+repository escapes; the exact path must actually be admitted and copied. Both `.env.*` and
+`*.env` dotenv-name families plus host-owned internal namespaces are always excluded. General tasks
+remain read-only unless the user independently authorizes implementation and the host selects
+`--write`; that route additionally requires qualified recursive Linux bwrap PID-namespace
+containment and is unavailable on macOS today. A qualified write exports a mode-aware audited inert
+handoff that is never applied automatically. Live writable-state bounds tolerate benign temporary
+subtree disappearance and fail closed on other audit errors. macOS read-only cleanup is best-effort,
+not proof of recursive descendant absence.
+Profiles remain regular `fugu/high`, `fugu/xhigh` with `--deep`, and `fugu-ultra/high` with
+`--ultra`. Regular/deep calls are ephemeral; Ultra reserves synthesis time and resumes only the
+exact isolated session with further tools forbidden. Session state and raw events never leave the
+lane; events cross a bounded host-owned pipe, final output remains pinned to a no-follow
+descriptor, and every settled phase receives a final descriptor-safe writable-state audit. Codex's documented externally-sandboxed mode avoids an invalid nested macOS sandbox while
+Elves' required outer boundary remains authoritative. Manus supports a normal private
 task plus Cobbler-managed `--wide` and deterministic `--fanout` rosters, explicit `--file`
 attachments, and duplicate-safe `--resume` that retries only known-failed steps; roster manifests
 are validated and exclusively reserved before any upload. A durable pre-create marker prevents
@@ -386,12 +397,12 @@ exactly one file below; other docs link instead of restating.
 
 ```bash
 # Elves source checkout:
-python3 scripts/verify_repo.py --version 2.14.1
+python3 scripts/verify_repo.py --version 2.15.0
 # before operational-artifact cleanup, from a clean worktree:
-python3 scripts/verify_repo.py --version 2.14.1 --final-readiness \
+python3 scripts/verify_repo.py --version 2.15.0 --final-readiness \
   --session .elves-session.json
 # after the narrow operational-artifact cleanup commit, on its clean current tip:
-python3 scripts/verify_repo.py --ci --version 2.14.1 --base-ref origin/main
+python3 scripts/verify_repo.py --ci --version 2.15.0 --base-ref origin/main
 test -z "$(git status --porcelain)"
 ```
 

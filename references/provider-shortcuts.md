@@ -5,7 +5,8 @@ not change the native-first worker default, the supported-host policy, or landin
 
 | Intent | Claude Code | Codex / natural language | Runner |
 |---|---|---|---|
-| Fugu repository review | `/fugu [--deep\|--ultra] <task>` | `$elves fugu [--deep\|--ultra] <task>` | `run_fugu.sh` |
+| General Fugu task | `/fugu [--deep\|--ultra] [--write] [--include PATH] <task>` | `$elves fugu [--deep\|--ultra] [--write] [--include PATH] <task>` | `run_fugu.sh` |
+| Fugu repository review | `/fugu [--deep\|--ultra] review <scope>` | `$elves fugu [--deep\|--ultra] review <scope>` | `run_fugu.sh` |
 | Manus web research | `/manus [--wide\|--fanout] …` | `$elves manus [--wide\|--fanout] …` | `run_manus.sh` |
 | Grok Build headless task | `/grok <instructions>` | `$elves grok <instructions>` | `run_grok.sh` |
 | Devin remote task | `/devin <instructions>` | `$elves devin <instructions>` | `run_devin.sh` |
@@ -16,36 +17,74 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
 
 ## Route contracts
 
-- **Fugu:** requires the official `codex-fugu` launcher and its configured Sakana credentials. The
-  runner copies only tracked working-tree files into a disposable snapshot, moves prose agent
-  instructions to inert evidence paths, and adds host-generated branch/diff context filtered to
-  paths that survived that same snapshot policy. Safe tracked deletions are admitted by that policy
-  even though no current file remains, while deleted credential/config paths stay suppressed. It then
-  requires Elves' qualified kernel filesystem sandbox (`sandbox-exec` on macOS or `bwrap` on
-  Linux), an isolated HOME/CODEX_HOME, an environment containing only runtime names plus the
-  Sakana grant, and a Codex shell policy that does not forward that grant to model-run commands.
-  Because macOS forbids nested `sandbox-exec`, it uses Codex's documented externally-sandboxed mode
-  only after the required outer boundary is active; that flag cannot bypass Elves' host-read and
-  snapshot-write denials, which are regression-tested independently. Regular and deep reviews use
-  ephemeral one-shot sessions. Ultra instead uses a resumable session confined to the disposable
-  isolated CODEX_HOME: it supplies compact host evidence, captures the exact `thread.started` id,
+- **Fugu:** requires the official `codex-fugu` launcher and its configured Sakana credentials.
+  Provider selection and task type are separate. Plain `/fugu <task>` (or `$elves fugu <task>`)
+  performs a general task and returns the requested analysis, design, investigation, or other
+  deliverable without forcing P0-P3 findings or a clean-review verdict. The `review` subcommand
+  selects the opinionated read-only review: host-generated branch/base/diff evidence, actionable
+  P0-P3 findings with exact locations, and exactly `No actionable findings` when clean.
+
+  Both modes use a disposable Git-enumerated snapshot containing policy-admitted tracked files and
+  safe non-ignored untracked files. `--include <path>` records a host-selected exact file and
+  requires that exact file to survive admission and copy; disappearance or rejection fails closed,
+  and the manifest distinguishes requested from admitted paths. It does not override policy.
+  Ignored dependency/cache/build trees, every `.env.*` and `*.env` credential-name variant, other
+  credential names/suffixes, `.git`, `.elves`, executable agent configuration, symlinks, hard
+  links, special files, files owned by another user, out-of-repository paths, and oversized context
+  fail closed or remain excluded with bounded diagnostics. Source files cannot occupy the host-owned
+  `_elves_context`, `_elves_review`, `_instruction_evidence`, or `_elves_transport` namespaces.
+  Prose instruction files move to inert evidence paths. Context is limited to 20,000 files, 512 MiB
+  total, and 16 MiB per file. The runner does not paste repository bodies into the prompt; putting
+  a file in the snapshot therefore does not itself spend model context. Relevance belongs to the
+  host/Fugu task; admissibility remains the safety kernel's decision.
+
+  General tasks are read-only by default. `--write` is valid only for a general task and requires
+  independent implementation authority from the surrounding user request. It is enabled only when
+  the qualified outer boundary is Linux bwrap with a PID namespace that proves recursive teardown;
+  it fails before provider launch on macOS and any platform without that boundary. A qualified
+  write changes the outer boundary from read-only to writable for the disposable snapshot only.
+  After successful PID-namespace teardown, the host compares a pre-task digest-and-mode baseline
+  with a second no-follow audit. Credential-bearing, protected/ignored/instruction, symlink,
+  hard-link, special,
+  unsafe-directory, unsafe-mode, over-count, or oversized output fails closed. Mode-only changes
+  and new executable files are represented in the manifest; exported file bodies stay private at
+  mode 0600 or owner-executable 0700. Accepted changed regular files and deletion records enter a
+  fresh inert `/tmp/elves-fugu-handoff-*` bundle with a JSON manifest (at most 2,000 changed files
+  and 64 MiB). The host checkout is never edited, and the handoff is never applied automatically.
+
+  Every mode requires Elves' qualified kernel filesystem sandbox (`sandbox-exec` on macOS or
+  `bwrap` on Linux), isolated HOME/CODEX_HOME, an environment containing only runtime names plus
+  the Sakana grant, and a Codex shell policy that does not forward that grant to model-run commands.
+  Because macOS forbids nested `sandbox-exec`, Codex's documented externally-sandboxed mode is used
+  only after the outer boundary is active. Linux omits procfs so model-directed commands cannot
+  inspect the credential-bearing parent. Regular and deep calls use ephemeral one-shot sessions.
+  Ultra uses a resumable session confined to the lane: it captures the exact `thread.started` id
   and reserves part of the hard wall limit for a no-more-tools synthesis turn on that exact id when
-  exploration does not finish first. It never uses ambiguous `--last` state; raw JSON events, the
-  final-message file, and resumable session state are destroyed with the lane. Every profile closes
-  interactive input after each prompt, disables launcher notices/updates, and has a hard
-  process-group wall-clock limit. If the OS read sandbox cannot be proven, the shortcut fails
-  closed. The supported profiles are:
+  exploration does not finish first. It never uses ambiguous `--last` state; raw events, the
+  final-message output, and session state are destroyed with the lane. Ultra events cross a bounded
+  host-owned pipe, and the final-message inode is opened once with no-follow semantics; host parsing,
+  reads, and truncation never reopen provider-controlled names. A live monitor covers snapshot, HOME, tmp, and
+  XDG writable state; defaults allow at most 20,000 additional filesystem entries, 256 MiB
+  aggregate growth, and 64 MiB per file before the provider is terminated and the result rejected.
+  After every provider phase settles, the monitor joins and a final descriptor-safe audit runs
+  before any output or handoff is accepted.
+  Traversal tolerates only benign ENOENT/rename races from disappearing temporary generations;
+  permissions, ownership, unsupported types, and other audit failures remain fail-closed, and links
+  are never followed. Every profile closes input, disables launcher notices/updates, and has a hard
+  wall-clock limit. Linux writable mode uses authoritative PID-namespace teardown. macOS read-only
+  mode uses best-effort native-bound cleanup of observed processes; polling cannot prove recursive
+  absence and is never handoff authority. If a writable boundary cannot be proven, the shortcut
+  fails before provider launch. The supported profiles are:
 
   | Shortcut | Model / effort | Default wall limit | Use |
   |---|---|---:|---|
-  | `/fugu <task>` | `fugu` / `high` | 10 minutes | routine repository review |
-  | `/fugu --deep <task>` | `fugu` / `xhigh` | 20 minutes | harder correctness or security review |
-  | `/fugu --ultra <task>` | `fugu-ultra` / `high` | 30 minutes total; at most 20 minutes exploring by default | compact, high-stakes final audit with a reserved synthesis phase |
+  | `/fugu <task>` | `fugu` / `high` | 10 minutes | routine general task or explicit review |
+  | `/fugu --deep <task>` | `fugu` / `xhigh` | 20 minutes | harder analysis, implementation, or review |
+  | `/fugu --ultra <task>` | `fugu-ultra` / `high` | 30 minutes total; at most 20 minutes exploring by default | compact high-stakes task with a reserved synthesis phase |
 
   Sakana documents `max` as a compatibility alias for `xhigh`, not a separate effort level. The
   public shortcut therefore uses `xhigh` explicitly and does not market an Ultra/max lane. A
-  legacy invocation containing one existing file still works, but the path is only a focus hint;
-  the runner never copies file contents into the prompt. With no task, Fugu reviews the current
+  general invocation with no task is rejected; use `review` with no scope to review the current
   repository changes.
 - **Manus:** requires `MANUS_API_KEY`. The ordinary form creates one private `manus-1.6-max` task
   through `https://api.manus.ai/v2/task.create` with `x-manus-api-key`, explicitly empty
@@ -173,14 +212,14 @@ installation and command details are at
 [`console.sakana.ai/get-started`](https://console.sakana.ai/get-started) and
 [`SakanaAI/fugu`](https://github.com/SakanaAI/fugu/blob/main/docs/commands_details.md).
 
-Fugu and Grok project access is a disposable tracked-source snapshot, not the host checkout:
-ignored and untracked files, `.git`, `.elves`, executable agent configuration, and ordinary
-credential stores are absent and outside the kernel read boundary. Both Linux boundaries omit
-procfs so model-directed commands cannot inspect the credential-bearing parent environment. On
-macOS, native temp/cache traversal receives metadata-only `/var` access and a standalone Codex
-binary receives only its active immutable versioned runtime; sibling host file data remains denied.
-Repositories must still apply their provider/data-governance policy before invoking either
-optional paid route.
+Fugu project access is a policy-admitted tracked plus non-ignored-untracked snapshot; Grok remains
+a tracked-source snapshot. Neither is the host checkout. Ignored dependency/cache/build trees,
+`.git`, `.elves`, executable agent configuration, unsafe file types/links, and ordinary credential
+stores remain absent and outside the kernel boundary. Both Linux boundaries omit procfs so
+model-directed commands cannot inspect the credential-bearing parent environment. On macOS, native
+temp/cache traversal receives metadata-only `/var` access and a standalone Codex binary receives
+only its active immutable versioned runtime; sibling host file data remains denied. Repositories
+must still apply their provider/data-governance policy before invoking either optional paid route.
 
 `MANUS_MAX_WAIT_SECONDS=0` and `DEVIN_MAX_WAIT_SECONDS=0` provide create-and-return behavior. In a
 Manus roster mode the printed manifest, rather than “last task,” is the authoritative follow and
