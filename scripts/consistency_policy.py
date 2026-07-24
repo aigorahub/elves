@@ -2083,6 +2083,45 @@ ADAPTIVE_WORKER_ROUTING_PHRASES = {
     ],
 }
 
+# The Fugu shortcut's model/effort profiles are restated on six surfaces, and the
+# only Fugu coverage used to be the Claude alias phrase group. A model rename could
+# therefore land everywhere except one page and still pass: that is exactly how
+# `guide/index.html` kept saying `fugu-ultra/high` after every other surface moved
+# to `fugu-ultra-v1.1/high`. Pin all three profiles per surface, in that surface's
+# own markup, so the next rename has to be complete.
+FUGU_SHORTCUT_PROFILE_PHRASES = {
+    "SKILL.md": [
+        "`fugu/high`",
+        "`fugu/xhigh`",
+        "`fugu-ultra-v1.1/high`",
+    ],
+    "AGENTS.md": [
+        "`fugu/high`",
+        "`fugu/xhigh`",
+        "`fugu-ultra-v1.1/high`",
+    ],
+    "README.md": [
+        "`fugu/high`",
+        "`fugu/xhigh`",
+        "`fugu-ultra-v1.1/high`",
+    ],
+    "guide/index.html": [
+        "<code>fugu/high</code>",
+        "<code>fugu/xhigh</code>",
+        "<code>fugu-ultra-v1.1/high</code>",
+    ],
+    "references/provider-shortcuts.md": [
+        "`fugu` / `high`",
+        "`fugu` / `xhigh`",
+        "`fugu-ultra-v1.1` / `high`",
+    ],
+    "aliases/claude/fugu/SKILL.md": [
+        "`fugu/high`",
+        "`fugu/xhigh`",
+        "`fugu-ultra-v1.1/high`",
+    ],
+}
+
 PREWALK_PHRASES = {
     "SKILL.md": [
         "Exact-session prewalk",

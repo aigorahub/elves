@@ -4,6 +4,38 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.16.1] - 2026-07-24
+
+### Deterministic supervisor and Manus timing proofs
+
+- Stop `test_nonzero_exit_overrides_complete_worker_report` and its three sibling
+  lifecycle waits from polling through the supervisor reaping window. `monitor_full_run`
+  deliberately refuses an exit record while the recorded identity is still alive, and that
+  refusal is not transient in the state machine: a later poll recovers `exit_code`, but the
+  blocker keeps naming the premature refusal, so the settled nonzero-exit classification is
+  unreachable once the window has been observed. Waiting for the reap before monitoring
+  removes the race at its source instead of widening a deadline. `await_supervised_reap`
+  fails loudly when the identity is still alive after its budget, so a genuinely unreapable
+  run reports that directly rather than as a confusing assertion elsewhere.
+- Add a deterministic regression test that holds the recorded group alive past the product's
+  settle window and pins the resulting `failed` status with no `exit_code` — the exact status
+  a poll-for-first-terminal-state test captured on a loaded CI host.
+- Give `test_manus_wide_timeout_is_hard_bounded_and_resumable` a wall budget above the
+  create round trip. The runner arms its deadline at the top of `main()`, so the previous
+  0.05s budget had to cover roster setup, manifest writes, and the create call; on a loaded
+  host it expired first and left `main_task` null, failing on a bare `TypeError`. The timeout
+  still fires during polling, and an explicit precondition assertion now names the cause
+  instead of subscripting `None`.
+
+### Fugu shortcut profile drift guard
+
+- Add `FUGU_SHORTCUT_PROFILE_PHRASES`, pinning `fugu/high`, `fugu/xhigh`, and
+  `fugu-ultra-v1.1/high` across `SKILL.md`, `AGENTS.md`, `README.md`, `guide/index.html`,
+  `references/provider-shortcuts.md`, and the Claude alias, each in that surface's own
+  markup. Fugu was previously covered only by the alias phrase group, so a model rename could
+  land on five surfaces and miss the sixth — which is how `guide/index.html` kept saying
+  `fugu-ultra/high` through the v2.16.0 rename.
+
 ## [2.16.0] - 2026-07-24
 
 ### Opus 5 delegation and family-local native handoffs
