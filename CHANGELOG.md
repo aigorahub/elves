@@ -22,9 +22,14 @@ All notable changes to the Elves skill are documented here.
 
 ### Fugu-Ultra v1.1 and the Claude Code-compatible Fugu endpoint
 
-- Pin the `/fugu --ultra` profile to the exact catalog slug `fugu-ultra-v1.1` instead of the
-  floating `fugu-ultra` alias, matching Sakana's 2026-07-24 release. Ultra-phase detection now
-  keys on the `fugu-ultra` prefix so both published versions resolve correctly.
+- Resolve the `/fugu --ultra` model against the installed Codex catalog instead of hard-coding one
+  spelling. Sakana's 2026-07-24 catalog publishes `fugu-ultra-v1.1` and drops the plain
+  `fugu-ultra` slug that older bundles listed, so the lane prefers `fugu-ultra-v1.1`, accepts the
+  equivalent `fugu-ultra` alias from a legacy bundle, and otherwise keeps `fugu-ultra-v1.1` and
+  lets the provider resolve its own aliases. `fugu-ultra-v1.0` is never substituted, because it is
+  a different model. Catalog reads are bounded and fail safe: an unreadable, oversized, or
+  unparseable `fugu.json` keeps the default rather than failing the lane. Ultra-phase detection
+  keys on the `fugu-ultra` prefix so every published spelling resolves correctly.
 - Correct the documented effort facts. `max` is a genuinely distinct third effort level on
   `fugu-ultra-v1.1` only; `fugu`, `fugu-ultra-v1.0`, and `fugu-cyber` still accept `max` as a
   compatibility alias for `xhigh`. The shortcut still exposes no `max` lane, because `--ultra`'s

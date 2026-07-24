@@ -1051,9 +1051,12 @@ class LocalCliRunnerTests(unittest.TestCase):
             repo = root / "repo"
             repo.mkdir()
             subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            codex_home = root / "codexhome"
+            codex_home.mkdir()
             env = {
                 "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
                 "SAKANA_API_KEY": "test-sakana-key",
+                "CODEX_HOME": str(codex_home),
             }
             deep = run_script("run_fugu.sh", "--deep", "review parser", env=env, cwd=repo)
             ultra = run_script("run_fugu.sh", "--ultra", "review parser", env=env, cwd=repo)
@@ -1068,6 +1071,55 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertIn("arg=<--output-last-message>", ultra.stdout)
         self.assertNotIn("arg=<--ephemeral>", ultra.stdout)
         self.assertIn("Fugu Ultra exploration phase", ultra.stderr)
+
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    def test_fugu_ultra_selects_the_ultra_slug_the_installed_catalog_publishes(self) -> None:
+        # Sakana renamed the ultra slug to `fugu-ultra-v1.1` and older bundles ship
+        # the floating `fugu-ultra` alias, so the lane resolves against the installed
+        # catalog instead of hard-pinning one spelling. `fugu-ultra-v1.0` is a
+        # different model and must never be chosen for the caller.
+        cases = (
+            (["fugu", "fugu-ultra-v1.1", "fugu-ultra-v1.0"], "fugu-ultra-v1.1"),
+            (["fugu", "fugu-ultra"], "fugu-ultra"),
+            (["fugu", "fugu-ultra-v1.0"], "fugu-ultra-v1.1"),
+            (None, "fugu-ultra-v1.1"),
+            ("{ not json", "fugu-ultra-v1.1"),
+        )
+        for catalog, expected in cases:
+            with self.subTest(catalog=catalog):
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    root = Path(tmpdir)
+                    bin_dir = root / "bin"
+                    bin_dir.mkdir()
+                    self.make_fugu_capture_fake(bin_dir)
+                    self.make_fake(bin_dir, "codex")
+                    repo = root / "repo"
+                    repo.mkdir()
+                    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+                    codex_home = root / "codexhome"
+                    codex_home.mkdir()
+                    if isinstance(catalog, list):
+                        (codex_home / "fugu.json").write_text(
+                            json.dumps({"models": [{"slug": slug} for slug in catalog]}),
+                            encoding="utf-8",
+                        )
+                    elif isinstance(catalog, str):
+                        (codex_home / "fugu.json").write_text(catalog, encoding="utf-8")
+                    result = run_script(
+                        "run_fugu.sh",
+                        "--ultra",
+                        "review parser",
+                        env={
+                            "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                            "SAKANA_API_KEY": "test-sakana-key",
+                            "CODEX_HOME": str(codex_home),
+                        },
+                        cwd=repo,
+                    )
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(f"arg=<--model>\narg=<{expected}>", result.stdout)
+                self.assertNotIn("arg=<fugu-ultra-v1.0>", result.stdout)
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
     def test_fugu_ultra_resumes_exact_session_for_bounded_synthesis(self) -> None:

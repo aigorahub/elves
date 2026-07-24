@@ -412,6 +412,49 @@ def toml_string(path: Path, key: str, *, section: str | None = None) -> str:
     return ""
 
 
+# Preference order for the `--ultra` lane. Sakana's current catalog publishes the
+# exact `fugu-ultra-v1.1` slug; older bundles published the floating `fugu-ultra`
+# alias instead. `fugu-ultra-v1.0` is deliberately absent: it is a different model,
+# and silently running it would misreport the lane.
+ULTRA_MODEL_PREFERENCE = ("fugu-ultra-v1.1", "fugu-ultra")
+
+
+def catalog_slugs(path: Path) -> tuple[str, ...]:
+    """Read model slugs from a Codex model catalog; empty on any unusable file."""
+    if not secure_regular(path, max_bytes=1024 * 1024):
+        return ()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ValueError):
+        return ()
+    if not isinstance(data, dict) or not isinstance(data.get("models"), list):
+        return ()
+    slugs = []
+    for entry in data["models"]:
+        if isinstance(entry, dict):
+            slug = entry.get("slug")
+            if isinstance(slug, str) and slug:
+                slugs.append(slug)
+    return tuple(slugs)
+
+
+def resolve_ultra_model(requested: str, catalog: Path) -> str:
+    """Pin the ultra lane to an ultra slug the installed catalog actually lists.
+
+    Selection never invents an identifier and never crosses to a different model:
+    it only chooses between the current versioned slug and the equivalent floating
+    alias. An unreadable, unparseable, or ultra-less catalog keeps the requested
+    pin so the provider stays authoritative over its own aliases.
+    """
+    if not requested.startswith("fugu-ultra"):
+        return requested
+    slugs = catalog_slugs(catalog)
+    for candidate in ULTRA_MODEL_PREFERENCE:
+        if candidate in slugs:
+            return candidate
+    return requested
+
+
 class RuntimeBudget:
     """Live bounded-growth monitor for every provider-writable lane directory."""
 
@@ -1015,6 +1058,7 @@ try:
             candidate = Path(configured_catalog).expanduser()
             if secure_regular(candidate):
                 catalog_source = candidate
+        model = resolve_ultra_model(model, catalog_source)
         catalog_line = ""
         if secure_regular(catalog_source):
             isolated_catalog = codex_home / "fugu.json"

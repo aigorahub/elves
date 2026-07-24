@@ -1144,7 +1144,7 @@ CLAUDE_ALIAS_SKILL_PHRASES = {
         "run_fugu.sh",
         "codex-fugu",
         "fugu/high",
-        "fugu-ultra",
+        "fugu-ultra-v1.1",
         "read-only",
         "non-ignored",
         "audited handoff",

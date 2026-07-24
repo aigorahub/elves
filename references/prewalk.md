@@ -79,8 +79,9 @@ every other unqualified provider; a Claude-shaped CLI is an analogy, and an anal
 host never qualifies an external provider. Whenever a Fugu route is pinned — for either phase, or
 for an ordinary worker — name a current catalog slug: `fugu`, `fugu-ultra-v1.1`, or `fugu-cyber`
 on the `codex-fugu` lane, and the `[1m]` tier names on the Claude Code-compatible interface. Prefer
-the exact versioned `fugu-ultra-v1.1` over the floating `fugu-ultra` alias so a route recorded in a
-qualification artifact keeps meaning one model.
+the exact versioned `fugu-ultra-v1.1` over the floating `fugu-ultra` alias: a route recorded in a
+qualification artifact has to keep meaning one model, and an alias that follows the vendor's latest
+ultra release does not.
 
 Configure or inspect the preference from the active Elves skill root:
 

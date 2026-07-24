@@ -232,7 +232,8 @@ required capability, then execute it without an extra confirmation prompt:
   closed on other traversal errors. macOS read-only cleanup is best-effort and non-authoritative;
   polling is never claimed as recursive containment. The default is regular `fugu/high`; `--deep`
   selects `fugu/xhigh`, and `--ultra` selects
-  `fugu-ultra-v1.1/high` (the exact versioned slug, not the floating `fugu-ultra` alias).
+  `fugu-ultra-v1.1/high`, resolved against the installed catalog so a legacy bundle publishing only
+  the `fugu-ultra` alias still launches and `fugu-ultra-v1.0` is never substituted.
   Regular and deep are ephemeral one-shot sessions. Ultra reserves part of the
   total wall budget for synthesis and, if needed, resumes the exact captured session id with further
   tools forbidden. It never guesses a “last” session; raw events are parsed incrementally under a

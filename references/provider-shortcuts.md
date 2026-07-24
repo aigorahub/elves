@@ -83,10 +83,15 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
   | `/fugu --ultra <task>` | `fugu-ultra-v1.1` / `high` | 30 minutes total; at most 20 minutes exploring by default | compact high-stakes task with a reserved synthesis phase |
 
   Sakana's Fugu-Ultra v1.1 release (2026-07-24) ships at the same price as v1.0 and changes two
-  facts the shortcut depends on. The published catalog slug is now `fugu-ultra-v1.1`, with plain
-  `fugu-ultra` retained as an accepted API alias; the `--ultra` profile pins the exact versioned
-  slug rather than the floating alias so a catalog refresh cannot silently move the lane. And
-  `max` is a genuinely distinct third effort level **on `fugu-ultra-v1.1` only** — `fugu`,
+  facts the shortcut depends on. The published catalog slug is now `fugu-ultra-v1.1`, and plain
+  `fugu-ultra` — the only ultra slug older bundles listed — survives just as an accepted API alias.
+  Because the runner hands the installed `fugu.json` to the isolated launcher, the `--ultra` lane
+  resolves its model against that catalog instead of hard-coding one spelling: it prefers
+  `fugu-ultra-v1.1`, accepts the equivalent `fugu-ultra` alias when a legacy bundle publishes only
+  that, and otherwise keeps `fugu-ultra-v1.1` so the provider stays authoritative over its own
+  aliases. `fugu-ultra-v1.0` is deliberately never selected — it is a different model, and silently
+  running it would misreport the lane. And `max` is a genuinely distinct third effort level **on
+  `fugu-ultra-v1.1` only** — `fugu`,
   `fugu-ultra-v1.0`, and `fugu-cyber` still accept `max` purely as a compatibility alias that maps
   to `xhigh`. The shortcut still exposes no `max` lane: `--ultra` stays at `high` because its value
   is the reserved exact-session synthesis phase inside a bounded wall limit, and a `max` lane would
