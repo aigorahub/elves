@@ -87,22 +87,22 @@ protected-ref, PR, release, or landing authority.
 
 **Tasks:**
 
-- [ ] Separate general-task and explicit-review grammar and prompts.
-- [ ] Safely admit non-ignored untracked and host-selected context.
-- [ ] Add isolated-write handoff behavior without host-checkout mutation.
-- [ ] Preserve and prove sandbox, credential, cleanup, and authority boundaries.
-- [ ] Update all public/installed docs and release metadata to v2.15.0.
-- [ ] Run focused, canonical, Fugu, independent, PR, and landing verification.
+- [x] Separate general-task and explicit-review grammar and prompts.
+- [x] Safely admit non-ignored untracked and host-selected context.
+- [x] Add isolated-write handoff behavior without host-checkout mutation.
+- [x] Preserve and prove sandbox, credential, cleanup, and authority boundaries.
+- [x] Update all public/installed docs and release metadata to v2.15.0.
+- [x] Run focused, canonical, Fugu, independent, PR, and landing verification.
 
 **Acceptance criteria:**
 
-- [ ] [B1-A1] `$elves fugu <task>` and equivalent natural language execute a general Fugu task whose prompt and output contract follow the requested work rather than forcing repository-review severities or a clean-review verdict.
-- [ ] [B1-A2] `$elves fugu review <scope>` and equivalent natural language retain an explicit read-only review contract with base/change evidence, ordered actionable findings, exact file/line references, and a deterministic no-findings response.
-- [ ] [B1-A3] The Fugu context bundle safely admits regular non-ignored untracked files and exact host-selected relevant paths while continuing to exclude ignored dependency/cache/build trees, credentials, Git/Elves operational state, executable agent configuration, symlinks, hard links, special files, and out-of-repository paths with visible bounded diagnostics.
-- [ ] [B1-A4] A user-authorized Fugu implementation task may write only inside its disposable kernel-isolated workspace and yields a bounded, audited handoff that the host can inspect; no provider process directly mutates the host checkout or gains Git, PR, merge, tag, release, posting, secret, or protected-ref authority.
-- [ ] [B1-A5] Regular, deep, and Ultra profiles preserve their documented model/effort and hard-wall behavior in both task types, including exact-session Ultra synthesis, closed input, credential scrubbing, no Linux procfs, qualified macOS/Linux boundaries, and fail-closed cleanup.
-- [ ] [B1-A6] Focused provider/isolation tests, installed Claude/Codex bundle smokes, repository consistency, the v2.15.0 release checklist, and the canonical verifier pass at the exact pull-request head against the immutable base.
-- [ ] [B1-A7] SKILL, AGENTS, README, guide, changelog, provider references, installed surfaces, and durable guidance consistently explain general Fugu tasks, explicit review mode, context selection, isolated-write handoff, authority limits, and v2.15.0.
+- [x] [B1-A1] `$elves fugu <task>` and equivalent natural language execute a general Fugu task whose prompt and output contract follow the requested work rather than forcing repository-review severities or a clean-review verdict.
+- [x] [B1-A2] `$elves fugu review <scope>` and equivalent natural language retain an explicit read-only review contract with base/change evidence, ordered actionable findings, exact file/line references, and a deterministic no-findings response.
+- [x] [B1-A3] The Fugu context bundle safely admits regular non-ignored untracked files and exact host-selected relevant paths while continuing to exclude ignored dependency/cache/build trees, credentials, Git/Elves operational state, executable agent configuration, symlinks, hard links, special files, and out-of-repository paths with visible bounded diagnostics.
+- [x] [B1-A4] A user-authorized Fugu implementation task may write only inside its disposable kernel-isolated workspace and yields a bounded, audited handoff that the host can inspect; no provider process directly mutates the host checkout or gains Git, PR, merge, tag, release, posting, secret, or protected-ref authority.
+- [x] [B1-A5] Regular, deep, and Ultra profiles preserve their documented model/effort and hard-wall behavior in both task types, including exact-session Ultra synthesis, closed input, credential scrubbing, no Linux procfs, qualified macOS/Linux boundaries, and fail-closed cleanup.
+- [x] [B1-A6] Focused provider/isolation tests, installed Claude/Codex bundle smokes, repository consistency, the v2.15.0 release checklist, and the canonical verifier pass at the exact pull-request head against the immutable base.
+- [x] [B1-A7] SKILL, AGENTS, README, guide, changelog, provider references, installed surfaces, and durable guidance consistently explain general Fugu tasks, explicit review mode, context selection, isolated-write handoff, authority limits, and v2.15.0.
 
 **Docs likely touched:** SKILL, AGENTS, README, guide, CHANGELOG, provider shortcuts, durable
 provider guidance, and any generated installed-surface manifests required by existing shipment.
@@ -130,10 +130,10 @@ installed-bundle/sync tests, consistency, release checklist, and the canonical v
 
 ## Master Acceptance
 
-- [ ] [M-A1] The authoritative plan, session, and worker packet retain exact stable-id/criterion parity, and every B1 criterion carries exact-head evidence before landing.
-- [ ] [M-A2] Fugu review mode and an independent cumulative reviewer report no unresolved actionable security, correctness, context-completeness, authority, or documentation findings.
-- [ ] [M-A3] The canonical repository verifier and strict landing check pass on the exact reviewed pull-request head against the unchanged immutable base.
-- [ ] [M-A4] The pull request is mergeable by a regular merge commit with required checks green, a clean worktree, no unresolved feedback, and v2.15.0 release follow-through ready.
+- [x] [M-A1] The authoritative plan, session, and worker packet retain exact stable-id/criterion parity, and every B1 criterion carries exact-head evidence before landing.
+- [x] [M-A2] Fugu review mode and an independent cumulative reviewer report no unresolved actionable security, correctness, context-completeness, authority, or documentation findings.
+- [x] [M-A3] The canonical repository verifier and strict landing check pass on the exact reviewed pull-request head against the unchanged immutable base.
+- [x] [M-A4] The pull request is mergeable by a regular merge commit with required checks green, a clean worktree, no unresolved feedback, and v2.15.0 release follow-through ready.
 
 ## Non-negotiables
 

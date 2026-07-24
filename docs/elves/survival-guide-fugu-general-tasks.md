@@ -58,10 +58,10 @@ draft—but never post—the X announcement.
 
 ## Stop Gate
 
-- **Planned batches remaining:** 1
+- **Planned batches remaining:** 0
 - **Stop allowed right now:** no
-- **Why:** staging, implementation, review, landing, release, and cleanup remain.
-- **Next required action:** launch the native implementation worker for Batch B1 and park until terminal or material wake.
+- **Why:** exact-HEAD landing, merge, release, announcement draft, and cleanup remain.
+- **Next required action:** commit host-owned acceptance evidence and run the strict landing check.
 
 ## Effort Standard
 
@@ -79,14 +79,14 @@ draft—but never post—the X announcement.
 
 ## Current Phase
 
-- **Status:** launch-ready
+- **Status:** exact-tip landing readiness
 - **Active batch:** B1
-- **What was just finished:** Contract staging, push, and draft PR #193 creation
-- **Single next action:** launch the native implementation worker with the staged packet.
+- **What was just finished:** Batch B1 implementation, exact-tip canonical proof, Fugu review, independent terminal review, and real Ultra smoke at `4868e35`
+- **Single next action:** commit host-owned acceptance evidence, attest the committed tip, and run strict landing.
 
 ## Active Compute
 
-- No implementation worker or Fugu process is active yet; PR #193 is the active draft.
+- No worker or provider subprocess is active; PR #193 remains draft until strict landing passes.
 
 ## Next Exact Batch
 
