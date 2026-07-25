@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.17.0"
+  version: "2.17.1"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -64,7 +64,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.17.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.17.1):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
@@ -210,8 +210,8 @@ When an explicit request matches one of these provider tags, resolve the runner 
 Elves skill root**, keep the target repository as the working directory, validate its arguments and
 required capability, then execute it without an extra confirmation prompt:
 
-- `/fugu [--deep|--ultra] <task>` or “use Fugu …” →
-  `scripts/run_fugu.sh [--deep|--ultra] <task>` for a bounded general `codex-fugu` task whose
+- `/fugu [--deep|--ultra|--max] <task>` or “use Fugu …” →
+  `scripts/run_fugu.sh [--deep|--ultra|--max] <task>` for a bounded general `codex-fugu` task whose
   output follows the request rather than a forced review rubric. `/fugu … review <scope>`, `$elves
   fugu review <scope>`, or “do a Fugu review …” selects the explicit read-only review contract.
   Both use a Git-enumerated snapshot containing policy-admitted tracked and non-ignored untracked

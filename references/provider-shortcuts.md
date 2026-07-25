@@ -5,8 +5,8 @@ not change the native-first worker default, the supported-host policy, or landin
 
 | Intent | Claude Code | Codex / natural language | Runner |
 |---|---|---|---|
-| General Fugu task | `/fugu [--deep\|--ultra] [--write] [--include PATH] <task>` | `$elves fugu [--deep\|--ultra] [--write] [--include PATH] <task>` | `run_fugu.sh` |
-| Fugu repository review | `/fugu [--deep\|--ultra] review <scope>` | `$elves fugu [--deep\|--ultra] review <scope>` | `run_fugu.sh` |
+| General Fugu task | `/fugu [--deep\|--ultra\|--max] [--write] [--include PATH] <task>` | `$elves fugu [--deep\|--ultra\|--max] [--write] [--include PATH] <task>` | `run_fugu.sh` |
+| Fugu repository review | `/fugu [--deep\|--ultra\|--max] review <scope>` | `$elves fugu [--deep\|--ultra\|--max] review <scope>` | `run_fugu.sh` |
 | Manus web research | `/manus [--wide\|--fanout] …` | `$elves manus [--wide\|--fanout] …` | `run_manus.sh` |
 | Grok Build headless task | `/grok <instructions>` | `$elves grok <instructions>` | `run_grok.sh` |
 | Devin remote task | `/devin <instructions>` | `$elves devin <instructions>` | `run_devin.sh` |

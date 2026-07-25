@@ -8,7 +8,7 @@ plans and reviews; a subscription-native (or optional external) worker implement
 files let the work survive context compaction. You write the plan and own the merge decision. The
 agent does the middle.
 
-**Current release: v2.17.0** — see [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.17.1** — see [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 **New to Elves?** Use the [practical user guide](https://aigorahub.github.io/elves/) — especially
@@ -64,8 +64,8 @@ Codex users should not need or expect a top-level `/cobbler` command.
 ### Optional provider shortcuts
 
 Focused provider tasks do not require a full Elves run. Claude Code gets
-`/fugu [--deep|--ultra] [--write] [--include PATH] <task>` and
-`/fugu [--deep|--ultra] review <scope>`,
+`/fugu [--deep|--ultra|--max] [--write] [--include PATH] <task>` and
+`/fugu [--deep|--ultra|--max] review <scope>`,
 `/manus <topic>`, `/grok <instructions>`, and `/devin <instructions>`; Codex uses the equivalent
 `$elves fugu|manus|grok|devin …` forms or natural language. Plain Fugu follows the requested
 analysis, design, investigation, or other task; `fugu review` keeps the read-only P0-P3 review
@@ -399,12 +399,12 @@ exactly one file below; other docs link instead of restating.
 
 ```bash
 # Elves source checkout:
-python3 scripts/verify_repo.py --version 2.17.0
+python3 scripts/verify_repo.py --version 2.17.1
 # before operational-artifact cleanup, from a clean worktree:
-python3 scripts/verify_repo.py --version 2.17.0 --final-readiness \
+python3 scripts/verify_repo.py --version 2.17.1 --final-readiness \
   --session .elves-session.json
 # after the narrow operational-artifact cleanup commit, on its clean current tip:
-python3 scripts/verify_repo.py --ci --version 2.17.0 --base-ref origin/main
+python3 scripts/verify_repo.py --ci --version 2.17.1 --base-ref origin/main
 test -z "$(git status --porcelain)"
 ```
 

@@ -9,8 +9,8 @@ disable-model-invocation: true
 # Fugu Task or Review
 
 This is the Elves-managed Claude Code alias for
-`/fugu [--deep|--ultra] [--write] [--include PATH] <task>` and
-`/fugu [--deep|--ultra] review <scope>`.
+`/fugu [--deep|--ultra|--max] [--write] [--include PATH] <task>` and
+`/fugu [--deep|--ultra|--max] review <scope>`.
 
 Load the installed `elves` skill's **Provider shortcut protocols** and
 `references/provider-shortcuts.md`. Resolve `scripts/run_fugu.sh` from the active Elves skill root,
