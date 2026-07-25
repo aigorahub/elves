@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.16.1"
+  version: "2.17.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -64,7 +64,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.16.1):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.17.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
@@ -233,7 +233,9 @@ required capability, then execute it without an extra confirmation prompt:
   polling is never claimed as recursive containment. The default is regular `fugu/high`; `--deep`
   selects `fugu/xhigh`, and `--ultra` selects
   `fugu-ultra-v1.1/high`, resolved against the installed catalog so a legacy bundle publishing only
-  the `fugu-ultra` alias still launches and `fugu-ultra-v1.0` is never substituted.
+  the `fugu-ultra` alias still launches and `fugu-ultra-v1.0` is never substituted. `--max` selects
+  `fugu-ultra-v1.1/max` with a 60-minute default wall budget for one narrow high-stakes gate;
+  profiles are mutually exclusive.
   Regular and deep are ephemeral one-shot sessions. Ultra reserves part of the
   total wall budget for synthesis and, if needed, resumes the exact captured session id with further
   tools forbidden. It never guesses a “last” session; raw events are parsed incrementally under a

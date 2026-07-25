@@ -4,6 +4,39 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.17.0] - 2026-07-25
+
+### Fugu `--max` lane
+
+- Add `/fugu --max` (`$elves fugu --max`): `fugu-ultra-v1.1` at `max` effort on a 60-minute default
+  wall budget. v2.16.0 documented v1.1's third effort level but exposed no lane, reasoning that
+  `--ultra`'s value is its reserved exact-session synthesis inside a bounded wall limit. Field use
+  argued the other way for one narrow, high-stakes gate — a proof step, a security-sensitive review,
+  a decision that has to be right the first time — provided the prompt is narrow and the timeout is
+  long. The lane keeps everything that makes `--ultra` useful (same versioned model, catalog
+  resolution, reserved synthesis, identical context and audit rules) and changes only the effort
+  level and the wall budget. Profiles stay mutually exclusive, so `--ultra --max` is rejected.
+- Note that `max` is real only on `fugu-ultra-v1.1`: a legacy bundle publishing only the floating
+  `fugu-ultra` alias has the provider map `max` down to `xhigh`, which is the provider's documented
+  compatibility behavior rather than a silent Elves downgrade.
+- State in `references/provider-shortcuts.md` that every Fugu profile is bounded by a hard
+  wall-clock limit covering exploration, synthesis, and cleanup — in contrast to stream/SSE idle
+  timeouts elsewhere in Sakana tooling, under which a Max or Ultra call emitting heartbeats can run
+  indefinitely and needs a separate cap.
+- Extend `FUGU_SHORTCUT_PROFILE_PHRASES` to pin the new lane on all six restating surfaces.
+
+### Load-stable Fugu Ultra exploration budgets
+
+- Raise the exploration budgets in four Fugu Ultra tests from 0.8-1s to 3s (wall 10s). The previous
+  budgets sat below the kernel-sandbox process-spawn floor, so under load the fake launcher could
+  not emit `thread.started` before the phase closed and all four failed together with
+  `exploration ended without a resumable exact thread id`. Under 2x CPU oversubscription across 22
+  runs the old budgets failed 1/22 and the raised budgets 0/22.
+- Recorded for the next person: making the fakes cheaper does *not* fix this. Emitting the thread id
+  before draining stdin and replacing a `dd | tr` pipeline with one `printf` builtin measured
+  20/22 against a 21/22 baseline — indistinguishable. The cost that matters is process spawn under
+  the sandbox, which no fake-side change removes.
+
 ## [2.16.1] - 2026-07-24
 
 ### Deterministic supervisor and Manus timing proofs

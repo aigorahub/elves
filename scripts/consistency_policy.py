@@ -2094,31 +2094,37 @@ FUGU_SHORTCUT_PROFILE_PHRASES = {
         "`fugu/high`",
         "`fugu/xhigh`",
         "`fugu-ultra-v1.1/high`",
+        "`fugu-ultra-v1.1/max`",
     ],
     "AGENTS.md": [
         "`fugu/high`",
         "`fugu/xhigh`",
         "`fugu-ultra-v1.1/high`",
+        "`fugu-ultra-v1.1/max`",
     ],
     "README.md": [
         "`fugu/high`",
         "`fugu/xhigh`",
         "`fugu-ultra-v1.1/high`",
+        "`fugu-ultra-v1.1/max`",
     ],
     "guide/index.html": [
         "<code>fugu/high</code>",
         "<code>fugu/xhigh</code>",
         "<code>fugu-ultra-v1.1/high</code>",
+        "<code>fugu-ultra-v1.1/max</code>",
     ],
     "references/provider-shortcuts.md": [
         "`fugu` / `high`",
         "`fugu` / `xhigh`",
         "`fugu-ultra-v1.1` / `high`",
+        "`fugu-ultra-v1.1` / `max`",
     ],
     "aliases/claude/fugu/SKILL.md": [
         "`fugu/high`",
         "`fugu/xhigh`",
         "`fugu-ultra-v1.1/high`",
+        "`fugu-ultra-v1.1/max`",
     ],
 }
 

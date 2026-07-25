@@ -81,6 +81,7 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
   | `/fugu <task>` | `fugu` / `high` | 10 minutes | routine general task or explicit review |
   | `/fugu --deep <task>` | `fugu` / `xhigh` | 20 minutes | harder analysis, implementation, or review |
   | `/fugu --ultra <task>` | `fugu-ultra-v1.1` / `high` | 30 minutes total; at most 20 minutes exploring by default | compact high-stakes task with a reserved synthesis phase |
+  | `/fugu --max <task>` | `fugu-ultra-v1.1` / `max` | 60 minutes total; at most 20 minutes exploring by default | one narrow, high-stakes gate worth the deepest reasoning tier |
 
   Sakana's Fugu-Ultra v1.1 release (2026-07-24) ships at the same price as v1.0 and changes two
   facts the shortcut depends on. The published catalog slug is now `fugu-ultra-v1.1`, and plain
@@ -93,11 +94,33 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
   running it would misreport the lane. And `max` is a genuinely distinct third effort level **on
   `fugu-ultra-v1.1` only** — `fugu`,
   `fugu-ultra-v1.0`, and `fugu-cyber` still accept `max` purely as a compatibility alias that maps
-  to `xhigh`. The shortcut still exposes no `max` lane: `--ultra` stays at `high` because its value
-  is the reserved exact-session synthesis phase inside a bounded wall limit, and a `max` lane would
-  change that budget rather than the task shape. `--deep` therefore keeps naming `xhigh`
-  explicitly. A general invocation with no task is rejected; use `review` with no scope to review
-  the current repository changes.
+  to `xhigh`. `--deep` therefore keeps naming `xhigh` explicitly. A general invocation with no task
+  is rejected; use `review` with no scope to review the current repository changes.
+
+  **The `--max` lane.** v2.16.0 documented v1.1's third effort level but deliberately exposed no
+  lane for it, on the reasoning that `--ultra`'s value is its reserved exact-session synthesis
+  inside a bounded wall limit and a `max` lane would change the budget rather than the task shape.
+  Field use since then argues the other way: `fugu-ultra` at `max` is worth the wall time for a
+  single narrow, high-stakes gate — a proof step, a security-sensitive review, a decision that has
+  to be right the first time — provided the prompt is narrow and the timeout is long. `--max`
+  therefore keeps everything that makes `--ultra` useful (the same versioned model, catalog
+  resolution, the reserved synthesis phase, the same context and audit rules) and changes only the
+  effort level and the default wall budget, which doubles to 60 minutes. It is deliberately not the
+  default for anything: at this tier the useful question is whether one specific answer is worth an
+  hour, and a broad task is the wrong shape for it. Profiles remain mutually exclusive, so
+  `--ultra --max` is rejected rather than silently resolved.
+
+  Because `max` is real only on `fugu-ultra-v1.1`, a legacy bundle whose catalog publishes only the
+  floating `fugu-ultra` alias will have the provider map `max` down to `xhigh`. That is the
+  provider's documented compatibility behavior, not a silent Elves downgrade, and the lane still
+  reports the effort it asked for.
+
+  **Wall limits here are wall limits.** Sakana tooling elsewhere exposes a `--stream` timeout that
+  is an idle/SSE timeout rather than a wall-clock bound, so a Max or Ultra call that keeps emitting
+  heartbeats can run indefinitely under it and needs a separate cap. Every profile above is bounded
+  by a hard wall-clock limit that covers exploration, the reserved synthesis phase, and cleanup;
+  when it expires the lane is terminated and the result rejected. Raise it deliberately with
+  `SAKANA_FUGU_MAX_WAIT_SECONDS` rather than assuming a stream setting will bound the call.
 
   **Claude Code-compatible Fugu endpoint.** Sakana now also fronts Fugu with Claude Code-compatible
   endpoints and a `claude-fugu` launcher alongside `codex-fugu`. Claude Code points at it through
