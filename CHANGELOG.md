@@ -4,6 +4,19 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.17.1] - 2026-07-25
+
+### Document the `--max` flag on every invocation surface
+
+- v2.17.0 shipped the `/fugu --max` lane and described its model, effort, and wall budget, but left
+  every user-facing invocation grammar reading `[--deep|--ultra]`, so the flag was undiscoverable
+  from the docs on both supported hosts. Update the grammar to `[--deep|--ultra|--max]` across the
+  Claude Code form (`README.md`, `guide/index.html`, the `/fugu` alias, and the shortcut table),
+  the Codex form (`AGENTS.md` and the shortcut table's `$elves fugu` column), the `run_fugu.sh`
+  invocations in `SKILL.md` and `AGENTS.md`, and the pinned alias phrases in the consistency policy.
+  Claude Code and Codex were equally incomplete, so host parity was never broken — both were simply
+  missing the flag.
+
 ## [2.17.0] - 2026-07-25
 
 ### Fugu `--max` lane
