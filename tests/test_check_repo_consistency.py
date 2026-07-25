@@ -55,7 +55,7 @@ class ConsistencyPhraseTests(unittest.TestCase):
         # Every surface pins all three profiles, so a partial rename cannot pass.
         for label, phrases in group.items():
             with self.subTest(surface=label):
-                self.assertEqual(len(phrases), 3, phrases)
+                self.assertEqual(len(phrases), 4, phrases)
                 self.assertTrue(
                     any("ultra-v1.1" in phrase for phrase in phrases), phrases
                 )
@@ -64,7 +64,10 @@ class ConsistencyPhraseTests(unittest.TestCase):
         # The exact drift that reached main in PR #194: every surface renamed the
         # ultra profile except the guide.
         group = self.consistency.FUGU_SHORTCUT_PROFILE_PHRASES
-        stale_guide = "<code>fugu/high</code> <code>fugu/xhigh</code> <code>fugu-ultra/high</code>"
+        stale_guide = (
+            "<code>fugu/high</code> <code>fugu/xhigh</code> "
+            "<code>fugu-ultra/high</code> <code>fugu-ultra-v1.1/max</code>"
+        )
         texts = {label: " ".join(phrases) for label, phrases in group.items()}
         texts["guide/index.html"] = stale_guide
 

@@ -960,8 +960,8 @@ class LocalCliRunnerTests(unittest.TestCase):
                 env={
                     "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
                     "SAKANA_API_KEY": "test-sakana-key",
-                    "SAKANA_FUGU_MAX_WAIT_SECONDS": "6",
-                    "SAKANA_FUGU_ULTRA_EXPLORE_SECONDS": "1",
+                    "SAKANA_FUGU_MAX_WAIT_SECONDS": "10",
+                    "SAKANA_FUGU_ULTRA_EXPLORE_SECONDS": "3",
                     "SAKANA_FUGU_RUNTIME_MAX_FILE_BYTES": str(2 * 1024 * 1024),
                 },
                 cwd=repo,
@@ -992,8 +992,8 @@ class LocalCliRunnerTests(unittest.TestCase):
                 env={
                     "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
                     "SAKANA_API_KEY": "test-sakana-key",
-                    "SAKANA_FUGU_MAX_WAIT_SECONDS": "3",
-                    "SAKANA_FUGU_ULTRA_EXPLORE_SECONDS": "0.8",
+                    "SAKANA_FUGU_MAX_WAIT_SECONDS": "10",
+                    "SAKANA_FUGU_ULTRA_EXPLORE_SECONDS": "3",
                 },
                 cwd=repo,
             )
@@ -1060,6 +1060,10 @@ class LocalCliRunnerTests(unittest.TestCase):
             }
             deep = run_script("run_fugu.sh", "--deep", "review parser", env=env, cwd=repo)
             ultra = run_script("run_fugu.sh", "--ultra", "review parser", env=env, cwd=repo)
+            maxed = run_script("run_fugu.sh", "--max", "review parser", env=env, cwd=repo)
+            both = run_script(
+                "run_fugu.sh", "--ultra", "--max", "review parser", env=env, cwd=repo
+            )
 
         self.assertEqual(deep.returncode, 0, deep.stderr)
         self.assertIn("arg=<--model>\narg=<fugu>", deep.stdout)
@@ -1071,6 +1075,16 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertIn("arg=<--output-last-message>", ultra.stdout)
         self.assertNotIn("arg=<--ephemeral>", ultra.stdout)
         self.assertIn("Fugu Ultra exploration phase", ultra.stderr)
+        # `max` is a real third effort level on fugu-ultra-v1.1 only, and the lane
+        # keeps Ultra's reserved exact-session synthesis rather than becoming a
+        # plain one-shot call.
+        self.assertEqual(maxed.returncode, 0, maxed.stderr)
+        self.assertIn("arg=<--model>\narg=<fugu-ultra-v1.1>", maxed.stdout)
+        self.assertIn('arg=<model_reasoning_effort="max">', maxed.stdout)
+        self.assertIn("Fugu Ultra exploration phase", maxed.stderr)
+        # Profiles stay mutually exclusive.
+        self.assertEqual(both.returncode, 2, both.stdout)
+        self.assertIn("choose only one Fugu profile", both.stderr)
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
     def test_fugu_ultra_selects_the_ultra_slug_the_installed_catalog_publishes(self) -> None:
@@ -1140,8 +1154,8 @@ class LocalCliRunnerTests(unittest.TestCase):
                 env={
                     "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
                     "SAKANA_API_KEY": "test-sakana-key",
-                    "SAKANA_FUGU_MAX_WAIT_SECONDS": "3",
-                    "SAKANA_FUGU_ULTRA_EXPLORE_SECONDS": "0.8",
+                    "SAKANA_FUGU_MAX_WAIT_SECONDS": "10",
+                    "SAKANA_FUGU_ULTRA_EXPLORE_SECONDS": "3",
                 },
                 cwd=repo,
             )
@@ -1157,7 +1171,7 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertIn(
             "synthesis=<browse, run commands, or inspect more files", result.stdout
         )
-        self.assertIn("Fugu Ultra exploration phase: up to 0.8s", result.stderr)
+        self.assertIn("Fugu Ultra exploration phase: up to 3s", result.stderr)
         self.assertIn("Fugu Ultra exact-session synthesis phase", result.stderr)
         self.assertNotIn("--last", result.stdout + result.stderr)
 
@@ -1207,8 +1221,8 @@ class LocalCliRunnerTests(unittest.TestCase):
                 env={
                     "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
                     "SAKANA_API_KEY": "test-sakana-key",
-                    "SAKANA_FUGU_MAX_WAIT_SECONDS": "3",
-                    "SAKANA_FUGU_ULTRA_EXPLORE_SECONDS": "0.8",
+                    "SAKANA_FUGU_MAX_WAIT_SECONDS": "10",
+                    "SAKANA_FUGU_ULTRA_EXPLORE_SECONDS": "3",
                 },
                 cwd=repo,
             )

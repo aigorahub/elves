@@ -27,7 +27,8 @@ read-only cleanup remains best-effort and never claims recursive containment.
 
 The runner uses the official `codex-fugu` launcher with policy-admitted tracked and non-ignored
 untracked context, closed interactive input, and a hard wall-clock bound. It selects regular
-`fugu/high` by default, `fugu/xhigh` with `--deep`, or `fugu-ultra-v1.1/high` with `--ultra`.
+`fugu/high` by default, `fugu/xhigh` with `--deep`, `fugu-ultra-v1.1/high` with `--ultra`, or
+`fugu-ultra-v1.1/max` with `--max`.
 Regular/deep sessions are ephemeral; Ultra uses exact-session staged synthesis, with its state
 confined to the disposable isolated lane, events carried by a bounded host-owned pipe, final
 output pinned to a no-follow descriptor, and a final descriptor-safe writable-state audit after

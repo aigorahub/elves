@@ -8,7 +8,7 @@ plans and reviews; a subscription-native (or optional external) worker implement
 files let the work survive context compaction. You write the plan and own the merge decision. The
 agent does the middle.
 
-**Current release: v2.16.1** — see [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.17.0** — see [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 **New to Elves?** Use the [practical user guide](https://aigorahub.github.io/elves/) — especially
@@ -80,8 +80,9 @@ containment and is unavailable on macOS today. A qualified write exports a mode-
 handoff that is never applied automatically. Live writable-state bounds tolerate benign temporary
 subtree disappearance and fail closed on other audit errors. macOS read-only cleanup is best-effort,
 not proof of recursive descendant absence.
-Profiles remain regular `fugu/high`, `fugu/xhigh` with `--deep`, and `fugu-ultra-v1.1/high` with
-`--ultra`. Regular/deep calls are ephemeral; Ultra reserves synthesis time and resumes only the
+Profiles remain regular `fugu/high`, `fugu/xhigh` with `--deep`, `fugu-ultra-v1.1/high` with
+`--ultra`, and `fugu-ultra-v1.1/max` with `--max` for one narrow high-stakes gate on a 60-minute
+default wall budget. Regular/deep calls are ephemeral; Ultra and max reserve synthesis time and resume only the
 exact isolated session with further tools forbidden. Session state and raw events never leave the
 lane; events cross a bounded host-owned pipe, final output remains pinned to a no-follow
 descriptor, and every settled phase receives a final descriptor-safe writable-state audit. Codex's documented externally-sandboxed mode avoids an invalid nested macOS sandbox while
@@ -398,12 +399,12 @@ exactly one file below; other docs link instead of restating.
 
 ```bash
 # Elves source checkout:
-python3 scripts/verify_repo.py --version 2.16.1
+python3 scripts/verify_repo.py --version 2.17.0
 # before operational-artifact cleanup, from a clean worktree:
-python3 scripts/verify_repo.py --version 2.16.1 --final-readiness \
+python3 scripts/verify_repo.py --version 2.17.0 --final-readiness \
   --session .elves-session.json
 # after the narrow operational-artifact cleanup commit, on its clean current tip:
-python3 scripts/verify_repo.py --ci --version 2.16.1 --base-ref origin/main
+python3 scripts/verify_repo.py --ci --version 2.17.0 --base-ref origin/main
 test -z "$(git status --porcelain)"
 ```
 

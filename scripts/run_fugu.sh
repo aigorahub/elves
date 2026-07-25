@@ -7,13 +7,15 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 usage() {
   cat <<'EOF'
 Usage:
-  run_fugu.sh [--deep|--ultra] [--include PATH]... [--write] [--] <task...>
-  run_fugu.sh [--deep|--ultra] [--include PATH]... review [scope...]
+  run_fugu.sh [--deep|--ultra|--max] [--include PATH]... [--write] [--] <task...>
+  run_fugu.sh [--deep|--ultra|--max] [--include PATH]... review [scope...]
 
 Profiles:
   default   fugu at high effort
   --deep    fugu at xhigh effort
   --ultra   fugu-ultra-v1.1 at high effort with exact-session synthesis
+  --max     fugu-ultra-v1.1 at max effort with exact-session synthesis and a
+            long wall budget, for one narrow high-stakes gate
 
 Modes:
   task      The default. Follow the requested task without a review-only rubric.
@@ -41,6 +43,14 @@ while [ "$#" -gt 0 ]; do
         exit 2
       fi
       PROFILE="deep"
+      shift
+      ;;
+    --max)
+      if [ "$PROFILE" != "routine" ]; then
+        echo "Error: choose only one Fugu profile." >&2
+        exit 2
+      fi
+      PROFILE="max"
       shift
       ;;
     --ultra)
@@ -120,6 +130,11 @@ case "$PROFILE" in
     MODEL="fugu-ultra-v1.1"
     EFFORT="high"
     DEFAULT_MAX_WAIT="1800"
+    ;;
+  max)
+    MODEL="fugu-ultra-v1.1"
+    EFFORT="max"
+    DEFAULT_MAX_WAIT="3600"
     ;;
 esac
 MAX_WAIT="${SAKANA_FUGU_MAX_WAIT_SECONDS:-$DEFAULT_MAX_WAIT}"
