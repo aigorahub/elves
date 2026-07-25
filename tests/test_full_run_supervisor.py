@@ -484,6 +484,43 @@ def _run_bound_supervisor_after_mutation(
     return int(proc.returncode), record
 
 
+# `monitor_full_run` refuses to trust an exit record while the recorded supervisor
+# identity is still alive, reporting that refusal as `failed` with a
+# premature-exit-record blocker and no `exit_code`. The product bridges the normal
+# sidecar write/exit race with its own bounded window (`EXIT_RECORD_SETTLE_SECONDS`,
+# 0.25s on Linux and 0.75s on Darwin), but a loaded host can leave the group
+# unreaped past it.
+#
+# That refusal is *not* transient in the state machine: it latches. A later poll
+# recovers `exit_code` once the record validates, but `blocker` keeps naming the
+# premature refusal forever, so the settled classification is unreachable. A test
+# that polls for the first terminal state can therefore both capture a status with
+# no exit code and permanently lose the classification it came to assert.
+#
+# The deterministic fix is to never observe the reaping window: wait for the
+# recorded identity to be fully reaped, then monitor once. Reuse the product's own
+# settle primitive with a generous test budget rather than racing it.
+def await_supervised_reap(repo: Path, session: str, *, timeout_seconds: float = 10.0) -> None:
+    """Block until the run's recorded supervisor identity is fully reaped.
+
+    Fails loudly rather than returning early: a caller that monitored anyway would
+    observe the reaping window and latch the premature refusal, turning a timing
+    problem into a confusing assertion about state or exit codes somewhere else.
+    """
+    state = load_state(repo, session)
+    pid_alive, group_alive = full_run_module._settle_recorded_supervisor_exit(
+        state.pid,
+        state.pgid,
+        timeout_seconds=timeout_seconds,
+    )
+    if pid_alive or group_alive:
+        raise AssertionError(
+            f"supervisor identity still alive after {timeout_seconds}s "
+            f"(pid={state.pid} alive={pid_alive}, pgid={state.pgid} alive={group_alive}); "
+            "monitoring now would observe the reaping window"
+        )
+
+
 def _init_feature_repo(path: Path, branch: str = "feat/x") -> str:
     subprocess.run(["git", "-C", str(path), "init", "-q"], check=True)
     subprocess.run(
@@ -6855,11 +6892,12 @@ class FullRunLifecycleTests(unittest.TestCase):
         self.assertIn(status["state"], {"healthy", "pending"}, status)
         self.assertFalse(status["check_summary"]["exit_record"])
 
-        while status["state"] not in {"complete", "failed"} and time.time() < deadline:
-            time.sleep(0.02)
-            status = monitor_full_run(self.repo, session_id=self.session, stale_after_seconds=60)
+        await_supervised_reap(self.repo, self.session)
+        status = monitor_full_run(
+            self.repo, session_id=self.session, stale_after_seconds=60
+        )
         self.assertEqual(status["state"], "complete", status)
-        self.assertEqual(status["check_summary"]["exit_code"], 0)
+        self.assertEqual(status["check_summary"]["exit_code"], 0, status)
 
     def test_terminal_retired_identity_is_never_reprobed_or_resignaled(self) -> None:
         prepare_full_run(
@@ -6873,11 +6911,8 @@ class FullRunLifecycleTests(unittest.TestCase):
             fixture_script=self.worker,
         )
         launch_full_run(self.repo, session_id=self.session)
-        deadline = time.time() + 5
+        await_supervised_reap(self.repo, self.session)
         status = monitor_full_run(self.repo, session_id=self.session)
-        while status["state"] not in {"complete", "failed"} and time.time() < deadline:
-            time.sleep(0.03)
-            status = monitor_full_run(self.repo, session_id=self.session)
         self.assertEqual(status["state"], "complete", status)
         retired = load_state(self.repo, self.session)
         self.assertIsNone(retired.pid)
@@ -6910,14 +6945,71 @@ class FullRunLifecycleTests(unittest.TestCase):
             fixture_script=failing,
         )
         launch_full_run(self.repo, session_id=self.session)
-        deadline = time.time() + 3
-        status = monitor_full_run(self.repo, session_id=self.session, stale_after_seconds=60)
-        while status["state"] not in {"complete", "failed"} and time.time() < deadline:
-            time.sleep(0.02)
-            status = monitor_full_run(self.repo, session_id=self.session, stale_after_seconds=60)
+        await_supervised_reap(self.repo, self.session)
+        status = monitor_full_run(
+            self.repo, session_id=self.session, stale_after_seconds=60
+        )
         self.assertEqual(status["state"], "failed", status)
-        self.assertEqual(status["check_summary"]["exit_code"], 7)
+        self.assertEqual(status["check_summary"]["exit_code"], 7, status)
         self.assertIn("nonzero exit", status["blocker"])
+
+    def test_monitoring_the_reaping_window_yields_a_failure_without_an_exit_code(
+        self,
+    ) -> None:
+        # Deterministic form of the load-sensitive flake that `await_supervised_reap`
+        # exists to avoid. Holding the recorded group "alive" past the product's
+        # settle window makes the monitor refuse the exit record and report `failed`
+        # with no `exit_code` — the exact status a poll-for-first-terminal-state test
+        # used to capture on a loaded CI host.
+        #
+        # Note: this refusal latches. A later poll recovers `exit_code`, but the
+        # blocker keeps naming the premature refusal, so the settled nonzero-exit
+        # classification is never reached once the window has been observed. That
+        # behavior is deliberately not asserted here; it is the reason the tests wait
+        # for the reap rather than polling through it.
+        failing = Path(self.tmp.name) / "failing_worker.py"
+        failing.write_text(FAKE_WORKER + "\nraise SystemExit(7)\n", encoding="utf-8")
+        failing.chmod(failing.stat().st_mode | stat.S_IXUSR)
+        prepare_full_run(
+            self.repo,
+            session_id=self.session,
+            branch=self.branch,
+            start_head=self.start_head,
+            worktree=self.repo,
+            packet_path=self.packet,
+            adapter="fixture",
+            fixture_script=failing,
+        )
+        launch_full_run(self.repo, session_id=self.session)
+
+        settled = full_run_module._settle_recorded_supervisor_exit
+        unreaped_polls: list[dict] = []
+
+        def hold_group_alive_once(pid, pgid, **kwargs):
+            if not unreaped_polls:
+                unreaped_polls.append({})
+                return True, True
+            return settled(pid, pgid, **kwargs)
+
+        with mock.patch.object(
+            full_run_module,
+            "_settle_recorded_supervisor_exit",
+            side_effect=hold_group_alive_once,
+        ):
+            # Reach the exit-record validation, which is where the refusal happens.
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline:
+                refused = monitor_full_run(
+                    self.repo, session_id=self.session, stale_after_seconds=60
+                )
+                if unreaped_polls:
+                    break
+                time.sleep(0.02)
+
+        self.assertTrue(unreaped_polls, "settle helper was never exercised")
+        self.assertEqual(refused["state"], "failed", refused)
+        self.assertIsNone(refused["check_summary"]["exit_code"], refused)
+        self.assertIn("premature exit record", refused["blocker"], refused)
 
     def test_clean_exit_with_git_progress_but_no_complete_report_fails(self) -> None:
         worker = Path(self.tmp.name) / "progress_only.py"
@@ -6964,11 +7056,8 @@ class FullRunLifecycleTests(unittest.TestCase):
             fixture_script=worker,
         )
         launch_full_run(self.repo, session_id=self.session)
-        deadline = time.time() + 5
+        await_supervised_reap(self.repo, self.session)
         status = monitor_full_run(self.repo, session_id=self.session)
-        while status["state"] not in {"complete", "failed"} and time.time() < deadline:
-            time.sleep(0.03)
-            status = monitor_full_run(self.repo, session_id=self.session)
         self.assertEqual(status["state"], "complete", status)
         record = json.loads(
             (full_run_root(self.repo, self.session) / "exit_record.json").read_text(

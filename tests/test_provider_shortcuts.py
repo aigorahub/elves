@@ -2699,8 +2699,23 @@ class RemoteApiRunnerTests(unittest.TestCase):
         self.assertEqual(manifest["fanout_tasks"], {})
 
     def test_manus_wide_timeout_is_hard_bounded_and_resumable(self) -> None:
+        # The runner arms its wall-clock deadline at the top of `main()`, so the
+        # budget has to cover roster setup, manifest writes, and the create round
+        # trip before any polling begins. The previous 0.05s budget was below that
+        # floor — a local create round trip alone costs tens of milliseconds — so a
+        # loaded host could expire the deadline before the task id was ever
+        # recorded, leaving `main_task` null and failing on a bare `TypeError`.
+        #
+        # The timeout still has to fire during polling, which is what makes the run
+        # both hard-bounded and resumable: the poll interval below is far larger than
+        # the budget, so the first `_bounded_sleep` always hits the deadline. Give
+        # creation enough headroom to be deterministic under parallel load while
+        # keeping the total bound well inside the elapsed assertion.
+        create_calls: list[str] = []
+
         def responder(method, path, _payload):
             if method == "POST" and path == "/task.create":
+                create_calls.append(path)
                 return 200, {"data": {"task_id": "wide-running"}}
             if path.startswith("/task.detail?"):
                 return 200, {"task": {"status": "running"}}
@@ -2725,7 +2740,7 @@ class RemoteApiRunnerTests(unittest.TestCase):
                         "MANUS_API_KEY": "wide-key",
                         "MANUS_API_BASE": server.base_url,
                         "MANUS_POLL_INTERVAL_SECONDS": "5",
-                        "MANUS_MAX_WAIT_SECONDS": "0.05",
+                        "MANUS_MAX_WAIT_SECONDS": "0.75",
                     },
                     cwd=root,
                 )
@@ -2733,9 +2748,17 @@ class RemoteApiRunnerTests(unittest.TestCase):
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
         self.assertEqual(result.returncode, 124, result.stderr)
-        self.assertLess(elapsed, 2)
+        self.assertLess(elapsed, 3)
         self.assertIn("Resume with: run_manus.sh --resume", result.stderr)
         self.assertEqual(manifest["state"], "timed_out")
+        # Guard the precondition explicitly: without a recorded task id the
+        # resumability assertion below is vacuous, and the failure should say so
+        # rather than surfacing as a subscript of None.
+        self.assertEqual(
+            create_calls,
+            ["/task.create"],
+            f"create did not complete inside the wall budget; manifest={manifest}",
+        )
         self.assertEqual(manifest["main_task"]["id"], "wide-running")
 
     def test_devin_uses_official_sessions_api_and_repo_context(self) -> None:

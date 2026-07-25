@@ -39,6 +39,61 @@ class ConsistencyPhraseTests(unittest.TestCase):
             ["SKILL.md: missing reviewed-PR landing phrase `gh pr merge --merge`"],
         )
 
+    def test_fugu_profile_group_covers_every_restating_surface(self) -> None:
+        group = self.consistency.FUGU_SHORTCUT_PROFILE_PHRASES
+        self.assertEqual(
+            sorted(group),
+            [
+                "AGENTS.md",
+                "README.md",
+                "SKILL.md",
+                "aliases/claude/fugu/SKILL.md",
+                "guide/index.html",
+                "references/provider-shortcuts.md",
+            ],
+        )
+        # Every surface pins all three profiles, so a partial rename cannot pass.
+        for label, phrases in group.items():
+            with self.subTest(surface=label):
+                self.assertEqual(len(phrases), 3, phrases)
+                self.assertTrue(
+                    any("ultra-v1.1" in phrase for phrase in phrases), phrases
+                )
+
+    def test_fugu_profile_guard_catches_a_single_stale_surface(self) -> None:
+        # The exact drift that reached main in PR #194: every surface renamed the
+        # ultra profile except the guide.
+        group = self.consistency.FUGU_SHORTCUT_PROFILE_PHRASES
+        stale_guide = "<code>fugu/high</code> <code>fugu/xhigh</code> <code>fugu-ultra/high</code>"
+        texts = {label: " ".join(phrases) for label, phrases in group.items()}
+        texts["guide/index.html"] = stale_guide
+
+        errors = self.consistency.find_missing_phrases(
+            texts, group, "Fugu shortcut profiles"
+        )
+
+        self.assertEqual(
+            errors,
+            [
+                "guide/index.html: missing Fugu shortcut profiles phrase "
+                "`<code>fugu-ultra-v1.1/high</code>`"
+            ],
+        )
+
+    def test_fugu_profile_guard_passes_on_the_live_repository(self) -> None:
+        group = self.consistency.FUGU_SHORTCUT_PROFILE_PHRASES
+        texts = {
+            label: self.consistency.read_text(self.consistency.REPO_ROOT / label)
+            for label in group
+        }
+
+        self.assertEqual(
+            self.consistency.find_missing_phrases(
+                texts, group, "Fugu shortcut profiles"
+            ),
+            [],
+        )
+
     def test_find_forbidden_phrases_reports_stale_merge_policy(self) -> None:
         stale = (
             "Only if the user has set a merge-on-green preference in Run Control "
