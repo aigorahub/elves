@@ -196,8 +196,13 @@ State of the world as of this review (all **[observed]** on 2026-07-27):
 
 - Upstream `aigorahub/elves` main = v2.17.1 (`9731fc3`); no open PRs at review time.
 - Fork `RBrownHOPE/elves` main = `81eb1a1`: content-identical to v2.17.1, with the fork's
-  five historical reconciliation merge commits joined; pushed 2026-07-27. Full local suite
-  on the merged tree: exit 0 (Python 3.9.6 host, floor-gated skips expected).
+  five historical reconciliation merge commits joined; pushed 2026-07-27. The tree is
+  byte-identical to upstream v2.17.1, whose CI matrix is fully green. Correction to an
+  earlier claim: the local suite on this Python 3.9.6 host is NOT green — 1401 tests, 25
+  failures + 2 errors, all in `tests/test_provider_shortcuts.py`, a Python-floor artifact
+  (`run_fugu.sh`'s embedded Python uses 3.10+ union syntax; upstream's floor is 3.10). The
+  earlier "exit 0" statement was a shell-pipeline artifact — the exit code observed was
+  `tail`'s, not unittest's. See the structural-debt survey for the finding and fix.
 - Parallelves (PR #100) merged 2026-07-20 as v2.11.0 (merge `d910700`); its contract,
   validator, CLI, and tests are untouched through v2.17.1. Suggestions issue #86 is closed.
 - Leftovers on the shared machine, safe to remove when convenient: worktrees
