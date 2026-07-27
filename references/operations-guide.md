@@ -144,6 +144,51 @@ This injects the survival guide, current git status, and recent commits into Cla
 Replace `docs/elves/survival-guide.md` with the exact path recorded for the active run. Do not use a
 wildcard: parallel or archived runs may have more than one matching guide.
 
+### Recover after compaction deterministically
+
+Current Claude Code hooks support SessionStart matchers (`startup`, `resume`, `clear`, `compact`,
+`fork`). A `compact`-matched hook fires immediately after a compaction finishes, so the survival
+guide is re-injected at the exact moment context was summarized instead of relying on the agent to
+remember a read-order protocol. Hook capabilities are version-dependent: verify the matcher values
+(and the structured `hookSpecificOutput.additionalContext` output field, if you prefer it over
+plain stdout injection) against your installed Claude Code version's hooks documentation.
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '=== ELVES POST-COMPACTION RECOVERY ===' && cat docs/elves/survival-guide.md 2>/dev/null && git status --short"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Steer what compaction preserves
+
+The compactor reads a "Summary instructions" section from the project memory file (CLAUDE.md).
+Adding one tells auto-compaction what an Elves run cannot afford to lose:
+
+```markdown
+# Summary instructions
+
+When summarizing this conversation, always preserve:
+- The active run's survival guide path and `.elves-session.json` path
+- Batch number and status, and every acceptance ID (B#-A#, M-A#) with its met/unmet state
+- The current feature branch name and the forbidden-command list
+- Stop Gate and Run Control state
+```
+
+Compaction is a lossy summary; the run docs remain the ground truth. These hooks make recovery
+deterministic — they do not replace the survival guide.
+
 ### Enforce forbidden commands with hooks
 
 Elves tells the agent not to run destructive git commands, but instructions can be forgotten after context compaction. For bulletproof enforcement, add a PreToolUse hook that blocks them deterministically:

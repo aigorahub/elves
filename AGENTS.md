@@ -1,5 +1,5 @@
 ---
-version: "2.17.1"
+version: "2.18.0"
 ---
 
 # Elves: Codex repository adapter
@@ -33,7 +33,7 @@ authenticated live catalog (`references/adaptive-worker-routing.md`).
 | Cobbler | `$elves cobbler: <task>` or "Ask the Cobbler…" |
 | Cobbler Mode | `$elves cobbler-mode` or natural "Cobbler Mode: on/off" |
 | Setup | `$elves setup-cobbler` / `$elves setup-council` |
-| Provider shortcut | `$elves fugu [--deep\|--ultra\|--max] [--write] [--include PATH] <task>` / `$elves fugu review <scope>`, `$elves manus [--wide\|--fanout] …`, `$elves grok <instructions>`, or `$elves devin <instructions>` |
+| Provider shortcut | `$elves fugu [--deep\|--ultra\|--max] [--write] [--include PATH] <task>` / `$elves fugu [--deep\|--ultra\|--max] review <scope>`, `$elves manus [--wide\|--fanout] …`, `$elves grok <instructions>`, or `$elves devin <instructions>` |
 | Land PR | natural language; `\land-pr` / `/land-pr` when the host maps them |
 
 ### Provider subprocess capabilities map

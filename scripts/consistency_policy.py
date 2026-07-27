@@ -2128,6 +2128,34 @@ FUGU_SHORTCUT_PROFILE_PHRASES = {
     ],
 }
 
+# The complete /fugu invocation grammar on every restating surface. The v2.17.1
+# release fixed `--max` missing from these grammars after v2.17.0 shipped it on
+# one surface only; this group pins the full task and review forms so a flag
+# added to the runner cannot land on five surfaces and miss the sixth again.
+# (The alias surface's grammar is pinned with the alias phrase group.)
+FUGU_INVOCATION_GRAMMAR_PHRASES = {
+    "SKILL.md": [
+        "`/fugu [--deep|--ultra|--max] [--write] [--include PATH] <task>`",
+        "`/fugu [--deep|--ultra|--max] review <scope>`",
+    ],
+    "AGENTS.md": [
+        "`$elves fugu [--deep\\|--ultra\\|--max] [--write] [--include PATH] <task>`",
+        "`$elves fugu [--deep\\|--ultra\\|--max] review <scope>`",
+    ],
+    "README.md": [
+        "`/fugu [--deep|--ultra|--max] [--write] [--include PATH] <task>`",
+        "`/fugu [--deep|--ultra|--max] review <scope>`",
+    ],
+    "guide/index.html": [
+        "<code>/fugu [--deep|--ultra|--max] [--write] [--include PATH] &lt;task&gt;</code>",
+        "<code>/fugu [--deep|--ultra|--max] review &lt;scope&gt;</code>",
+    ],
+    "references/provider-shortcuts.md": [
+        "`/fugu [--deep\\|--ultra\\|--max] [--write] [--include PATH] <task>`",
+        "`/fugu [--deep\\|--ultra\\|--max] review <scope>`",
+    ],
+}
+
 PREWALK_PHRASES = {
     "SKILL.md": [
         "Exact-session prewalk",

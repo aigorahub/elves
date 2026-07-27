@@ -56,7 +56,7 @@
 - PR review automation only becomes useful once the branch is pushed and the PR exists. Opening the
   PR late starves the review loop.
 - This repo has no package-managed lint/typecheck/build pipeline. Use
-  `python3 scripts/verify_repo.py --version 2.10.0` as the canonical aggregate proof command, plus
+  `python3 scripts/verify_repo.py --ci` as the canonical aggregate proof command, plus
   `--final-readiness --session <session-path>` for live landing readiness.
 - Provider wording drifts easily. Normal Cobbler and ordinary Elves must not require OpenRouter.
   Math may show `openrouter:<model-id>` as an optional role route, but default config should keep

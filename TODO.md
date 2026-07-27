@@ -33,6 +33,16 @@ Project backlog and deferred tasks. Live items first; completed history under
 - [ ] [#97, v2.10.2 review advisory] Widen the public persona wording guard beyond the six
   claim shapes (e.g. "Fable-powered", "runs on Fable", "is Fable", and Claude/Anthropic persona
   phrasings) while keeping model-identifier exemptions false-positive-free.
+- [ ] [advisor-plans/004 steps 3-7] Extract `run_fugu.sh`'s heredoc Python body into
+  `scripts/cobbler_runtime/fugu.py` (the v2.18.0 heredoc compile gate closes the syntax hole;
+  the verbatim move needs a >=3.10 host so the provider-shortcut e2e pins can run).
+- [ ] [advisor-plans/001 step 6] Unify the three secret-file deny lists
+  (`isolation.py`/`openrouter_lens.py`/`manus.py`) on shared constants — widens snapshot
+  exclusions, so the Linux isolation-lane fixtures need review alongside the change.
+- [ ] [docs/reviews/2026-07-routing-caching-compaction.md P3/P4] Decide batch-boundary
+  `/compact` guidance (needs live verification of headless slash-command support on the
+  installed CLI) and whether a compaction inside a qualified exact-session prewalk should
+  normatively de-qualify `retained_safe` (a `references/prewalk.md` + consistency-pin change).
 
 ## Completed Archive
 

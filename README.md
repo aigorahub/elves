@@ -8,7 +8,7 @@ plans and reviews; a subscription-native (or optional external) worker implement
 files let the work survive context compaction. You write the plan and own the merge decision. The
 agent does the middle.
 
-**Current release: v2.17.1** — see [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.18.0** — see [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 **New to Elves?** Use the [practical user guide](https://aigorahub.github.io/elves/) — especially
@@ -33,6 +33,8 @@ Prefer the agent paste in the guide if you already have Claude Code or Codex ope
 the shell installs below.
 
 ### Install (Claude Code)
+
+Requires Python 3.10 or newer.
 
 ```bash
 ELVES_TMP="$(mktemp -d)"
@@ -399,12 +401,12 @@ exactly one file below; other docs link instead of restating.
 
 ```bash
 # Elves source checkout:
-python3 scripts/verify_repo.py --version 2.17.1
+python3 scripts/verify_repo.py --ci
 # before operational-artifact cleanup, from a clean worktree:
-python3 scripts/verify_repo.py --version 2.17.1 --final-readiness \
+python3 scripts/verify_repo.py --final-readiness \
   --session .elves-session.json
 # after the narrow operational-artifact cleanup commit, on its clean current tip:
-python3 scripts/verify_repo.py --ci --version 2.17.1 --base-ref origin/main
+python3 scripts/verify_repo.py --ci --base-ref origin/main
 test -z "$(git status --porcelain)"
 ```
 

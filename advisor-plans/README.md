@@ -17,11 +17,11 @@ planned. Everything else is recorded in the survey's registry with fix sketches.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| 001 | Close the redaction parity gap and unify the secret corpora | P1 | M | — | TODO |
-| 002 | Make preflight's gh-identity extraction total | P1 | S | — | TODO |
-| 003 | Make the verification signal honest on every host | P1 | S | — | TODO |
-| 004 | Heredoc gate, then extract run_fugu.sh's Python to a module | P2 | M/L | 003 (soft) | TODO |
-| 005 | Fail closed on tar extraction without `filter=` | P2 | S | — | TODO |
+| 001 | Close the redaction parity gap and unify the secret corpora | P1 | M | — | DONE (steps 1–5, v2.18.0; step 6 deny-list union deferred to TODO.md) |
+| 002 | Make preflight's gh-identity extraction total | P1 | S | — | DONE (v2.18.0) |
+| 003 | Make the verification signal honest on every host | P1 | S | — | DONE (v2.18.0) |
+| 004 | Heredoc gate, then extract run_fugu.sh's Python to a module | P2 | M/L | 003 (soft) | IN PROGRESS (gate steps 1–2 DONE in v2.18.0; extraction steps 3–7 need a >=3.10 host for the e2e behavior pins) |
+| 005 | Fail closed on tar extraction without `filter=` | P2 | S | — | DONE (v2.18.0) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED
 (one-line rationale).
