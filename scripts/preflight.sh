@@ -199,7 +199,7 @@ if ! command -v gh &>/dev/null; then
 else
   GH_STATUS=$(gh auth status 2>&1 || true)
   if echo "$GH_STATUS" | grep -q "Logged in"; then
-    GH_USER=$(echo "$GH_STATUS" | grep -o "account [^ ]*" | head -1 | awk '{print $2}')
+    GH_USER=$(echo "$GH_STATUS" | awk '/Logged in/{for(i=1;i<NF;i++){if($i=="account"||$i=="as"){print $(i+1); exit}}}')
     pass "gh authenticated${GH_USER:+ as ${GH_USER}}"
   else
     fail "gh CLI is not authenticated"

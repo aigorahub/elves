@@ -17,6 +17,10 @@ if ! REPO_ROOT=$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null); then
   exit 2
 fi
 
+if ! python3 -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)'; then
+  echo "run_grok.sh requires Python >= 3.10 (repo floor); found $(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')" >&2
+  exit 2
+fi
 exec python3 - "$PROMPT_CONTENT" "$REPO_ROOT" "$SCRIPT_DIR" <<'PY'
 import ast
 import json

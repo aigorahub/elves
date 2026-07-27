@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import subprocess
 import sys
+import tarfile
 import tempfile
 import unittest
 from pathlib import Path
@@ -1348,6 +1350,83 @@ def build_parser():
 
             self.assertFalse(result["ok"], result)
             self.assertIn("export:cobbler_runtime.public_fn", result["breaking"])
+
+
+class _NoFilterTar(tarfile.TarFile):
+    """Simulates interpreters predating extractall(filter=) (< 3.10.12 / 3.11.4)."""
+
+    def extractall(self, *args, **kwargs):  # noqa: ANN002, ANN003
+        if "filter" in kwargs:
+            raise TypeError("filter unsupported (simulated old interpreter)")
+        return super().extractall(*args, **kwargs)
+
+
+class ArchiveExtractionFailClosedTests(unittest.TestCase):
+    def _tar_bytes(self, entries) -> bytes:
+        buffer = io.BytesIO()
+        with tarfile.open(fileobj=buffer, mode="w") as tar:
+            for name, kind in entries:
+                info = tarfile.TarInfo(name)
+                info.mode = 0o755 if kind == "dir" else 0o644
+                if kind == "dir":
+                    info.type = tarfile.DIRTYPE
+                    tar.addfile(info)
+                elif kind == "symlink":
+                    info.type = tarfile.SYMTYPE
+                    info.linkname = "/tmp/target"
+                    tar.addfile(info)
+                else:
+                    payload = b"content\n"
+                    info.size = len(payload)
+                    tar.addfile(info, io.BytesIO(payload))
+        return buffer.getvalue()
+
+    def test_filter_unavailable_rejects_unsafe_members(self) -> None:
+        from cobbler_runtime.public_api_snapshot import _extract_archive_members
+
+        for entries, label in (
+            ([("ok.txt", "file"), ("evil", "symlink")], "symlink member"),
+            ([("../escape.txt", "file")], "dotdot member"),
+            ([("/abs.txt", "file")], "absolute member"),
+        ):
+            with self.subTest(label=label):
+                data = self._tar_bytes(entries)
+                with tempfile.TemporaryDirectory() as raw:
+                    temp_root = Path(raw)
+                    with _NoFilterTar.open(
+                        fileobj=io.BytesIO(data), mode="r:"
+                    ) as tar:
+                        reason = _extract_archive_members(tar, temp_root)
+                    self.assertIsNotNone(reason)
+                    self.assertIn("api_snapshot_tar_member_unsafe", reason)
+                    self.assertEqual(
+                        [p for p in temp_root.rglob("*")],
+                        [],
+                        "nothing may be extracted when validation fails",
+                    )
+                self.assertFalse((Path(raw).parent / "escape.txt").exists())
+
+    def test_filter_unavailable_extracts_clean_archives(self) -> None:
+        from cobbler_runtime.public_api_snapshot import _extract_archive_members
+
+        data = self._tar_bytes([("pkg", "dir"), ("pkg/mod.py", "file")])
+        with tempfile.TemporaryDirectory() as raw:
+            temp_root = Path(raw)
+            with _NoFilterTar.open(fileobj=io.BytesIO(data), mode="r:") as tar:
+                reason = _extract_archive_members(tar, temp_root)
+            self.assertIsNone(reason)
+            self.assertTrue((temp_root / "pkg" / "mod.py").is_file())
+
+    def test_modern_filter_path_extracts_clean_archives(self) -> None:
+        from cobbler_runtime.public_api_snapshot import _extract_archive_members
+
+        data = self._tar_bytes([("pkg", "dir"), ("pkg/mod.py", "file")])
+        with tempfile.TemporaryDirectory() as raw:
+            temp_root = Path(raw)
+            with tarfile.open(fileobj=io.BytesIO(data), mode="r:") as tar:
+                reason = _extract_archive_members(tar, temp_root)
+            self.assertIsNone(reason)
+            self.assertTrue((temp_root / "pkg" / "mod.py").is_file())
 
 
 if __name__ == "__main__":

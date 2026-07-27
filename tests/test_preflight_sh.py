@@ -161,6 +161,31 @@ exit 1
         self.assertIn("Project Type Detection", result.stdout)
         self.assertNotIn("Recommended dedicated worktree", result.stdout)
 
+    def test_preflight_tolerates_gh_auth_status_as_wording(self) -> None:
+        self.write_executable(
+            "gh",
+            """#!/usr/bin/env bash
+if [ "$1 $2" = "auth status" ]; then
+  printf 'Logged in to github.com as alt-user (keyring)\\n'
+  exit 0
+fi
+if [ "$1" = "api" ] && [ "$2" = "repos/aigorahub/elves/releases/latest" ]; then
+  printf '{"tag_name":"v1.15.0","html_url":"https://example.com/v1.15.0"}\\n'
+  exit 0
+fi
+printf 'unexpected gh invocation: %s\\n' "$*" >&2
+exit 1
+""",
+        )
+        repo = self.create_repo(with_remote=True)
+
+        result = self.run_preflight(repo)
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("gh authenticated as alt-user", result.stdout)
+        self.assertIn("Push Access", result.stdout)
+        self.assertIn("Sleep Prevention", result.stdout)
+
     def test_preflight_fails_when_origin_remote_is_missing(self) -> None:
         self.write_fake_gh()
         repo = self.create_repo(with_remote=False)

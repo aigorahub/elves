@@ -46,6 +46,7 @@ _SECRET_NAME_MARKERS: tuple[str, ...] = (
     "API_KEY",
     "APIKEY",
     "BEARER",
+    "WEBHOOK",
 )
 
 # Minimal runtime discovery allowlist. extra_allowlist may add non-secret names
@@ -106,6 +107,14 @@ SECRET_VALUE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "uri_userinfo",
         re.compile(r"(?i)\b[a-z][a-z0-9+.-]*://[^/\s:@]+:[^/\s@]+@"),
+    ),
+    (
+        "uri_userinfo_bare",
+        re.compile(r"(?i)\b[a-z][a-z0-9+.-]*://[A-Za-z0-9._~%+-]{8,}@"),
+    ),
+    (
+        "slack_webhook",
+        re.compile(r"(?i)https://hooks\.slack\.[^/\s]+/services/[^/\s]+/[^/\s]+/[^\s?\"']+"),
     ),
     (
         "secret_assignment",

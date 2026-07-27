@@ -37,6 +37,7 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
+from consistency_engine import read_frontmatter_version  # noqa: E402
 from cobbler_runtime.context import (  # noqa: E402
     is_secret_env_name,
     redact_text,
@@ -272,6 +273,38 @@ def compile_scripts(repo_root: Path) -> tuple[bool, str]:
     return True, f"compileall ok ({count} files)"
 
 
+_HEREDOC_OPEN = re.compile(r"<<'PY'\s*$")
+
+
+def _compile_shell_heredocs(path: Path, rel: str) -> str | None:
+    """Compile every ``<<'PY'`` heredoc body so embedded Python cannot ship
+    unparseable — ``bash -n`` treats a quoted heredoc as an opaque string and
+    ``compileall`` never visits ``.sh`` files."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    index = 0
+    while index < len(lines):
+        if _HEREDOC_OPEN.search(lines[index]):
+            start = index + 1
+            end = start
+            while end < len(lines) and lines[end] != "PY":
+                end += 1
+            if end >= len(lines):
+                return f"unterminated <<'PY' heredoc in {rel} at line {index + 1}"
+            # Newline padding keeps SyntaxError line numbers aligned with the
+            # real file instead of the heredoc-relative offset.
+            padded = "\n" * start + "\n".join(lines[start:end]) + "\n"
+            try:
+                compile(padded, f"{rel} (embedded Python)", "exec")
+            except SyntaxError as exc:
+                return (
+                    f"embedded Python syntax failed for {rel}: "
+                    f"line {exc.lineno}: {exc.msg}"
+                )
+            index = end
+        index += 1
+    return None
+
+
 def check_shell(repo_root: Path) -> tuple[bool, str]:
     checked = 0
     for rel in SHELL_SCRIPTS:
@@ -284,6 +317,9 @@ def check_shell(repo_root: Path) -> tuple[bool, str]:
             return False, _redact_message(
                 f"shell syntax failed for {rel}: {proc.stderr.strip()}"
             )
+        heredoc_error = _compile_shell_heredocs(path, rel)
+        if heredoc_error is not None:
+            return False, _redact_message(heredoc_error)
     return True, f"shell syntax ok ({checked} files)"
 
 
@@ -1755,7 +1791,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--version",
         default=None,
-        help="Pin release checklist to this version (required for --ci/final readiness)",
+        help=(
+            "Pin release checklist to this version "
+            "(defaults to the SKILL.md frontmatter version for --ci/final readiness)"
+        ),
     )
     parser.add_argument(
         "--base-ref",
@@ -1827,7 +1866,14 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--final-readiness and --ci are mutually exclusive")
     strict = final or ci_mode
     if strict and not args.version:
-        parser.error("--ci and --final-readiness require --version")
+        skill_md = args.repo_root / "SKILL.md"
+        if skill_md.is_file():
+            args.version = read_frontmatter_version(skill_md)
+    if strict and not args.version:
+        parser.error(
+            "--ci and --final-readiness require --version "
+            "(SKILL.md frontmatter version unavailable)"
+        )
     if strict and (args.skip_tests or args.skip_smokes):
         skipped = []
         if args.skip_tests:

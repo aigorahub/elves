@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
 import json
 import os
 import subprocess
@@ -224,11 +226,35 @@ class VerifyRepoUnitTests(unittest.TestCase):
             )
         self.assertEqual(caught.exception.code, 2)
 
-    def test_strict_modes_require_version(self) -> None:
-        for mode in ("--ci", "--final-readiness"):
-            with self.subTest(mode=mode), self.assertRaises(SystemExit) as caught:
-                self.verify.main(["--repo-root", str(REPO_ROOT), mode])
+    def test_strict_modes_require_a_resolvable_version(self) -> None:
+        # Strict modes default --version from the repo root's SKILL.md
+        # frontmatter; a repo root without one still fails closed at parsing.
+        with tempfile.TemporaryDirectory() as tmp:
+            for mode in ("--ci", "--final-readiness"):
+                stderr = io.StringIO()
+                with self.subTest(mode=mode), self.assertRaises(
+                    SystemExit
+                ) as caught, contextlib.redirect_stderr(stderr):
+                    self.verify.main(["--repo-root", tmp, mode])
+                self.assertEqual(caught.exception.code, 2)
+                self.assertIn("require --version", stderr.getvalue())
+
+    def test_strict_version_defaults_from_skill_frontmatter(self) -> None:
+        # With a frontmatter version present, parsing proceeds past the version
+        # requirement; --final-readiness then fails on the NEXT requirement
+        # (--session), proving the default resolved without running any gate.
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "SKILL.md").write_text(
+                '---\nversion: "9.9.9"\n---\n', encoding="utf-8"
+            )
+            stderr = io.StringIO()
+            with self.assertRaises(SystemExit) as caught, contextlib.redirect_stderr(
+                stderr
+            ):
+                self.verify.main(["--repo-root", tmp, "--final-readiness"])
             self.assertEqual(caught.exception.code, 2)
+            self.assertIn("--session", stderr.getvalue())
+            self.assertNotIn("require --version", stderr.getvalue())
 
     def test_landing_gate_passes_explicit_session_and_optional_plan(self) -> None:
         # Use a disposable session/plan pair. Product tips remove .elves-session.json
