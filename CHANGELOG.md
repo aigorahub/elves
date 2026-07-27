@@ -41,7 +41,7 @@ All notable changes to the Elves skill are documented here.
   parity test pins every named pattern to a synthetic sample and asserts the shell and Python
   boundaries cover the same shape families. Operators should rotate any Slack webhook or
   URL-embedded token that passed through run artifacts before this release. Deny-list
-  unification across `isolation`/`openrouter_lens`/`manus` remains tracked in TODO.md.
+  unification across `isolation`/`openrouter_lens`/`manus` remains tracked in issue #204.
 
 ### Preflight and snapshot hardening
 
@@ -58,7 +58,7 @@ All notable changes to the Elves skill are documented here.
   mapping, so the ~1,760 embedded Python lines in the provider runners can no longer ship
   unparseable (`bash -n` treats a quoted heredoc as an opaque string, and `compileall` never
   visits `.sh` files). Extracting the Fugu body into an importable module remains tracked in
-  `advisor-plans/004` and TODO.md.
+  `advisor-plans/004` and issue #203.
 
 ### Docs: grammar completion, compaction stewardship, config example
 
@@ -74,6 +74,12 @@ All notable changes to the Elves skill are documented here.
   documentation.
 - Add the missing `worker.parallel` key to `config.json.example`'s worker block, and remove
   the one em dash from `guide/index.html` per PRODUCT.md's guide voice.
+
+### Backlog tracking
+
+- Live backlog tracking moves from `TODO.md` to GitHub issues. `TODO.md`'s Live section
+  becomes a migration map and pointer; its Completed Archive remains as history. Issues
+  #203-#208 cover the v2.18.0 deferrals and the previously unfiled Parallelves phases.
 
 ## [2.17.1] - 2026-07-25
 

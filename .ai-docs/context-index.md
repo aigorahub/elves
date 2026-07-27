@@ -11,7 +11,7 @@ the runtime surfaces, and the checks that usually matter before editing.
 - `guide/index.html`: short public walkthrough for installing, running, watching, and finishing an
   Elves run in Claude Code or Codex.
 - `CHANGELOG.md`: release history and version-specific behavior changes.
-- `TODO.md`: deferred follow-ups and scout ideas.
+- `TODO.md`: historical archive; the live backlog is tracked in GitHub issues.
 - `config.json.example`: persistent preference schema, Cobbler-first defaults, and optional
   provider configuration.
 - `docs/cobbler.md`: human-facing Cobbler walkthrough, paired with `assets/cobbler-infographic.png`.

@@ -17,10 +17,10 @@ planned. Everything else is recorded in the survey's registry with fix sketches.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| 001 | Close the redaction parity gap and unify the secret corpora | P1 | M | — | DONE (steps 1–5, v2.18.0; step 6 deny-list union deferred to TODO.md) |
+| 001 | Close the redaction parity gap and unify the secret corpora | P1 | M | — | DONE (steps 1–5, v2.18.0; step 6 deny-list union deferred to issue #204) |
 | 002 | Make preflight's gh-identity extraction total | P1 | S | — | DONE (v2.18.0) |
 | 003 | Make the verification signal honest on every host | P1 | S | — | DONE (v2.18.0) |
-| 004 | Heredoc gate, then extract run_fugu.sh's Python to a module | P2 | M/L | 003 (soft) | IN PROGRESS (gate steps 1–2 DONE in v2.18.0; extraction steps 3–7 need a >=3.10 host for the e2e behavior pins) |
+| 004 | Heredoc gate, then extract run_fugu.sh's Python to a module | P2 | M/L | 003 (soft) | IN PROGRESS (gate steps 1–2 DONE in v2.18.0; extraction steps 3–7 tracked as issue #203 — needs a >=3.10 host for the e2e behavior pins) |
 | 005 | Fail closed on tar extraction without `filter=` | P2 | S | — | DONE (v2.18.0) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED
@@ -36,7 +36,7 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED
 
 ## Next wave (surveyed, not yet planned)
 
-In leverage order from the survey registry: C-03 (bounded/stdin-closed subprocess
+Tracked as the umbrella issue #206. In leverage order from the survey registry: C-03 (bounded/stdin-closed subprocess
 sweep), C-04 (atomic `.elves-session.json` writes via `storage.atomic_write_json`),
 C-05 (`run_grok.sh` wall budget + containment), D-06 (git-helper consolidation onto
 `leases.run_git`), D-07/D-08 (pin-corpus broadcast form + checker registry), T-04/P-01/
