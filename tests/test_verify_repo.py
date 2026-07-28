@@ -1093,6 +1093,35 @@ class VerifyRepoUnitTests(unittest.TestCase):
             ok, message = self.verify.check_secret_patterns(root)
             self.assertTrue(ok, message)
 
+    def test_secret_scan_allows_documented_slack_webhooks_but_rejects_live_ones(self) -> None:
+        """Placeholder Slack webhook shapes used in docs must not trip the gate.
+
+        Plan 001 added the slack_webhook corpus pattern; without a placeholder
+        branch the release scan fails on the shipped operations-guide examples.
+        """
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            references = root / "references"
+            references.mkdir()
+            (references / "examples.md").write_text(
+                "# export ELVES_SLACK_WEBHOOK=https://hooks.slack.com/services/T.../B.../...\n"
+                "looks like `https://hooks.slack.com/services/T.../B.../...`\n"
+                'export ELVES_SLACK_WEBHOOK="https://hooks.slack.com/services/YOUR/WEBHOOK/URL"\n',
+                encoding="utf-8",
+            )
+            ok, message = self.verify.check_secret_patterns(root)
+            self.assertTrue(ok, message)
+
+            (references / "examples.md").write_text(
+                "export ELVES_SLACK_WEBHOOK="
+                "https://hooks.slack.com/services/T01234567/B07654321/"
+                "abcdefghijklmnopqrstuvwxyz012345\n",
+                encoding="utf-8",
+            )
+            ok, message = self.verify.check_secret_patterns(root)
+            self.assertFalse(ok, message)
+            self.assertIn("slack_webhook", message)
+
     def test_secret_scan_includes_tracked_env_templates_but_not_ignored_local_env(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)

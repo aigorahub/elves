@@ -1248,6 +1248,35 @@ def _secret_value_placeholder(pattern_name: str, value: str) -> bool:
         candidate = re.sub(r"(?i)^github_pat_", "", value)
     elif pattern_name == "aws_access_key":
         return value.upper() == "AKIAIOSFODNN7EXAMPLE"
+    elif pattern_name == "slack_webhook":
+        # Docs ship the canonical hooks.slack.com/services/T…/B…/… shape with
+        # ellipsis or YOUR/WEBHOOK/URL segments. A real webhook token has no
+        # placeholder segment, so the scan still fails closed on live values.
+        # Only strip quote/paren wrappers; never strip '.' or ellipsis vanishes.
+        tail = value.split("/services/", 1)[-1]
+        segments = [
+            seg.strip("`\"'").rstrip("),;")
+            for seg in tail.split("/")
+            if seg.strip("`\"'").rstrip("),;")
+        ]
+        if not segments:
+            return False
+        placeholder_words = {
+            "YOUR",
+            "WEBHOOK",
+            "URL",
+            "TOKEN",
+            "EXAMPLE",
+            "PLACEHOLDER",
+            "XXXX",
+            "XXXXX",
+        }
+        return all(
+            "..." in seg
+            or seg.upper() in placeholder_words
+            or _secret_placeholder(seg)
+            for seg in segments
+        )
     elif pattern_name == "pem_block":
         candidate = re.sub(
             r"-----BEGIN [A-Z ]*PRIVATE KEY-----|"

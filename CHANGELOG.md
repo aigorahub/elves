@@ -42,6 +42,10 @@ All notable changes to the Elves skill are documented here.
   boundaries cover the same shape families. Operators should rotate any Slack webhook or
   URL-embedded token that passed through run artifacts before this release. Deny-list
   unification across `isolation`/`openrouter_lens`/`manus` remains tracked in issue #204.
+- Teach the release secret scan that documented Slack webhook placeholders
+  (`T.../B.../...`, `YOUR/WEBHOOK/URL`) are not credentials, so the new pattern does not fail
+  `verify_repo.py --ci` on the shipped operations-guide and tool-config examples. Live
+  multi-segment tokens still fail closed; a unit test pins both sides.
 
 ### Preflight and snapshot hardening
 
@@ -74,6 +78,9 @@ All notable changes to the Elves skill are documented here.
   documentation.
 - Add the missing `worker.parallel` key to `config.json.example`'s worker block, and remove
   the one em dash from `guide/index.html` per PRODUCT.md's guide voice.
+- Align remaining user-facing version callouts to v2.18.0 (SKILL.md user-guide label and the
+  guide's GitHub source/releases link) so Claude Code and Codex adapter surfaces stay in lockstep
+  with the release pin.
 
 ### Backlog tracking
 
