@@ -512,7 +512,7 @@
     <div class="masthead-inner">
       <div class="brand-row">
         <a class="wordmark" href="https://github.com/aigorahub/elves">Elves</a>
-        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.17.1 source and releases on GitHub</a>
+        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.18.0 source and releases on GitHub</a>
       </div>
       <h1>Using Elves</h1>
       <p class="intro">Plan with the main agent, hand implementation to a separate worker, then
@@ -559,6 +559,7 @@
    python3 "$ELVES_TMP/elves/scripts/sync_installed_skills.py" --apply --target &lt;claude|codex|all&gt;
    rm -rf "$ELVES_TMP"
    Use target `claude`, `codex`, or `all` to match what you detected.
+   Requires Python 3.10 or newer.
 
 3. Validate each install you performed:
    python3 ~/.claude/skills/elves/scripts/install_doctor.py --startup
@@ -577,7 +578,7 @@
         <div class="note">
           <strong>Hosts.</strong> Supported main drivers are <strong>Claude Code</strong> and
           <strong>Codex</strong> only. Grok Build, Devin, and OpenCode can be optional workers
-          after Elves is installed on a supported host — they are not where you install the Elves
+          after Elves is installed on a supported host; they are not where you install the Elves
           skill.
         </div>
       </section>

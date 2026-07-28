@@ -11,7 +11,7 @@ the runtime surfaces, and the checks that usually matter before editing.
 - `guide/index.html`: short public walkthrough for installing, running, watching, and finishing an
   Elves run in Claude Code or Codex.
 - `CHANGELOG.md`: release history and version-specific behavior changes.
-- `TODO.md`: deferred follow-ups and scout ideas.
+- `TODO.md`: historical archive; the live backlog is tracked in GitHub issues.
 - `config.json.example`: persistent preference schema, Cobbler-first defaults, and optional
   provider configuration.
 - `docs/cobbler.md`: human-facing Cobbler walkthrough, paired with `assets/cobbler-infographic.png`.
@@ -135,13 +135,13 @@ For this repo, use the canonical aggregate verifier instead of maintaining a dup
 list:
 
 ```bash
-python3 scripts/verify_repo.py --version 2.10.0
+python3 scripts/verify_repo.py --ci
 ```
 
 Before final readiness on an active run, use:
 
 ```bash
-python3 scripts/verify_repo.py --version 2.10.0 --final-readiness --session <session-path>
+python3 scripts/verify_repo.py --final-readiness --session <session-path>
 ```
 
 The aggregate verifier includes `git diff --check`; focused tests remain useful while iterating.

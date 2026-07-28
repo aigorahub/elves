@@ -17,6 +17,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence  # Any used by PROFILE_RECIPES
 
+from .context import SECRET_VALUE_PATTERNS as _SHARED_SECRET_VALUE_PATTERNS
+
 from .adapters import default_profiles
 from .capabilities import doctor_inventory
 from .config import models_toml_is_local_only, resolve_config
@@ -49,10 +51,9 @@ OPTIONAL_ENV_NAMES: tuple[str, ...] = (
 )
 
 _SECRET_VALUE_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"(?i)(api[_-]?key|token|secret|password)\s*=\s*[\"']?[^$\"'\s#]+"),
-    re.compile(r"\bsk-[A-Za-z0-9]{10,}"),
-    re.compile(r"\bxai-[A-Za-z0-9]{10,}"),
-    re.compile(r"\bghp_[A-Za-z0-9]{20,}"),
+    # Shared corpus first so setup scanning and runtime redaction cannot drift.
+    *(pattern for _name, pattern in _SHARED_SECRET_VALUE_PATTERNS),
+    # Setup-specific: local filesystem paths are identifying in shared recipes.
     re.compile(r"/Users/[^\s\"']+"),
     re.compile(r"/home/[^\s\"']+"),
 )

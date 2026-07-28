@@ -134,6 +134,10 @@ class CaptureServer:
         self.thread.join(timeout=2)
 
 
+@unittest.skipIf(
+    sys.version_info < (3, 10),
+    "provider runner heredocs require Python >= 3.10 (repo floor); skipping on older interpreter",
+)
 class LocalCliRunnerTests(unittest.TestCase):
     def make_fake(self, root: Path, name: str) -> Path:
         binary = root / name
@@ -1547,6 +1551,10 @@ class LocalCliRunnerTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
 
 
+@unittest.skipIf(
+    sys.version_info < (3, 10),
+    "provider runner heredocs require Python >= 3.10 (repo floor); skipping on older interpreter",
+)
 class RemoteApiRunnerTests(unittest.TestCase):
     def test_manus_uses_v2_private_max_task_contract(self) -> None:
         def responder(method, path, _payload):

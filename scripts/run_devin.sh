@@ -12,6 +12,10 @@ if [ -z "${DEVIN_API_KEY:-}" ]; then
   exit 1
 fi
 
+if ! python3 -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)'; then
+  echo "run_devin.sh requires Python >= 3.10 (repo floor); found $(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')" >&2
+  exit 2
+fi
 exec python3 - "$TASK_DESCRIPTION" <<'PY'
 import json
 import math

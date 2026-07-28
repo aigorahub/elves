@@ -157,6 +157,10 @@ PYTHON_ARGS=(
 if [ "${#INCLUDE_PATHS[@]}" -gt 0 ]; then
   PYTHON_ARGS+=("${INCLUDE_PATHS[@]}")
 fi
+if ! python3 -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)'; then
+  echo "run_fugu.sh requires Python >= 3.10 (repo floor); found $(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')" >&2
+  exit 2
+fi
 exec python3 - "${PYTHON_ARGS[@]}" <<'PY'
 import ast
 import asyncio

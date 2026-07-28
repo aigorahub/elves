@@ -21,7 +21,7 @@ import tempfile
 import textwrap
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Mapping, Sequence
 
 from .context import (
@@ -1682,6 +1682,40 @@ def _load_committed_snapshot(
     return _snapshot_from_data(data)
 
 
+def _extract_archive_members(tar: tarfile.TarFile, temp_root: Path) -> str | None:
+    """Extract with the ``data`` filter, or hand-validate members where the
+    interpreter predates ``filter=`` (< 3.10.12 / 3.11.4).
+
+    Never extract unfiltered: a member the ``data`` filter would reject fails
+    closed with a bounded reason instead of being materialized.
+    """
+    try:
+        tar.extractall(temp_root, filter="data")
+        return None
+    except TypeError:
+        pass  # filter= unavailable on this interpreter; validate by hand below.
+    resolved_root = temp_root.resolve()
+    members = tar.getmembers()
+    for member in members:
+        name = member.name
+        if not (member.isreg() or member.isdir()):
+            return _redact_message(
+                f"api_snapshot_tar_member_unsafe: non-regular member {name!r}"
+            )
+        pure = PurePosixPath(name)
+        if pure.is_absolute() or ".." in pure.parts:
+            return _redact_message(
+                f"api_snapshot_tar_member_unsafe: path escape in {name!r}"
+            )
+        destination = (temp_root / name).resolve()
+        if destination != resolved_root and resolved_root not in destination.parents:
+            return _redact_message(
+                f"api_snapshot_tar_member_unsafe: destination escape in {name!r}"
+            )
+    tar.extractall(temp_root, members=members)
+    return None
+
+
 def _capture_snapshot_from_ref(
     repo_root: Path,
     *,
@@ -1698,10 +1732,9 @@ def _capture_snapshot_from_ref(
         with tempfile.TemporaryDirectory(prefix="elves-api-baseline-") as raw:
             temp_root = Path(raw)
             with tarfile.open(fileobj=io.BytesIO(archive.stdout), mode="r:") as tar:
-                try:
-                    tar.extractall(temp_root, filter="data")
-                except TypeError:  # pragma: no cover - Python < 3.12 compatibility
-                    tar.extractall(temp_root)
+                extract_error = _extract_archive_members(tar, temp_root)
+                if extract_error is not None:
+                    return None, extract_error
             return capture_snapshot(temp_root), None
     except (OSError, tarfile.TarError) as exc:
         return None, _redact_message(f"could not inspect {base_ref} archive: {exc}")

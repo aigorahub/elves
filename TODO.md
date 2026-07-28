@@ -5,34 +5,17 @@ Project backlog and deferred tasks. Live items first; completed history under
 
 ## Live
 
-- [ ] Parallelves Phase 2: session-schema lane state and staging validation — v1 records `lanes`
-  advisorily for recovery only; validating staged lane state needs its own planned run.
-- [ ] Parallelves runtime lane supervision (future work beyond the v1 phase roadmap) — explicitly future work; v1 ships contract
-  plus recommend-only tooling and no orchestrator, so supervision needs a product decision first.
-- [ ] [#98] Investigate host-native UI prompts and arbitrary third-party tools that bypass
-  Elves' transport helpers. Those surfaces cannot honestly be described as covered by the
-  built-in external-lane filter and may require host or MCP-level interception.
-- [ ] [#92, issue-86 §17] Decompose `full_run.py` (monitor/await extraction) — structural
-  refactor deserving its own planned run; v2.10.2's shared projection helper removed the worst
-  duplication.
-- [ ] [#93, issue-86 §18] Confidence-calibration tracking across runs — roadmap feature
-  needing a product decision, not patch-release material.
-- [ ] [#94, issue-86 §19] Native-lane structured confidence sidecar — roadmap feature
-  needing a product decision, not patch-release material.
-- [ ] [#95, issue-86 §20 + prewalk launch path] Complete and independently review the Grok
-  prewalk launch path before opening the maintainer-owned `launch_ready` registry gate:
-  materialize the bounded prompt-file input, validate the non-yolo auth/permission profile end
-  to end, run an operator-authorized live canary at the `high` execution-effort default, bind
-  its artifact to the live installed version/build, and regression-test create→exact-resume
-  continuity. Qualification evidence must never open this gate by itself; operator-owned and
-  never fabricated by an unattended worker.
-- [ ] [#96, v2.10.2 review advisory] Resume-prepare over a terminally-evented session survives
-  the liveness guard but appends `run_started` after a terminal event, so the rebuilt run dies
-  on first monitor ("event appears after terminal event"). Fail-closed today; either refuse
-  terminal sessions at rebuild or cover the interplay with a test.
-- [ ] [#97, v2.10.2 review advisory] Widen the public persona wording guard beyond the six
-  claim shapes (e.g. "Fable-powered", "runs on Fable", "is Fable", and Claude/Anthropic persona
-  phrasings) while keeping model-identifier exemptions false-positive-free.
+Live backlog tracking has moved to GitHub issues:
+https://github.com/aigorahub/elves/issues
+
+Migration map: Parallelves Phase 2 → #207; Parallelves runtime lane supervision → #208;
+host-native UI/third-party interception → #98; `full_run.py` decomposition → #92;
+confidence-calibration tracking → #93; structured confidence sidecar → #94; Grok prewalk
+launch path → #95; resume-prepare terminal-event interplay → #96; persona wording guard
+widening → #97; `run_fugu.sh` heredoc extraction → #203; secret deny-list unification →
+#204; compaction P3/P4 decisions → #205; structural-debt next-wave umbrella → #206.
+
+The Completed Archive below remains as history.
 
 ## Completed Archive
 

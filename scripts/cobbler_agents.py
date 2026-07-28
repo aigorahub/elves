@@ -343,10 +343,7 @@ def cmd_validate_config(args: argparse.Namespace) -> int:
 def _emit_lanes_payload(args: argparse.Namespace, payload: dict[str, Any], *, exit_code: int) -> int:
     payload.setdefault("mutated_repo", False)
     payload.setdefault("model_calls_made", False)
-    if getattr(args, "json", False):
-        return _emit_json(payload, exit_code=exit_code)
-    print(json.dumps(payload, indent=2, sort_keys=True))
-    return exit_code
+    return _emit_json(payload, exit_code=exit_code)
 
 
 def _load_lane_timings(path: Path) -> dict[str, Any]:
@@ -1964,10 +1961,7 @@ def cmd_implement(args: argparse.Namespace) -> int:
                     args, "grok_goal_behavioral_evidence", None
                 ),
             )
-            if args.json:
-                return _emit_json(payload, exit_code=0)
-            print(json.dumps(payload, indent=2, sort_keys=True))
-            return 0
+            return _emit_json(payload, exit_code=0)
 
         if action == "full-run-launch":
             payload = launch_full_run(
@@ -2092,10 +2086,7 @@ def cmd_implement(args: argparse.Namespace) -> int:
                 raw_tail=bool(getattr(args, "raw_tail", False)),
                 tail_lines=int(getattr(args, "tail", 40) or 40),
             )
-            if args.json:
-                return _emit_json(payload, exit_code=0)
-            print(json.dumps(payload, indent=2, sort_keys=True))
-            return 0
+            return _emit_json(payload, exit_code=0)
 
         if action == "full-run-stop":
             payload = stop_full_run(repo_root, session_id=args.session_id)
@@ -2120,10 +2111,7 @@ def cmd_implement(args: argparse.Namespace) -> int:
                 executable=args.executable,
                 adapter=getattr(args, "adapter", None) or "grok-build",
             )
-            if args.json:
-                return _emit_json(payload, exit_code=0)
-            print(json.dumps(payload, indent=2, sort_keys=True))
-            return 0
+            return _emit_json(payload, exit_code=0)
 
         if action == "launch":
             payload = launch_payload(

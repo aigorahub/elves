@@ -4,6 +4,90 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.18.0] - 2026-07-27
+
+### Structural-debt survey, deep-dive reviews, and executor plans
+
+- Add `docs/reviews/2026-07-structural-debt-survey.md` (a four-auditor, driver-vetted audit of
+  the v2.10→v2.17.1 growth: 28 registered findings with evidence, measured baselines, vetting
+  corrections, and direction options) and `docs/reviews/2026-07-routing-caching-compaction.md`
+  (driver→worker handoff economics, model-scoped prompt-cache reality, compaction control
+  surfaces, and the recycle-beats-summarize doctrine). Executor-ready plans for the top five
+  findings live in `advisor-plans/`; the items below are that first wave, and
+  `advisor-plans/README.md` records per-plan status and deferrals.
+
+### Honest verification signal on every host
+
+- Skip the provider-shortcut suites below the Python 3.10 floor instead of failing 25 tests
+  plus 2 errors with raw TypeErrors on stock macOS Python, and guard all three heredoc runner
+  scripts (`run_fugu.sh`, `run_grok.sh`, `run_devin.sh`) with a clear "requires Python >= 3.10
+  (repo floor)" message before the embedded Python executes.
+- `verify_repo.py --ci` and `--final-readiness` now default `--version` from the SKILL.md
+  frontmatter, so gate commands in docs never carry a version literal again. The stale
+  `--version 2.10.0` examples in `.ai-docs/` (which failed three ways on a clean tree) become
+  versionless forms, and the README maintainers' gates drop their literals. The 3.10 floor is
+  now stated user-facing in the README and guide install steps. The unit test pinning the old
+  require-`--version` contract is replaced by two sharper ones: fail closed when no SKILL.md
+  frontmatter is present at the repo root, and resolve-and-proceed when one is.
+
+### Redaction parity and secret-corpus unification
+
+- Add `slack_webhook` and colon-less `uri_userinfo_bare` patterns to
+  `context.SECRET_VALUE_PATTERNS`: both shapes were already redacted at the notify/preflight
+  shell boundary but previously survived Python-side artifact persistence and the release
+  secret scan. Classify `*WEBHOOK` environment names as secret, rebuild `setup.py`'s drifted
+  private pattern copy on the shared corpus, and route four previously unredacted
+  `json.dumps` payload prints in `cobbler_agents.py` through the redacting `_emit_json`. A new
+  parity test pins every named pattern to a synthetic sample and asserts the shell and Python
+  boundaries cover the same shape families. Operators should rotate any Slack webhook or
+  URL-embedded token that passed through run artifacts before this release. Deny-list
+  unification across `isolation`/`openrouter_lens`/`manus` remains tracked in issue #204.
+- Teach the release secret scan that documented Slack webhook placeholders
+  (`T.../B.../...`, `YOUR/WEBHOOK/URL`) are not credentials, so the new pattern does not fail
+  `verify_repo.py --ci` on the shipped operations-guide and tool-config examples. Live
+  multi-segment tokens still fail closed; a unit test pins both sides.
+
+### Preflight and snapshot hardening
+
+- `preflight.sh` no longer aborts the entire checklist at the gh-identity section when
+  `gh auth status` uses the `as <user>` wording: the previous `grep -o "account ..."` pipeline
+  exited nonzero under `set -euo pipefail`, killing sections 3-14 before any real check ran.
+  Both wordings are now parsed by one total `awk` extraction and covered by tests.
+- The public-API snapshot baseline extraction fails closed when `tarfile`'s `filter=` keyword
+  is unavailable (Python 3.10.0-3.10.11 / 3.11.0-3.11.3, inside the supported floor): archive
+  members are hand-validated against non-regular types, absolute paths, `..` segments, and
+  destination escapes instead of falling back to an unfiltered `extractall` of a
+  caller-supplied ref.
+- `verify_repo.py`'s shell gate now compiles every `<<'PY'` heredoc body with real-file line
+  mapping, so the ~1,760 embedded Python lines in the provider runners can no longer ship
+  unparseable (`bash -n` treats a quoted heredoc as an opaque string, and `compileall` never
+  visits `.sh` files). Extracting the Fugu body into an importable module remains tracked in
+  `advisor-plans/004` and issue #203.
+
+### Docs: grammar completion, compaction stewardship, config example
+
+- Complete the remaining `/fugu` invocation-grammar drift siblings of the v2.17.1 fix:
+  SKILL.md's copy-ready task line gains `[--write] [--include PATH]`, and the review forms on
+  SKILL.md and AGENTS.md gain the `[--deep|--ultra|--max]` profile flags. A new
+  `FUGU_INVOCATION_GRAMMAR_PHRASES` group pins the full task and review grammar on the
+  restating surfaces so a runner flag can no longer land on five surfaces and miss the sixth.
+- Extend `references/operations-guide.md` with deterministic post-compaction recovery (a
+  `compact`-matched SessionStart hook) and a compactor "Summary instructions" block that
+  preserves acceptance IDs, run-doc paths, the branch name, and Stop Gate state. Both are
+  marked version-dependent and should be verified against the installed host's hooks
+  documentation.
+- Add the missing `worker.parallel` key to `config.json.example`'s worker block, and remove
+  the one em dash from `guide/index.html` per PRODUCT.md's guide voice.
+- Align remaining user-facing version callouts to v2.18.0 (SKILL.md user-guide label and the
+  guide's GitHub source/releases link) so Claude Code and Codex adapter surfaces stay in lockstep
+  with the release pin.
+
+### Backlog tracking
+
+- Live backlog tracking moves from `TODO.md` to GitHub issues. `TODO.md`'s Live section
+  becomes a migration map and pointer; its Completed Archive remains as history. Issues
+  #203-#208 cover the v2.18.0 deferrals and the previously unfiled Parallelves phases.
+
 ## [2.17.1] - 2026-07-25
 
 ### Document the `--max` flag on every invocation surface
