@@ -1659,7 +1659,8 @@ IMPLEMENTATION_LANES_PHRASES = {
 SETUP_COBBLER_PHRASES = {
     "SKILL.md": [
         "### External-agent setup and model onboarding",
-        "Supported main drivers are Claude Code and Codex only",
+        "Supported main drivers are Claude Code, Codex, and Grok Build",
+        "no prewalk when Grok is the main driver",
         "/setup-cobbler",
         "/setup-council",
         "$elves setup-cobbler",
@@ -2013,7 +2014,7 @@ if isinstance(RISK_TIER_PHRASES, dict) and 'SKILL.md' in RISK_TIER_PHRASES:
     RISK_TIER_PHRASES['SKILL.md'] = ['Thin safety kernel', 'validate once, verify changes, attest final', 'low | standard | high', 'trusted | untrusted', 'touched surfaces', 'risk checkpoints', 'terminal readiness', 'exact HEAD', 'impact-selected']
 if isinstance(SETUP_COBBLER_PHRASES, dict) and 'SKILL.md' in SETUP_COBBLER_PHRASES:
     SETUP_COBBLER_PHRASES = dict(SETUP_COBBLER_PHRASES)
-    SETUP_COBBLER_PHRASES['SKILL.md'] = ['setup-cobbler', 'setup-council', 'model-onboarding.md', 'not a top-level', 'cobbler_agents.py setup', 'references/cobbler-setup-recipes.md', 'Supported main drivers are Claude Code and Codex only', '$elves setup-council']
+    SETUP_COBBLER_PHRASES['SKILL.md'] = ['setup-cobbler', 'setup-council', 'model-onboarding.md', 'not a top-level', 'cobbler_agents.py setup', 'references/cobbler-setup-recipes.md', 'Supported main drivers are Claude Code, Codex, and Grok Build', 'no prewalk when Grok is the main driver', '$elves setup-council']
 if isinstance(SINGLE_KICKOFF_PHRASES, dict) and 'SKILL.md' in SINGLE_KICKOFF_PHRASES:
     SINGLE_KICKOFF_PHRASES = dict(SINGLE_KICKOFF_PHRASES)
     SINGLE_KICKOFF_PHRASES['SKILL.md'] = ['Default user path: one kickoff', 'Trusted full-run delegation keeps that path', 'chat-to-work', 'chat-to-land', 'Legacy two-call', 'full-run', 'parked']

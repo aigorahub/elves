@@ -8,7 +8,7 @@ plans and reviews; a subscription-native (or optional external) worker implement
 files let the work survive context compaction. You write the plan and own the merge decision. The
 agent does the middle.
 
-**Current release: v2.18.1** — see [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.19.0** — see [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 **New to Elves?** Use the [practical user guide](https://aigorahub.github.io/elves/) — especially
@@ -18,11 +18,11 @@ orients you. The guide also covers the first run, worker choice, live progress, 
 landing. This README is the repository reference: shell install, safety model, operations, and an
 index into the detailed contracts under [`references/`](references/).
 
-**Supported main drivers:** Claude Code and Codex only. Grok Build is an optional *worker* once
-Elves is installed on a supported host — not a place to install the Elves skill, and not a
-supported main driver out of the box. Grok may still *discover* Elves via Claude skill
-compatibility; the skill and guide tell the agent to **refuse orchestration from Grok as host**
-and redirect to Claude Code or Codex. See the guide FAQ
+**Supported main drivers:** Claude Code, Codex, and Grok Build. Grok may drive Elves with one hard
+limit: **no prewalk** when Grok is the host (actual mode always off; `required` fails closed).
+Grok Build is also an optional *worker* under Claude/Codex when permitted. Managed skill install
+targets remain Claude and Codex roots; Grok often discovers Elves via Claude skill compatibility.
+See the guide FAQ
 [I opened Grok Build and tried /elves](https://aigorahub.github.io/elves/#troubleshooting).
 
 ---

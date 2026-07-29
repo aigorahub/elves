@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.18.1"
+  version: "2.19.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -17,23 +17,28 @@ confidently, review intelligently, and ship.
 
 ## Supported main drivers (host check)
 
-**Supported main drivers are Claude Code and Codex only.** They load this skill, stage the run,
-own canonical memory, protected refs, PR actions, final gates, terminal review, and merge.
+**Supported main drivers are Claude Code, Codex, and Grok Build.** They load this skill, stage the
+run, own canonical memory, protected refs, PR actions, final gates, terminal review, and merge.
 
-**Grok Build is not a supported main driver.** Grok may still *discover* this skill (for example
-via Claude skill compatibility when `~/.claude/skills/elves` is installed). If the current session
-is Grok Build (or another non–Claude/Codex host) acting as the **orchestrator** — not as a worker
-already launched by Claude Code or Codex — **do not stage or run an Elves workflow**. Instead:
+**Grok Build may drive Elves.** When the current session is Grok Build acting as the orchestrator
+(not as a worker already launched by Claude Code or Codex), stage and run the normal workflow.
 
-1. Say clearly that Elves is unsupported as a Grok Build (or exotic) main driver.
-2. Tell the user to open **Claude Code** or **Codex**, install Elves there if needed, and kick off
-   from that host.
-3. Note that Grok Build remains an **optional worker** under Claude/Codex when permitted
-   (`grok-4.5` at `high` when the live catalog offers it).
-4. Stop after that orientation unless the user is only asking for a short explanation.
+**Hard limit: no prewalk when Grok is the main driver.** Exact-session prewalk is never offered,
+selected, or claimed on a Grok-driven run. Actual prewalk mode is always `off` under `auto`. If
+the user or config sets `worker.prewalk=required` while Grok is host, fail before launch with an
+honest reason (Grok-host prewalk is unsupported). Prefer host-native implementation in the Grok
+session, or a cold packet handoff to a separate worker. A cold packet is not prewalk. Do not
+advertise Grok-host prewalk availability or invent a fake resume trajectory.
 
-Do not invent a Grok-native install path or pretend host parity exists. Install targets remain
-`~/.claude/skills/elves` and `~/.codex/skills/elves` only.
+Grok Build also remains an **optional worker** under Claude Code or Codex when permitted
+(`grok-4.5` at `high` when the live catalog offers it). That worker role is separate from Grok as
+host; worker prewalk stays feature-gated and unqualified as today (`references/prewalk.md`).
+
+Managed install targets remain `~/.claude/skills/elves` and `~/.codex/skills/elves`. Grok often
+discovers Elves via Claude skill compatibility; a native `~/.grok/skills` install is optional
+follow-up work, not a requirement to drive. Do not invent unsupported host surfaces for other
+products. If the session is an exotic non-supported host (not Claude, Codex, or Grok), refuse to
+stage and redirect to a supported driver.
 
 **The user owns whether Elves may merge.** You never merge by default — the user merges when they
 return. Exceptions: explicit merge-on-green in Run Control, chat-to-land, or the Reviewed PR Landing
@@ -64,7 +69,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.18.1):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.19.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
@@ -674,16 +679,18 @@ lanes remain useful but are not the default happy path.
 
 ## Host parity
 
-Claude Code and Codex provide the same workflow and safety. See `references/host-parity.md`.
-Exact-session prewalk must also preserve the same trajectory, checkpoint, visibility, fallback, and
-authority semantics on both hosts; supervised transport syntax may differ.
+Claude Code and Codex provide the same workflow and safety, including the prewalk contract when
+behaviorally qualified. Grok Build is a supported main driver with the same safety kernel and a
+documented prewalk gap: **no prewalk when Grok is host**. See `references/host-parity.md`.
+Exact-session prewalk must preserve the same trajectory, checkpoint, visibility, fallback, and
+authority semantics on Claude and Codex; supervised transport syntax may differ.
 **Codex Goals** are optional continuation plumbing — distinct from **Grok Build goal mode**.
 
 ## Compatibility notes
 
 - Missing optional provider access never blocks a native run.
 - Record `implementation_lane: fast | untrusted` when using external work drivers.
-- Supported main drivers are Claude Code and Codex only. Grok Build as host is unsupported: warn
-  and redirect (see **Supported main drivers** above). Grok as optional worker is supported when
-  permitted and capability-qualified.
+- Supported main drivers are Claude Code, Codex, and Grok Build. When Grok is host, prewalk is
+  always off (see **Supported main drivers** above). Grok as optional worker under Claude/Codex
+  remains supported when permitted and capability-qualified.
 - Compatibility: `$elves setup-council` remains supported.

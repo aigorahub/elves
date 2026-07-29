@@ -1,33 +1,30 @@
-# Host parity: Claude Code and Codex
+# Host parity: Claude Code, Codex, and Grok Build
 
-Workflow semantics are identical. Invocation surfaces differ.
+**Supported main drivers are Claude Code, Codex, and Grok Build.** Claude Code and Codex share full
+workflow and prewalk parity. Grok Build may stage and run Elves as orchestrator under the same
+safety kernel, with one documented gap: **no exact-session prewalk when Grok is host**.
 
-**Supported main drivers are Claude Code and Codex only.** Grok Build is not a host-parity peer:
-it may discover the skill (for example via Claude skill compatibility) but must refuse to stage or
-run as orchestrator and redirect to a supported host. Grok’s supported role is optional worker
-labor under Claude/Codex. Native Grok skill install and full Grok host parity are tracked as future
-work (issues #88 and #89).
+| Concern | Claude Code | Codex | Grok Build (host) |
+|---------|-------------|-------|-------------------|
+| Skill load | Project/global Agent Skill | Project/global Agent Skill | Claude-compat and/or native skill discovery |
+| Primary invoke | `/elves`, natural language | `$elves`, natural language | natural language (no invented top-level slash map) |
+| Cobbler | `/cobbler`, `/cobbler-mode` | `$elves cobbler: …`, natural chat | natural language |
+| Setup | `/setup-cobbler` | `$elves setup-cobbler` | natural language / scripts |
+| Provider shortcuts | `/fugu`, `/manus`, `/grok`, `/devin` | `$elves fugu|manus|grok|devin …`, natural chat | natural language; same runners from skill root |
+| Land PR | `/land-pr` or `\land-pr` | natural language or alias | natural language |
+| Continuation | optional | optional **Codex Goals** (seatbelt, not memory) | host session continuity; not Codex Goals |
+| Native / host work | Separate custom/background session; supervised CLI uses safe mode and classifier-approved commits | Separate custom agent or sandboxed `codex exec`; narrow Git roots permit commits | Host-native Grok session or cold packet worker; **not** prewalk |
+| Exact-session prewalk | when behaviorally qualified | when behaviorally qualified | **always off** as host; never claim prewalk |
+| Visibility | Proven native agent view or exact private-log follow command | Proven native agent view or exact private-log follow command | Live session + run docs; same memory/landing ownership |
+| Grok Build goal | proven enhancement or one-packet fallback (worker) | same (worker) | host-native path; goal mode is not a substitute for prewalk |
+| Confidence-guided review | Attach terminal `review_context.review_prompt_block`, or derive the same table from native `Confidence:` trailers | Same machine-produced block/table and Final Readiness output section | Same contract when workers emit trailers/blocks |
 
-| Concern | Claude Code | Codex |
-|---------|-------------|-------|
-| Skill load | Project/global Agent Skill | Project/global Agent Skill |
-| Primary invoke | `/elves`, natural language | `$elves`, natural language |
-| Cobbler | `/cobbler`, `/cobbler-mode` | `$elves cobbler: …`, natural chat |
-| Setup | `/setup-cobbler` | `$elves setup-cobbler` |
-| Provider shortcuts | `/fugu`, `/manus`, `/grok`, `/devin` | `$elves fugu|manus|grok|devin …`, natural chat |
-| Land PR | `/land-pr` or `\land-pr` | natural language or alias |
-| Continuation | optional | optional **Codex Goals** (seatbelt, not memory) |
-| Native worker | Separate custom/background session; supervised CLI uses safe mode and classifier-approved commits | Separate custom agent or sandboxed `codex exec`; narrow Git roots permit commits |
-| Visibility | Proven native agent view or exact private-log follow command | Proven native agent view or exact private-log follow command |
-| Exact resume | `--resume <uuid>` | `codex exec resume <thread-id>` from registered worktree CWD |
-| Grok Build goal | proven enhancement or one-packet fallback | same proven enhancement or fallback |
-| Confidence-guided review | Attach terminal `review_context.review_prompt_block`, or derive the same table from native `Confidence:` trailers | Same machine-produced block/table and Final Readiness output section |
-
-Both hosts read safe worker preferences from the same XDG file and make the same deterministic
-decision. Transport syntax differs; packet, authority, fallback, follow, and terminal-review
-semantics do not. See [`adaptive-worker-routing.md`](adaptive-worker-routing.md).
+Claude and Codex read safe worker preferences from the same XDG file and make the same
+deterministic decision. Transport syntax differs; packet, authority, fallback, follow, and
+terminal-review semantics do not. See [`adaptive-worker-routing.md`](adaptive-worker-routing.md).
 When checking a route, pass `--host claude` from Claude Code and `--host codex` from Codex so any
-native fallback uses the live driver's transport.
+native fallback uses the live driver's transport. Grok as **optional worker** under Claude/Codex
+is unchanged. Native `~/.grok/skills` install remains optional (#88).
 
 Provider shortcuts preserve the same route semantics and authority on both hosts; only Claude Code
 installs the four slash aliases. Codex must use the main skill surface. See
@@ -67,9 +64,11 @@ pruning. The current persisted-instruction transport activates only for behavior
 `retained_safe`; `pruned` and `turn_scoped` remain schema states for future delivery mechanisms.
 Consequently the shipped code is feature-gated and `auto` remains actually off for an unqualified
 installed version on either host. A release must not claim general prewalk availability when one
-primary host would silently start a new session. The same release-honesty rule extends to external
-providers: no release may claim Grok prewalk availability or behavioral qualification. See
-[`prewalk.md`](prewalk.md).
+primary host would silently start a new session. **Grok as main driver never participates in
+prewalk:** actual mode is always `off`, and `required` fails before launch. The same release-honesty
+rule extends to Grok-as-worker and other external providers:
+no release may claim Grok prewalk availability or behavioral qualification.
+See [`prewalk.md`](prewalk.md).
 
 The host-profile registry also carries a feature-gated `grok` prewalk arm.
 `native-worker prewalk-capabilities --host grok --json` reports installed advertised grammar with

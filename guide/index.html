@@ -512,7 +512,7 @@
     <div class="masthead-inner">
       <div class="brand-row">
         <a class="wordmark" href="https://github.com/aigorahub/elves">Elves</a>
-        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.18.1 source and releases on GitHub</a>
+        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.19.0 source and releases on GitHub</a>
       </div>
       <h1>Using Elves</h1>
       <p class="intro">Plan with the main agent, hand implementation to a separate worker, then
@@ -566,20 +566,20 @@
    python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup
 
 4. In plain language, explain:
-   - Elves is a skill for Claude Code or Codex (those are the supported main drivers).
+   - Elves is a skill for Claude Code, Codex, and Grok Build (those are the supported main drivers).
    - I own the plan and whether to merge. The driver plans/reviews/lands; a separate worker implements.
    - Default: same subscription, lower-effort native worker. Outcome is usually a landable PR; merge only if I authorize it.
-   - Optional workers (Grok Build, Devin, OpenCode, …) are not required. Native works with no extra keys.
-   - Grok Build is an optional *worker*, not a supported main driver for the Elves skill itself.
+   - Optional workers (Grok Build under Claude/Codex, Devin, OpenCode, …) are not required. Native works with no extra keys.
+   - When Grok Build is the main driver, it may run Elves fully, but exact-session prewalk is always off.
 
 5. Stop after install + orientation. Offer one short first-run starter prompt I can paste later (chat-to-work: landable PR, do not merge).</code></pre>
         </div>
 
         <div class="note">
-          <strong>Hosts.</strong> Supported main drivers are <strong>Claude Code</strong> and
-          <strong>Codex</strong> only. Grok Build, Devin, and OpenCode can be optional workers
-          after Elves is installed on a supported host; they are not where you install the Elves
-          skill.
+          <strong>Hosts.</strong> Supported main drivers are <strong>Claude Code</strong>,
+          <strong>Codex</strong>, and <strong>Grok Build</strong>. When Grok is host, prewalk is
+          always off. Managed skill install targets remain Claude and Codex roots; Grok often
+          discovers Elves via Claude skill compatibility. Devin and OpenCode stay optional workers.
         </div>
       </section>
 
@@ -1081,14 +1081,12 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" preferences reset</code></
 
         <details>
           <summary>I opened Grok Build and tried <code>/elves</code> (or Elves appeared in skills).</summary>
-          <p><strong>Unsupported host.</strong> Grok Build can discover the Elves skill when Claude
-            skill compatibility is on (for example after install into
-            <code>~/.claude/skills/elves</code>), but Grok is <strong>not</strong> a supported main
-            driver. Do not stage or run Elves from inside Grok as the orchestrator. Open
-            <strong>Claude Code</strong> or <strong>Codex</strong>, install Elves there if needed,
-            and start the run from that host. Use Grok as an optional <em>worker</em> only after
-            the supported host permits it. The skill should refuse Grok-as-host orchestration and
-            redirect you.</p>
+          <p><strong>Supported host, no prewalk.</strong> Grok Build is a supported main driver.
+            You can stage and run Elves from Grok when the skill is discoverable (for example after
+            install into <code>~/.claude/skills/elves</code> with Claude skill compatibility).
+            Exact-session prewalk is always off when Grok is the orchestrator: use host-native
+            work or a cold packet handoff, not a prewalk claim. Grok can also stay an optional
+            <em>worker</em> under Claude Code or Codex when permitted.</p>
         </details>
 
         <details>

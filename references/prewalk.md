@@ -61,10 +61,14 @@ single-phase launch/status/follow remains supported.
 - `required` fails before launch if exact resume, route change, worktree/stream binding, or usable
   instruction fidelity is unqualified.
 - External providers remain off unless their trajectory semantics are separately qualified. The
-  Grok Build arm exists behind exactly that gate: it is feature-gated, unqualified, and actually
-  off. An operator-authorized live canary can establish version-bound `retained_safe` behavioral
-  evidence, but qualification does not itself open the separate registry launch gate. Analogy to
-  a native host never qualifies an external provider.
+  Grok Build **worker** arm exists behind exactly that gate: it is feature-gated, unqualified, and
+  actually off. An operator-authorized live canary can establish version-bound `retained_safe`
+  behavioral evidence, but qualification does not itself open the separate registry launch gate.
+  Analogy to a native host never qualifies an external provider.
+- **Grok Build as main driver (orchestrator) never uses prewalk.** When the live host is Grok,
+  requested `auto` records actual mode `off`, and `required` fails before launch with an honest
+  Grok-host-no-prewalk reason. Prefer host-native implementation or a cold packet handoff. Do not
+  claim exact-session prewalk for a Grok-driven run.
 
 The initial release therefore normally reports actual mode `off`: read-only installed-help probes
 show advertised grammar, but no host — Codex, Claude, or Grok — is behaviorally qualified by this

@@ -4,6 +4,22 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.19.0] - 2026-07-29
+
+### Grok Build as a supported main driver (no prewalk)
+
+- Grok Build may stage and run Elves as orchestrator alongside Claude Code and Codex. The safety
+  kernel (memory, protected refs, PR, gates, landing, merge ownership) is the same.
+- **Hard limit:** when Grok is the main driver, exact-session prewalk is always off. `auto`
+  records actual mode `off`; `worker.prewalk=required` fails before launch. Prefer host-native
+  work or a cold packet handoff. Never claim Grok-host prewalk.
+- Grok remains an optional worker under Claude/Codex when permitted. Worker prewalk stays
+  feature-gated and unqualified as before.
+- Managed install targets remain Claude and Codex skill roots; Grok often discovers Elves via
+  Claude skill compatibility. Native `~/.grok/skills` install remains issue #88.
+- SKILL, AGENTS, README, guide (including the Grok FAQ), PRODUCT, host-parity, prewalk, and
+  consistency pins restated for Claude/Codex/Grok host set and the prewalk gap.
+
 ## [2.18.1] - 2026-07-29
 
 ### Host Fugu routing for natural "use Fugu"
