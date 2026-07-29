@@ -163,10 +163,18 @@ If `Planned batches remaining` is greater than 0, `Stop allowed right now` shoul
 
 > Rewrite this section in place if the user gives a stronger instruction about pace or effort.
 
-- Work as hard as you can for the full run. Do not be lazy.
-- Maintain the same level of effort on the last batch as on the first.
-- Do not settle for the minimum acceptable change, the first green check, or a shallow pass when deeper verification or the next planned task remains.
-- When one task is complete, immediately take the next highest-value action from the plan, review queue, or scout work.
+- Work as hard as you can for the full run on **plan acceptance and blockers**. Do not be lazy.
+- Maintain the same drive on the last product batch as on the first.
+- Do not settle for the minimum acceptable change on the planned path, or for a shallow pass when the next planned task remains.
+- When one task is complete, immediately take the next highest-value action from the plan (not a polish detour).
+- Hard work does **not** mean mid-run nit perfection, nested full reviews, or re-running a large full suite between ordinary batches. Use impact path mid-run; full suite and deferred hygiene at terminal.
+
+## Deferred hygiene
+
+> Bank advisory nits mid-run; drain at terminal readiness. Blockers are never deferred.
+
+- **Open items:** [none / list: surface — what — why advisory]
+- **Last drained:** [never / batch or HEAD]
 
 ---
 
@@ -437,7 +445,8 @@ bad syntax or mismatches.
 - [ ] Staging acceptance validation passed before any worker launch (plan syntax parsed; session
       and packet id/text mappings match)
 
-- [ ] All configured validation gates pass (lint, typecheck, build, test)
+- [ ] Impact-path validation green mid-run; full suite (or project full gate) green at terminal readiness
+- [ ] Deferred hygiene drained or explicitly empty at terminal
 - [ ] Plan Acceptance criteria for this batch are met with `B#-A#` evidence (not only "tests green")
 - [ ] `.elves-session.json` batch entry has non-empty `acceptance: [{id: "B#-A#", criterion, met: true, evidence}]` before `status: complete`
 - [ ] Every `M-A#` Master Acceptance criterion is reconciled with evidence before branch readiness
@@ -914,4 +923,5 @@ complete. Don't re-implement it.
 - thin safety kernel; risk low|standard|high independent of trust trusted|untrusted
 - validate once, verify changes, attest final
 - impact-selected proof during work; broad proof once at terminal readiness and explicit high-risk checkpoints
+- mid-run impact path only; deferred hygiene for advisories; full suite at terminal
 - mid-run nonblocking new/unresolved PR feedback; terminal waits for required checks

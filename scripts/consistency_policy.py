@@ -81,18 +81,59 @@ EFFORT_GUARDRAIL_PHRASES = {
     "SKILL.md": [
         "## Effort Standard",
         "Work as hard as you can",
+        "plan acceptance and blockers",
+        "deferred hygiene",
     ],
     "references/survival-guide-template.md": [
         "## Effort Standard",
         "Work as hard as you can",
+        "## Deferred hygiene",
+        "impact path mid-run",
     ],
     "references/kickoff-prompt-template.md": [
         "Work as hard as you can",
         "Do not coast after the first success",
+        "deferred hygiene",
+        "impact-path",
     ],
     "references/open-ended-guide.md": [
         "## Sustain Effort",
         "Work as hard as you can",
+        "deferred hygiene",
+        "impact path",
+    ],
+}
+
+# Mid-run impact path vs terminal full suite + deferred hygiene (v2.20.0).
+# Without these pins, validation-guide can reintroduce "zero debt every batch" and
+# fight the proof budget again.
+MIDRUN_TERMINAL_HYGIENE_PHRASES = {
+    "SKILL.md": [
+        "deferred hygiene",
+        "impact path",
+        "full suite",
+        "validate once, verify changes, attest final",
+    ],
+    "references/validation-guide.md": [
+        "validate once, verify changes, attest final",
+        "Deferred hygiene",
+        "Mid-run vs terminal",
+        "impact path",
+        "weaken, skip, or delete tests",
+    ],
+    "references/proof-and-review.md": [
+        "deferred hygiene",
+        "full suite",
+        "impact path",
+        "per-batch driver reviews",
+    ],
+    "references/survival-guide-template.md": [
+        "Deferred hygiene",
+        "full suite at terminal",
+        "impact-selected proof during work",
+    ],
+    "references/execution-log-template.md": [
+        "Deferred hygiene",
     ],
 }
 
@@ -1969,7 +2010,12 @@ if isinstance(DOMAIN_WORKFLOW_PHRASES, dict) and 'SKILL.md' in DOMAIN_WORKFLOW_P
     DOMAIN_WORKFLOW_PHRASES['SKILL.md'] = ['**Elves** is the execution system', '**Cobbler** is the default coordinator', '**Domain workflows** are specialized Cobbler-managed packs', '**Math** is the first domain workflow', '**Providers** are optional role routes', 'cobbler.default_for_session']
 if isinstance(EFFORT_GUARDRAIL_PHRASES, dict) and 'SKILL.md' in EFFORT_GUARDRAIL_PHRASES:
     EFFORT_GUARDRAIL_PHRASES = dict(EFFORT_GUARDRAIL_PHRASES)
-    EFFORT_GUARDRAIL_PHRASES['SKILL.md'] = ['## Effort Standard', 'Work as hard as you can']
+    EFFORT_GUARDRAIL_PHRASES['SKILL.md'] = [
+        '## Effort Standard',
+        'Work as hard as you can',
+        'plan acceptance and blockers',
+        'deferred hygiene',
+    ]
 if isinstance(ELVES_REPORT_PHRASES, dict) and 'SKILL.md' in ELVES_REPORT_PHRASES:
     ELVES_REPORT_PHRASES = dict(ELVES_REPORT_PHRASES)
     ELVES_REPORT_PHRASES['SKILL.md'] = ['## Elves Report', 'problems found', 'lessons learned', '/tmp/elves-report-<repo-slug>-<yyyy-mm-dd>.html', 'references/elves-report-template.html', 'collapsible `<details>` sections', 'committed examples and reusable templates non-identifying', 'Elves Report path']

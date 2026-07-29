@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.19.0"
+  version: "2.20.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -69,7 +69,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.19.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.20.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
@@ -125,7 +125,10 @@ Worker state, readiness evidence, and landing authority are **independent**:
 6. Native Claude Code and Codex without Grok or optional providers
 
 Proof budget: **validate once, verify changes, attest final**. Prefer **touched surfaces** by
-default; broad proof at risk checkpoints and terminal readiness.
+default; broad proof at risk checkpoints and terminal readiness. Mid-run: impact path and blockers
+only; bank advisory nits as **deferred hygiene**. Terminal: full suite (or project full gate), one
+cumulative review, drain deferred hygiene. See `references/validation-guide.md` and
+`references/proof-and-review.md`.
 
 ## Why This Exists
 
@@ -396,8 +399,13 @@ never authority. Example:
 
 ## Effort Standard
 
-Do not be lazy. Work as hard as you can for the full run. Same effort on the last batch as the
-first. Prefer deeper verified progress over the minimum acceptable change.
+Do not be lazy. Work as hard as you can for the full run on **plan acceptance and blockers**. Same
+drive on the last product batch as the first. Prefer deeper progress on the planned path over the
+minimum acceptable change.
+
+Hard work does **not** mean mid-run nit perfection, nested full reviews, or re-running a large full
+suite between ordinary batches. Correctness on the impact path is non-negotiable; polish and
+full-suite attestation belong at terminal readiness (deferred hygiene).
 
 ## Run Mode
 
@@ -496,9 +504,16 @@ Pre-implementation survey. Extend existing utilities. Write tests. Commit with p
 ### 6. Validate
 
 Impact path: changed surface → affected consumer → selected test. Touched-surface proof by default;
-broad at high-risk checkpoints and terminal. Bug-fix protocol: category → category test → fix all.
+broad at high-risk checkpoints and **terminal** (full suite or project full gate). Do not re-run a
+large full suite between ordinary batches when the impact path is green. Bug-fix protocol for
+blockers: category → category test → fix all. Queue pure advisories under **Deferred hygiene**
+(survival guide + execution-log digest); drain at terminal. Details:
+`references/validation-guide.md`.
 
 ### 7. Review
+
+Mid-run: contract walk for this batch; no nested full product re-review of settled work. Terminal:
+one cumulative review only.
 
 Reviewers read worker confidence trailers/report fields **first** and allocate attention
 accordingly: flagged `unsure_about` areas get a deeper pass. The signal is triage, never
@@ -510,8 +525,8 @@ history. The reviewer must return a **Confidence-Guided Review** section that na
 passes performed, or explicitly records that signals were partial/absent and baseline review was
 used. Claude Code and Codex use this identical contract.
 Independent feedback. Walk contract. Enforce code quality. Medium/high blast radius: regression
-pass. Fix blocking; advisory does not delay readiness. Resolve PR threads. **PENDING-DOCS** is not
-clean. **Public API surface snapshots are optional regression evidence.** Use existing structured sources before inventing scanners. If no credible source exists, record `unavailable` with the reason instead of fabricating a snapshot. A missing snapshot source is not blocking unless `required: true` was explicitly set in the survival guide. `required: true` is valid only when explicitly set by the user or project survival guide. Do not infer required mode from project type, provider config, framework choice, or the presence of API files. Snapshot artifacts are run artifacts, not product docs. Temporary snapshot artifacts should not remain in final product PR diffs unless the user explicitly asks. Record shapes and field names, not secrets, bearer tokens, cookies, customer payloads, or production sample data. A snapshot proves public surface shape only; it is not a substitute for tests, E2E checks, review, or the human-owned constitution. Record the public API surface delta when configured.
+pass. Fix blocking; advisory does not delay readiness (bank mid-run advisories as deferred hygiene).
+Resolve PR threads. **PENDING-DOCS** is not clean. **Public API surface snapshots are optional regression evidence.** Use existing structured sources before inventing scanners. If no credible source exists, record `unavailable` with the reason instead of fabricating a snapshot. A missing snapshot source is not blocking unless `required: true` was explicitly set in the survival guide. `required: true` is valid only when explicitly set by the user or project survival guide. Do not infer required mode from project type, provider config, framework choice, or the presence of API files. Snapshot artifacts are run artifacts, not product docs. Temporary snapshot artifacts should not remain in final product PR diffs unless the user explicitly asks. Record shapes and field names, not secrets, bearer tokens, cookies, customer payloads, or production sample data. A snapshot proves public surface shape only; it is not a substitute for tests, E2E checks, review, or the human-owned constitution. Record the public API surface delta when configured.
 
 ### 8. Legality Check
 
@@ -560,10 +575,13 @@ with preserved/improved coverage and evidence are allowed.
 
 Landable is **plan Acceptance with proof** — not green CI + `status: complete`.
 
-Before batch `status: complete`: gates green, regression attestation, non-empty
-`acceptance: [{id, criterion, met, evidence}]`, PR feedback triaged, legality clean, docs current,
-session JSON updated, commit pushed. **God-file rule:** structure locks alone do not complete a
-split batch unless plan Acceptance allows characterization-only. Prefer **one batch per close commit**.
+Before batch `status: complete`: **impact** gates green for this batch (not necessarily full-suite
+mid-run), regression attestation on the impact path, non-empty
+`acceptance: [{id, criterion, met, evidence}]`, PR feedback triaged for blockers, legality clean for
+FAIL, docs current for owned surfaces, deferred hygiene updated, session JSON updated, commit
+pushed. **God-file rule:** structure locks alone do not complete a split batch unless plan
+Acceptance allows characterization-only. Prefer **one batch per close commit**. Terminal readiness
+still requires full suite (or project full gate) and drained deferred hygiene.
 
 Landing check (installed):
 
@@ -595,6 +613,7 @@ intentions. Agent drafts; human owns.
 See `references/proof-and-review.md`.
 
 - Impact-selected verification; evidence inputs + invalidation scope for reuse
+- Mid-run impact path only; terminal full suite + deferred hygiene drain
 - One cumulative review: completeness, constitution, declared risks, concrete regressions
 - Consolidate blockers before revision; advisory does not delay readiness
 - Re-review = revision delta + unresolved blockers only

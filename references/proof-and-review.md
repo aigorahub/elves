@@ -9,6 +9,10 @@ Machine sources: `scripts/cobbler_runtime/evidence_review.py`, `risk_policy.py`.
 - Per-batch default: touched surfaces via impact path.
 - Broad proof: high-risk checkpoints and terminal readiness.
 - Never weaken, skip, or delete tests merely to obtain green.
+- **Mid-run:** selected impact tests and blockers only. Do not re-run a large full suite between
+  ordinary batches when the impact path is green.
+- **Terminal:** full suite (or project full gate), one cumulative review, then drain **deferred
+  hygiene** (advisory nits banked mid-run). See `references/validation-guide.md`.
 
 ## Impact path
 
@@ -34,12 +38,15 @@ Legacy 2.2 tier names map onto these axes for compatibility.
 ## Convergent review loop
 
 1. **One cumulative review** at terminal: completeness, constitution, declared risks, concrete regressions.
-2. **Consolidate** blocking findings before revision. Advisory findings do not delay readiness.
+2. **Consolidate** blocking findings before revision. Advisory findings do not delay readiness;
+   mid-run advisories belong in deferred hygiene until terminal.
 3. **Revise** once for the consolidated set.
 4. **delta re-review** only the revision delta and unresolved blockers — no rescan of settled work.
 5. New re-review blockers require a concrete serious category: regression, acceptance/constitution
    breach, security, data integrity, or failure introduced by the revision.
 6. **Stop** when exact-tip evidence is sufficient — not when reviewers run out of suggestions.
+7. Healthy trusted full-runs do **not** add per-batch driver reviews; workers use impact proof
+   mid-run and the host reviews once at terminal.
 
 ## Final readiness
 

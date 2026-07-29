@@ -37,6 +37,7 @@
 - **Next exact batch:** [B#: Batch N: Name]
 - **Active PR:** [#N / "not created yet"]
 - **Docs promoted this run:** [list / "none yet"]
+- **Deferred hygiene:** [none / count + top items; drain at terminal]
 - **Latest Elves Report:** [/tmp/elves-report-...html / "not generated yet"]
 - **Progress commits:** host-native/legacy uses
   `[branch · Batch N/total · Contract|Implement|Validate|Review|Close] concrete outcome`; the exact

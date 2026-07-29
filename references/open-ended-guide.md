@@ -25,8 +25,10 @@ pushed checkpoint is evidence of progress, not permission to stop.
 ## Sustain Effort
 
 Open-ended mode is not permission to coast. Do not be lazy. Work as hard as you can for the full
-run. Do not settle for shallow progress, the first green check, or repetitive low-value busywork.
-When one line of work is exhausted, broaden coverage and attack the next highest-value area.
+run on plan acceptance and blockers. Do not settle for shallow progress on the planned path, the
+first green check, or repetitive low-value polish. When one line of work is exhausted, take the next
+highest-value planned area. Mid-run: impact path only; bank deferred hygiene. Terminal: full suite
+and drain the queue.
 
 ## Behavioral Examples
 

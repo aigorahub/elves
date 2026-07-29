@@ -163,6 +163,10 @@ silently deleting it.
   remains an optional worker under Claude/Codex. Optional routes (Antigravity, Gemini CLI, Muse,
   OpenRouter, AlphaEvolve, …) may still work as tools the host calls; exotic interfaces are not
   heavily tested. Prefer contributor PRs (or issues) when optional paths fail.
+- [2026-07-29] **Mid-run impact path; terminal full suite + deferred hygiene.** High-effort models
+  were re-running full suites and polishing every nit between batches because validation-guide said
+  "zero debt / production-ready every batch" while proof-and-review said impact path. Correctness
+  on the impact path is non-negotiable; advisory polish is banked and drained once at terminal.
 - [2026-07-13] When the user has Grok Build and explicitly requests trusted full-run delegation,
   prefer one complete packet, one exact persistent session, `branch_progress`, and a parked host via
   `full-run-prepare|full-run-launch|full-run-await|full-run-reconcile|full-run-logs`.
