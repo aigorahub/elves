@@ -15,7 +15,26 @@ This is the Elves-managed Claude Code alias for
 Load the installed `elves` skill's **Provider shortcut protocols** and
 `references/provider-shortcuts.md`. Resolve `scripts/run_fugu.sh` from the active Elves skill root,
 keep the target repository as the working directory, pass through the validated mode/profile/context,
-and run it. Plain `/fugu <task>` is a general read-only task whose answer follows the request;
+and run it.
+
+**Host Fugu routing (required when the user omits a profile flag).** Natural language "use Fugu"
+or plain `/fugu <task>` is **not** always bare `fugu/high`. Before launch, decide and state one
+short `Fugu route: …` line:
+
+1. Task mode: general (default) vs `review <scope>` when the user asked for a review/audit.
+2. Profile (locks model + effort; mutually exclusive; explicit user flags always win):
+   plain → `fugu/high` (routine); `--deep` → `fugu/xhigh` (harder multi-file work); `--ultra` →
+   `fugu-ultra-v1.1/high` (compact high-stakes with reserved synthesis); `--max` →
+   `fugu-ultra-v1.1/max` (one narrow gate, 60-minute wall). Prefer the cheapest matching lane.
+3. Write: read-only default; `--write` only with independent implementation authority on qualified
+   Linux bwrap PID-namespace (unavailable on macOS).
+4. Context: the isolation snapshot is always on. Default admitted tracked + safe non-ignored
+   untracked context is enough for most tasks; add exact `--include PATH` only for host-selected
+   files that must be admitted. There is no separate "minimal snapshot" product.
+
+Full decision table: `references/provider-shortcuts.md` (**Host routing when the user says "use Fugu"**).
+
+Plain `/fugu <task>` is a general read-only task whose answer follows the request;
 `/fugu review <scope>` is the opinionated read-only review. Use `--write` only when the user's
 surrounding request independently authorizes implementation and the platform provides qualified
 recursive Linux bwrap PID-namespace containment. It is unavailable on macOS today. A qualified
@@ -27,8 +46,8 @@ read-only cleanup remains best-effort and never claims recursive containment.
 
 The runner uses the official `codex-fugu` launcher with policy-admitted tracked and non-ignored
 untracked context, closed interactive input, and a hard wall-clock bound. It selects regular
-`fugu/high` by default, `fugu/xhigh` with `--deep`, `fugu-ultra-v1.1/high` with `--ultra`, or
-`fugu-ultra-v1.1/max` with `--max`.
+`fugu/high` when the host chooses plain, `fugu/xhigh` with `--deep`, `fugu-ultra-v1.1/high` with
+`--ultra`, or `fugu-ultra-v1.1/max` with `--max`.
 Regular/deep sessions are ephemeral; Ultra uses exact-session staged synthesis, with its state
 confined to the disposable isolated lane, events carried by a bounded host-owned pipe, final
 output pinned to a no-follow descriptor, and a final descriptor-safe writable-state audit after

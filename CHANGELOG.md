@@ -4,6 +4,30 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.18.1] - 2026-07-29
+
+### Host Fugu routing for natural "use Fugu"
+
+- Natural language such as "use Fugu" (or plain `/fugu` / `$elves fugu` without a profile flag)
+  is no longer treated as an implicit always-bare `fugu/high` launch. The host agent must choose
+  the lane before launch: general vs `review <scope>`, plain / `--deep` / `--ultra` / `--max`
+  (profile locks model + effort; no free model slug), read-only vs qualified `--write`, and
+  optional exact `--include` paths. Prefer the cheapest matching lane; explicit user flags always
+  win. The disposable isolation snapshot remains always-on safety infrastructure, not a host
+  skip option; the host only adds admitted context via `--include`.
+- Authoritative decision table lives in `references/provider-shortcuts.md` under **Host routing
+  when the user says "use Fugu"**. SKILL.md, AGENTS.md, README, guide, and the Claude `/fugu`
+  alias carry the same contract anchors, and `FUGU_HOST_ROUTING_PHRASES` pins them so the
+  routing story cannot land on five surfaces and miss the sixth (including model-lock and
+  cheapest-lane anchors after Fugu review of PR #210).
+- Flag→profile table is documented as the runner map only; flagless invocations are host-routed.
+  Paid Fugu spend inside that section requires explicit user provider intent.
+
+### Follow-up filed
+
+- Issue #211 tracks an optional stdlib tool-output compact layer (RTK ideas without an RTK
+  dependency): exit-code honesty, failure tee, git/test filters, Elves-owned subprocess wiring.
+
 ## [2.18.0] - 2026-07-27
 
 ### Structural-debt survey, deep-dive reviews, and executor plans

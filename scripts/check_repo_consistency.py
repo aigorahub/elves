@@ -164,6 +164,16 @@ def main() -> int:
     )
     errors.extend(
         find_missing_phrases(
+            {
+                label: read_text(REPO_ROOT / label)
+                for label in FUGU_HOST_ROUTING_PHRASES
+            },
+            FUGU_HOST_ROUTING_PHRASES,
+            "Fugu host routing",
+        )
+    )
+    errors.extend(
+        find_missing_phrases(
             {label: read_text(REPO_ROOT / label) for label in PREWALK_PHRASES},
             PREWALK_PHRASES,
             "exact-session prewalk",
@@ -701,6 +711,7 @@ def main() -> int:
     print("- Claude Cobbler alias guardrails are aligned")
     print("- Fugu shortcut model/effort profiles are aligned")
     print("- Fugu invocation grammar is aligned on every restating surface")
+    print("- Fugu host routing decision anchors are aligned")
     return 0
 
 

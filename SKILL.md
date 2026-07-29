@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.18.0"
+  version: "2.18.1"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -64,7 +64,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.18.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.18.1):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
@@ -215,6 +215,15 @@ required capability, then execute it without an extra confirmation prompt:
   output follows the request rather than a forced review rubric.
   `/fugu [--deep|--ultra|--max] review <scope>`, `$elves fugu [--deep|--ultra|--max] review
   <scope>`, or “do a Fugu review …” selects the explicit read-only review contract.
+  **Host Fugu routing:** when the user says “use Fugu” (or plain `/fugu` / `$elves fugu`) without
+  an explicit profile flag, the host agent must choose the lane before launch: general vs
+  `review <scope>`, plain / `--deep` / `--ultra` / `--max` (profile locks model + effort; never
+  invent a free model slug), read-only vs qualified `--write`, and optional exact `--include`
+  paths. State one short `Fugu route: …` line, then invoke the runner. Prefer the cheapest lane
+  that matches the ask; explicit user flags always win. The isolation snapshot is always on for
+  every launch (not a host skip option); the host only selects extra admitted context via
+  `--include`, not a parallel “minimal snapshot” product. Full decision table:
+  `references/provider-shortcuts.md` (**Host routing when the user says "use Fugu"**).
   Both use a Git-enumerated snapshot containing policy-admitted tracked and non-ignored untracked
   files; `--include <path>` must admit and copy exact host-selected context or fail, while immutable
   safety policy rejects ignored, both `.env.*` and `*.env` credential-name families,
@@ -231,12 +240,12 @@ required capability, then execute it without an extra confirmation prompt:
   Codex uses its documented externally-sandboxed mode so macOS does not attempt a forbidden nested
   sandbox. Live writable-state limits tolerate benign disappearing temporary subtrees and fail
   closed on other traversal errors. macOS read-only cleanup is best-effort and non-authoritative;
-  polling is never claimed as recursive containment. The default is regular `fugu/high`; `--deep`
-  selects `fugu/xhigh`, and `--ultra` selects
-  `fugu-ultra-v1.1/high`, resolved against the installed catalog so a legacy bundle publishing only
-  the `fugu-ultra` alias still launches and `fugu-ultra-v1.0` is never substituted. `--max` selects
-  `fugu-ultra-v1.1/max` with a 60-minute default wall budget for one narrow high-stakes gate;
-  profiles are mutually exclusive.
+  polling is never claimed as recursive containment. The default runner profile is regular
+  `fugu/high` when the host intentionally selects plain; `--deep` selects `fugu/xhigh`, and
+  `--ultra` selects `fugu-ultra-v1.1/high`, resolved against the installed catalog so a legacy
+  bundle publishing only the `fugu-ultra` alias still launches and `fugu-ultra-v1.0` is never
+  substituted. `--max` selects `fugu-ultra-v1.1/max` with a 60-minute default wall budget for one
+  narrow high-stakes gate; profiles are mutually exclusive.
   Regular and deep are ephemeral one-shot sessions. Ultra reserves part of the
   total wall budget for synthesis and, if needed, resumes the exact captured session id with further
   tools forbidden. It never guesses a “last” session; raw events are parsed incrementally under a

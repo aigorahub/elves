@@ -78,10 +78,17 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
 
   | Shortcut | Model / effort | Default wall limit | Use |
   |---|---|---:|---|
-  | `/fugu <task>` | `fugu` / `high` | 10 minutes | routine general task or explicit review |
-  | `/fugu --deep <task>` | `fugu` / `xhigh` | 20 minutes | harder analysis, implementation, or review |
-  | `/fugu --ultra <task>` | `fugu-ultra-v1.1` / `high` | 30 minutes total; at most 20 minutes exploring by default | compact high-stakes task with a reserved synthesis phase |
-  | `/fugu --max <task>` | `fugu-ultra-v1.1` / `max` | 60 minutes total; at most 20 minutes exploring by default | one narrow, high-stakes gate worth the deepest reasoning tier |
+  | plain profile (host may choose after routing) | `fugu` / `high` | 10 minutes | routine general task or explicit review |
+  | `--deep` | `fugu` / `xhigh` | 20 minutes | harder analysis, implementation, or review |
+  | `--ultra` | `fugu-ultra-v1.1` / `high` | 30 minutes total; at most 20 minutes exploring by default | compact high-stakes task with a reserved synthesis phase |
+  | `--max` | `fugu-ultra-v1.1` / `max` | 60 minutes total; at most 20 minutes exploring by default | one narrow, high-stakes gate worth the deepest reasoning tier |
+
+  This table is the **runner flag → model/effort map**, not a claim that every bare invocation
+  must stay on plain. Flagless `/fugu` / `$elves fugu` / natural-language "use Fugu" is
+  **host-routed**: the host chooses task mode, profile (locks model + effort), write mode, and
+  `--include` context before launch, preferring the cheapest matching lane. See **Host routing
+  when the user says "use Fugu"** below. The runner does not score complexity; it only executes
+  the selected profile.
 
   Sakana's Fugu-Ultra v1.1 release (2026-07-24) ships at the same price as v1.0 and changes two
   facts the shortcut depends on. The published catalog slug is now `fugu-ultra-v1.1`, and plain
@@ -143,6 +150,72 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
   Haiku both resolve to `fugu[1m]`, so the model picker shows duplicate rows; and session-header
   billing labels reflect API-token usage. The `claude-fugu` launcher does not auto-update, so new
   Fugu models reach it only after a manual update.
+### Host routing when the user says "use Fugu"
+
+Natural language such as "use Fugu", "ask Fugu", or `/fugu <task>` **without** an explicit
+profile flag is **not** a request to always run bare `fugu/high`. The host agent (Claude Code or
+Codex) must choose the lane before launch, then invoke `run_fugu.sh` with the matching flags.
+`run_fugu.sh` itself does not score complexity: it only executes the profile the host selects.
+
+**Always-true isolation facts.** Every successful Fugu launch uses a disposable
+kernel-isolated Git-enumerated snapshot. That isolation snapshot is not optional and is not a
+second product the host can skip. What the host *does* choose is (1) whether Fugu is the right
+provider at all, (2) task mode, (3) profile (which locks model + effort + wall budget), (4) write
+mode, and (5) extra context via `--include`.
+
+Decide in this order, then state the choice in one short line before launch
+(example: `Fugu route: general --deep, default admitted snapshot, include scripts/run_fugu.sh`):
+
+1. **Should Fugu run?** Prefer host-native tools for trivial lookups the driver can answer from
+   open files. Inside this section the user already named Fugu or an equivalent provider shortcut;
+   use that explicit intent to run a bounded high-reasoning pass when the task is worth the paid
+   call the user authorized (deep multi-file analysis, security-sensitive review, hard design
+   tradeoff, compact high-stakes gate). Explicit provider intent authorizes the call and its usage,
+   not merge or protected-ref authority. Do not invent an unprompted paid Fugu launch from this
+   section alone.
+
+2. **Task mode.** Default is **general** (analysis, design, investigation, implement-plan, other
+   deliverable). Use `review <scope>` only when the user asked for a review, audit, or PR/diff
+   findings with the P0-P3 contract. Scope the review narrowly (paths, PR, or "current changes")
+   rather than an unbounded whole-repo tour when the ask is focused.
+
+3. **Profile (model is locked to the profile).** Profiles are mutually exclusive; never pass two.
+
+   | Signals | Choose | Model / effort |
+   |---|---|---|
+   | Small, local, low-stakes; quick design sketch; light review of a small diff | plain (no flag) | `fugu` / `high` |
+   | Multi-file or multi-module work; non-trivial design; medium review; implementation analysis with real tradeoffs | `--deep` | `fugu` / `xhigh` |
+   | Compact high-stakes question that benefits from explore then reserved synthesis (security-sensitive review, hard correctness gate) | `--ultra` | `fugu-ultra-v1.1` / `high` |
+   | One narrow decision that must be right the first time, prompt already tight, worth up to ~60 minutes | `--max` | `fugu-ultra-v1.1` / `max` |
+
+   **Hard rules.** Explicit user flags (`--deep`, `--ultra`, `--max`, or plain) always win: never
+   upgrade or downgrade them. Prefer the cheapest lane that still matches the ask. Do not pick
+   `--max` for broad multi-goal work; split the work or stay at deep/ultra. Do not pick `--ultra`
+   or `--max` for routine greps, renames, or single-file Q&A. The host cannot pick an arbitrary
+   model slug: the profile table is the model map, and Ultra/max still resolve `fugu-ultra-v1.1`
+   from the installed catalog (never silent `fugu-ultra-v1.0`).
+
+4. **Write mode.** Default **read-only**. Pass `--write` only when (a) the surrounding user request
+   independently authorizes implementation edits, (b) the task is general (not review), and
+   (c) the platform is qualified Linux bwrap with a PID namespace. On macOS, omit `--write` and
+   say so if the user asked for edits.
+
+5. **Context selection (not a second snapshot product).** The default admitted snapshot already
+   includes policy-admitted tracked files and safe non-ignored untracked files. The runner does not
+   paste file bodies into the prompt, so breadth of admission is not the same as prompt-token cost;
+   relevance still belongs to Fugu and to host path hints. Add `--include PATH` for exact
+   host-selected files that matter and might otherwise be easy to miss (fresh untracked notes,
+   specific configs that are admitted). Never try to include secrets, `.env*` / `*.env`, ignored
+   dependency trees, `.git`, `.elves`, or executable agent config: the safety kernel rejects them
+   and exact includes that cannot be admitted fail closed. Prefer a few exact includes over
+   inventing a parallel "minimal snapshot" mode that does not exist.
+
+6. **Prompt shape.** Write a concrete task string (or review scope) that matches the chosen lane:
+   narrow for ultra/max, fuller for deep when the surface area is real. Do not re-force the review
+   rubric on a general task.
+
+After settlement, report Fugu's answer and the route used. Never auto-apply a write handoff.
+
 - **Manus:** requires `MANUS_API_KEY`. The ordinary form creates one private `manus-1.6-max` task
   through `https://api.manus.ai/v2/task.create` with `x-manus-api-key`, explicitly empty
   `message.connectors`, `message.enable_skills`, and `message.force_skills`, then polls with a
