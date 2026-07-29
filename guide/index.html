@@ -681,10 +681,17 @@ python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup</code></pre>
             best-effort and never proof of recursive containment. The
             Linux boundary omits procfs, and Codex's externally-sandboxed mode runs only inside
             Elves' mandatory outer boundary. Fugu uses regular
-            <code>fugu/high</code> by default, <code>fugu/xhigh</code> with
+            <code>fugu/high</code> when the host chooses plain,
+            <code>fugu/xhigh</code> with
             <code>--deep</code>, <code>fugu-ultra-v1.1/high</code> with
             <code>--ultra</code>, or <code>fugu-ultra-v1.1/max</code> with <code>--max</code> for
             one narrow high-stakes gate on a 60-minute budget.
+            When you say “use Fugu” without a profile flag, the host agent routes first
+            (general vs review, profile, write mode, optional <code>--include</code>), states a
+            short <code>Fugu route: …</code> line, and prefers the cheapest matching lane; explicit
+            flags always win. The isolation snapshot is always on. See
+            <code>references/provider-shortcuts.md</code>
+            (<strong>Host routing when the user says "use Fugu"</strong>).
             Regular and deep calls are ephemeral one-shot sessions. Ultra
             reserves part of its total wall limit for synthesis; if
             exploration uses its phase, Elves resumes the exact captured session with further tools

@@ -45,6 +45,13 @@ assume `./scripts` belongs to the target repository and do not execute mappings 
 - General Fugu task → `run_fugu.sh [--deep|--ultra|--max] [--write] [--include PATH] <task>`; explicit
   review → `run_fugu.sh [--deep|--ultra|--max] review <scope>`. General output follows the task instead
   of a forced review rubric; review retains read-only base/change evidence and ordered findings.
+  **Host Fugu routing:** natural “use Fugu” without an explicit profile flag is host-routed. Before
+  launch, choose general vs `review <scope>`, plain / `--deep` / `--ultra` / `--max` (profile locks
+  model + effort), read-only vs qualified `--write`, and optional `--include` paths; state one short
+  `Fugu route: …` line; prefer the cheapest matching lane; explicit user flags always win. The
+  isolation snapshot is always on; the host only adds exact admitted context via `--include`, not a
+  separate “minimal snapshot” mode. Full table: `references/provider-shortcuts.md`
+  (**Host routing when the user says "use Fugu"**).
   Both receive a bounded policy-admitted tracked plus non-ignored-untracked snapshot. The host may
   select exact context, but the safety kernel rejects ignored/credential/operational/configuration
   paths (including both `.env.*` and `*.env` variants and reserved internal namespaces), unsafe

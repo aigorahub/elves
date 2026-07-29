@@ -84,7 +84,13 @@ subtree disappearance and fail closed on other audit errors. macOS read-only cle
 not proof of recursive descendant absence.
 Profiles remain regular `fugu/high`, `fugu/xhigh` with `--deep`, `fugu-ultra-v1.1/high` with
 `--ultra`, and `fugu-ultra-v1.1/max` with `--max` for one narrow high-stakes gate on a 60-minute
-default wall budget. Regular/deep calls are ephemeral; Ultra and max reserve synthesis time and resume only the
+default wall budget. **Host Fugu routing:** when the user says “use Fugu” without an explicit
+profile flag, the host agent chooses general vs review, plain / deep / ultra / max (profile locks
+model + effort), write mode, and optional `--include` paths before launch, states a short
+`Fugu route: …` line, and prefers the cheapest matching lane; explicit flags always win. The
+isolation snapshot is always on; the host only adds exact admitted context via `--include`. See
+`references/provider-shortcuts.md` (**Host routing when the user says "use Fugu"**).
+Regular/deep calls are ephemeral; Ultra and max reserve synthesis time and resume only the
 exact isolated session with further tools forbidden. Session state and raw events never leave the
 lane; events cross a bounded host-owned pipe, final output remains pinned to a no-follow
 descriptor, and every settled phase receives a final descriptor-safe writable-state audit. Codex's documented externally-sandboxed mode avoids an invalid nested macOS sandbox while

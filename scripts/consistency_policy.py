@@ -2156,6 +2156,56 @@ FUGU_INVOCATION_GRAMMAR_PHRASES = {
     ],
 }
 
+# Host-side Fugu routing when the user omits a profile flag. Without these pins,
+# a surface can keep saying "default is regular fugu/high" while the host-routing
+# contract (choose lane before launch; isolation snapshot always on; profile locks
+# model) drifts on the others. Keep the shared decision anchors short so ordinary
+# editorial rewording of surrounding prose does not fail CI.
+FUGU_HOST_ROUTING_PHRASES = {
+    "SKILL.md": [
+        "Host Fugu routing",
+        "Fugu route:",
+        'Host routing when the user says "use Fugu"',
+        "isolation snapshot is always on",
+        "explicit user flags always win",
+    ],
+    "AGENTS.md": [
+        "Host Fugu routing",
+        "Fugu route:",
+        'Host routing when the user says "use Fugu"',
+        "isolation snapshot is always on",
+        "explicit user flags always win",
+    ],
+    "README.md": [
+        "Host Fugu routing",
+        "Fugu route:",
+        'Host routing when the user says "use Fugu"',
+        "isolation snapshot is always on",
+        "explicit flags always win",
+    ],
+    "guide/index.html": [
+        "Fugu route:",
+        'Host routing when the user says "use Fugu"',
+        "isolation snapshot is always on",
+        "flags always win",
+    ],
+    "references/provider-shortcuts.md": [
+        'Host routing when the user says "use Fugu"',
+        "does not score complexity",
+        "isolation snapshot is not optional",
+        "profile table is the model map",
+        "Explicit user flags",
+        "always win",
+    ],
+    "aliases/claude/fugu/SKILL.md": [
+        "Host Fugu routing",
+        "Fugu route:",
+        'Host routing when the user says "use Fugu"',
+        "isolation snapshot is always on",
+        "explicit user flags always win",
+    ],
+}
+
 PREWALK_PHRASES = {
     "SKILL.md": [
         "Exact-session prewalk",
