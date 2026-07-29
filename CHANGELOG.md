@@ -4,6 +4,24 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.20.0] - 2026-07-29
+
+### Mid-run impact path; terminal full suite and deferred hygiene
+
+- Reconcile overnight validation with the proof budget. Ordinary batches prove acceptance via the
+  **impact path** (touched surfaces → selected tests) and fix **blockers** only.
+- **Deferred hygiene:** bank advisory nits mid-run (survival guide + execution-log digest); drain
+  at terminal readiness. Never defer red impact tests, build/typecheck blockers on touched work,
+  unmet acceptance, or security/data-integrity defects.
+- **Terminal:** full suite (or project full gate), one cumulative review, delta re-review only,
+  drain deferred hygiene. No nested full product re-review of settled batches mid-run.
+- Retune Effort Standard: hard work on plan acceptance and blockers, not mid-run nit perfection or
+  re-running a large full suite between ordinary batches.
+- Rewrite `references/validation-guide.md` (remove "zero accumulated debt / every batch
+  production-ready" as mid-run law). Align SKILL, proof-and-review, survival-guide and
+  execution-log templates, kickoff and open-ended guides, and consistency pins
+  (`MIDRUN_TERMINAL_HYGIENE_PHRASES`).
+
 ## [2.19.0] - 2026-07-29
 
 ### Grok Build as a supported main driver (no prewalk)

@@ -145,8 +145,8 @@ I am going offline until [WHEN].
 By [WHEN], I want [CHECKPOINT DELIVERABLE]. This is a [delivery checkpoint / hard stop].
 Operate Cobbler-first: use independent lenses for non-trivial planning, contract, risk, debugging, review, and synthesis decisions; keep writes, git, PRs, and durable memory in the coordinator unless explicitly delegated.
 Do not stop unless you hit a genuine blocker with no reasonable workaround.
-Do not be lazy. Work as hard as you can for the entire run.
-Do not coast after the first success, first green check, or first useful checkpoint. Push each batch to a thoroughly verified state, then continue immediately.
+Do not be lazy. Work as hard as you can for the entire run on plan acceptance and blockers.
+Do not coast after the first success, first green check, or first useful checkpoint. Push each batch through impact-path proof and blockers, bank advisory nits as deferred hygiene, then continue immediately. Full suite and polish drain at terminal readiness.
 If the remaining work feels like a lot for one turn, that is the point: the volume is the reason this run exists, not a reason to stop.
 On host-native and legacy bounded routes: Every completed batch must end with a commit and push before you start anything else.
 Immediately after every commit and push, re-read the survival guide before any other action. During a healthy
@@ -158,7 +158,7 @@ Do not wait for me to acknowledge checkpoints, summaries, or clean commits. If w
 Do not send a final response unless the survival guide Stop Gate says stopping is allowed or a true blocker forces it.
 Use your judgment. Work in small batches and commit frequently.
 Make the commit subjects read like progress reports.
-Run every relevant validation gate, including E2E or browser checks wherever they make sense.
+Mid-run: impact-path validation (selected tests / touched E2E). Terminal: full suite or project full gate, then drain deferred hygiene.
 After every host-owned or legacy bounded push, read PR comments and checks, fix blockers, and re-check for regressions against earlier verified work. During a healthy trusted full-run, do this once at terminal/safety wake, never once per worker push.
 If the run uses paid compute, remote jobs, or long-lived servers, keep the survival guide's `Active Compute` section current after every host-owned push and topology change; use bounded worker telemetry while a trusted full-run remains healthy.
 Keep going until the plan is done, I stop you, or you hit a true blocker.
@@ -172,8 +172,8 @@ Read docs/elves/survival-guide.md first, then `.elves-session.json` if it exists
 I am going offline until 7:30am ET.
 By 7:30am ET, I want a review-ready checkpoint with green local validation. This is a delivery checkpoint, not a stop boundary.
 Do not stop unless you hit a genuine blocker with no reasonable workaround.
-Do not be lazy. Work as hard as you can for the entire run.
-Do not coast after the first success, first green check, or first useful checkpoint. Push each batch to a thoroughly verified state, then continue immediately.
+Do not be lazy. Work as hard as you can for the entire run on plan acceptance and blockers.
+Do not coast after the first success, first green check, or first useful checkpoint. Push each batch through impact-path proof and blockers, bank advisory nits as deferred hygiene, then continue immediately. Full suite and polish drain at terminal readiness.
 If the remaining work feels like a lot for one turn, that is the point: the volume is the reason this run exists, not a reason to stop.
 On host-native and legacy bounded routes: Every completed batch must end with a commit and push before you start anything else.
 Immediately after every commit and push, re-read the survival guide before any other action. During a healthy
@@ -185,7 +185,7 @@ Do not wait for me to acknowledge checkpoints, summaries, or clean commits. If w
 Do not send a final response unless the survival guide Stop Gate says stopping is allowed or a true blocker forces it.
 Use your judgment. Work in small batches and commit frequently.
 Make the commit subjects read like progress reports.
-Run every relevant validation gate, including E2E or browser checks wherever they make sense.
+Mid-run: impact-path validation (selected tests / touched E2E). Terminal: full suite or project full gate, then drain deferred hygiene.
 After every host-owned or legacy bounded push, read PR comments and checks, fix blockers, and re-check for regressions against earlier verified work. During a healthy trusted full-run, do this once at terminal/safety wake, never once per worker push.
 If the run uses paid compute, remote jobs, or long-lived servers, keep the survival guide's `Active Compute` section current after every host-owned push and topology change; use bounded worker telemetry while a trusted full-run remains healthy.
 Keep going until the plan is done, I stop you, or you hit a true blocker.

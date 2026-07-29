@@ -85,6 +85,15 @@ def main() -> int:
             if phrase not in text:
                 errors.append(f"{label}: missing effort guardrail phrase `{phrase}`")
 
+    for label, phrases in MIDRUN_TERMINAL_HYGIENE_PHRASES.items():
+        path = REPO_ROOT / label
+        text = read_text(path)
+        for phrase in phrases:
+            if phrase not in text:
+                errors.append(
+                    f"{label}: missing mid-run/terminal hygiene phrase `{phrase}`"
+                )
+
     for label, phrases in FINAL_READINESS_REVIEW_PHRASES.items():
         path = REPO_ROOT / label
         text = read_text(path)
@@ -693,6 +702,7 @@ def main() -> int:
     print("- Operator-facing docs are aligned")
     print("- Non-stop guardrails are aligned across runtime and template docs")
     print("- Effort guardrails are aligned across runtime and template docs")
+    print("- Mid-run impact path and terminal deferred-hygiene guardrails are aligned")
     print("- Final readiness review guardrails are aligned")
     print("- Installed helper paths and generic final-readiness gates are aligned")
     print("- Single-kickoff E2E and legacy handoff guidance are aligned")
