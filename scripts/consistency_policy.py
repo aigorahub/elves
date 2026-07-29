@@ -2168,6 +2168,8 @@ FUGU_HOST_ROUTING_PHRASES = {
         'Host routing when the user says "use Fugu"',
         "isolation snapshot is always on",
         "explicit user flags always win",
+        "locks model + effort",
+        "cheapest",
     ],
     "AGENTS.md": [
         "Host Fugu routing",
@@ -2175,6 +2177,8 @@ FUGU_HOST_ROUTING_PHRASES = {
         'Host routing when the user says "use Fugu"',
         "isolation snapshot is always on",
         "explicit user flags always win",
+        "locks model + effort",
+        "cheapest",
     ],
     "README.md": [
         "Host Fugu routing",
@@ -2182,20 +2186,27 @@ FUGU_HOST_ROUTING_PHRASES = {
         'Host routing when the user says "use Fugu"',
         "isolation snapshot is always on",
         "explicit flags always win",
+        "locks model + effort",
+        "cheapest",
     ],
     "guide/index.html": [
         "Fugu route:",
         'Host routing when the user says "use Fugu"',
         "isolation snapshot is always on",
         "flags always win",
+        "locks model + effort",
+        "cheapest",
     ],
     "references/provider-shortcuts.md": [
         'Host routing when the user says "use Fugu"',
         "does not score complexity",
         "isolation snapshot is not optional",
-        "profile table is the model map",
+        "locks model + effort",
+        "cheapest matching lane",
         "Explicit user flags",
         "always win",
+        "runner flag",
+        "host-routed",
     ],
     "aliases/claude/fugu/SKILL.md": [
         "Host Fugu routing",
@@ -2203,6 +2214,8 @@ FUGU_HOST_ROUTING_PHRASES = {
         'Host routing when the user says "use Fugu"',
         "isolation snapshot is always on",
         "explicit user flags always win",
+        "locks model + effort",
+        "cheapest",
     ],
 }
 

@@ -78,15 +78,17 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
 
   | Shortcut | Model / effort | Default wall limit | Use |
   |---|---|---:|---|
-  | `/fugu <task>` | `fugu` / `high` | 10 minutes | routine general task or explicit review |
-  | `/fugu --deep <task>` | `fugu` / `xhigh` | 20 minutes | harder analysis, implementation, or review |
-  | `/fugu --ultra <task>` | `fugu-ultra-v1.1` / `high` | 30 minutes total; at most 20 minutes exploring by default | compact high-stakes task with a reserved synthesis phase |
-  | `/fugu --max <task>` | `fugu-ultra-v1.1` / `max` | 60 minutes total; at most 20 minutes exploring by default | one narrow, high-stakes gate worth the deepest reasoning tier |
+  | plain profile (host may choose after routing) | `fugu` / `high` | 10 minutes | routine general task or explicit review |
+  | `--deep` | `fugu` / `xhigh` | 20 minutes | harder analysis, implementation, or review |
+  | `--ultra` | `fugu-ultra-v1.1` / `high` | 30 minutes total; at most 20 minutes exploring by default | compact high-stakes task with a reserved synthesis phase |
+  | `--max` | `fugu-ultra-v1.1` / `max` | 60 minutes total; at most 20 minutes exploring by default | one narrow, high-stakes gate worth the deepest reasoning tier |
 
-  Natural-language "use Fugu" without an explicit profile flag is **host-routed**: the host
-  agent chooses task mode, profile (model + effort), write mode, and `--include` context before
-  launch. See **Host routing when the user says "use Fugu"** below. The runner does not score
-  complexity; it only executes the selected profile.
+  This table is the **runner flag → model/effort map**, not a claim that every bare invocation
+  must stay on plain. Flagless `/fugu` / `$elves fugu` / natural-language "use Fugu" is
+  **host-routed**: the host chooses task mode, profile (locks model + effort), write mode, and
+  `--include` context before launch, preferring the cheapest matching lane. See **Host routing
+  when the user says "use Fugu"** below. The runner does not score complexity; it only executes
+  the selected profile.
 
   Sakana's Fugu-Ultra v1.1 release (2026-07-24) ships at the same price as v1.0 and changes two
   facts the shortcut depends on. The published catalog slug is now `fugu-ultra-v1.1`, and plain
@@ -165,10 +167,12 @@ Decide in this order, then state the choice in one short line before launch
 (example: `Fugu route: general --deep, default admitted snapshot, include scripts/run_fugu.sh`):
 
 1. **Should Fugu run?** Prefer host-native tools for trivial lookups the driver can answer from
-   open files. Use Fugu when the user named Fugu, or when a bounded external high-reasoning pass
-   is worth the paid call (deep multi-file analysis, security-sensitive review, hard design tradeoff,
-   compact high-stakes gate). Explicit provider intent authorizes the call and its usage, not merge
-   or protected-ref authority.
+   open files. Inside this section the user already named Fugu or an equivalent provider shortcut;
+   use that explicit intent to run a bounded high-reasoning pass when the task is worth the paid
+   call the user authorized (deep multi-file analysis, security-sensitive review, hard design
+   tradeoff, compact high-stakes gate). Explicit provider intent authorizes the call and its usage,
+   not merge or protected-ref authority. Do not invent an unprompted paid Fugu launch from this
+   section alone.
 
 2. **Task mode.** Default is **general** (analysis, design, investigation, implement-plan, other
    deliverable). Use `review <scope>` only when the user asked for a review, audit, or PR/diff

@@ -13,7 +13,8 @@ host-native UI/third-party interception → #98; `full_run.py` decomposition →
 confidence-calibration tracking → #93; structured confidence sidecar → #94; Grok prewalk
 launch path → #95; resume-prepare terminal-event interplay → #96; persona wording guard
 widening → #97; `run_fugu.sh` heredoc extraction → #203; secret deny-list unification →
-#204; compaction P3/P4 decisions → #205; structural-debt next-wave umbrella → #206.
+#204; compaction P3/P4 decisions → #205; structural-debt next-wave umbrella → #206;
+tool-output compact layer (RTK ideas, no RTK dep) → #211.
 
 The Completed Archive below remains as history.
 

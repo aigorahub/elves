@@ -4,6 +4,8 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.18.1] - 2026-07-29
+
 ### Host Fugu routing for natural "use Fugu"
 
 - Natural language such as "use Fugu" (or plain `/fugu` / `$elves fugu` without a profile flag)
@@ -16,7 +18,15 @@ All notable changes to the Elves skill are documented here.
 - Authoritative decision table lives in `references/provider-shortcuts.md` under **Host routing
   when the user says "use Fugu"**. SKILL.md, AGENTS.md, README, guide, and the Claude `/fugu`
   alias carry the same contract anchors, and `FUGU_HOST_ROUTING_PHRASES` pins them so the
-  routing story cannot land on five surfaces and miss the sixth.
+  routing story cannot land on five surfaces and miss the sixth (including model-lock and
+  cheapest-lane anchors after Fugu review of PR #210).
+- Flag→profile table is documented as the runner map only; flagless invocations are host-routed.
+  Paid Fugu spend inside that section requires explicit user provider intent.
+
+### Follow-up filed
+
+- Issue #211 tracks an optional stdlib tool-output compact layer (RTK ideas without an RTK
+  dependency): exit-code honesty, failure tee, git/test filters, Elves-owned subprocess wiring.
 
 ## [2.18.0] - 2026-07-27
 
