@@ -156,10 +156,13 @@ silently deleting it.
 - [2026-07-12] Prefer high-quality Claude/Codex for plan+review and a labor model for implement
   (`*-planning` / `*-labor` profiles + local `requested_model`). Google Gemini CLI / Antigravity
   CLI are optional plan/review lenses, usually not cost-effective for the main implement batch.
-- [2026-07-12] **Supported Elves main drivers are Claude Code and Codex only.** Optional routes
-  (Antigravity, Gemini CLI, Muse, OpenRouter, Grok, AlphaEvolve) may work as tools the host calls;
-  that is not our focus. Exotic interfaces are not heavily tested (e.g. no Antigravity subscription
-  for maintainer dogfood). Prefer contributor PRs (or issues) when optional paths fail.
+- [2026-07-12] **Supported Elves main drivers were Claude Code and Codex only** at the time of this
+  note. Superseded 2026-07-29: see next entry.
+- [2026-07-29] **Supported Elves main drivers are Claude Code, Codex, and Grok Build.** When Grok
+  is host, prewalk is always off (no exact-session prewalk claim; `required` fails closed). Grok
+  remains an optional worker under Claude/Codex. Optional routes (Antigravity, Gemini CLI, Muse,
+  OpenRouter, AlphaEvolve, …) may still work as tools the host calls; exotic interfaces are not
+  heavily tested. Prefer contributor PRs (or issues) when optional paths fail.
 - [2026-07-13] When the user has Grok Build and explicitly requests trusted full-run delegation,
   prefer one complete packet, one exact persistent session, `branch_progress`, and a parked host via
   `full-run-prepare|full-run-launch|full-run-await|full-run-reconcile|full-run-logs`.
