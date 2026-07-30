@@ -77,3 +77,6 @@ Grok host behavior, experimental-mode honesty, and no authority expansion.
 - [x] M-A4: Claude Code, Codex, and Grok Build have equivalent user-visible semantics.
 - [x] M-A5: The exact release tip passes full verification and Fugu review, has green PR checks, and
   is ready for landing and global installation.
+
+Cleanup record: PR #217 removes the temporary `.elves-session.json` after its committed landing
+check. The plan and durable learnings remain in the release tree.
