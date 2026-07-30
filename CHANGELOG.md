@@ -4,6 +4,33 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.21.0] - 2026-07-29
+
+### Automatic prewalk qualification
+
+- Make `worker.prewalk=required` run a bounded live qualification canary automatically when matching
+  cached proof is absent. The canary has a 180-second wall limit and 1 MiB combined output limit,
+  uses a temporary Git worktree, sends the guide packet once, resumes the exact session with only
+  `Continue.`, and proves route change, same worktree, one logical stream, retained guide context,
+  and packet count before any task worker launches.
+- Persist private version/build-and-route-bound success evidence under
+  `${XDG_CACHE_HOME:-~/.cache}/elves/prewalk/`. Later `auto` runs reuse matching proof without model
+  calls. Failed canaries stop before task launch and name a private `.attempt.json` artifact with
+  bounded redacted diagnostics and check results.
+- Add explicit `worker.prewalk=experimental`. It requires advertised exact resume and route
+  override, reports `exact_session_experimental`, and accepts only qualification uncertainty. The
+  real prewalk supervisor still enforces session, worktree, stream, one-packet, meaningful-edit,
+  forbidden-path, Git-authority, and no-post-edit-cold-fallback rules.
+- Give Claude Code, Codex, and Grok Build the same host semantics. Grok single-phase native-worker
+  launch remains registry-gated; valid qualification or explicit experimental mode may enter only
+  the non-yolo two-phase prewalk supervisor. Grok provider consent, repository veto, live catalog,
+  API-key, Git, PR, and landing restrictions remain unchanged.
+- Add prompt-file delivery to the shared multi-phase supervisor so Grok guide and `Continue.`
+  phases use the same bounded input contract as its host profile.
+- Update SKILL, AGENTS, README, product context, prewalk, host-parity, adaptive-routing, Grok,
+  Parallelves, durable AI docs, learnings, config example, public guide, and test expectations for
+  the automatic qualification contract.
+
 ## [2.20.0] - 2026-07-29
 
 ### Mid-run impact path; terminal full suite and deferred hygiene

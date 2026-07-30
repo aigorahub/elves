@@ -82,12 +82,11 @@ An explicit model is accepted only if the catalog returns that exact identifier.
 `--effort high` by default—the highest Grok Build effort. The operator can still make an explicit
 lower-effort tradeoff.
 
-## Feature-gated prewalk lane (distinct from trusted full-run)
+## Qualified prewalk lane (distinct from trusted full-run)
 
 Everything below this section describes the **trusted full-run lane**: yolo-approved
 (`--always-approve`), optionally `--grant-github-push`, worker-owned feature-branch progress. The
-**prewalk lane** is a separate, narrower authority profile in the host-profile registry and is
-currently **feature-gated off** (`launch_ready` false; no live qualification artifact exists):
+**prewalk lane** is a separate, narrower authority profile in the host-profile registry:
 
 - non-yolo: `--permission-mode auto` only — this lane never emits `--always-approve`, `--yolo`,
   or `dontAsk`;
@@ -98,16 +97,15 @@ currently **feature-gated off** (`launch_ready` false; no live qualification art
 - the private JSON TODO mirror is authoritative because the installed build's `plan.json`
   persistence is vestigial.
 
-Behavioral qualification requires an **operator-authorized live canary**, recorded as a
-`grok_prewalk_qualification_canary` (schema version 1) artifact. A live canary must prove, on the
+Required mode automatically runs the bounded live canary when matching proof is absent and records
+a `grok_prewalk_qualification_canary` (schema version 1) artifact. The canary must prove, on the
 exact installed version and build commit: the same session and worktree across both phases, the
 route change actually applied on resume, guide-only fact retention after transition, no packet
 replay, stream identity, honest `retained_safe` instruction fidelity under the persisted-
-instruction transport, and — because unattended commits are an open question under
-`--permission-mode auto` — whether the lane can complete an unattended commit at all. The artifact
-is written by the operator from observed canary facts; Elves tooling only validates it and never
-fabricates one. An artifact reporting `pruned` or `turn_scoped` loads as recorded, non-activating
-evidence.
+instruction transport. The real run separately proves whether the lane can complete task edits and
+commits under `--permission-mode auto`. Elves writes only bounded fact evidence and never stores
+model output or the random canary values. An artifact reporting `pruned` or `turn_scoped` loads as
+recorded, non-activating evidence.
 
 Validate a recorded artifact only against the installed binary:
 
@@ -118,18 +116,17 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" route-worker --json \
   --prewalk auto --grok-prewalk-qualification /path/to/grok-prewalk-canary.json
 ```
 
-The artifact can qualify the observed behavior, but it cannot grant launch authority. While the
-registry keeps `launch_ready` false, `auto` reports
-`grok_prewalk_unqualified:launch_feature_gate_closed` with actual mode `off`, and `required` fails
-before launch. Opening that gate is a separate maintainer change after the launch path itself is
-complete and regression-tested.
+The registry keeps single-phase Grok native-worker launch gated. A valid artifact or explicit
+experimental request may enter only the two-phase prewalk supervisor. Provider consent,
+`allow_grok=false`, live model catalog, API-key, Git, and landing restrictions remain unchanged.
 
 Verification basis: grok-build 0.2.102 source (commit `98c3b24`) plus the 2026-07 repository audit
 (repo-only `docs/reviews/2026-07-repo-audit-grok-prewalk.md` in a source checkout via PR #82;
 installed bundles must not depend on that file). Advertised grammar and registry rows follow that
 verified source. The cross-family delegation default was rechecked against Grok Build 0.2.103 and
 source commit `7cfcb20`: the live/default model is catalog-owned, and `high` is the advertised
-highest implementation-quality effort. No statement here claims behavioral qualification.
+highest implementation-quality effort. Qualification claims remain bound to the cached artifact's
+exact build and routes.
 
 ## Launch, follow, and recover
 

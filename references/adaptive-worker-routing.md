@@ -106,24 +106,21 @@ model/effort. It reports requested/actual prewalk mode, provenance, guide/execut
 model policy/model/effort, exact-resume and route-override capability, instruction fidelity,
 fallback reason, and whether qualification made model calls (help probes always report false).
 
-`worker.prewalk` accepts `off`, `auto`, and `required`. `auto` is conservative: only a behaviorally
-qualified subscription-native exact-session transport may activate it, only for medium/high or
-multi-step work; atomic low-reasoning work records a skip. External providers remain off unless
-their trajectory semantics are separately qualified. `required` fails before launch rather than
-silently becoming a packet handoff.
+`worker.prewalk` accepts `off`, `auto`, `required`, and `experimental`. `auto` is conservative:
+only matching cached behavioral proof may activate it, only for medium/high or multi-step work;
+atomic low-reasoning work records a skip. `required` marks the model-free route as
+`qualification_required`, then the launch command runs the bounded live canary if matching cached
+proof is absent. It either proceeds with exact-session proof or stops before task launch with a
+private evidence path. `experimental` accepts only qualification uncertainty, reports
+`exact_session_experimental`, and preserves every real-run continuity and authority check.
 
 For `provider=grok` that separate qualification is a valid `grok_prewalk_qualification_canary`
-artifact, passed with `--probe-grok --grok-prewalk-qualification <artifact.json>`. The live probe
-binds the artifact to the exact installed version/build; the artifact's own identity fields are
-never accepted as proof of what is installed. A valid artifact qualifies behavioral evidence but
-does not open the separate registry launch gate. While `launch_ready` is false, `prewalk auto`
-falls back with
-`prewalk_capability_unavailable:grok_prewalk_unqualified:launch_feature_gate_closed` and actual
-mode `off`, and `prewalk required` fails before launch with the same reason. Missing, mismatched,
-or non-`retained_safe` evidence uses its own concrete reason. `allow_grok=false` remains an
-absolute veto regardless of any evidence. The release-honesty rule extends to external providers:
-no release may claim Grok prewalk availability or behavioral qualification while the arm is
-feature-gated and unqualified for launch.
+artifact, either created automatically by required mode or passed with
+`--probe-grok --grok-prewalk-qualification <artifact.json>`. The live probe binds the artifact to
+the exact installed version/build; the artifact's own identity fields are never accepted as proof
+of what is installed. A valid artifact or explicit experimental request opens only the two-phase
+prewalk supervisor. Grok single-phase native-worker launch remains registry-gated.
+`allow_grok=false` remains an absolute veto regardless of evidence.
 
 Inspect the installed grammar without inference:
 
@@ -133,12 +130,13 @@ python3 scripts/cobbler_agents.py native-worker prewalk-capabilities --host clau
 python3 scripts/cobbler_agents.py native-worker prewalk-capabilities --host grok --json
 ```
 
-Static help establishes advertised flags only. Actual prewalk additionally requires exact-version
+Static help establishes advertised flags only. Normal prewalk additionally requires exact-version
 behavioral evidence for one session/worktree/stream, route change, guide-only fact retention, no
 packet replay, and honest instruction fidelity. The current persisted-instruction delivery path
-activates only for proven `retained_safe`; `pruned` and `turn_scoped` remain future transport states.
-With no qualifying evidence, the built-in `auto` preference honestly resolves to actual mode `off`;
-the probe makes zero model calls. See the normative [`prewalk.md`](prewalk.md) contract.
+activates normally only for proven `retained_safe`; `pruned` and `turn_scoped` remain future
+transport states. With no qualifying evidence, `auto` resolves to actual mode `off`; the probe
+makes zero model calls. Required mode is the explicit paid qualification
+request. See the normative [`prewalk.md`](prewalk.md) contract.
 
 When Grok Build is explicitly permitted and silently qualifies:
 

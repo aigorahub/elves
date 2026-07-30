@@ -141,6 +141,7 @@ from cobbler_runtime.worker_routing import (  # noqa: E402
     probe_grok_capabilities,
 )
 from cobbler_runtime.prewalk import (  # noqa: E402
+    experimental_prewalk_capabilities,
     fixture_prewalk_capabilities,
     load_grok_prewalk_qualification,
     probe_installed_prewalk_capabilities,
@@ -152,6 +153,8 @@ from cobbler_runtime.native_worker import (  # noqa: E402
     launch_native_worker,
     native_worker_status,
     native_worker_profiles,
+    prewalk_qualification_cache_path,
+    qualify_installed_prewalk_transport,
     supervise_native_worker,
 )
 
@@ -730,16 +733,15 @@ def cmd_native_worker(args: argparse.Namespace) -> int:
         return 0
     if action == "_supervise":
         return supervise_native_worker(repo_root=repo_root, run_id=args.run_id, packet=Path(args.packet))
-    if action == "launch" and args.host:
-        # Feature-gated hosts (registry launch_ready=False) exist for spec and
-        # prewalk-capabilities only. Qualification evidence describes transport
-        # behavior but does not itself open a launch gate. A missing --host
-        # falls through to the required-arguments envelope below.
+    if action == "launch" and args.host and (args.prewalk or "off") == "off":
+        # Registry-gated hosts remain unavailable for single-phase launch.
+        # Required or experimental prewalk is validated below before the
+        # two-phase supervisor receives a spec.
         launch_profile = resolve_host_profile(args.host)
         if not launch_profile.launch_ready:
             issue = ValidationIssue(
                 f"{launch_profile.capability_host}_native_worker_launch_unqualified",
-                f"{launch_profile.capability_host} native-worker launch is feature-gated off; qualification evidence alone does not authorize launch",
+                f"{launch_profile.capability_host} single-phase native-worker launch is feature-gated off",
             )
             return _emit_json({"ok": False, "issues": [issue.to_dict()]}, exit_code=1)
     prewalk_requested = (args.prewalk or "off") != "off"
@@ -796,7 +798,40 @@ def cmd_native_worker(args: argparse.Namespace) -> int:
                     ),
                 )
             )
-            if capabilities.qualified():
+            if (
+                args.host != "fixture"
+                and not args.prewalk_capability_evidence
+                and args.prewalk in {"auto", "required"}
+            ):
+                cache_path = prewalk_qualification_cache_path(
+                    capabilities,
+                    guide_model=args.guide_model,
+                    guide_effort=args.guide_effort,
+                    execution_model=execution_model,
+                    execution_effort=execution_effort,
+                )
+                if cache_path.is_file():
+                    capabilities = probe_installed_prewalk_capabilities(
+                        args.host,
+                        behavioral_evidence=cache_path,
+                    )
+                elif action == "launch" and args.prewalk == "required":
+                    capabilities = qualify_installed_prewalk_transport(
+                        host=args.host,
+                        guide_model=args.guide_model,
+                        guide_effort=args.guide_effort,
+                        execution_model=execution_model,
+                        execution_effort=execution_effort,
+                    )
+            if args.prewalk == "experimental":
+                capabilities = experimental_prewalk_capabilities(
+                    capabilities,
+                    guide_model=args.guide_model,
+                    guide_effort=args.guide_effort,
+                    execution_model=execution_model,
+                    execution_effort=execution_effort,
+                )
+            if capabilities.qualified() or args.prewalk == "experimental":
                 prewalk_spec = build_native_worker_prewalk_spec(
                     host=args.host,
                     worktree=Path(args.worktree),
@@ -834,8 +869,18 @@ def cmd_native_worker(args: argparse.Namespace) -> int:
                 )
             else:
                 raise ValidationIssue(
-                    capabilities.unavailable_reason() or "prewalk_capability_unavailable",
-                    "Required prewalk is unavailable before launch",
+                    (
+                        "prewalk_live_qualification_failed"
+                        if action != "launch"
+                        else capabilities.unavailable_reason()
+                        or "prewalk_capability_unavailable"
+                    ),
+                    (
+                        "Required prewalk launch runs automatic live qualification; "
+                        "the model-free spec action cannot qualify it"
+                        if action != "launch"
+                        else "Required prewalk is unavailable after live qualification"
+                    ),
                 )
         else:
             spec = build_native_worker_spec(
@@ -869,7 +914,13 @@ def cmd_native_worker(args: argparse.Namespace) -> int:
             "worker": state,
             "prewalk": {
                 "requested": args.prewalk,
-                "actual": "exact_session" if prewalk_spec else "off",
+                "actual": (
+                    "exact_session_experimental"
+                    if prewalk_spec and args.prewalk == "experimental"
+                    else "exact_session"
+                    if prewalk_spec
+                    else "off"
+                ),
                 "fallback_reason": prewalk_fallback,
             },
             "model_calls_made": args.host != "fixture",
@@ -881,7 +932,13 @@ def cmd_native_worker(args: argparse.Namespace) -> int:
             "profiles": native_worker_profiles(),
             "prewalk": {
                 "requested": args.prewalk,
-                "actual": "exact_session" if prewalk_spec else "off",
+                "actual": (
+                    "exact_session_experimental"
+                    if prewalk_spec and args.prewalk == "experimental"
+                    else "exact_session"
+                    if prewalk_spec
+                    else "off"
+                ),
                 "fallback_reason": prewalk_fallback,
             },
             "model_calls_made": False,
@@ -2415,13 +2472,15 @@ def build_parser() -> argparse.ArgumentParser:
         "route-worker",
         help="Inspect a deterministic native/optional-Grok worker recommendation",
     )
-    route_worker.add_argument("--host", choices=("codex", "claude"), required=True)
+    route_worker.add_argument("--host", choices=("codex", "claude", "grok"), required=True)
     route_worker.add_argument("--execution-reasoning", choices=("low", "medium", "high"), required=True)
     route_worker.add_argument("--review-risk", choices=("low", "standard", "high"), required=True)
     route_worker.add_argument("--driver-effort", choices=("low", "medium", "high"))
     route_worker.add_argument("--provider", choices=("auto", "native", "grok"))
     route_worker.add_argument("--effort", choices=("low", "medium", "high"))
-    route_worker.add_argument("--prewalk", choices=("off", "auto", "required"))
+    route_worker.add_argument(
+        "--prewalk", choices=("off", "auto", "required", "experimental")
+    )
     route_worker.add_argument("--guide-model")
     route_worker.add_argument("--guide-effort", choices=("low", "medium", "high"))
     route_worker.add_argument(
@@ -2482,7 +2541,11 @@ def build_parser() -> argparse.ArgumentParser:
     native_worker.add_argument("--worktree")
     native_worker.add_argument("--effort", choices=("low", "medium", "high"))
     native_worker.add_argument("--model", help="Current driver model observed by the host, or an explicit routed model")
-    native_worker.add_argument("--prewalk", choices=("off", "auto", "required"), default="off")
+    native_worker.add_argument(
+        "--prewalk",
+        choices=("off", "auto", "required", "experimental"),
+        default="off",
+    )
     native_worker.add_argument("--guide-model")
     native_worker.add_argument("--guide-effort", choices=("low", "medium", "high"))
     native_worker.add_argument("--execution-model")

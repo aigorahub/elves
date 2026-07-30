@@ -512,7 +512,7 @@
     <div class="masthead-inner">
       <div class="brand-row">
         <a class="wordmark" href="https://github.com/aigorahub/elves">Elves</a>
-        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.20.0 source and releases on GitHub</a>
+        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.21.0 source and releases on GitHub</a>
       </div>
       <h1>Using Elves</h1>
       <p class="intro">Plan with the main agent, hand implementation to a separate worker, then
@@ -570,15 +570,15 @@
    - I own the plan and whether to merge. The driver plans/reviews/lands; a separate worker implements.
    - Default: same subscription, lower-effort native worker. Outcome is usually a landable PR; merge only if I authorize it.
    - Optional workers (Grok Build under Claude/Codex, Devin, OpenCode, …) are not required. Native works with no extra keys.
-   - When Grok Build is the main driver, it may run Elves fully, but exact-session prewalk is always off.
+   - Required prewalk qualifies Claude Code, Codex, or Grok Build automatically before task launch when matching proof is absent.
 
 5. Stop after install + orientation. Offer one short first-run starter prompt I can paste later (chat-to-work: landable PR, do not merge).</code></pre>
         </div>
 
         <div class="note">
           <strong>Hosts.</strong> Supported main drivers are <strong>Claude Code</strong>,
-          <strong>Codex</strong>, and <strong>Grok Build</strong>. When Grok is host, prewalk is
-          always off. Managed skill install targets remain Claude and Codex roots; Grok often
+          <strong>Codex</strong>, and <strong>Grok Build</strong>. Required prewalk uses the same
+          automatic qualification contract on each host. Managed skill install targets remain Claude and Codex roots; Grok often
           discovers Elves via Claude skill compatibility. Devin and OpenCode stay optional workers.
         </div>
       </section>
@@ -834,8 +834,8 @@ python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup</code></pre>
           cold-handoff evidence, not prewalk continuity; see the
           <a href="https://github.com/aigorahub/elves/blob/main/references/schema-and-acceptance.md">schema and acceptance contract</a>.</p>
 
-        <h3>Use exact-session prewalk when qualified</h3>
-        <p>Prewalk lets one native worker orient on a guide model or effort, create a bounded TODO,
+        <h3>Use exact-session prewalk</h3>
+        <p>Prewalk lets one worker orient on a guide model or effort, create a bounded TODO,
           make the first real task edit, and then resume the <strong>same session in the same
           worktree</strong> on the execution route. The packet is sent once; the later input is only
           <code>Continue.</code>. Starting a new worker with a summary is a normal cold handoff, not
@@ -846,25 +846,24 @@ python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup</code></pre>
           <pre><code id="prewalk-probe"># Read-only: inspects installed help/version and makes no model call.
 python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" \
   native-worker prewalk-capabilities --host codex --json
-# Use --host claude for Claude Code or --host grok for Grok Build.</code></pre>
+# Use --host claude for Claude Code or --host grok for Grok Build.
+
+# A real launch with --prewalk required runs qualification automatically.
+# Use --prewalk experimental only when you explicitly accept qualification uncertainty.</code></pre>
         </div>
 
         <p>The preference defaults to safe <code>auto</code>, while direct launch defaults to
-          <code>off</code> for compatibility. Help output proves only that exact-resume and route
-          flags are advertised. Actual prewalk stays off until the exact installed host version has
-          behavioral evidence for session, worktree, and stream continuity, route change, no packet
-          replay, and honest instruction fidelity. The current persisted-instruction transport
-          activates only for proven <code>retained_safe</code>; <code>pruned</code> and
-          <code>turn_scoped</code> remain future delivery states. <code>required</code> fails before
-          launch if proof is absent; no paid canary runs implicitly.</p>
+          <code>off</code> for compatibility. <code>auto</code> never spends on qualification and
+          reuses only matching cached proof. <code>required</code> automatically runs a
+          180-second, 1 MiB-bounded live canary when proof is absent. The task worker starts only
+          after exact session, route change, worktree, stream, retained-context, and packet-count
+          checks pass. Failure stops with a private evidence path.</p>
 
-        <p>Grok prewalk has an additional maintainer-owned launch gate. A recorded
-          <code>grok_prewalk_qualification_canary</code> must be supplied together with
-          <code>--probe-grok</code>, which binds it to the version and build commit reported by the
-          installed binary. Even valid <code>retained_safe</code> evidence cannot open
-          <code>launch_ready</code> by itself. While that gate is closed, <code>auto</code> reports
-          <code>grok_prewalk_unqualified:launch_feature_gate_closed</code> with actual mode
-          <code>off</code>, and <code>required</code> fails before launch.</p>
+        <p><code>experimental</code> is an explicit operator choice that accepts qualification
+          uncertainty after static grammar inspection. It reports
+          <code>exact_session_experimental</code> and keeps every real-run continuity and authority
+          check. Claude Code, Codex, and Grok Build share these semantics. Grok single-phase
+          native-worker launch remains registry-gated.</p>
 
         <h3>Use the optional open-source Grok worker</h3>
         <p>Install from the <a href="https://github.com/xai-org/grok-build">official Grok Build
@@ -1081,11 +1080,12 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" preferences reset</code></
 
         <details>
           <summary>I opened Grok Build and tried <code>/elves</code> (or Elves appeared in skills).</summary>
-          <p><strong>Supported host, no prewalk.</strong> Grok Build is a supported main driver.
+          <p><strong>Supported host.</strong> Grok Build is a supported main driver.
             You can stage and run Elves from Grok when the skill is discoverable (for example after
             install into <code>~/.claude/skills/elves</code> with Claude skill compatibility).
-            Exact-session prewalk is always off when Grok is the orchestrator: use host-native
-            work or a cold packet handoff, not a prewalk claim. Grok can also stay an optional
+            Required prewalk runs the same automatic qualification canary used by Claude Code and
+            Codex; experimental mode accepts qualification uncertainty without relaxing runtime
+            checks. Grok can also stay an optional
             <em>worker</em> under Claude Code or Codex when permitted.</p>
         </details>
 

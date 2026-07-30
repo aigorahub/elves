@@ -115,22 +115,20 @@ it carries create/resume argv builders, effort grammar, transport name, identity
 provider-secret allowlist, help-probe argv, commit mode, and `launch_ready`. Spec construction,
 child-env secret projection, launch identity readiness, prewalk probes, and routing transport
 naming all consume the registry instead of per-site `if/elif` chains; `native_worker_profiles()`
-is a view of it. The `grok` row is feature-gated (`launch_ready` false, non-yolo
-`--permission-mode auto`, `XAI_API_KEY`-only): grok prewalk routing requires the absence of the repository allow_grok=false veto, explicit
-consent, and a valid operator-recorded `grok_prewalk_qualification_canary` artifact
-(`retained_safe`, bound to the exact version/build from a live installed-binary probe). The
-artifact can qualify behavioral evidence but cannot open the separate registry launch gate;
-while `launch_ready` is false, routing records
-`grok_prewalk_unqualified:launch_feature_gate_closed` with actual mode `off`, and `required` fails
-before launch. Other invalid or missing evidence records its concrete
-`grok_prewalk_unqualified:<reason>`. No environment is qualified for launch; nothing may claim
-Grok prewalk availability.
+is a view of it. The `grok` row keeps single-phase native-worker launch gated (`launch_ready`
+false, non-yolo `--permission-mode auto`, `XAI_API_KEY`-only). Qualified or explicit experimental
+prewalk may enter only the two-phase supervisor. Grok prewalk routing still requires the absence of
+the repository `allow_grok=false` veto and explicit consent.
 
 Exact-session prewalk is a lifecycle inside one subscription-native (or separately qualified)
 worker, not a cross-worker context transfer. The packet appears once on the guide turn; private model-free policy verifies a
 bounded TODO, first meaningful edit, session/worktree/Git continuity, and checkpoint before the
 supervisor resumes that same ID on a separately pinned execution route with `Continue.`. Static
-host help is advertised capability only; version-bound behavioral evidence gates actual prewalk and
+host help is advertised capability only. Required mode runs a 180-second, 1 MiB-bounded live canary
+when matching proof is absent, caches successful exact-version-and-route evidence, and stops with
+private attempt evidence on failure. Auto reuses cached proof without model calls. Experimental
+mode accepts qualification uncertainty while preserving every real-run check. Behavioral evidence
+gates normal prewalk and
 records instruction fidelity as `pruned`, `turn_scoped`, `retained_safe`, or `unsupported`. The
 current persisted-instruction path activates only `retained_safe`; the other usable-sounding states
 require a future, separately proven delivery mechanism. The driver retains all canonical memory,

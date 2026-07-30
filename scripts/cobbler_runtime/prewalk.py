@@ -9,7 +9,7 @@ evidence, and the model-free transition check used by the native supervisor.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime
 import hashlib
 import json
@@ -41,8 +41,13 @@ PREWALK_CONTINUATION_INPUT = "Continue."
 PREWALK_CAPABILITY_ARTIFACT_MAX_BYTES = 64 * 1024
 PREWALK_RUNTIME_ARTIFACT_MAX_BYTES = 256 * 1024
 PREWALK_PACKET_MAX_BYTES = 4 * 1024 * 1024
-PREWALK_MODES = ("off", "auto", "required")
-PREWALK_ACTUAL_MODES = ("off", "exact_session")
+PREWALK_MODES = ("off", "auto", "required", "experimental")
+PREWALK_ACTUAL_MODES = (
+    "off",
+    "qualification_required",
+    "exact_session",
+    "exact_session_experimental",
+)
 PREWALK_INSTRUCTION_FIDELITIES = (
     "pruned",
     "turn_scoped",
@@ -67,6 +72,7 @@ PREWALK_FAILURE_CODES = frozenset(
         "prewalk_changed_path_forbidden",
         "prewalk_packet_replayed",
         "prewalk_instruction_pruning_unqualified",
+        "prewalk_live_qualification_failed",
         "prewalk_guide_exit_before_checkpoint",
         "prewalk_execution_resume_failed",
         "prewalk_post_edit_cold_fallback_forbidden",
@@ -112,6 +118,7 @@ class PrewalkCapabilities:
     host: str
     transport: str
     installed_version: str | None = None
+    installed_build_commit: str | None = None
     advertised_exact_resume: bool = False
     advertised_route_override_on_resume: bool = False
     behaviorally_verified_session_continuity: bool = False
@@ -136,6 +143,18 @@ class PrewalkCapabilities:
             and self.instruction_fidelity == "retained_safe"
             and self.qualified_guide_effort is not None
             and self.qualified_execution_effort is not None
+        )
+
+    def experimental_eligible(self) -> bool:
+        """Return whether an explicit operator may test the advertised lane.
+
+        Experimental mode accepts qualification uncertainty only. The real
+        worker supervisor still enforces exact session, worktree, stream,
+        packet-count, transition, and authority checks.
+        """
+        return bool(
+            self.advertised_exact_resume
+            and self.advertised_route_override_on_resume
         )
 
     def route_matches(
@@ -787,6 +806,13 @@ def probe_installed_prewalk_capabilities(
             else ""
         ),
     )
+    build_match = re.search(r"\(([0-9a-f]{7,40})\)", version_text, re.I)
+    advertised = replace(
+        advertised,
+        installed_build_commit=(
+            build_match.group(1).lower() if build_match else None
+        ),
+    )
     if behavioral_evidence is None:
         return advertised
     if profile.capability_host == "grok":
@@ -798,7 +824,6 @@ def probe_installed_prewalk_capabilities(
             )
         # Bind the artifact to the installed build commit when the version
         # output publishes one (same `(hex)` grammar the goal canary binds).
-        build_match = re.search(r"\(([0-9a-f]{7,40})\)", version_text, re.I)
         return load_grok_prewalk_qualification(
             behavioral_evidence,
             installed_version=version,
@@ -812,6 +837,30 @@ def probe_installed_prewalk_capabilities(
         host=profile.capability_host,
         installed_version=version,
         advertised=advertised,
+    )
+
+
+def experimental_prewalk_capabilities(
+    advertised: PrewalkCapabilities,
+    *,
+    guide_model: str,
+    guide_effort: str,
+    execution_model: str,
+    execution_effort: str,
+) -> PrewalkCapabilities:
+    """Bind an explicit experimental request to one advertised route pair."""
+    if not advertised.experimental_eligible():
+        raise ValidationIssue(
+            advertised.unavailable_reason() or "prewalk_capability_unavailable",
+            "Experimental prewalk still requires advertised exact resume and route override",
+        )
+    return replace(
+        advertised,
+        evidence_source="explicit_experimental_request",
+        qualified_guide_model=guide_model,
+        qualified_guide_effort=guide_effort,
+        qualified_execution_model=execution_model,
+        qualified_execution_effort=execution_effort,
     )
 
 

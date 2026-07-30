@@ -20,6 +20,12 @@ silently deleting it.
 
 ## Repo Conventions
 
+- [2026-07-29] Qualification should be an automatic gate at the point of use, not a manual artifact
+  ceremony. Required prewalk runs a bounded live canary when exact version/build and route proof is
+  absent; auto reuses successful cached proof without spending; experimental accepts only
+  qualification uncertainty and never weakens the real session, worktree, stream, packet,
+  transition, Git, or landing checks.
+
 - [2026-07-17] Tighten staging contracts through explicit versioned opt-in, not surprise migration.
   Existing delegable sessions keep advisory missing-packet compatibility; declaring top-level
   `handoff` activates strict handoff v1 across session state, pending-acceptance ownership, exact

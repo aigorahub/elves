@@ -6,7 +6,7 @@
     "native_effort": "auto",
     "prewalk": "auto",
     "parallel": "off",
-    "_comment": "Safe machine-global convenience at ${XDG_CONFIG_HOME:-~/.config}/elves/config.json. provider: auto|native|grok; native_effort: auto|low|medium|high; prewalk: off|auto|required; parallel: off|auto. Auto remains single-phase until exact-session behavior and retained-safe instruction delivery are qualified for the installed host. Repository safety vetoes win; convenience order is run, repository, global, built-in. Repository allow is not Grok consent; authority and credentials are forbidden."
+    "_comment": "Safe machine-global convenience at ${XDG_CONFIG_HOME:-~/.config}/elves/config.json. provider: auto|native|grok; native_effort: auto|low|medium|high; prewalk: off|auto|required|experimental; parallel: off|auto. Auto reuses matching cached proof and never spends. Required runs a bounded live canary before task launch when proof is absent. Experimental accepts qualification uncertainty but preserves runtime continuity checks. Repository safety vetoes win; convenience order is run, repository, global, built-in. Repository allow is not Grok consent; authority and credentials are forbidden."
   },
   "batch_sizing": {
     "team_size": 4,
