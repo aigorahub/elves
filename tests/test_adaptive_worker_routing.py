@@ -32,6 +32,7 @@ from cobbler_runtime.native_worker import (  # noqa: E402
 )
 from cobbler_runtime.prewalk import (  # noqa: E402
     PrewalkCapabilities,
+    advertised_prewalk_capabilities,
     fixture_prewalk_capabilities,
     load_grok_prewalk_qualification,
 )
@@ -135,6 +136,10 @@ class GlobalPreferencesTests(unittest.TestCase):
             path = Path(tmp) / "config.json"
             set_preference("worker.prewalk", "required", path=path)
             self.assertEqual(load_preferences(path)["worker"]["prewalk"], "required")
+            set_preference("worker.prewalk", "experimental", path=path)
+            self.assertEqual(
+                load_preferences(path)["worker"]["prewalk"], "experimental"
+            )
             with self.assertRaises(ValidationIssue) as caught:
                 set_preference("worker.prewalk", "enabled", path=path)
             self.assertEqual(caught.exception.code, "invalid_global_preference")
@@ -193,10 +198,13 @@ class RouteDecisionMatrixTests(unittest.TestCase):
         self.assertTrue(qualified.prewalk.behaviorally_verified_session_continuity)
         self.assertEqual(qualified.prewalk.instruction_fidelity.value, "retained_safe")
 
-    def test_required_prewalk_fails_before_launch_when_unqualified(self) -> None:
-        with self.assertRaises(ValidationIssue) as caught:
-            self.decide(explicit_intent={"worker": {"prewalk": "required"}})
-        self.assertEqual(caught.exception.code, "prewalk_exact_resume_unqualified")
+    def test_required_prewalk_defers_unqualified_transport_to_live_canary(self) -> None:
+        decision = self.decide(
+            explicit_intent={"worker": {"prewalk": "required"}}
+        )
+        self.assertEqual(decision.prewalk.actual_mode, "qualification_required")
+        self.assertIn("prewalk_live_qualification_required", decision.reasons)
+        self.assertIsNone(decision.prewalk.fallback_reason)
 
     def test_auto_prewalk_skips_low_reasoning_atomic_work(self) -> None:
         decision = self.decide(
@@ -206,6 +214,32 @@ class RouteDecisionMatrixTests(unittest.TestCase):
         )
         self.assertEqual(decision.prewalk.actual_mode, "off")
         self.assertEqual(decision.prewalk.fallback_reason, "prewalk_atomic_task_skipped")
+
+    def test_grok_host_uses_the_same_required_and_experimental_route_states(
+        self,
+    ) -> None:
+        required = self.decide(
+            host="grok",
+            explicit_intent={"worker": {"prewalk": "required"}},
+        )
+        self.assertEqual(required.worker_transport, "grok_build")
+        self.assertEqual(required.prewalk.actual_mode, "qualification_required")
+
+        advertised = advertised_prewalk_capabilities(
+            host="grok",
+            version="0.2.102",
+            create_help="--session-id --resume --model --effort",
+            resume_help="--session-id --resume --model --effort",
+        )
+        experimental = self.decide(
+            host="grok",
+            explicit_intent={"worker": {"prewalk": "experimental"}},
+            prewalk_capabilities=advertised,
+        )
+        self.assertEqual(
+            experimental.prewalk.actual_mode, "exact_session_experimental"
+        )
+        self.assertEqual(experimental.prewalk.guide.transport, "grok_build")
 
     def test_explicit_grok_regular_and_complex_model_policy(self) -> None:
         capabilities = GrokCapabilities(
@@ -1222,17 +1256,13 @@ class GrokPrewalkQualificationGateTests(unittest.TestCase):
             "qualification_fixture_evidence_forbidden",
         )
 
-    def test_required_prewalk_without_artifact_fails_before_launch(self) -> None:
-        with self.assertRaises(ValidationIssue) as caught:
-            self.decide(
-                explicit_intent={"worker": {"provider": "grok", "prewalk": "required"}},
-            )
-        self.assertEqual(caught.exception.code, "prewalk_capability_unavailable")
-        self.assertEqual(
-            caught.exception.hint,
-            "prewalk_capability_unavailable:grok_prewalk_unqualified:"
-            "qualification_artifact_missing",
+    def test_required_prewalk_without_artifact_requests_live_canary(self) -> None:
+        decision = self.decide(
+            explicit_intent={"worker": {"provider": "grok", "prewalk": "required"}},
         )
+        self.assertEqual(decision.prewalk.actual_mode, "qualification_required")
+        self.assertIn("prewalk_live_qualification_required", decision.reasons)
+        self.assertIsNone(decision.prewalk.fallback_reason)
 
     def test_incomplete_qualification_reports_its_concrete_reason(self) -> None:
         pruned = self._grok_qualification(instruction_fidelity="pruned")
@@ -1289,44 +1319,34 @@ class GrokPrewalkQualificationGateTests(unittest.TestCase):
             grok_prewalk_qualification=self._grok_qualification(),
         )
         self.assertEqual(decision.provider, "grok")
-        self.assertEqual(decision.prewalk.actual_mode, "off")
+        self.assertEqual(decision.prewalk.actual_mode, "exact_session")
         self.assertEqual(decision.prewalk.guide.transport, "grok_build")
         self.assertEqual(decision.prewalk.instruction_fidelity.value, "retained_safe")
         self.assertEqual(decision.prewalk.capability_state.value, "qualified")
-        self.assertEqual(
-            decision.prewalk.fallback_reason,
-            "prewalk_capability_unavailable:grok_prewalk_unqualified:"
-            "launch_feature_gate_closed",
-        )
+        self.assertIsNone(decision.prewalk.fallback_reason)
 
-        # Preserve the route-matching contract behind the explicit launch
-        # feature gate so a future activation cannot bypass it.
-        with mock.patch(
-            "cobbler_runtime.worker_routing.resolve_host_profile",
-            return_value=mock.Mock(launch_ready=True),
-        ):
-            activated = self.decide(
-                explicit_intent={
-                    "worker": {
-                        "provider": "grok",
-                        "prewalk": "required",
-                        "prewalk_guide_model": "guide-model",
-                    }
-                },
-                grok_prewalk_qualification=self._grok_qualification(),
-            )
-            route_changed = self.decide(
-                explicit_intent={
-                    "worker": {
-                        "provider": "grok",
-                        "prewalk": "auto",
-                        "prewalk_guide_model": "other-guide-model",
-                    }
-                },
-                grok_prewalk_qualification=self._grok_qualification(
-                    evidence_source="artifact:/fixture/grok-qualification.json"
-                ),
-            )
+        activated = self.decide(
+            explicit_intent={
+                "worker": {
+                    "provider": "grok",
+                    "prewalk": "required",
+                    "prewalk_guide_model": "guide-model",
+                }
+            },
+            grok_prewalk_qualification=self._grok_qualification(),
+        )
+        route_changed = self.decide(
+            explicit_intent={
+                "worker": {
+                    "provider": "grok",
+                    "prewalk": "auto",
+                    "prewalk_guide_model": "other-guide-model",
+                }
+            },
+            grok_prewalk_qualification=self._grok_qualification(
+                evidence_source="artifact:/fixture/grok-qualification.json"
+            ),
+        )
         self.assertEqual(activated.prewalk.actual_mode, "exact_session")
         self.assertEqual(route_changed.prewalk.actual_mode, "off")
         self.assertEqual(
@@ -1374,7 +1394,7 @@ class GrokPrewalkQualificationArtifactGateTests(unittest.TestCase):
         params.update(overrides)
         return decide_worker_route(**params)
 
-    def test_retained_safe_artifact_is_qualified_but_cannot_open_launch_gate(self) -> None:
+    def test_retained_safe_artifact_opens_the_two_phase_launch_route(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = write_grok_qualification_artifact(Path(tmp))
             decision = self._decide_with_artifact(
@@ -1387,39 +1407,24 @@ class GrokPrewalkQualificationArtifactGateTests(unittest.TestCase):
                     }
                 },
             )
-            with self.assertRaises(ValidationIssue) as caught:
-                self._decide_with_artifact(path)
+            required = self._decide_with_artifact(path)
         self.assertEqual(decision.provider, "grok")
-        self.assertEqual(decision.prewalk.actual_mode, "off")
+        self.assertEqual(decision.prewalk.actual_mode, "exact_session")
         self.assertEqual(decision.prewalk.guide.transport, "grok_build")
         self.assertEqual(decision.prewalk.execution.transport, "grok_build")
         self.assertEqual(decision.prewalk.instruction_fidelity.value, "retained_safe")
-        self.assertEqual(
-            decision.prewalk.fallback_reason,
-            "prewalk_capability_unavailable:grok_prewalk_unqualified:"
-            "launch_feature_gate_closed",
-        )
+        self.assertIsNone(decision.prewalk.fallback_reason)
         self.assertEqual(decision.prewalk.capability_state.value, "qualified")
-        self.assertEqual(caught.exception.code, "prewalk_capability_unavailable")
-        self.assertEqual(
-            caught.exception.hint,
-            "prewalk_capability_unavailable:grok_prewalk_unqualified:"
-            "launch_feature_gate_closed",
-        )
+        self.assertEqual(required.prewalk.actual_mode, "exact_session")
 
-    def test_pruned_artifact_fails_required_before_launch(self) -> None:
+    def test_pruned_artifact_requires_a_fresh_live_canary(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = write_grok_qualification_artifact(
                 Path(tmp), mutation={"instruction_fidelity": "pruned"}
             )
-            with self.assertRaises(ValidationIssue) as caught:
-                self._decide_with_artifact(path)
-        self.assertEqual(caught.exception.code, "prewalk_capability_unavailable")
-        self.assertEqual(
-            caught.exception.hint,
-            "prewalk_capability_unavailable:grok_prewalk_unqualified:"
-            "prewalk_instruction_pruning_unqualified",
-        )
+            decision = self._decide_with_artifact(path)
+        self.assertEqual(decision.prewalk.actual_mode, "qualification_required")
+        self.assertIn("prewalk_live_qualification_required", decision.reasons)
 
     def test_pruned_artifact_reports_honest_fallback_in_auto_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1531,12 +1536,10 @@ class GrokPrewalkQualificationArtifactGateTests(unittest.TestCase):
             payload = json.loads(passed.stdout)
             self.assertEqual(payload["decision"]["provider"], "grok")
             self.assertEqual(
-                payload["decision"]["prewalk"]["actual_mode"], "off"
+                payload["decision"]["prewalk"]["actual_mode"], "exact_session"
             )
-            self.assertEqual(
-                payload["decision"]["prewalk"]["fallback_reason"],
-                "prewalk_capability_unavailable:grok_prewalk_unqualified:"
-                "launch_feature_gate_closed",
+            self.assertIsNone(
+                payload["decision"]["prewalk"]["fallback_reason"]
             )
             self.assertEqual(
                 payload["grok_prewalk_qualification"]["evidence_source"],

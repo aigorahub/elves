@@ -28,11 +28,10 @@ The Completed Archive below remains as history.
 ### Future Ideas
 
 - [x] Replace the old optional trajectory experiment with true exact-session native-worker
-  prewalk. Codex and Claude now share a feature-gated guide→meaningful-edit checkpoint→execution
+  prewalk. Codex, Claude, and Grok now share a guide→meaningful-edit checkpoint→execution
   supervisor, bounded TODO/checkpoint artifacts, honest instruction fidelity, deterministic
-  capability/routing state, parity fixtures, and installed-bundle coverage. Live behavioral
-  qualification and dogfood evaluation remain rollout phases, not implementation claims; see
-  `references/prewalk.md`.
+  capability/routing state, parity fixtures, installed-bundle coverage, automatic required-mode
+  qualification, cached-proof reuse, and an explicit experimental mode; see `references/prewalk.md`.
 
 - [x] Add a lightweight process-retro pass to entropy checks.
   `SKILL.md`, `AGENTS.md`, `README.md`, and `references/execution-log-template.md` now tell Elves

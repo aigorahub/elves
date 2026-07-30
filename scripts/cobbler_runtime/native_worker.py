@@ -6,6 +6,7 @@ import json
 import hashlib
 import os
 import selectors
+import secrets
 import shlex
 import signal
 import stat
@@ -13,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -49,11 +51,17 @@ from .prewalk import (
     observed_changed_paths,
     packet_digest,
     prewalk_paths,
+    probe_installed_prewalk_capabilities,
     recovery_prompt,
     validate_meaningful_edit,
     write_session_identity,
 )
 from .schema import ValidationIssue
+from .storage import StorageError, atomic_write_json
+
+
+PREWALK_QUALIFICATION_TIMEOUT_SECONDS = 180
+PREWALK_QUALIFICATION_OUTPUT_MAX_BYTES = 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -133,6 +141,19 @@ class NativeWorkerPrewalkSpec:
             "instruction_fidelity": self.instruction_fidelity,
             "forbidden_paths": list(self.forbidden_paths),
         }
+
+
+@dataclass(frozen=True)
+class PrewalkQualificationResult:
+    """One bounded provider phase used only by the live qualification canary."""
+
+    exit_code: int
+    stdout: str
+    stderr_tail: str
+    observed_session_ids: tuple[str, ...]
+    provider_event_count: int
+    timed_out: bool = False
+    output_limit_exceeded: bool = False
 
 
 def native_worker_profiles() -> dict[str, dict[str, Any]]:
@@ -313,13 +334,25 @@ def build_native_worker_prewalk_spec(
 ) -> NativeWorkerPrewalkSpec:
     """Build guide-create plus execution-resume policy for one exact session."""
     mode = requested_mode.strip().lower()
-    if mode not in {"auto", "required"}:
-        raise ValidationIssue("invalid_prewalk_mode", "Prewalk spec requires auto or required mode")
-    if not capabilities.qualified():
+    if mode not in {"auto", "required", "experimental"}:
+        raise ValidationIssue(
+            "invalid_prewalk_mode",
+            "Prewalk spec requires auto, required, or experimental mode",
+        )
+    capability_accepted = (
+        capabilities.experimental_eligible()
+        if mode == "experimental"
+        else capabilities.qualified()
+    )
+    if not capability_accepted:
         code = capabilities.unavailable_reason() or "prewalk_capability_unavailable"
         raise ValidationIssue(
             code,
-            "Exact-session prewalk transport is not behaviorally qualified",
+            (
+                "Experimental prewalk transport lacks required advertised grammar"
+                if mode == "experimental"
+                else "Exact-session prewalk transport is not behaviorally qualified"
+            ),
             hint=capabilities.evidence_source,
         )
     if not isinstance(todo_limit, int) or isinstance(todo_limit, bool) or not PREWALK_MIN_TODO_LIMIT <= todo_limit <= PREWALK_MAX_TODO_LIMIT:
@@ -373,6 +406,566 @@ def build_native_worker_prewalk_spec(
     )
     result.execution_spec(guide.session_id or "prewalk-session-preview")
     return result
+
+
+def _qualification_cache_root(
+    *, cache_root: Path | None = None, env: dict[str, str] | None = None
+) -> Path:
+    if cache_root is not None:
+        root = cache_root.expanduser()
+    else:
+        values = os.environ if env is None else env
+        configured = values.get("XDG_CACHE_HOME", "").strip()
+        if configured and not Path(configured).expanduser().is_absolute():
+            raise ValidationIssue(
+                "prewalk_capability_unavailable",
+                "XDG_CACHE_HOME must be absolute for prewalk qualification evidence",
+                path="XDG_CACHE_HOME",
+            )
+        root = (
+            Path(configured).expanduser()
+            if configured
+            else Path(values.get("HOME", "~")).expanduser() / ".cache"
+        )
+    return root.resolve() / "elves" / "prewalk"
+
+
+def prewalk_qualification_cache_path(
+    capabilities: PrewalkCapabilities,
+    *,
+    guide_model: str,
+    guide_effort: str,
+    execution_model: str,
+    execution_effort: str,
+    cache_root: Path | None = None,
+    env: dict[str, str] | None = None,
+) -> Path:
+    """Return the private cache key for one installed build and route pair."""
+    identity = {
+        "host": capabilities.host,
+        "transport": capabilities.transport,
+        "installed_version": capabilities.installed_version,
+        "installed_build_commit": capabilities.installed_build_commit,
+        "guide": {"model": guide_model, "effort": guide_effort},
+        "execution": {"model": execution_model, "effort": execution_effort},
+    }
+    digest = hashlib.sha256(
+        json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()[:32]
+    return _qualification_cache_root(cache_root=cache_root, env=env) / (
+        f"{capabilities.host}-{digest}.json"
+    )
+
+
+def _terminate_canary_process(child: subprocess.Popen[bytes]) -> None:
+    try:
+        os.killpg(child.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    try:
+        child.wait(timeout=2)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(child.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+
+def _run_bounded_qualification_phase(
+    *,
+    spec: NativeWorkerSpec,
+    input_text: str,
+    child_env: dict[str, str],
+    timeout_seconds: float,
+) -> PrewalkQualificationResult:
+    """Run one canary phase with a hard wall limit and bounded output."""
+    if timeout_seconds <= 0:
+        return PrewalkQualificationResult(
+            exit_code=124,
+            stdout="",
+            stderr_tail="qualification deadline exhausted",
+            observed_session_ids=(),
+            provider_event_count=0,
+            timed_out=True,
+        )
+    worktree = Path(spec.cwd).resolve()
+    prompt_path: Path | None = None
+    child: subprocess.Popen[bytes] | None = None
+    selector: selectors.BaseSelector | None = None
+    argv = list(spec.argv)
+    stdin_handle = tempfile.TemporaryFile(mode="w+b")
+    try:
+        if spec.prompt_file_flag:
+            prompt_fd, prompt_name = tempfile.mkstemp(
+                prefix=".qualification-prompt-",
+                suffix=".txt",
+                dir=str(worktree),
+                text=True,
+            )
+            prompt_path = Path(prompt_name)
+            os.fchmod(prompt_fd, 0o600)
+            with os.fdopen(prompt_fd, "w", encoding="utf-8") as handle:
+                handle.write(input_text)
+                handle.flush()
+                os.fsync(handle.fileno())
+            argv.extend((spec.prompt_file_flag, str(prompt_path)))
+        else:
+            stdin_handle.write(input_text.encode("utf-8"))
+            stdin_handle.flush()
+            stdin_handle.seek(0)
+        child = subprocess.Popen(
+            argv,
+            cwd=str(worktree),
+            env=child_env,
+            stdin=subprocess.DEVNULL if spec.prompt_file_flag else stdin_handle,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=False,
+            close_fds=True,
+            start_new_session=True,
+        )
+        assert child.stdout is not None and child.stderr is not None
+        selector = selectors.DefaultSelector()
+        selector.register(child.stdout, selectors.EVENT_READ, "stdout")
+        selector.register(child.stderr, selectors.EVENT_READ, "stderr")
+        chunks: dict[str, bytearray] = {
+            "stdout": bytearray(),
+            "stderr": bytearray(),
+        }
+        deadline = time.monotonic() + timeout_seconds
+        timed_out = False
+        output_limit_exceeded = False
+        while selector.get_map():
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                timed_out = True
+                _terminate_canary_process(child)
+                break
+            events = selector.select(timeout=min(0.2, remaining))
+            for key, _ in events:
+                data = os.read(key.fileobj.fileno(), 8192)
+                if not data:
+                    selector.unregister(key.fileobj)
+                    continue
+                target = chunks[str(key.data)]
+                if (
+                    len(chunks["stdout"])
+                    + len(chunks["stderr"])
+                    + len(data)
+                    > PREWALK_QUALIFICATION_OUTPUT_MAX_BYTES
+                ):
+                    output_limit_exceeded = True
+                    _terminate_canary_process(child)
+                    break
+                target.extend(data)
+            if output_limit_exceeded:
+                break
+        if child.poll() is None:
+            _terminate_canary_process(child)
+        exit_code = child.wait()
+        stdout = chunks["stdout"].decode("utf-8", errors="replace")
+        stderr = chunks["stderr"].decode("utf-8", errors="replace")
+        observed: list[str] = []
+        provider_event_count = 0
+        for line in stdout.splitlines():
+            event = _parse_provider_event(line)
+            if event is None:
+                continue
+            provider_event_count += 1
+            session_id = _provider_session_id_from_event(event, host=spec.host)
+            if session_id and session_id not in observed:
+                observed.append(session_id)
+        return PrewalkQualificationResult(
+            exit_code=(
+                124
+                if timed_out
+                else 125
+                if output_limit_exceeded
+                else exit_code
+            ),
+            stdout=stdout,
+            stderr_tail=stderr[-_NATIVE_WORKER_STDERR_TAIL_CHARS:],
+            observed_session_ids=tuple(observed),
+            provider_event_count=provider_event_count,
+            timed_out=timed_out,
+            output_limit_exceeded=output_limit_exceeded,
+        )
+    finally:
+        if selector is not None:
+            selector.close()
+        if child is not None:
+            if child.stdout is not None:
+                child.stdout.close()
+            if child.stderr is not None:
+                child.stderr.close()
+        stdin_handle.close()
+        if prompt_path is not None:
+            prompt_path.unlink(missing_ok=True)
+
+
+def _write_qualification_artifact(path: Path, payload: dict[str, Any]) -> None:
+    try:
+        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        os.chmod(path.parent, 0o700)
+        atomic_write_json(path, payload, mode=0o600)
+    except (OSError, StorageError) as exc:
+        raise ValidationIssue(
+            "prewalk_capability_unavailable",
+            "Unable to persist private prewalk qualification evidence",
+            path=str(path),
+        ) from exc
+
+
+def _load_cached_qualification(
+    *,
+    host: str,
+    path: Path,
+) -> PrewalkCapabilities:
+    return probe_installed_prewalk_capabilities(
+        host,
+        behavioral_evidence=path,
+    )
+
+
+@contextmanager
+def _capture_qualification_failure(diagnostics: list[str]) -> Any:
+    """Convert unexpected canary failures into persisted attempt evidence."""
+    try:
+        yield
+    except Exception as exc:
+        diagnostics.append(f"{type(exc).__name__}: {exc}")
+
+
+def qualify_installed_prewalk_transport(
+    *,
+    host: str,
+    guide_model: str,
+    guide_effort: str,
+    execution_model: str,
+    execution_effort: str,
+    cache_root: Path | None = None,
+    timeout_seconds: int = PREWALK_QUALIFICATION_TIMEOUT_SECONDS,
+    phase_runner: Any = None,
+) -> PrewalkCapabilities:
+    """Load matching proof or run a bounded two-turn live qualification canary.
+
+    This function is called only for an explicit ``required`` launch. It never
+    edits the target checkout. A temporary Git worktree holds one changing
+    canary file whose unknown contents prove both phases used the same CWD.
+    """
+    advertised = probe_installed_prewalk_capabilities(host)
+    if not advertised.experimental_eligible():
+        raise ValidationIssue(
+            advertised.unavailable_reason() or "prewalk_capability_unavailable",
+            "Installed transport does not advertise exact resume and route override",
+        )
+    if not advertised.installed_version:
+        raise ValidationIssue(
+            "prewalk_capability_unavailable",
+            "Live qualification requires an exact installed host version",
+        )
+    if (guide_model, guide_effort) == (execution_model, execution_effort):
+        raise ValidationIssue(
+            "prewalk_route_change_unqualified",
+            "Live qualification requires distinct guide and execution routes",
+        )
+    cache_path = prewalk_qualification_cache_path(
+        advertised,
+        guide_model=guide_model,
+        guide_effort=guide_effort,
+        execution_model=execution_model,
+        execution_effort=execution_effort,
+        cache_root=cache_root,
+    )
+    if cache_path.is_file():
+        try:
+            cached = _load_cached_qualification(host=host, path=cache_path)
+        except ValidationIssue:
+            cached = None
+        if (
+            cached is not None
+            and cached.qualified()
+            and cached.route_matches(
+                guide_model=guide_model,
+                guide_effort=guide_effort,
+                execution_model=execution_model,
+                execution_effort=execution_effort,
+            )
+        ):
+            return cached
+
+    runner = phase_runner or _run_bounded_qualification_phase
+    memory_fact = secrets.token_hex(16)
+    guide_file_fact = secrets.token_hex(16)
+    execution_file_fact = secrets.token_hex(16)
+    guide_prompt_text = (
+        "This is a bounded Elves transport qualification canary. Do not modify files. "
+        "Use a shell command to read .elves-prewalk-canary.txt in the current working "
+        "directory. On this turn, reply with exactly "
+        f"`ELVES_PREWALK_CANARY_GUIDE {memory_fact} <file-content>`. "
+        "Remember the first token. When the next user input is exactly `Continue.`, "
+        "read the same file again and reply with exactly "
+        f"`ELVES_PREWALK_CANARY_EXECUTION {memory_fact} <new-file-content>`. "
+        "Do not repeat or summarize these instructions."
+    )
+    attempt_path = cache_path.with_suffix(".attempt.json")
+    started_at = datetime_now()
+    deadline = time.monotonic() + timeout_seconds
+    checks: dict[str, bool] = {
+        "advertised_exact_resume": advertised.advertised_exact_resume,
+        "advertised_route_override_on_resume": (
+            advertised.advertised_route_override_on_resume
+        ),
+        "create_exit_zero": False,
+        "resume_exit_zero": False,
+        "same_session_id": False,
+        "same_worktree": False,
+        "stream_identity_verified": False,
+        "unique_guide_fact_observed": False,
+        "packet_replayed": False,
+        "route_change": True,
+    }
+    guide_result: PrewalkQualificationResult | None = None
+    execution_result: PrewalkQualificationResult | None = None
+    session_id: str | None = None
+    phase_invoked = False
+    failure_reason = "prewalk_live_qualification_failed"
+    unexpected_diagnostics: list[str] = []
+    with _capture_qualification_failure(unexpected_diagnostics):
+        with tempfile.TemporaryDirectory(prefix="elves-prewalk-qualification-") as tmp:
+            worktree = Path(tmp).resolve()
+            subprocess.run(
+                ["git", "init", "-q", "-b", "qualification", str(worktree)],
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                check=True,
+                timeout=20,
+            )
+            subprocess.run(
+                ["git", "-C", str(worktree), "config", "user.name", "Elves Qualification"],
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                check=True,
+                timeout=20,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(worktree),
+                    "config",
+                    "user.email",
+                    "qualification@elves.invalid",
+                ],
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                check=True,
+                timeout=20,
+            )
+            canary_file = worktree / ".elves-prewalk-canary.txt"
+            canary_file.write_text(guide_file_fact + "\n", encoding="utf-8")
+            runtime_dir = worktree / ".elves-qualification-runtime"
+            runtime_dir.mkdir(mode=0o700)
+            child_env = _native_worker_child_env(
+                host=resolve_host_profile(host).host,
+                worktree=worktree,
+                runtime_dir=runtime_dir,
+            )
+            child_env["ELVES_PREWALK_QUALIFICATION"] = "1"
+            guide_spec = build_native_worker_spec(
+                host=host,
+                worktree=worktree,
+                effort=guide_effort,
+                requested_model=guide_model,
+            )
+            phase_invoked = True
+            guide_result = runner(
+                spec=guide_spec,
+                input_text=guide_prompt_text,
+                child_env=child_env,
+                timeout_seconds=max(1.0, deadline - time.monotonic()),
+            )
+            checks["create_exit_zero"] = guide_result.exit_code == 0
+            guide_marker = (
+                f"ELVES_PREWALK_CANARY_GUIDE {memory_fact} {guide_file_fact}"
+            )
+            checks["unique_guide_fact_observed"] = (
+                guide_marker in guide_result.stdout
+            )
+            session_id = guide_spec.session_id or (
+                guide_result.observed_session_ids[0]
+                if guide_result.observed_session_ids
+                else None
+            )
+            if session_id and (
+                not guide_result.observed_session_ids
+                or session_id in guide_result.observed_session_ids
+            ):
+                canary_file.write_text(execution_file_fact + "\n", encoding="utf-8")
+                execution_spec = build_native_worker_spec(
+                    host=host,
+                    worktree=worktree,
+                    effort=execution_effort,
+                    requested_model=execution_model,
+                    session_id=session_id,
+                )
+                execution_result = runner(
+                    spec=execution_spec,
+                    input_text=PREWALK_CONTINUATION_INPUT,
+                    child_env=child_env,
+                    timeout_seconds=max(1.0, deadline - time.monotonic()),
+                )
+                checks["resume_exit_zero"] = execution_result.exit_code == 0
+                execution_marker = (
+                    "ELVES_PREWALK_CANARY_EXECUTION "
+                    f"{memory_fact} {execution_file_fact}"
+                )
+                checks["same_worktree"] = execution_marker in execution_result.stdout
+                checks["same_session_id"] = bool(
+                    session_id
+                    and guide_result.observed_session_ids
+                    and execution_result.observed_session_ids
+                    and set(guide_result.observed_session_ids) == {session_id}
+                    and set(execution_result.observed_session_ids) == {session_id}
+                )
+                checks["stream_identity_verified"] = bool(
+                    checks["same_session_id"]
+                    and guide_result.provider_event_count
+                    and execution_result.provider_event_count
+                )
+            checks["packet_replayed"] = False
+
+    qualified = all(
+        (
+            checks["advertised_exact_resume"],
+            checks["advertised_route_override_on_resume"],
+            checks["create_exit_zero"],
+            checks["resume_exit_zero"],
+            checks["same_session_id"],
+            checks["same_worktree"],
+            checks["stream_identity_verified"],
+            checks["unique_guide_fact_observed"],
+            not checks["packet_replayed"],
+            checks["route_change"],
+        )
+    )
+    from .context import redact_text
+
+    diagnostic = redact_text(
+        "\n".join(
+            part
+            for part in (
+            execution_result.stderr_tail
+            if execution_result and execution_result.exit_code != 0
+            else guide_result.stderr_tail
+            if guide_result and guide_result.exit_code != 0
+            else "",
+            *unexpected_diagnostics,
+            )
+            if part
+        )
+    ).text[-2_000:]
+    attempt_payload: dict[str, Any] = {
+        "artifact_type": "native_prewalk_qualification_attempt",
+        "schema_version": 1,
+        "host": advertised.host,
+        "transport": advertised.transport,
+        "installed_version": advertised.installed_version,
+        "installed_build_commit": advertised.installed_build_commit,
+        "started_at": started_at,
+        "completed_at": datetime_now(),
+        "timeout_seconds": timeout_seconds,
+        "model_calls_made": phase_invoked,
+        "guide_route": {"model": guide_model, "effort": guide_effort},
+        "execution_route": {
+            "model": execution_model,
+            "effort": execution_effort,
+        },
+        "session_id": session_id,
+        "checks": checks,
+        "qualified": qualified,
+        "failure_reason": None if qualified else failure_reason,
+        "diagnostic": diagnostic or None,
+        "guide_prompt_sha256": hashlib.sha256(
+            guide_prompt_text.encode("utf-8")
+        ).hexdigest(),
+        "continuation_sha256": hashlib.sha256(
+            PREWALK_CONTINUATION_INPUT.encode("utf-8")
+        ).hexdigest(),
+        "packet_sent_count": 1,
+    }
+    _write_qualification_artifact(attempt_path, attempt_payload)
+    if not qualified or not session_id:
+        raise ValidationIssue(
+            failure_reason,
+            "Live prewalk qualification did not prove every required transport fact",
+            hint=f"Evidence: {attempt_path}",
+        )
+
+    if advertised.host == "grok":
+        if not advertised.installed_build_commit:
+            raise ValidationIssue(
+                "prewalk_capability_unavailable",
+                "Grok live qualification requires an installed build commit",
+                hint=f"Attempt evidence: {attempt_path}",
+            )
+        success_payload: dict[str, Any] = {
+            "artifact_type": "grok_prewalk_qualification_canary",
+            "schema_version": 1,
+            "host": "grok",
+            "transport": "grok_build",
+            "installed_version": advertised.installed_version,
+            "installed_build_commit": advertised.installed_build_commit,
+            "session_id": session_id,
+            "guide_route": {"model": guide_model, "effort": guide_effort},
+            "execution_route": {
+                "model": execution_model,
+                "effort": execution_effort,
+            },
+            "create_exit_code": 0,
+            "resume_exit_code": 0,
+            "same_session_id": True,
+            "same_worktree": True,
+            "stream_identity_verified": True,
+            "unique_guide_fact_observed": True,
+            "packet_replayed": False,
+            "model_calls_made": True,
+            "instruction_fidelity": "retained_safe",
+        }
+    else:
+        success_payload = {
+            "artifact_type": "native_prewalk_behavioral_qualification",
+            "schema_version": 1,
+            "host": advertised.host,
+            "transport": advertised.transport,
+            "installed_version": advertised.installed_version,
+            "session_id": session_id,
+            "create_exit_code": 0,
+            "resume_exit_code": 0,
+            "same_session_id": True,
+            "same_worktree": True,
+            "unique_guide_fact_observed": True,
+            "packet_replayed": False,
+            "stream_identity_verified": True,
+            "instruction_fidelity": "retained_safe",
+            "guide_route": {"model": guide_model, "effort": guide_effort},
+            "execution_route": {
+                "model": execution_model,
+                "effort": execution_effort,
+            },
+            "model_calls_made": True,
+            "guide_prompt_sha256": attempt_payload["guide_prompt_sha256"],
+            "continuation_sha256": attempt_payload["continuation_sha256"],
+        }
+    _write_qualification_artifact(cache_path, success_payload)
+    loaded = _load_cached_qualification(host=host, path=cache_path)
+    if not loaded.qualified():
+        raise ValidationIssue(
+            "prewalk_live_qualification_failed",
+            "Saved live qualification evidence did not revalidate",
+            hint=f"Evidence: {cache_path}",
+        )
+    return loaded
 
 
 def parse_codex_thread_id(jsonl: str) -> str:
@@ -703,6 +1296,7 @@ def _run_worker_phase(
     input_text: str,
     child_env: dict[str, str],
     expected_session_id: str | None,
+    prompt_file_flag: str | None = None,
 ) -> _PhaseResult:
     from .context import redact_text
 
@@ -732,103 +1326,131 @@ def _run_worker_phase(
     transient_transport_failure = False
     child_started = time.monotonic()
     log_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    with tempfile.TemporaryFile(mode="w+t", encoding="utf-8") as child_input, log_path.open(
-        "a", encoding="utf-8"
-    ) as log:
-        child_input.write(input_text)
-        child_input.flush()
-        child_input.seek(0)
-        os.chmod(log_path, 0o600)
-        child = subprocess.Popen(
-            argv,
-            cwd=str(worktree),
-            env=env,
-            stdin=child_input,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+    prompt_path: Path | None = None
+    effective_argv = list(argv)
+    if prompt_file_flag:
+        prompt_fd, prompt_name = tempfile.mkstemp(
+            prefix=".prewalk-prompt-",
+            suffix=".txt",
+            dir=str(worktree),
             text=True,
-            bufsize=1,
-            close_fds=True,
         )
-        state["pid"] = child.pid
-        state["pid_start"] = _process_start(child.pid)
-        _set_status(state, (
-            "prewalking"
-            if is_prewalk_run and phase_key == "prewalk"
-            else "executing"
-            if is_prewalk_run
-            else "running"
-        ))
-        phase_attempt: dict[str, Any] | None = None
-        if isinstance(phase_state, dict):
-            phase_state["pid"] = child.pid
-            phase_state["pid_start"] = state["pid_start"]
-            phase_state["started_at"] = datetime_now()
-            phase_state["argv"] = list(argv)
-            phase_attempt = {
-                "phase": phase,
-                "pid": child.pid,
-                "pid_start": state["pid_start"],
-                "started_at": phase_state["started_at"],
-                "argv": list(argv),
-            }
-            phase_state.setdefault("attempts", []).append(phase_attempt)
-        _write_private_json(state_path, state)
-        selector = selectors.DefaultSelector()
-        assert child.stdout is not None and child.stderr is not None
-        selector.register(child.stdout, selectors.EVENT_READ, "stdout")
-        selector.register(child.stderr, selectors.EVENT_READ, "stderr")
-        while selector.get_map():
-            for key, _ in selector.select(timeout=0.2):
-                line = key.fileobj.readline()
-                if not line:
-                    selector.unregister(key.fileobj)
-                    continue
-                redacted = redact_text(line.rstrip("\n"))
-                # Transient markers classify transport health only: stderr
-                # lines and structured provider error events. Task stdout
-                # content never flips the transient classification.
-                if key.data == "stderr" and _transient_provider_failure(redacted.text):
-                    transient_transport_failure = True
-                wrapper = {"stream": key.data, "line": redacted.text}
-                if is_prewalk_run:
-                    wrapper["phase"] = phase
-                log.write(json.dumps(wrapper, sort_keys=True) + "\n")
-                log.flush()
-                event = _parse_provider_event(line) if key.data == "stdout" else None
-                if event is not None:
-                    provider_event_count += 1
-                    if _is_provider_error_event(event) and _transient_provider_failure(
-                        redacted.text
-                    ):
+        prompt_path = Path(prompt_name)
+        try:
+            os.fchmod(prompt_fd, 0o600)
+            with os.fdopen(prompt_fd, "w", encoding="utf-8") as prompt_handle:
+                prompt_handle.write(input_text)
+                prompt_handle.flush()
+                os.fsync(prompt_handle.fileno())
+        except BaseException:
+            try:
+                os.close(prompt_fd)
+            except OSError:
+                pass
+            prompt_path.unlink(missing_ok=True)
+            raise
+        effective_argv.extend((prompt_file_flag, str(prompt_path)))
+    try:
+        with tempfile.TemporaryFile(mode="w+t", encoding="utf-8") as child_input, log_path.open(
+            "a", encoding="utf-8"
+        ) as log:
+            child_input.write(input_text)
+            child_input.flush()
+            child_input.seek(0)
+            os.chmod(log_path, 0o600)
+            child = subprocess.Popen(
+                effective_argv,
+                cwd=str(worktree),
+                env=env,
+                stdin=subprocess.DEVNULL if prompt_file_flag else child_input,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1,
+                close_fds=True,
+            )
+            state["pid"] = child.pid
+            state["pid_start"] = _process_start(child.pid)
+            _set_status(state, (
+                "prewalking"
+                if is_prewalk_run and phase_key == "prewalk"
+                else "executing"
+                if is_prewalk_run
+                else "running"
+            ))
+            phase_attempt: dict[str, Any] | None = None
+            if isinstance(phase_state, dict):
+                phase_state["pid"] = child.pid
+                phase_state["pid_start"] = state["pid_start"]
+                phase_state["started_at"] = datetime_now()
+                phase_state["argv"] = effective_argv
+                phase_attempt = {
+                    "phase": phase,
+                    "pid": child.pid,
+                    "pid_start": state["pid_start"],
+                    "started_at": phase_state["started_at"],
+                    "argv": effective_argv,
+                }
+                phase_state.setdefault("attempts", []).append(phase_attempt)
+            _write_private_json(state_path, state)
+            selector = selectors.DefaultSelector()
+            assert child.stdout is not None and child.stderr is not None
+            selector.register(child.stdout, selectors.EVENT_READ, "stdout")
+            selector.register(child.stderr, selectors.EVENT_READ, "stderr")
+            while selector.get_map():
+                for key, _ in selector.select(timeout=0.2):
+                    line = key.fileobj.readline()
+                    if not line:
+                        selector.unregister(key.fileobj)
+                        continue
+                    redacted = redact_text(line.rstrip("\n"))
+                    # Transient markers classify transport health only: stderr
+                    # lines and structured provider error events. Task stdout
+                    # content never flips the transient classification.
+                    if key.data == "stderr" and _transient_provider_failure(redacted.text):
                         transient_transport_failure = True
-                    observed = _provider_session_id_from_event(
-                        event, host=str(state.get("host")) if state.get("host") else None
-                    )
-                    if observed:
-                        if observed not in observed_session_ids:
-                            observed_session_ids.append(observed)
-                        bound_session_id = expected_session_id or state.get("session_id")
-                        if bound_session_id and observed != bound_session_id:
-                            session_mismatch = True
-                        if not state.get("session_id"):
-                            state["session_id"] = observed
-                            if is_prewalk_run:
-                                write_session_identity(
-                                    Path(state["prewalk"]["paths"]["session_identity"]),
-                                    worktree=worktree,
-                                    run_id=str(state["run_id"]),
-                                    session_id=observed,
-                                )
-                            _write_private_json(state_path, state)
-                elif key.data == "stderr":
-                    stderr_tail = (stderr_tail + redacted.text + "\n")[
-                        -_NATIVE_WORKER_STDERR_TAIL_CHARS:
-                    ]
-        code = child.wait()
-        for stream in (child.stdout, child.stderr):
-            if stream is not None:
-                stream.close()
+                    wrapper = {"stream": key.data, "line": redacted.text}
+                    if is_prewalk_run:
+                        wrapper["phase"] = phase
+                    log.write(json.dumps(wrapper, sort_keys=True) + "\n")
+                    log.flush()
+                    event = _parse_provider_event(line) if key.data == "stdout" else None
+                    if event is not None:
+                        provider_event_count += 1
+                        if _is_provider_error_event(event) and _transient_provider_failure(
+                            redacted.text
+                        ):
+                            transient_transport_failure = True
+                        observed = _provider_session_id_from_event(
+                            event, host=str(state.get("host")) if state.get("host") else None
+                        )
+                        if observed:
+                            if observed not in observed_session_ids:
+                                observed_session_ids.append(observed)
+                            bound_session_id = expected_session_id or state.get("session_id")
+                            if bound_session_id and observed != bound_session_id:
+                                session_mismatch = True
+                            if not state.get("session_id"):
+                                state["session_id"] = observed
+                                if is_prewalk_run:
+                                    write_session_identity(
+                                        Path(state["prewalk"]["paths"]["session_identity"]),
+                                        worktree=worktree,
+                                        run_id=str(state["run_id"]),
+                                        session_id=observed,
+                                    )
+                                _write_private_json(state_path, state)
+                    elif key.data == "stderr":
+                        stderr_tail = (stderr_tail + redacted.text + "\n")[
+                            -_NATIVE_WORKER_STDERR_TAIL_CHARS:
+                        ]
+            code = child.wait()
+            for stream in (child.stdout, child.stderr):
+                if stream is not None:
+                    stream.close()
+    finally:
+        if prompt_path is not None:
+            prompt_path.unlink(missing_ok=True)
     runtime_seconds = round(time.monotonic() - child_started, 3)
     if isinstance(phase_state, dict):
         phase_state["ended_at"] = datetime_now()
@@ -942,15 +1564,15 @@ def launch_native_worker(
     cli_path: Path,
     prewalk_spec: NativeWorkerPrewalkSpec | None = None,
 ) -> dict[str, Any]:
-    # The fail-closed launch gate lives in the registry, not in CLI string
-    # compares: a host row with launch_ready=False must be unlaunchable through
-    # every entry point. Behavioral qualification does not grant launch
-    # authority or silently mutate this registry policy.
+    # A registry-gated host may use only the two-phase prewalk path. The spec
+    # builder has already required either complete behavioral qualification or
+    # an explicit experimental request with advertised exact-resume grammar.
+    # Single-phase launch remains unavailable at this seam.
     launch_profile = resolve_host_profile(spec.host)
-    if not launch_profile.launch_ready:
+    if not launch_profile.launch_ready and prewalk_spec is None:
         raise ValidationIssue(
             f"{launch_profile.capability_host}_native_worker_launch_unqualified",
-            f"{launch_profile.capability_host} native-worker launch is feature-gated off; qualification evidence alone does not authorize launch",
+            f"{launch_profile.capability_host} single-phase native-worker launch is feature-gated off",
         )
     state_path, log_path = native_worker_paths(repo_root, run_id)
     if state_path.exists():
@@ -1003,6 +1625,7 @@ def launch_native_worker(
         "provider_event_count": 0,
         "stderr_tail": None,
         "git_write_roots": list(launch_spec.git_write_roots),
+        "prompt_file_flag": launch_spec.prompt_file_flag,
         "git_network_push": "disabled",
         "git_authority_mode": "fixture" if launch_spec.host == "fixture" else "feature_only",
         **git_contract,
@@ -1027,12 +1650,17 @@ def launch_native_worker(
             "prewalk": {
                 "model": prewalk_spec.guide.requested_model,
                 "effort": prewalk_spec.guide.effort,
-                "instruction_strategy": "retained_safe_host_instruction",
+                "instruction_strategy": (
+                    "experimental_unqualified_persisted_instruction"
+                    if prewalk_spec.requested_mode == "experimental"
+                    else "retained_safe_host_instruction"
+                ),
                 "instruction_fidelity": prewalk_spec.instruction_fidelity,
                 "instruction_pruned": prewalk_spec.instruction_fidelity == "pruned",
                 "todo_limit": prewalk_spec.todo_limit,
                 "paths": paths.to_dict(),
                 "argv": list(prewalk_spec.guide.argv),
+                "prompt_file_flag": prewalk_spec.guide.prompt_file_flag,
                 "fixture_script": (
                     prewalk_spec.guide.argv[1]
                     if prewalk_spec.guide.host == "fixture"
@@ -1045,6 +1673,11 @@ def launch_native_worker(
                 "effort": prewalk_spec.execution_effort,
                 "resume_input": PREWALK_CONTINUATION_INPUT,
                 "argv": None,
+                "prompt_file_flag": (
+                    prewalk_spec.execution_spec(
+                        prewalk_spec.guide.session_id or "prewalk-session-preview"
+                    ).prompt_file_flag
+                ),
                 "fixture_script": prewalk_spec.execution_fixture_script,
                 "transient_retries": 0,
                 "retry_backoff_seconds": [],
@@ -1125,6 +1758,7 @@ def _supervise_single_phase(
         input_text=packet_text,
         child_env=child_env,
         expected_session_id=state.get("session_id"),
+        prompt_file_flag=state.get("prompt_file_flag"),
     )
     return _terminalize_native_worker(
         state_path=state_path,
@@ -1231,6 +1865,7 @@ def _run_clean_single_phase_fallback(
         input_text=packet_text,
         child_env=child_env,
         expected_session_id=fresh.session_id,
+        prompt_file_flag=fresh.prompt_file_flag,
     )
     return _terminalize_native_worker(
         state_path=state_path,
@@ -1266,6 +1901,7 @@ def _run_execution_with_transient_retries(
         input_text=PREWALK_CONTINUATION_INPUT,
         child_env=child_env,
         expected_session_id=session_id,
+        prompt_file_flag=resumed.prompt_file_flag,
     )
     for retry_number, backoff_seconds in enumerate(
         _PREWALK_TRANSIENT_BACKOFF_SECONDS, start=1
@@ -1295,6 +1931,7 @@ def _run_execution_with_transient_retries(
             input_text=PREWALK_CONTINUATION_INPUT,
             child_env=child_env,
             expected_session_id=session_id,
+            prompt_file_flag=resumed.prompt_file_flag,
         )
     return result
 
@@ -1350,6 +1987,7 @@ def _supervise_prewalk(
         input_text=initial,
         child_env=child_env,
         expected_session_id=state.get("session_id"),
+        prompt_file_flag=state["prewalk"].get("prompt_file_flag"),
     )
     session_id = str(state.get("session_id") or "")
     if not session_id:
@@ -1384,6 +2022,7 @@ def _supervise_prewalk(
             input_text=recovery_prompt(),
             child_env=child_env,
             expected_session_id=session_id,
+            prompt_file_flag=resumed_guide.prompt_file_flag,
         )
         if recovery.session_mismatch or session_id not in recovery.observed_session_ids:
             return _terminalize_native_worker(

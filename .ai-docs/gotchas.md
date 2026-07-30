@@ -109,9 +109,10 @@
 - Prewalk is stricter than exact resume in isolation: it requires one worker session and worktree
   across guide and execution routes, one packet send, a bounded TODO, a validated real task edit,
   and minimal continuation. A new worker with a summary or copied packet is a cold handoff, never
-  prewalk. Help text proves only advertised grammar; do not enable `auto`, claim instruction
-  pruning, or accept post-edit cold fallback without exact-version behavioral evidence. Preserve
-  the dirty worktree and stable `prewalk_*` diagnostic on failure.
+  prewalk. Help text proves only advertised grammar. Auto requires matching cached proof; required
+  obtains it through a bounded live canary; experimental must be explicit and honestly reported.
+  No mode may accept post-edit cold fallback. Preserve the dirty worktree and stable `prewalk_*`
+  diagnostic on failure.
 - `scripts/consistency_policy.py` phrase-pins many normative sentences in `SKILL.md`, `README.md`,
   `AGENTS.md`, `CHANGELOG.md`, and `references/*`. Editing a pinned sentence without updating its
   pin (or adding a pinned phrase the doc does not contain) fails

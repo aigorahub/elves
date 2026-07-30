@@ -20,6 +20,12 @@ silently deleting it.
 
 ## Repo Conventions
 
+- [2026-07-29] Qualification should be an automatic gate at the point of use, not a manual artifact
+  ceremony. Required prewalk runs a bounded live canary when exact version/build and route proof is
+  absent; auto reuses successful cached proof without spending; experimental accepts only
+  qualification uncertainty and never weakens the real session, worktree, stream, packet,
+  transition, Git, or landing checks.
+
 - [2026-07-17] Tighten staging contracts through explicit versioned opt-in, not surprise migration.
   Existing delegable sessions keep advisory missing-packet compatibility; declaring top-level
   `handoff` activates strict handoff v1 across session state, pending-acceptance ownership, exact
@@ -158,11 +164,12 @@ silently deleting it.
   CLI are optional plan/review lenses, usually not cost-effective for the main implement batch.
 - [2026-07-12] **Supported Elves main drivers were Claude Code and Codex only** at the time of this
   note. Superseded 2026-07-29: see next entry.
-- [2026-07-29] **Supported Elves main drivers are Claude Code, Codex, and Grok Build.** When Grok
-  is host, prewalk is always off (no exact-session prewalk claim; `required` fails closed). Grok
-  remains an optional worker under Claude/Codex. Optional routes (Antigravity, Gemini CLI, Muse,
-  OpenRouter, AlphaEvolve, …) may still work as tools the host calls; exotic interfaces are not
-  heavily tested. Prefer contributor PRs (or issues) when optional paths fail.
+- [2026-07-29] **Supported Elves main drivers are Claude Code, Codex, and Grok Build.** The original
+  no-prewalk restriction in this entry is superseded by the 2026-07-29 automatic prewalk
+  qualification convention above. Grok remains an optional worker under Claude/Codex. Optional
+  routes (Antigravity, Gemini CLI, Muse, OpenRouter, AlphaEvolve, …) may still work as tools the
+  host calls; exotic interfaces are not heavily tested. Prefer contributor PRs (or issues) when
+  optional paths fail.
 - [2026-07-29] **Mid-run impact path; terminal full suite + deferred hygiene.** High-effort models
   were re-running full suites and polishing every nit between batches because validation-guide said
   "zero debt / production-ready every batch" while proof-and-review said impact path. Correctness

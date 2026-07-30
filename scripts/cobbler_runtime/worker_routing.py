@@ -859,7 +859,7 @@ def decide_worker_route(
 ) -> RouteDecision:
     """Return an inspectable route. Repository policy is the final safety veto."""
     host_token = host.strip().lower().replace("_", "-")
-    if host_token not in {"codex", "claude", "claude-code"}:
+    if host_token not in {"codex", "claude", "claude-code", "grok"}:
         raise ValidationIssue("unsupported_host", f"Unsupported host `{host}`", path="host")
     execution = execution_reasoning.strip().lower()
     risk = review_risk.strip().lower()
@@ -1078,12 +1078,7 @@ def decide_worker_route(
             unqualified = grok_prewalk_unqualified_reason(grok_prewalk_qualification)
             if unqualified is None and grok_prewalk_qualification is not None:
                 caps = grok_prewalk_qualification
-                if not resolve_host_profile("grok").launch_ready:
-                    prewalk_fallback = (
-                        "prewalk_capability_unavailable:grok_prewalk_unqualified:"
-                        "launch_feature_gate_closed"
-                    )
-                elif caps.route_matches(
+                if caps.route_matches(
                     guide_model=guide_model,
                     guide_effort=guide_effort,
                     execution_model=selected_model,
@@ -1097,10 +1092,17 @@ def decide_worker_route(
                         "qualification_route_mismatch"
                     )
             else:
-                prewalk_fallback = (
-                    "prewalk_capability_unavailable:grok_prewalk_unqualified:"
-                    f"{unqualified}"
-                )
+                if requested_prewalk is PrewalkMode.REQUIRED:
+                    actual_prewalk = "qualification_required"
+                    reasons.append("prewalk_live_qualification_required")
+                elif requested_prewalk is PrewalkMode.EXPERIMENTAL:
+                    actual_prewalk = "qualification_required"
+                    reasons.append("prewalk_experimental_advertised_probe_required")
+                else:
+                    prewalk_fallback = (
+                        "prewalk_capability_unavailable:grok_prewalk_unqualified:"
+                        f"{unqualified}"
+                    )
         elif requested_prewalk is PrewalkMode.AUTO and execution == "low":
             prewalk_fallback = "prewalk_atomic_task_skipped"
         elif caps.qualified() and caps.route_matches(
@@ -1111,21 +1113,20 @@ def decide_worker_route(
         ):
             actual_prewalk = "exact_session"
             reasons.append("trajectory_preserving_prewalk_qualified")
+        elif requested_prewalk is PrewalkMode.EXPERIMENTAL:
+            if caps.experimental_eligible():
+                actual_prewalk = "exact_session_experimental"
+                reasons.append("explicit_experimental_prewalk")
+            else:
+                actual_prewalk = "qualification_required"
+                reasons.append("prewalk_experimental_advertised_probe_required")
+        elif requested_prewalk is PrewalkMode.REQUIRED:
+            actual_prewalk = "qualification_required"
+            reasons.append("prewalk_live_qualification_required")
         elif caps.qualified():
             prewalk_fallback = "prewalk_route_change_unqualified"
         else:
             prewalk_fallback = caps.unavailable_reason() or "prewalk_capability_unavailable"
-        if requested_prewalk is PrewalkMode.REQUIRED and actual_prewalk != "exact_session":
-            failure_code = (
-                prewalk_fallback.split(":", 1)[0]
-                if prewalk_fallback
-                else "prewalk_capability_unavailable"
-            )
-            raise ValidationIssue(
-                failure_code,
-                "Required prewalk is unavailable for the selected worker transport",
-                hint=prewalk_fallback,
-            )
     if prewalk_fallback:
         reasons.append(f"honest_prewalk_fallback:{prewalk_fallback}")
     capability_state = (

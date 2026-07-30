@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.20.0"
+  version: "2.21.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -23,16 +23,19 @@ run, own canonical memory, protected refs, PR actions, final gates, terminal rev
 **Grok Build may drive Elves.** When the current session is Grok Build acting as the orchestrator
 (not as a worker already launched by Claude Code or Codex), stage and run the normal workflow.
 
-**Hard limit: no prewalk when Grok is the main driver.** Exact-session prewalk is never offered,
-selected, or claimed on a Grok-driven run. Actual prewalk mode is always `off` under `auto`. If
-the user or config sets `worker.prewalk=required` while Grok is host, fail before launch with an
-honest reason (Grok-host prewalk is unsupported). Prefer host-native implementation in the Grok
-session, or a cold packet handoff to a separate worker. A cold packet is not prewalk. Do not
-advertise Grok-host prewalk availability or invent a fake resume trajectory.
+All three supported hosts may use exact-session prewalk when their installed transport proves the
+same continuity contract. `worker.prewalk=required` automatically runs one bounded live
+qualification canary when matching version-and-route-bound evidence is absent. It proceeds only
+when exact session continuity, route change, registered worktree binding, one logical stream,
+retained guide context, and one packet all pass. Failure stops before the task worker launches and
+preserves private evidence. `worker.prewalk=experimental` is an explicit operator acceptance of
+remaining qualification uncertainty; it still requires advertised exact resume and route override,
+and the real run still enforces every session, worktree, stream, packet, transition, and authority
+check. `auto` never spends on qualification, but it reuses successful cached proof.
 
 Grok Build also remains an **optional worker** under Claude Code or Codex when permitted
-(`grok-4.5` at `high` when the live catalog offers it). That worker role is separate from Grok as
-host; worker prewalk stays feature-gated and unqualified as today (`references/prewalk.md`).
+(`grok-4.5` at `high` when the live catalog offers it). Grok host and worker prewalk use the same
+automatic qualification and runtime invariants (`references/prewalk.md`).
 
 Managed install targets remain `~/.claude/skills/elves` and `~/.codex/skills/elves`. Grok often
 discovers Elves via Claude skill compatibility; a native `~/.grok/skills` install is optional
@@ -69,7 +72,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.20.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.21.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
@@ -350,19 +353,18 @@ gate or worker runs triggers a health check (near-zero CPU time against long wal
 hang signature). After repeated transient deaths in one batch, the driver may split the batch or
 take it host-native without that counting against the budget; document the decision.
 
-**Exact-session prewalk.** Optional subscription-native prewalk means one worker trajectory:
+**Exact-session prewalk.** Optional prewalk means one worker trajectory:
 guide route → bounded TODO + first meaningful task edit + private checkpoint → automatic exact-ID,
 same-worktree execution-route resume with only `Continue.`. The packet is sent once. A fresh session
 with a copied packet or summary is not prewalk; post-edit cold fallback is forbidden. `off`, `auto`,
-and `required` are deterministic/model-free routing requests, but actual prewalk requires
-version-bound behavioral proof of exact session/worktree/stream continuity, route change, no packet
-replay, and honest instruction fidelity. The evidence schema can report `pruned`, `turn_scoped`,
-`retained_safe`, or `unsupported`; because the current transport persists the cooperative guide
-instruction, this implementation activates only for proven `retained_safe`. Static help proves only
-advertised grammar. A separately qualified external transport must also have its maintainer-owned
-registry launch gate open; behavioral evidence never grants launch authority. Until both Codex and
-Claude transports are behaviorally qualified, the safe `auto` preference records actual mode
-`off`; `required` fails before launch. The driver still owns canonical memory, terminal review, PR,
+`required`, and `experimental` are deterministic routing requests. `required` automatically runs a
+bounded live qualification canary before task launch when matching cached proof is absent.
+Successful proof is bound to the installed version/build and exact guide/execution routes, then
+reused by `auto`; failure stops with private evidence. `experimental` accepts only the remaining
+qualification uncertainty and never relaxes live trajectory or authority checks. The evidence
+schema can report `pruned`, `turn_scoped`, `retained_safe`, or `unsupported`; the persisted
+cooperative guide instruction activates normally only for proven `retained_safe`. Static help proves
+advertised grammar only. The driver still owns canonical memory, terminal review, PR,
 landing, and merge. Full contract and host grammar: `references/prewalk.md`.
 
 **Parallel lanes (Parallelves).** Serial is the default everywhere; parallel lanes are an earned
@@ -698,18 +700,17 @@ lanes remain useful but are not the default happy path.
 
 ## Host parity
 
-Claude Code and Codex provide the same workflow and safety, including the prewalk contract when
-behaviorally qualified. Grok Build is a supported main driver with the same safety kernel and a
-documented prewalk gap: **no prewalk when Grok is host**. See `references/host-parity.md`.
-Exact-session prewalk must preserve the same trajectory, checkpoint, visibility, fallback, and
-authority semantics on Claude and Codex; supervised transport syntax may differ.
+Claude Code, Codex, and Grok Build provide the same workflow and prewalk safety contract.
+Exact-session prewalk preserves the same qualification, trajectory, checkpoint, visibility,
+fallback, and authority semantics on every host; supervised transport syntax may differ.
+See `references/host-parity.md`.
 **Codex Goals** are optional continuation plumbing — distinct from **Grok Build goal mode**.
 
 ## Compatibility notes
 
 - Missing optional provider access never blocks a native run.
 - Record `implementation_lane: fast | untrusted` when using external work drivers.
-- Supported main drivers are Claude Code, Codex, and Grok Build. When Grok is host, prewalk is
-  always off (see **Supported main drivers** above). Grok as optional worker under Claude/Codex
-  remains supported when permitted and capability-qualified.
+- Supported main drivers are Claude Code, Codex, and Grok Build. Required prewalk qualifies the
+  installed transport automatically; experimental prewalk is explicit and still fail-closed during
+  the real trajectory. Grok as an optional worker under Claude/Codex remains consent-gated.
 - Compatibility: `$elves setup-council` remains supported.

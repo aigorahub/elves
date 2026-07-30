@@ -1,8 +1,8 @@
 # Host parity: Claude Code, Codex, and Grok Build
 
-**Supported main drivers are Claude Code, Codex, and Grok Build.** Claude Code and Codex share full
-workflow and prewalk parity. Grok Build may stage and run Elves as orchestrator under the same
-safety kernel, with one documented gap: **no exact-session prewalk when Grok is host**.
+**Supported main drivers are Claude Code, Codex, and Grok Build.** All three share the workflow,
+safety kernel, automatic required-mode qualification, explicit experimental mode, and exact-session
+prewalk contract.
 
 | Concern | Claude Code | Codex | Grok Build (host) |
 |---------|-------------|-------|-------------------|
@@ -13,8 +13,8 @@ safety kernel, with one documented gap: **no exact-session prewalk when Grok is 
 | Provider shortcuts | `/fugu`, `/manus`, `/grok`, `/devin` | `$elves fugu|manus|grok|devin …`, natural chat | natural language; same runners from skill root |
 | Land PR | `/land-pr` or `\land-pr` | natural language or alias | natural language |
 | Continuation | optional | optional **Codex Goals** (seatbelt, not memory) | host session continuity; not Codex Goals |
-| Native / host work | Separate custom/background session; supervised CLI uses safe mode and classifier-approved commits | Separate custom agent or sandboxed `codex exec`; narrow Git roots permit commits | Host-native Grok session or cold packet worker; **not** prewalk |
-| Exact-session prewalk | when behaviorally qualified | when behaviorally qualified | **always off** as host; never claim prewalk |
+| Native / host work | Separate custom/background session; supervised CLI uses safe mode and classifier-approved commits | Separate custom agent or sandboxed `codex exec`; narrow Git roots permit commits | Host-native Grok session or qualified/experimental two-phase worker |
+| Exact-session prewalk | cached proof, automatic required canary, or explicit experimental mode | same | same |
 | Visibility | Proven native agent view or exact private-log follow command | Proven native agent view or exact private-log follow command | Live session + run docs; same memory/landing ownership |
 | Grok Build goal | proven enhancement or one-packet fallback (worker) | same (worker) | host-native path; goal mode is not a substitute for prewalk |
 | Confidence-guided review | Attach terminal `review_context.review_prompt_block`, or derive the same table from native `Confidence:` trailers | Same machine-produced block/table and Final Readiness output section | Same contract when workers emit trailers/blocks |
@@ -41,45 +41,44 @@ confidence to reduce review or gates.
 
 ## Exact-session prewalk parity
 
-Prewalk is supported only through a behaviorally qualified supervised transport. Both hosts must
-provide the same guide→meaningful-edit checkpoint→execution lifecycle and make the same user claim;
-syntax alone is not parity.
+Normal prewalk is supported only through a behaviorally qualified supervised transport. Required
+mode obtains that proof automatically when it is missing. Experimental mode is an explicit,
+honestly reported acceptance of qualification uncertainty. Every host must provide the same
+guide→meaningful-edit checkpoint→execution lifecycle and make the same user claim; syntax alone is
+not parity.
 
-| Concern | Claude Code 2.1.207 grammar | Codex 0.144.1 grammar | Shared requirement |
-|---|---|---|---|
-| Fresh identity | caller-generated `--session-id <uuid>` | capture `thread.started.thread_id` | exact ID before transition |
-| Guide route | `--model`, `--effort` | `--model`, `model_reasoning_effort` | explicit guide model/effort |
-| Resume | `--resume <uuid>` | `codex exec resume <id>` | never `--continue`, `--last`, or latest |
-| Resume route | model/effort flags with resume | route/sandbox/Git-root flags before `resume` | explicit execution model/effort |
-| Worktree | supervisor CWD + narrow allowed roots | `-C` on create; supervisor OS CWD on resume | exact registered worktree/branch |
-| Stream | stream JSON | JSONL | one redacted logical follow stream with phase labels |
-| TODO/checkpoint | native mechanism plus private JSON mirror | native mechanism plus private JSON mirror | same bounded provider-neutral schema |
-| Instruction fidelity | version-bound behavioral evidence | version-bound behavioral evidence | honest `pruned`, `turn_scoped`, `retained_safe`, or `unsupported` |
-| Git authority | safe mode, `auto` classifier, narrow roots | workspace sandbox, narrow roots | no push/protected-ref/PR/merge authority |
-| Failure | exact-session recovery | exact-session recovery | no post-edit cold fallback; same stable codes |
+| Concern | Claude Code grammar | Codex grammar | Grok Build grammar | Shared requirement |
+|---|---|---|---|---|
+| Fresh identity | caller-generated `--session-id <uuid>` | capture `thread.started.thread_id` | caller-generated `--session-id <uuid>` | exact ID before transition |
+| Guide route | `--model`, `--effort` | `--model`, `model_reasoning_effort` | `--model`, `--effort` | explicit guide model/effort |
+| Resume | `--resume <uuid>` | `codex exec resume <id>` | `--resume <uuid>` | never `--continue`, `--last`, or latest |
+| Resume route | model/effort flags with resume | route/sandbox/Git-root flags before `resume` | model/effort flags with resume | explicit execution model/effort |
+| Worktree | supervisor CWD + narrow allowed roots | `-C` on create; supervisor OS CWD on resume | `--cwd` create; resume-sticky sandbox | exact registered worktree/branch |
+| Stream | stream JSON | JSONL | streaming JSON | one redacted logical follow stream with phase labels |
+| TODO/checkpoint | native mechanism plus private JSON mirror | native mechanism plus private JSON mirror | private JSON mirror is authoritative | same bounded provider-neutral schema |
+| Instruction fidelity | version-bound behavioral evidence | same | version/build-bound behavioral evidence | honest `pruned`, `turn_scoped`, `retained_safe`, or `unsupported` |
+| Git authority | safe mode, `auto` classifier, narrow roots | workspace sandbox, narrow roots | `--permission-mode auto`, narrow roots | no push/protected-ref/PR/merge authority |
+| Failure | exact-session recovery | exact-session recovery | exact-session recovery | no post-edit cold fallback; same stable codes |
 
 The packet appears only on the guide turn and execution receives only `Continue.`. Static help
 fixtures prove advertised create/resume/route flags but not conversation continuity or instruction
 pruning. The current persisted-instruction transport activates only for behaviorally proven
 `retained_safe`; `pruned` and `turn_scoped` remain schema states for future delivery mechanisms.
-Consequently the shipped code is feature-gated and `auto` remains actually off for an unqualified
-installed version on either host. A release must not claim general prewalk availability when one
-primary host would silently start a new session. **Grok as main driver never participates in
-prewalk:** actual mode is always `off`, and `required` fails before launch. The same release-honesty
-rule extends to Grok-as-worker and other external providers:
-no release may claim Grok prewalk availability or behavioral qualification.
+Consequently `auto` remains off for an unqualified installed version. `required` runs the bounded
+live canary and either records exact-version-and-route proof or stops before task launch with
+evidence. `experimental` proceeds only from advertised exact-resume and route-override grammar,
+reports `exact_session_experimental`, and retains all real-run continuity checks. No host may
+silently start a new session or claim behavioral qualification from static help.
 See [`prewalk.md`](prewalk.md).
 
-The host-profile registry also carries a feature-gated `grok` prewalk arm.
+The host-profile registry also carries the `grok` prewalk arm.
 `native-worker prewalk-capabilities --host grok --json` reports installed advertised grammar with
 zero model calls, and `route-worker` accepts
 `--probe-grok --grok-prewalk-qualification <artifact.json>` so evidence is bound to the installed
-version/build. A valid `retained_safe` artifact qualifies behavior but cannot open the separate
-registry launch gate. While `launch_ready` is false, `provider=grok` plus `worker.prewalk auto`
-falls back to actual mode `off` with
-`prewalk_capability_unavailable:grok_prewalk_unqualified:launch_feature_gate_closed`, and
-`required` fails before launch; missing or invalid evidence reports its own concrete reason.
-`allow_grok=false` vetoes regardless of evidence. This prewalk lane is non-yolo
+version/build. Required mode creates that artifact automatically after the shared canary passes.
+The registry still rejects Grok single-phase native-worker launch, while qualified or explicit
+experimental prewalk may enter the two-phase supervisor. `allow_grok=false` vetoes regardless of
+evidence. This prewalk lane is non-yolo
 (`--permission-mode auto`) and distinct from the trusted full-run lane; see
 [`grok-open-source-worker.md`](grok-open-source-worker.md).
 

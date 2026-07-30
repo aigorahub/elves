@@ -79,17 +79,15 @@ most one lane's result lands.
 
 ## Prewalk lanes
 
-Per-lane prewalk is the existing per-session prewalk lifecycle unchanged. Qualification,
-`retained_safe`-only activation, and every current gate in `references/prewalk.md` apply per
-lane; per-lane prewalk needs no new machinery. No host is behaviorally qualified today, and
-nothing in this contract changes that: prewalk lanes activate for no host until
-operator-authorized canaries exist.
+Per-lane prewalk is the existing per-session prewalk lifecycle unchanged. Automatic required-mode
+qualification, cached-proof auto activation, explicit experimental mode, and every runtime gate in
+`references/prewalk.md` apply independently per lane. Per-lane prewalk needs no new machinery.
 
 ## Phase roadmap
 
 - **Phase 1** (this contract): the normative contract plus N parked full-run sessions composed by
   the driver, one per lane.
 - **Phase 2**: session-schema lane state and staging validation.
-- **Phase 3**: prewalk lanes, when hosts qualify.
+- **Phase 3**: prewalk lanes after the lane runtime ships.
 
 Runtime lane supervision is explicitly future work and ships in no v1 batch.

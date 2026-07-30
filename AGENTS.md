@@ -1,5 +1,5 @@
 ---
-version: "2.20.0"
+version: "2.21.0"
 ---
 
 # Elves: Codex repository adapter
@@ -143,10 +143,11 @@ provider usage, but not merge, protected-ref, secret, or approval-bypass authori
 ## Host check (Grok Build)
 
 Supported main drivers are Claude Code, Codex, and Grok Build. If this skill is loaded inside
-**Grok Build** as the orchestrator, **stage and run Elves** under the normal workflow. **Hard
-limit: no prewalk when Grok is host** (actual mode always `off`; `worker.prewalk=required` fails
-before launch). Grok remains an optional **worker** under Claude/Codex as well. Full wording:
-SKILL.md `## Supported main drivers (host check)`.
+**Grok Build** as the orchestrator, **stage and run Elves** under the normal workflow. Required
+prewalk runs the bounded automatic qualification canary before task launch when matching proof is
+absent; experimental prewalk accepts qualification uncertainty without relaxing runtime checks.
+Grok remains an optional **worker** under Claude/Codex as well. Full wording: SKILL.md
+`## Supported main drivers (host check)`.
 
 ## Recovery (same as SKILL)
 

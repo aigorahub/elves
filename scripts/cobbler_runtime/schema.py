@@ -64,6 +64,7 @@ class PrewalkMode(str, Enum):
     OFF = "off"
     AUTO = "auto"
     REQUIRED = "required"
+    EXPERIMENTAL = "experimental"
 
 
 class NativeWorkerPhaseRole(str, Enum):

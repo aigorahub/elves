@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -24,6 +25,7 @@ from cobbler_runtime.prewalk import (  # noqa: E402
     GROK_PREWALK_QUALIFICATION_ARTIFACT_TYPE,
     PREWALK_CONTINUATION_INPUT,
     advertised_prewalk_capabilities,
+    experimental_prewalk_capabilities,
     fixture_prewalk_capabilities,
     guide_prompt,
     load_and_validate_transition_artifacts,
@@ -36,9 +38,12 @@ from cobbler_runtime.prewalk import (  # noqa: E402
     validate_todo_artifact,
 )
 from cobbler_runtime.native_worker import (  # noqa: E402
+    PrewalkQualificationResult,
     build_native_worker_prewalk_spec,
     native_worker_paths,
     native_worker_status,
+    prewalk_qualification_cache_path,
+    qualify_installed_prewalk_transport,
 )
 from cobbler_runtime.schema import ValidationIssue  # noqa: E402
 
@@ -393,6 +398,55 @@ class CapabilityEvidenceTests(unittest.TestCase):
             self.assertFalse(caps.behaviorally_verified_session_continuity)
             self.assertFalse(caps.qualified())
             self.assertEqual(caps.instruction_fidelity, "unsupported")
+
+    def test_explicit_experimental_mode_binds_advertised_route_without_claiming_qualification(
+        self,
+    ) -> None:
+        advertised = advertised_prewalk_capabilities(
+            host="codex",
+            version="0.144.1",
+            create_help="--model -c model_reasoning_effort resume",
+            resume_help="Usage: resume SESSION_ID --model -c model_reasoning_effort",
+        )
+        experimental = experimental_prewalk_capabilities(
+            advertised,
+            guide_model="guide-model",
+            guide_effort="high",
+            execution_model="execution-model",
+            execution_effort="medium",
+        )
+        self.assertTrue(experimental.experimental_eligible())
+        self.assertFalse(experimental.qualified())
+        self.assertEqual(
+            experimental.evidence_source, "explicit_experimental_request"
+        )
+        self.assertTrue(
+            experimental.route_matches(
+                guide_model="guide-model",
+                guide_effort="high",
+                execution_model="execution-model",
+                execution_effort="medium",
+            )
+        )
+
+    def test_explicit_experimental_mode_rejects_identical_routes(self) -> None:
+        advertised = advertised_prewalk_capabilities(
+            host="codex",
+            version="0.144.1",
+            create_help="--model -c model_reasoning_effort resume",
+            resume_help="Usage: resume SESSION_ID --model -c model_reasoning_effort",
+        )
+        with self.assertRaises(ValidationIssue) as caught:
+            experimental_prewalk_capabilities(
+                advertised,
+                guide_model="same-model",
+                guide_effort="high",
+                execution_model="same-model",
+                execution_effort="high",
+            )
+        self.assertEqual(
+            caught.exception.code, "prewalk_route_change_unqualified"
+        )
 
     def test_bounded_behavioral_artifact_qualifies_retained_safe_continuity(self) -> None:
         advertised = advertised_prewalk_capabilities(
@@ -1455,6 +1509,183 @@ class PrewalkSupervisorLifecycleTests(unittest.TestCase):
             self.assertEqual(state["status"], "executing")
             self.assertTrue(state["process_identity_matches"])
             self.assertFalse(state["supervisor_identity_matches"])
+
+class AutomaticPrewalkQualificationTests(unittest.TestCase):
+    def _advertised(self):
+        return advertised_prewalk_capabilities(
+            host="codex",
+            version="9.9.9",
+            create_help="--model -c model_reasoning_effort resume",
+            resume_help="Usage: resume SESSION_ID --model -c model_reasoning_effort",
+        )
+
+    def _probe(self, advertised):
+        def probe(host, *, behavioral_evidence=None, **_kwargs):
+            self.assertEqual(host, "codex")
+            if behavioral_evidence is None:
+                return advertised
+            return load_prewalk_capability_evidence(
+                Path(behavioral_evidence),
+                host="codex",
+                installed_version="9.9.9",
+                advertised=advertised,
+            )
+
+        return probe
+
+    def test_required_canary_proves_and_reuses_matching_private_evidence(self) -> None:
+        advertised = self._advertised()
+        state: dict[str, str] = {}
+        calls: list[str] = []
+
+        def phase_runner(*, spec, input_text, **_kwargs):
+            calls.append(input_text)
+            canary_value = (
+                Path(spec.cwd) / ".elves-prewalk-canary.txt"
+            ).read_text(encoding="utf-8").strip()
+            if input_text != PREWALK_CONTINUATION_INPUT:
+                memory = re.search(
+                    r"ELVES_PREWALK_CANARY_GUIDE ([0-9a-f]+)",
+                    input_text,
+                ).group(1)
+                state["memory"] = memory
+                marker = (
+                    f"ELVES_PREWALK_CANARY_GUIDE {memory} {canary_value}"
+                )
+                event = {
+                    "type": "thread.started",
+                    "thread_id": "qualification-session",
+                }
+            else:
+                marker = (
+                    "ELVES_PREWALK_CANARY_EXECUTION "
+                    f"{state['memory']} {canary_value}"
+                )
+                event = {
+                    "type": "turn.started",
+                    "thread_id": "qualification-session",
+                }
+            return PrewalkQualificationResult(
+                exit_code=0,
+                stdout=json.dumps(event) + "\n" + marker + "\n",
+                stderr_tail="",
+                observed_session_ids=("qualification-session",),
+                provider_event_count=1,
+            )
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch(
+            "cobbler_runtime.native_worker.probe_installed_prewalk_capabilities",
+            side_effect=self._probe(advertised),
+        ):
+            cache_root = Path(tmp)
+            qualified = qualify_installed_prewalk_transport(
+                host="codex",
+                guide_model="guide-model",
+                guide_effort="high",
+                execution_model="execution-model",
+                execution_effort="medium",
+                cache_root=cache_root,
+                phase_runner=phase_runner,
+            )
+            self.assertTrue(qualified.qualified())
+            self.assertEqual(calls[-1], PREWALK_CONTINUATION_INPUT)
+            self.assertEqual(len(calls), 2)
+            cache_path = prewalk_qualification_cache_path(
+                advertised,
+                guide_model="guide-model",
+                guide_effort="high",
+                execution_model="execution-model",
+                execution_effort="medium",
+                cache_root=cache_root,
+            )
+            self.assertTrue(cache_path.is_file())
+            self.assertEqual(cache_path.stat().st_mode & 0o777, 0o600)
+
+            reused = qualify_installed_prewalk_transport(
+                host="codex",
+                guide_model="guide-model",
+                guide_effort="high",
+                execution_model="execution-model",
+                execution_effort="medium",
+                cache_root=cache_root,
+                phase_runner=lambda **_kwargs: self.fail(
+                    "matching evidence should avoid a second live canary"
+                ),
+            )
+            self.assertTrue(reused.qualified())
+            self.assertEqual(len(calls), 2)
+
+    def test_required_canary_failure_stops_with_private_attempt_evidence(self) -> None:
+        advertised = self._advertised()
+
+        def phase_runner(**_kwargs):
+            return PrewalkQualificationResult(
+                exit_code=0,
+                stdout=(
+                    json.dumps(
+                        {
+                            "type": "thread.started",
+                            "thread_id": "qualification-session",
+                        }
+                    )
+                    + "\nwrong output\n"
+                ),
+                stderr_tail="",
+                observed_session_ids=("qualification-session",),
+                provider_event_count=1,
+            )
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch(
+            "cobbler_runtime.native_worker.probe_installed_prewalk_capabilities",
+            side_effect=self._probe(advertised),
+        ):
+            with self.assertRaises(ValidationIssue) as caught:
+                qualify_installed_prewalk_transport(
+                    host="codex",
+                    guide_model="guide-model",
+                    guide_effort="high",
+                    execution_model="execution-model",
+                    execution_effort="medium",
+                    cache_root=Path(tmp),
+                    phase_runner=phase_runner,
+                )
+            self.assertEqual(
+                caught.exception.code, "prewalk_live_qualification_failed"
+            )
+            evidence = Path(caught.exception.hint.split("Evidence: ", 1)[1])
+            self.assertTrue(evidence.is_file())
+            payload = json.loads(evidence.read_text(encoding="utf-8"))
+            self.assertFalse(payload["qualified"])
+            self.assertFalse(payload["checks"]["unique_guide_fact_observed"])
+            self.assertEqual(evidence.stat().st_mode & 0o777, 0o600)
+
+    def test_required_canary_runtime_error_stops_with_attempt_evidence(self) -> None:
+        advertised = self._advertised()
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch(
+            "cobbler_runtime.native_worker.probe_installed_prewalk_capabilities",
+            side_effect=self._probe(advertised),
+        ):
+            with self.assertRaises(ValidationIssue) as caught:
+                qualify_installed_prewalk_transport(
+                    host="codex",
+                    guide_model="guide-model",
+                    guide_effort="high",
+                    execution_model="execution-model",
+                    execution_effort="medium",
+                    cache_root=Path(tmp),
+                    phase_runner=lambda **_kwargs: (_ for _ in ()).throw(
+                        OSError("provider process failed")
+                    ),
+                )
+            self.assertEqual(
+                caught.exception.code, "prewalk_live_qualification_failed"
+            )
+            evidence = Path(caught.exception.hint.split("Evidence: ", 1)[1])
+            payload = json.loads(evidence.read_text(encoding="utf-8"))
+            self.assertFalse(payload["qualified"])
+            self.assertTrue(payload["model_calls_made"])
+            self.assertIn("provider process failed", payload["diagnostic"])
 
 
 if __name__ == "__main__":

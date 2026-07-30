@@ -1701,7 +1701,7 @@ SETUP_COBBLER_PHRASES = {
     "SKILL.md": [
         "### External-agent setup and model onboarding",
         "Supported main drivers are Claude Code, Codex, and Grok Build",
-        "no prewalk when Grok is the main driver",
+        "bounded live qualification canary",
         "/setup-cobbler",
         "/setup-council",
         "$elves setup-cobbler",
@@ -2060,7 +2060,7 @@ if isinstance(RISK_TIER_PHRASES, dict) and 'SKILL.md' in RISK_TIER_PHRASES:
     RISK_TIER_PHRASES['SKILL.md'] = ['Thin safety kernel', 'validate once, verify changes, attest final', 'low | standard | high', 'trusted | untrusted', 'touched surfaces', 'risk checkpoints', 'terminal readiness', 'exact HEAD', 'impact-selected']
 if isinstance(SETUP_COBBLER_PHRASES, dict) and 'SKILL.md' in SETUP_COBBLER_PHRASES:
     SETUP_COBBLER_PHRASES = dict(SETUP_COBBLER_PHRASES)
-    SETUP_COBBLER_PHRASES['SKILL.md'] = ['setup-cobbler', 'setup-council', 'model-onboarding.md', 'not a top-level', 'cobbler_agents.py setup', 'references/cobbler-setup-recipes.md', 'Supported main drivers are Claude Code, Codex, and Grok Build', 'no prewalk when Grok is the main driver', '$elves setup-council']
+    SETUP_COBBLER_PHRASES['SKILL.md'] = ['setup-cobbler', 'setup-council', 'model-onboarding.md', 'not a top-level', 'cobbler_agents.py setup', 'references/cobbler-setup-recipes.md', 'Supported main drivers are Claude Code, Codex, and Grok Build', 'bounded live qualification canary', '$elves setup-council']
 if isinstance(SINGLE_KICKOFF_PHRASES, dict) and 'SKILL.md' in SINGLE_KICKOFF_PHRASES:
     SINGLE_KICKOFF_PHRASES = dict(SINGLE_KICKOFF_PHRASES)
     SINGLE_KICKOFF_PHRASES['SKILL.md'] = ['Default user path: one kickoff', 'Trusted full-run delegation keeps that path', 'chat-to-work', 'chat-to-land', 'Legacy two-call', 'full-run', 'parked']
@@ -2273,7 +2273,8 @@ PREWALK_PHRASES = {
         "with a copied packet or summary is not prewalk",
         "post-edit cold fallback is forbidden",
         "Static help proves",
-        "behavioral evidence never grants launch authority",
+        "bounded live qualification canary",
+        "experimental",
         "references/prewalk.md",
     ],
     "AGENTS.md": [
@@ -2284,8 +2285,8 @@ PREWALK_PHRASES = {
     "README.md": [
         "Optional exact-session prewalk",
         "same session in the same worktree",
-        "Static help probes make no model calls",
-        "behavioral qualification never opens",
+        "180-second",
+        "experimental",
         "references/prewalk.md",
     ],
     "references/prewalk.md": [
@@ -2294,44 +2295,43 @@ PREWALK_PHRASES = {
         "execution route with only",
         "retained_safe",
         "post-edit cold fallback",
-        "normally reports actual mode `off`",
-        "External providers remain off unless their trajectory semantics are separately qualified",
+        "`required` automatically runs one bounded live qualification canary",
+        "`experimental` is an explicit operator acceptance",
         "grok_prewalk_qualification_canary",
-        "qualification does not itself open the separate registry launch gate",
-        "never fabricates them",
+        "single-phase native-worker launch",
+        "It never stores model output",
     ],
     "references/host-parity.md": [
         "Exact-session prewalk parity",
         "one redacted logical follow stream",
         "no post-edit cold fallback",
         "prewalk.md",
-        "no release may claim Grok prewalk availability or behavioral qualification",
-        "grok_prewalk_unqualified",
-        "cannot open the separate",
+        "automatic required-mode qualification",
+        "exact_session_experimental",
+        "single-phase native-worker launch",
     ],
     "references/adaptive-worker-routing.md": [
         "Optional exact-session prewalk route",
         "requested/actual prewalk mode",
         "help probes always report false",
         "actual mode `off`",
-        "prewalk_capability_unavailable:grok_prewalk_unqualified:",
-        "does not open the separate registry launch gate",
-        "no release may claim Grok prewalk availability or behavioral qualification",
+        "qualification_required",
+        "exact_session_experimental",
+        "single-phase native-worker launch",
     ],
     "guide/index.html": [
-        "Use exact-session prewalk when qualified",
+        "Use exact-session prewalk",
         "same session in the same",
-        "no paid canary runs implicitly",
-        "cannot open",
+        "180-second",
+        "exact_session_experimental",
         "references/prewalk.md",
     ],
     "CHANGELOG.md": [
-        "True exact-session native-worker prewalk",
-        "execution-route resume with only",
-        "no paid canary ran",
-        "remains feature-gated off",
-        "Qualification never opens the separate registry launch feature gate",
-        "claims Grok prewalk availability or behavioral qualification",
+        "Automatic prewalk qualification",
+        "180-second",
+        "exact_session_experimental",
+        "private `.attempt.json`",
+        "Grok single-phase native-worker",
     ],
 }
 
@@ -2434,11 +2434,11 @@ GROK_OPEN_SOURCE_WORKER_PHRASES = {
         "--host-tests-pass",
         "--resume --grant-grok-auth",
         "/goal resume",
-        "## Feature-gated prewalk lane (distinct from trusted full-run)",
+        "## Qualified prewalk lane (distinct from trusted full-run)",
         "--permission-mode auto",
         "grok_prewalk_qualification_canary",
-        "operator-authorized live canary",
-        "cannot grant launch authority",
+        "Required mode automatically runs the bounded live canary",
+        "single-phase Grok native-worker launch gated",
         "commit `98c3b24`",
         "source commit `7cfcb20`",
     ],
@@ -2616,7 +2616,7 @@ PARALLELVES_CONTRACT_PHRASES = {
         "most one lane's result lands.",
         "`off` (default) | `auto`. `auto` is recommend-only and",
         "2-3 lanes maximum in v1",
-        "activate for no host until",
+        "Automatic required-mode",
         "Runtime lane supervision is explicitly future work and ships in no v1 batch.",
     ],
     "references/glossary.md": [

@@ -8,7 +8,7 @@ plans and reviews; a subscription-native (or optional external) worker implement
 files let the work survive context compaction. You write the plan and own the merge decision. The
 agent does the middle.
 
-**Current release: v2.20.0** — see [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.21.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 **New to Elves?** Use the [practical user guide](https://aigorahub.github.io/elves/) — especially
@@ -18,10 +18,10 @@ orients you. The guide also covers the first run, worker choice, live progress, 
 landing. This README is the repository reference: shell install, safety model, operations, and an
 index into the detailed contracts under [`references/`](references/).
 
-**Supported main drivers:** Claude Code, Codex, and Grok Build. Grok may drive Elves with one hard
-limit: **no prewalk** when Grok is the host (actual mode always off; `required` fails closed).
-Grok Build is also an optional *worker* under Claude/Codex when permitted. Managed skill install
-targets remain Claude and Codex roots; Grok often discovers Elves via Claude skill compatibility.
+**Supported main drivers:** Claude Code, Codex, and Grok Build. All three use the same automatic
+required-mode prewalk qualification and explicit experimental mode. Grok Build is also an optional
+*worker* under Claude/Codex when permitted. Managed skill install targets remain Claude and Codex
+roots; Grok often discovers Elves via Claude skill compatibility.
 See the guide FAQ
 [I opened Grok Build and tried /elves](https://aigorahub.github.io/elves/#troubleshooting).
 
@@ -188,20 +188,19 @@ it. Composer 2.5 (`grok-composer-2.5-fast`) is retired and is never selected.
 
 ### Optional exact-session prewalk
 
-Prewalk lets one qualified native worker orient on a guide model/effort, create a bounded TODO, make
+Prewalk lets one worker orient on a guide model/effort, create a bounded TODO, make
 the first real edit, and then resume the **same session in the same worktree** on the execution
 route. The packet is sent once; the resume input is only `Continue.`. A new worker that receives a
 summary is a normal cold handoff, not prewalk, and cold fallback is forbidden after an edit.
 
 The safe preference is `worker.prewalk: "auto"`, while the launch CLI defaults to `off` for backward
-compatibility. `auto` currently remains actually off unless the exact installed Codex or Claude
-version has behaviorally qualified session/worktree/stream continuity, route change, no packet
-replay, and honest instruction fidelity. The current persisted-instruction transport activates only
-for proven `retained_safe`; `pruned` and `turn_scoped` remain future delivery states.
-Static help probes make no model calls and prove only that flags are advertised; `required` fails
-before launch when proof is absent. Grok can additionally load a recorded canary only with a live
-installed-version/build probe; behavioral qualification never opens its separate, currently closed
-`launch_ready` registry gate. See the
+compatibility. `auto` makes no qualification model calls and reuses only matching cached proof.
+`required` automatically runs a 180-second, 1 MiB-bounded live canary when proof is absent. The
+task worker starts only after session, worktree, stream, route-change, retained-context, and
+packet-count checks pass; failure stops with a private evidence path. `experimental` explicitly
+accepts qualification uncertainty after static grammar inspection, reports that status, and keeps
+every real-run continuity and authority check. Claude Code, Codex, and Grok Build share these
+semantics. Grok single-phase native-worker launch remains registry-gated. See the
 [normative prewalk contract](references/prewalk.md) and
 [host parity matrix](references/host-parity.md).
 
