@@ -854,6 +854,17 @@ def experimental_prewalk_capabilities(
             advertised.unavailable_reason() or "prewalk_capability_unavailable",
             "Experimental prewalk still requires advertised exact resume and route override",
         )
+    if (
+        guide_model.strip(),
+        guide_effort.strip().lower(),
+    ) == (
+        execution_model.strip(),
+        execution_effort.strip().lower(),
+    ):
+        raise ValidationIssue(
+            "prewalk_route_change_unqualified",
+            "Experimental prewalk requires distinct guide and execution routes",
+        )
     return replace(
         advertised,
         evidence_source="explicit_experimental_request",

@@ -164,11 +164,12 @@ silently deleting it.
   CLI are optional plan/review lenses, usually not cost-effective for the main implement batch.
 - [2026-07-12] **Supported Elves main drivers were Claude Code and Codex only** at the time of this
   note. Superseded 2026-07-29: see next entry.
-- [2026-07-29] **Supported Elves main drivers are Claude Code, Codex, and Grok Build.** When Grok
-  is host, prewalk is always off (no exact-session prewalk claim; `required` fails closed). Grok
-  remains an optional worker under Claude/Codex. Optional routes (Antigravity, Gemini CLI, Muse,
-  OpenRouter, AlphaEvolve, …) may still work as tools the host calls; exotic interfaces are not
-  heavily tested. Prefer contributor PRs (or issues) when optional paths fail.
+- [2026-07-29] **Supported Elves main drivers are Claude Code, Codex, and Grok Build.** The original
+  no-prewalk restriction in this entry is superseded by the 2026-07-29 automatic prewalk
+  qualification convention above. Grok remains an optional worker under Claude/Codex. Optional
+  routes (Antigravity, Gemini CLI, Muse, OpenRouter, AlphaEvolve, …) may still work as tools the
+  host calls; exotic interfaces are not heavily tested. Prefer contributor PRs (or issues) when
+  optional paths fail.
 - [2026-07-29] **Mid-run impact path; terminal full suite + deferred hygiene.** High-effort models
   were re-running full suites and polishing every nit between batches because validation-guide said
   "zero debt / production-ready every batch" while proof-and-review said impact path. Correctness

@@ -429,6 +429,25 @@ class CapabilityEvidenceTests(unittest.TestCase):
             )
         )
 
+    def test_explicit_experimental_mode_rejects_identical_routes(self) -> None:
+        advertised = advertised_prewalk_capabilities(
+            host="codex",
+            version="0.144.1",
+            create_help="--model -c model_reasoning_effort resume",
+            resume_help="Usage: resume SESSION_ID --model -c model_reasoning_effort",
+        )
+        with self.assertRaises(ValidationIssue) as caught:
+            experimental_prewalk_capabilities(
+                advertised,
+                guide_model="same-model",
+                guide_effort="high",
+                execution_model="same-model",
+                execution_effort="high",
+            )
+        self.assertEqual(
+            caught.exception.code, "prewalk_route_change_unqualified"
+        )
+
     def test_bounded_behavioral_artifact_qualifies_retained_safe_continuity(self) -> None:
         advertised = advertised_prewalk_capabilities(
             host="codex",
