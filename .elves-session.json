@@ -1,0 +1,82 @@
+{
+  "batches": [
+    {
+      "acceptance": [
+        {
+          "criterion": "Required mode automatically runs a hard-time-bounded live canary only when matching successful evidence is absent, and persists a private evidence artifact on success or failure.",
+          "evidence": "AutomaticPrewalkQualificationTests proves cache miss qualification, private success and attempt artifacts, and matching cache reuse.",
+          "id": "B1-A1",
+          "met": true
+        },
+        {
+          "criterion": "A successful canary proves exact session continuity, route change, the same worktree, one logical stream, retained guide context, and one packet before real prewalk starts.",
+          "evidence": "The canary lifecycle test proves the same exact session, route-bound phases, changed temp-worktree fact, structured stream identity, retained guide fact, and packet_sent_count 1.",
+          "id": "B1-A2",
+          "met": true
+        },
+        {
+          "criterion": "Failed or incomplete qualification stops required launch with the evidence path and no task worker launch.",
+          "evidence": "Failure and runtime-error tests assert prewalk_live_qualification_failed, private attempt evidence, and no task launch path.",
+          "id": "B1-A3",
+          "met": true
+        },
+        {
+          "criterion": "Experimental mode is explicit and honestly reported, requires advertised exact resume and route override, and preserves all runtime trajectory and authority checks.",
+          "evidence": "Experimental capability and route tests prove advertised grammar is required, identical routes are rejected, honest state is reported, and the real supervisor checks remain active.",
+          "id": "B1-A4",
+          "met": true
+        },
+        {
+          "criterion": "Codex, Claude Code, and Grok Build use the same qualification and runtime invariants, with host-specific invocation syntax covered by tests.",
+          "evidence": "Host profile, adaptive routing, native prewalk, and CLI tests cover equivalent Codex, Claude Code, and Grok Build policy.",
+          "id": "B1-A5",
+          "met": true
+        },
+        {
+          "criterion": "Docs, guide, changelog, and version metadata describe the shipped behavior consistently.",
+          "evidence": "check_repo_consistency.py and release_checklist.py --version 2.21.0 pass across SKILL, AGENTS, README, guide, references, changelog, and version pins.",
+          "id": "B1-A6",
+          "met": true
+        }
+      ],
+      "id": "B1",
+      "status": "complete"
+    }
+  ],
+  "branch": "codex/prewalk-auto-qualification",
+  "master_acceptance": [
+    {
+      "criterion": "A user can request required prewalk without manually preparing qualification evidence.",
+      "evidence": "native-worker launch --prewalk required invokes automatic live qualification when matching proof is absent.",
+      "id": "M-A1",
+      "met": true
+    },
+    {
+      "criterion": "Qualification failure stops before task launch and names durable private evidence.",
+      "evidence": "Bounded canary failure paths persist redacted .attempt.json evidence and stop before launch_native_worker.",
+      "id": "M-A2",
+      "met": true
+    },
+    {
+      "criterion": "Experimental mode changes only the qualification threshold, not trajectory or authority enforcement.",
+      "evidence": "experimental_prewalk_capabilities changes capability admission only; build and supervisor paths retain exact-session, worktree, packet, artifact, Git, and fallback checks.",
+      "id": "M-A3",
+      "met": true
+    },
+    {
+      "criterion": "Claude Code, Codex, and Grok Build have equivalent user-visible semantics.",
+      "evidence": "Host parity docs and routing/native-worker tests cover all three supported main drivers.",
+      "id": "M-A4",
+      "met": true
+    },
+    {
+      "criterion": "The exact release tip passes full verification and Fugu review, has green PR checks, and is ready for landing and global installation.",
+      "evidence": "verify_repo.py --ci reports 1424 passing tests and all release gates; Fugu deep review findings are closed; PR #216 checks verify the committed tip before landing.",
+      "id": "M-A5",
+      "met": true
+    }
+  ],
+  "plan_path": "docs/plans/automatic-prewalk-qualification.md",
+  "run_id": "prewalk-auto-qualification-v221",
+  "start_head": "6030755790fa50b3d7de1cea4f03bf4751c25db6"
+}

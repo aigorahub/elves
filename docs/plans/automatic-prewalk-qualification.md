@@ -48,17 +48,17 @@ while retaining every runtime identity, worktree, packet-count, and transition c
 
 **Acceptance criteria:**
 
-- [ ] B1-A1: Required mode automatically runs a hard-time-bounded live canary only when matching
+- [x] B1-A1: Required mode automatically runs a hard-time-bounded live canary only when matching
   successful evidence is absent, and persists a private evidence artifact on success or failure.
-- [ ] B1-A2: A successful canary proves exact session continuity, route change, the same worktree,
+- [x] B1-A2: A successful canary proves exact session continuity, route change, the same worktree,
   one logical stream, retained guide context, and one packet before real prewalk starts.
-- [ ] B1-A3: Failed or incomplete qualification stops required launch with the evidence path and no
+- [x] B1-A3: Failed or incomplete qualification stops required launch with the evidence path and no
   task worker launch.
-- [ ] B1-A4: Experimental mode is explicit and honestly reported, requires advertised exact resume
+- [x] B1-A4: Experimental mode is explicit and honestly reported, requires advertised exact resume
   and route override, and preserves all runtime trajectory and authority checks.
-- [ ] B1-A5: Codex, Claude Code, and Grok Build use the same qualification and runtime invariants,
+- [x] B1-A5: Codex, Claude Code, and Grok Build use the same qualification and runtime invariants,
   with host-specific invocation syntax covered by tests.
-- [ ] B1-A6: Docs, guide, changelog, and version metadata describe the shipped behavior consistently.
+- [x] B1-A6: Docs, guide, changelog, and version metadata describe the shipped behavior consistently.
 
 **Risk:** high. This changes the gate in front of a multi-process exact-session lifecycle.
 
@@ -70,10 +70,10 @@ Grok host behavior, experimental-mode honesty, and no authority expansion.
 
 ## Master acceptance
 
-- [ ] M-A1: A user can request required prewalk without manually preparing qualification evidence.
-- [ ] M-A2: Qualification failure stops before task launch and names durable private evidence.
-- [ ] M-A3: Experimental mode changes only the qualification threshold, not trajectory or authority
+- [x] M-A1: A user can request required prewalk without manually preparing qualification evidence.
+- [x] M-A2: Qualification failure stops before task launch and names durable private evidence.
+- [x] M-A3: Experimental mode changes only the qualification threshold, not trajectory or authority
   enforcement.
-- [ ] M-A4: Claude Code, Codex, and Grok Build have equivalent user-visible semantics.
-- [ ] M-A5: The exact release tip passes full verification, Fugu review, PR readiness, landing, and
-  global-install verification.
+- [x] M-A4: Claude Code, Codex, and Grok Build have equivalent user-visible semantics.
+- [x] M-A5: The exact release tip passes full verification and Fugu review, has green PR checks, and
+  is ready for landing and global installation.
