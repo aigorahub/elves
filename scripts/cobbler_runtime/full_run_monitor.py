@@ -1014,6 +1014,3 @@ def await_full_run(
         if timeout_seconds is not None:
             delay = min(delay, max(0.0, float(timeout_seconds) - elapsed))
         sleep(delay)
-
-
-
