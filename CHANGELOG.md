@@ -6,6 +6,12 @@ All notable changes to the Elves skill are documented here.
 
 ## [2.23.1] - 2026-08-01
 
+### Fugu calling guide: Ultra log is quiet by design
+
+- Document that plain/`--deep` redirect logs show the tool trace mid-run, while `--ultra`/`--max`
+  only show the launcher preamble until synthesis finishes (quiet log is not a hang).
+- Keep the no-`tail` rule: redirect is required so timeout salvage can reach the capture file.
+
 ### Full-run terminal event log fail-closed
 
 - Resume prepare/launch now refuse with `full_run_resume_event_log_unverifiable` when
