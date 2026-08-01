@@ -1738,15 +1738,19 @@ class FullRunReportValidationTests(unittest.TestCase):
             "material_transition": True,
             "unchanged_healthy_poll_silent": False,
         }
+        from cobbler_runtime import full_run_monitor as full_run_monitor_module
+
         with (
             mock.patch.object(
-                full_run_module,
+                full_run_monitor_module,
                 "monitor_full_run",
                 side_effect=[quiet, terminal],
             ),
-            mock.patch.object(full_run_module, "load_state", return_value=state),
             mock.patch.object(
-                full_run_module,
+                full_run_monitor_module, "load_state", return_value=state
+            ),
+            mock.patch.object(
+                full_run_monitor_module,
                 "_all_follow_events",
                 side_effect=[events_50, events_55],
             ),
@@ -1760,6 +1764,8 @@ class FullRunReportValidationTests(unittest.TestCase):
         self.assertIn("event 54", result["follow_stream_lines"][-1])
 
     def test_follow_resets_absolute_cursor_when_resume_attempt_rotates_log(self) -> None:
+        from cobbler_runtime import full_run_monitor as full_run_monitor_module
+
         def events(prefix: str, count: int) -> list[dict[str, object]]:
             return [
                 {
@@ -1790,15 +1796,17 @@ class FullRunReportValidationTests(unittest.TestCase):
         attempt_2 = mock.Mock(attempt=2, grok_auth_strategy=None)
         with (
             mock.patch.object(
-                full_run_module, "monitor_full_run", side_effect=[quiet, terminal]
+                full_run_monitor_module,
+                "monitor_full_run",
+                side_effect=[quiet, terminal],
             ),
             mock.patch.object(
-                full_run_module,
+                full_run_monitor_module,
                 "load_state",
                 side_effect=[attempt_1, attempt_2],
             ),
             mock.patch.object(
-                full_run_module,
+                full_run_monitor_module,
                 "_all_follow_events",
                 side_effect=[events("attempt-1", 3), events("attempt-2", 2)],
             ),
@@ -5782,6 +5790,82 @@ class WorkerEffortAuthorityTests(unittest.TestCase):
             self.assertEqual(
                 ctx.exception.code, "full_run_resume_prepare_live"
             )
+
+    def test_resume_prepare_refuses_terminal_run_complete_event(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            prep = self._fixture_prepare(repo, effort="low")
+            events_path = Path(prep["events_path"])
+            before = events_path.read_bytes()
+            state = load_state(repo, "effort-explicitness")
+            state.status = "complete"
+            state.pid = None
+            full_run_module.save_state(repo, state)
+            with events_path.open("ab") as handle:
+                handle.write(
+                    (
+                        json.dumps(
+                            {
+                                "timestamp": "2026-08-01T00:00:00Z",
+                                "session_id": "effort-explicitness",
+                                "branch": "feat/x",
+                                "head": state.head,
+                                "batch": 0,
+                                "type": "run_complete",
+                                "summary": "done",
+                            }
+                        )
+                        + "\n"
+                    ).encode("utf-8")
+                )
+            after_append = events_path.read_bytes()
+            with self.assertRaises(full_run_module.ValidationIssue) as ctx:
+                self._fixture_prepare(repo, effort=None, create=False)
+            self.assertEqual(
+                ctx.exception.code, "full_run_resume_prepare_terminal"
+            )
+            self.assertEqual(events_path.read_bytes(), after_append)
+            self.assertNotEqual(after_append, before)
+            # No second run_started after the terminal event.
+            text = after_append.decode("utf-8")
+            self.assertEqual(text.count('"type":"run_started"'), 1)
+            self.assertIn('"type": "run_complete"', text)
+
+    def test_resume_prepare_refuses_terminal_blocked_event(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            prep = self._fixture_prepare(repo, effort="low")
+            events_path = Path(prep["events_path"])
+            before = events_path.read_bytes()
+            state = load_state(repo, "effort-explicitness")
+            state.status = "blocked"
+            state.pid = None
+            full_run_module.save_state(repo, state)
+            with events_path.open("ab") as handle:
+                handle.write(
+                    (
+                        json.dumps(
+                            {
+                                "timestamp": "2026-08-01T00:00:00Z",
+                                "session_id": "effort-explicitness",
+                                "branch": "feat/x",
+                                "head": state.head,
+                                "batch": 0,
+                                "type": "blocked",
+                                "summary": "blocked",
+                            }
+                        )
+                        + "\n"
+                    ).encode("utf-8")
+                )
+            after_append = events_path.read_bytes()
+            with self.assertRaises(full_run_module.ValidationIssue) as ctx:
+                self._fixture_prepare(repo, effort=None, create=False)
+            self.assertEqual(
+                ctx.exception.code, "full_run_resume_prepare_terminal"
+            )
+            self.assertEqual(events_path.read_bytes(), after_append)
+            self.assertEqual(after_append[: len(before)], before)
 
     def test_prepare_full_run_keeps_the_serialization_lock(self) -> None:
         # v2.10.2 terminal-review blocker: inserting resolve_worker_effort

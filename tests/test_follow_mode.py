@@ -108,11 +108,18 @@ class FollowModeTests(unittest.TestCase):
             }
 
         with mock.patch(
-            "cobbler_runtime.full_run.monitor_full_run", side_effect=fake_monitor
+            "cobbler_runtime.full_run_monitor.monitor_full_run", side_effect=fake_monitor
         ), mock.patch(
-            "cobbler_runtime.full_run.load_state"
-        ) as load_state:
-            load_state.return_value = mock.Mock(grok_auth_strategy="api_key")
+            "cobbler_runtime.full_run_monitor.load_state"
+        ) as load_state, mock.patch(
+            "cobbler_runtime.full_run_monitor._all_follow_events",
+            return_value=[],
+        ):
+            load_state.return_value = mock.Mock(
+                grok_auth_strategy="api_key",
+                attempt=1,
+                adapter="fixture",
+            )
             out = await_full_run(
                 Path("."),
                 session_id="s",
@@ -130,7 +137,7 @@ class FollowModeTests(unittest.TestCase):
 
     def test_quiet_opt_out(self) -> None:
         with mock.patch(
-            "cobbler_runtime.full_run.monitor_full_run",
+            "cobbler_runtime.full_run_monitor.monitor_full_run",
             return_value={
                 "state": "complete",
                 "next_action": "final_readiness",

@@ -1,5 +1,5 @@
 ---
-version: "2.22.0"
+version: "2.23.0"
 ---
 
 # Elves: Codex repository adapter
@@ -49,12 +49,15 @@ assume `./scripts` belongs to the target repository and do not execute mappings 
   launch, choose general vs `review <scope>`, plain / `--deep` / `--ultra` / `--max`
   (profile locks model + effort; no free model slug), read-only vs qualified `--write`, and
   optional `--include` paths; state one short `Fugu route: …` line; prefer the cheapest matching
-  lane; explicit user flags always win. Apply Fugu economy: host-native first for
-  inventory/triage/greps, default plain (`fugu/high`), narrow before upgrading profile, prefer
-  `--max-wait` over automatic `--deep`, never `--include` gitignored paths, use `--preflight` when
-  includes/write are non-obvious. The isolation snapshot is always on; the host only adds
-  exact admitted context via `--include`, not a separate “minimal snapshot” mode. Full table:
-  `references/provider-shortcuts.md` (**Host routing when the user says "use Fugu"**).
+  lane; explicit user flags always win. First paid call is plain unless the user set a flag.
+  Prefer `--ultra` when a written report must return after heavy exploration. Host-native first for
+  inventory/triage/greps; prefer `--max-wait` over automatic `--deep`; if any `--include`, run
+  `--preflight` first (never gitignored paths); redirect to a log (never `| tail`); chat cancel does
+  not stop the provider; harvest `Fugu partial salvage` from the log on timeout/crash before
+  relaunch. The isolation snapshot is always on; the host only adds exact admitted
+  context via `--include`, not a separate “minimal snapshot” mode. Full table:
+  `references/provider-shortcuts.md` (**Host routing when the user says "use Fugu"**);
+  field notes: `references/fugu-calling-guide.md`.
   Both receive a bounded policy-admitted tracked plus non-ignored-untracked snapshot. The host may
   select exact context, but the safety kernel rejects ignored/credential/operational/configuration
   paths (including both `.env.*` and `*.env` variants and reserved internal namespaces), unsafe
@@ -105,7 +108,7 @@ provider usage, but not merge, protected-ref, secret, or approval-bypass authori
   observe/propose/promote/waive learning stays under `.elves/runtime/landing-profile/` with no
   auto-promotion (`references/project-landing-profiles.md`)
 - **Helper paths:** `python3 scripts/...` is **source-checkout shorthand**; installed skills
-  (`~/.claude/skills/elves` or `~/.codex/skills/elves`) resolve helpers from the
+  (`~/.claude/skills/elves`, `~/.codex/skills/elves`, or `~/.grok/skills/elves`) resolve helpers from the
   **active Elves skill root** while keeping the target repository as the working directory. An
   installed Elves bundle never requires a repo-only helper (`references/runtime-helper-paths.md`)
 - **Stop control:** honor the **Stop Gate** and `continuation_guard`; no final response while

@@ -92,6 +92,7 @@ INSTALLED_PATH_CONTRACT_PHRASES = (
     "target repository as the working directory",
     "~/.claude/skills/elves",
     "~/.codex/skills/elves",
+    "~/.grok/skills/elves",
     "$elves_skill_root/scripts/elves_landing_check.py",
     "installed elves bundle never requires a repo-only helper",
 )
@@ -178,9 +179,11 @@ def _copy_managed_bundle(repo_root: Path, dest_root: Path, *, host: str) -> None
         for required in ("SKILL.md", "AGENTS.md"):
             if not (dest_root / required).is_file():
                 raise RuntimeError(f"{host.title()} bundle missing {required}")
-        if host == "codex":
+        if host in {"codex", "grok"}:
             if (dest_root / "aliases").exists():
-                raise RuntimeError("Codex bundle must not contain Claude aliases")
+                raise RuntimeError(
+                    f"{host.title()} bundle must not contain Claude aliases"
+                )
     finally:
         sync.REPO_ROOT = original_root
         sync.TARGETS = original_targets
@@ -215,7 +218,7 @@ def _validate_alias_installation(
                 failures.append(f"Claude alias {name} missing managed marker")
     elif found:
         failures.append(
-            "Codex install must contain no Claude aliases; "
+            f"{host.title()} install must contain no Claude aliases; "
             f"found sibling skill directories {sorted(found)}"
         )
     return failures, len(found)
@@ -640,7 +643,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--host",
-        choices=("all", "claude", "codex"),
+        choices=("all", "claude", "codex", "grok"),
         default="all",
         help="Which installed-bundle shape to smoke",
     )
@@ -661,7 +664,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Emit machine-readable JSON results",
     )
     args = parser.parse_args(argv)
-    hosts = ["claude", "codex"] if args.host == "all" else [args.host]
+    hosts = ["claude", "codex", "grok"] if args.host == "all" else [args.host]
     results = [smoke_host(h, repo_root=args.repo_root, keep=args.keep) for h in hosts]
     ok = all(bool(r["ok"]) for r in results)
     if args.json:

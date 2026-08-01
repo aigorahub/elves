@@ -193,6 +193,22 @@ authentication failures are diagnosable without opening the raw follow log. A sp
 proven host view nor a follow log reports `visibility_ready=false` and
 `visibility_mode=commit_only`.
 
+### What the built-in redaction filter does *not* cover
+
+Elves redacts and bounds streams that pass through its **transport helpers** (native-worker follow
+logs, full-run event/status surfaces, provider shortcut wrappers that scrub env and logs). The
+following surfaces can still carry secrets or unfiltered tool output because they **bypass** those
+helpers:
+
+- Host-native UI prompts and chat panels that the user types or pastes into directly
+- Third-party IDE plugins, MCP servers, and CLI tools launched outside Elves runners
+- Operator terminals and screenshots outside the supervised child process
+- Shared clipboard and OS-level accessibility tooling
+
+Do not claim that Elves intercepts MCP, host UI, or OS-wide I/O. Honest coverage is limited to the
+supervised runners and their documented private logs. Prefer not pasting secrets into host UI even
+when a worker is under Elves supervision.
+
 ## Cache and authority limits
 
 Exact worker resume preserves provider conversation continuity. Provider-side prompt caching may

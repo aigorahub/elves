@@ -4,6 +4,67 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.23.0] - 2026-08-01
+
+### Grok first-class host install (#88, #101)
+
+- `sync_installed_skills.py --target grok` installs `~/.grok/skills/elves` (first-class peer of
+  Claude/Codex). `--target all` remains update-only for existing roots.
+- README and guide ship copy-paste one-liners for Claude Code, Codex, and Grok Build.
+- Removed obsolete “Grok unsupported as main driver / discovery-only” public wording.
+
+### Full-run resume over terminal sessions (#96)
+
+- `prepare_full_run` / resume launch refuse when `events.jsonl` already contains `run_complete` or
+  `blocked` (`full_run_resume_prepare_terminal`); state and events stay unchanged.
+
+### Confidence sidecar and calibration (#94, #93)
+
+- `cobbler_runtime.confidence_sidecar`: native-lane JSON sidecars under `.elves/runtime/confidence/`
+  and bounded calibration JSONL (triage only, never landing authority).
+
+### Public wording and redaction honesty (#97, #98)
+
+- Wider persona/branding forbidden patterns for product-identity claims (hyphenated Fable branding,
+  “runs on …” framing, and host-vendor persona claims).
+- Documented host-UI / third-party / MCP bypass surfaces that the built-in redaction filter does not
+  cover (`references/adaptive-worker-routing.md`).
+
+### full_run monitor/await extraction (#92)
+
+- Move `monitor_full_run` and `await_full_run` to `cobbler_runtime/full_run_monitor.py` with lazy
+  re-export from `full_run` (behavior preserved; helpers re-bound so tests can still patch).
+
+### Grok prewalk launch path pins (#95)
+
+- Tests pin Grok non-yolo `--prompt-file` grammar, API-key-only auth names, and `launch_ready=false`
+  so qualification evidence alone never opens single-phase launch.
+
+### Fugu calling guide (host routing)
+
+- Collapse Fugu host routing into one decision path: host-native first, first paid call plain
+  unless the user set a flag, `--max-wait` before automatic `--deep`, **`--preflight` required when
+  any `--include` is present**, task strings name goal / paths / done-when / out of scope.
+- Profile choice by deliverable: plain/deep die empty on wall timeout; `--ultra`/`--max` reserve
+  synthesis so a written report can still return.
+- Add copy-paste `Fugu route:` templates and a wait/poll/capture contract: redirect to a log (never
+  `| tail`), chat cancel does not stop the provider, kill the process group to stop spend.
+- Companion field guide `references/fugu-calling-guide.md` (dogfood review runs + 2026 Claude Code /
+  Codex practice: scope before spend, ranked review prompts, verify findings host-native).
+- Field notes: Ultra/Max often run 20–60+ minutes and hit limits on open-ended prompts; keep those
+  lanes narrow (public 2026 operator reports + Elves dogfood).
+- Restate on SKILL, AGENTS, README, guide, and the Claude Fugu alias.
+
+### Fugu timeout/crash salvage
+
+- Plain/deep capture provider stdout/stderr on a host pipe and, on wall timeout or non-zero exit,
+  emit any salvageable partial text between `Fugu partial salvage` markers (exit code still fails).
+- Ultra emits the same salvage markers from `--output-last-message` and captured `agent_message`
+  events when exploration/synthesis times out, crashes, or ends without a clean final.
+- Prompts tell the model the wall is finite and partial findings beat silence.
+- Host guide: harvest salvage before relaunch; cleanup tips for process groups, logs, write
+  handoffs, and leftover isolation dirs.
+
 ## [2.22.0] - 2026-08-01
 
 ### Full Linear backlog resolution

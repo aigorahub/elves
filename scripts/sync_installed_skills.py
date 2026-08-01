@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
-"""Mirror the canonical Elves skill bundle into local Claude/Codex installs.
+"""Mirror the canonical Elves skill bundle into local Claude/Codex/Grok installs.
 
 Usage:
   python3 scripts/sync_installed_skills.py --check
   python3 scripts/sync_installed_skills.py --apply
   python3 scripts/sync_installed_skills.py --apply --target codex
+  python3 scripts/sync_installed_skills.py --apply --target grok
 
 `--check` reports drift between this repo checkout and the local installed copies.
 `--apply` overwrites the managed files/directories in the installed copies so they match
 this checkout exactly. Claude Code Cobbler, setup, compatibility, and provider shortcut alias
 skills are marker-gated: unmarked user-owned alias skill directories are reported as conflicts and
 are never overwritten.
-When `--target all` is used, the script only operates on installed targets it actually finds.
+When `--target all` is used, the script only operates on **already-installed** Elves skill roots
+it finds (update-only). First-time install of a host must use an explicit target
+(`claude`, `codex`, or `grok`).
 
 Runtime shipment rule (v2.1.0+): ship the entire ``scripts/cobbler_runtime/`` package
 recursively plus required top-level helpers (including ``openrouter_lens.py``). Adding a
@@ -143,32 +146,38 @@ def runtime_managed_paths(repo_root: Path | None = None) -> list[str]:
 RUNTIME_SCRIPT_PATHS = runtime_managed_paths()
 
 
-def build_targets(repo_root: Path | None = None) -> dict[str, dict]:
-    """Return TARGETS keyed for Claude Code and Codex installs."""
+def _bundle_managed_paths(repo_root: Path | None = None) -> list[str]:
+    """Shared managed paths for every first-class host skill root."""
     managed = runtime_managed_paths(repo_root)
+    return [
+        "SKILL.md",
+        "AGENTS.md",
+        "config.json.example",
+        "references",
+        *managed,
+    ]
+
+
+def build_targets(repo_root: Path | None = None) -> dict[str, dict]:
+    """Return TARGETS keyed for Claude Code, Codex, and Grok Build installs."""
+    managed = _bundle_managed_paths(repo_root)
     return {
         "claude": {
             "root": Path.home() / ".claude" / "skills" / "elves",
-            "managed_paths": [
-                "SKILL.md",
-                "AGENTS.md",
-                "config.json.example",
-                "references",
-                *managed,
-            ],
+            "managed_paths": list(managed),
             "cleanup_paths": REPO_ONLY_SCRIPT_PATHS,
             "alias_root": Path.home() / ".claude" / "skills",
             "managed_aliases": CLAUDE_ALIAS_NAMES,
         },
         "codex": {
             "root": Path.home() / ".codex" / "skills" / "elves",
-            "managed_paths": [
-                "SKILL.md",
-                "AGENTS.md",
-                "config.json.example",
-                "references",
-                *managed,
-            ],
+            "managed_paths": list(managed),
+            "cleanup_paths": REPO_ONLY_SCRIPT_PATHS,
+        },
+        "grok": {
+            # Grok Build native skill root (first-class host install).
+            "root": Path.home() / ".grok" / "skills" / "elves",
+            "managed_paths": list(managed),
             "cleanup_paths": REPO_ONLY_SCRIPT_PATHS,
         },
     }
@@ -180,7 +189,8 @@ TARGETS = build_targets()
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Check or sync installed Claude/Codex Elves skill copies against this repo checkout."
+            "Check or sync installed Claude/Codex/Grok Elves skill copies against this repo "
+            "checkout."
         )
     )
     mode = parser.add_mutually_exclusive_group(required=True)
@@ -196,15 +206,20 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--target",
-        choices=("all", "claude", "codex"),
+        choices=("all", "claude", "codex", "grok"),
         default="all",
-        help="Which installed skill copy to inspect or sync.",
+        help=(
+            "Which installed skill copy to inspect or sync. "
+            "`all` updates only hosts that already have an Elves skill root; "
+            "first-time install requires an explicit host target."
+        ),
     )
     return parser.parse_args()
 
 
 def selected_targets(target_name: str) -> list[str]:
     if target_name == "all":
+        # Update-only: do not create missing host roots under `all`.
         return [name for name, config in TARGETS.items() if config["root"].exists()]
     return [target_name]
 
@@ -514,7 +529,10 @@ def main() -> int:
 
     if not targets:
         print("No installed Elves skill copies were detected.")
-        print("Use `--target claude` or `--target codex` with `--apply` to create one explicitly.")
+        print(
+            "Use `--target claude`, `--target codex`, or `--target grok` with `--apply` "
+            "to create one explicitly (`all` only updates existing installs)."
+        )
         if args.check and args.target == "all":
             return 0
         return 1

@@ -8,7 +8,7 @@ plans and reviews; a subscription-native (or optional external) worker implement
 files let the work survive context compaction. You write the plan and own the merge decision. The
 agent does the middle.
 
-**Current release: v2.22.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.23.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 **New to Elves?** Use the [practical user guide](https://aigorahub.github.io/elves/) — especially
@@ -18,10 +18,11 @@ orients you. The guide also covers the first run, worker choice, live progress, 
 landing. This README is the repository reference: shell install, safety model, operations, and an
 index into the detailed contracts under [`references/`](references/).
 
-**Supported main drivers:** Claude Code, Codex, and Grok Build. All three use the same automatic
-required-mode prewalk qualification and explicit experimental mode. Grok Build is also an optional
-*worker* under Claude/Codex when permitted. Managed skill install targets remain Claude and Codex
-roots; Grok often discovers Elves via Claude skill compatibility.
+**Supported main drivers:** Claude Code, Codex, and Grok Build. All three are first-class hosts:
+native skill install, doctor validation, automatic required-mode prewalk qualification, and
+explicit experimental prewalk. Grok Build is also an optional *worker* under Claude/Codex when
+permitted. Managed install targets: `claude` → `~/.claude/skills/elves`, `codex` →
+`~/.codex/skills/elves`, `grok` → `~/.grok/skills/elves`.
 See the guide FAQ
 [I opened Grok Build and tried /elves](https://aigorahub.github.io/elves/#troubleshooting).
 
@@ -29,18 +30,14 @@ See the guide FAQ
 
 ## Quick start
 
-Prefer the agent paste in the guide if you already have Claude Code or Codex open. Otherwise use
-the shell installs below.
+Prefer the agent paste in the guide if you already have a supported host open. Otherwise use the
+shell one-liners below (Python 3.10+). First-time install needs an explicit host target; `--target
+all` only updates hosts that already have an Elves skill root.
 
 ### Install (Claude Code)
 
-Requires Python 3.10 or newer.
-
 ```bash
-ELVES_TMP="$(mktemp -d)"
-git clone https://github.com/aigorahub/elves.git "$ELVES_TMP/elves"
-python3 "$ELVES_TMP/elves/scripts/sync_installed_skills.py" --apply --target claude
-rm -rf "$ELVES_TMP"
+ELVES_TMP="$(mktemp -d)" && git clone --depth 1 https://github.com/aigorahub/elves.git "$ELVES_TMP/elves" && python3 "$ELVES_TMP/elves/scripts/sync_installed_skills.py" --apply --target claude && rm -rf "$ELVES_TMP"
 ```
 
 This installs `~/.claude/skills/elves/` plus eleven managed alias skills (`/cobbler`,
@@ -53,15 +50,22 @@ overwrites that alias.
 ### Install (Codex)
 
 ```bash
-ELVES_TMP="$(mktemp -d)"
-git clone https://github.com/aigorahub/elves.git "$ELVES_TMP/elves"
-python3 "$ELVES_TMP/elves/scripts/sync_installed_skills.py" --apply --target codex
-# Codex uses $elves … skill forms (or natural language). Do not invent top-level /cobbler.
+ELVES_TMP="$(mktemp -d)" && git clone --depth 1 https://github.com/aigorahub/elves.git "$ELVES_TMP/elves" && python3 "$ELVES_TMP/elves/scripts/sync_installed_skills.py" --apply --target codex && rm -rf "$ELVES_TMP"
 ```
 
 Codex installs the main skill bundle only — no slash aliases. Use `$elves cobbler: <task>` or
 natural language such as "Ask the Cobbler…".
-Codex users should not need or expect a top-level `/cobbler` command.
+Codex users should not need or expect a top-level `/cobbler` command. Do not invent top-level /cobbler.
+
+### Install (Grok Build)
+
+```bash
+ELVES_TMP="$(mktemp -d)" && git clone --depth 1 https://github.com/aigorahub/elves.git "$ELVES_TMP/elves" && python3 "$ELVES_TMP/elves/scripts/sync_installed_skills.py" --apply --target grok && rm -rf "$ELVES_TMP"
+```
+
+This installs `~/.grok/skills/elves/` for native Grok Build discovery (first-class host, same
+workflow contract as Claude and Codex). No Claude-style slash aliases. Invoke Elves via Grok Build
+skill discovery or natural language.
 
 ### Optional provider shortcuts
 
@@ -85,13 +89,16 @@ subtree disappearance and fail closed on other audit errors. macOS read-only cle
 not proof of recursive descendant absence.
 Profiles remain regular `fugu/high`, `fugu/xhigh` with `--deep`, `fugu-ultra-v1.1/high` with
 `--ultra`, and `fugu-ultra-v1.1/max` with `--max` for one narrow high-stakes gate on a 60-minute
-default wall budget. Prefer plain first; use `--max-wait` before automatic `--deep`. **Host Fugu routing:** when the user says “use Fugu” without an explicit
+default wall budget. Prefer plain first (first paid call is plain unless the user set a flag); use
+`--max-wait` before automatic `--deep`; if any `--include`, run `--preflight` first; prefer
+`--ultra` when a written report must survive exploration; redirect to a log (never `| tail`).
+**Host Fugu routing:** when the user says “use Fugu” without an explicit
 profile flag, the host agent chooses general vs review, plain / deep / ultra / max
 (profile locks model + effort; no free model slug), write mode, and optional `--include` paths
 before launch, states a short `Fugu route: …` line, and prefers the cheapest matching lane;
 explicit flags always win. The isolation snapshot is always on; the host only adds exact admitted
 context via `--include`. See `references/provider-shortcuts.md`
-(**Host routing when the user says "use Fugu"**).
+(**Host routing when the user says "use Fugu"**) and `references/fugu-calling-guide.md`.
 Regular/deep calls are ephemeral; Ultra and max reserve synthesis time and resume only the
 exact isolated session with further tools forbidden. Session state and raw events never leave the
 lane; events cross a bounded host-owned pipe, final output remains pinned to a no-follow
@@ -119,16 +126,30 @@ environment names, timeouts, and follow behavior.
 
 ### Per-project install
 
-Clone into `.claude/skills/elves` or `.codex/skills/elves` inside your repo (remove the nested
-`.git`), or prefer `scripts/sync_installed_skills.py` over hand-maintaining a second tree.
+Clone into `.claude/skills/elves`, `.codex/skills/elves`, or `.grok/skills/elves` inside your repo
+(remove the nested `.git`), or prefer `scripts/sync_installed_skills.py` over hand-maintaining a
+second tree.
 
 ### Validate the install
 
 ```bash
 # Claude Code:
 python3 ~/.claude/skills/elves/scripts/install_doctor.py --startup
-# Codex (use this instead):
+# Codex:
 python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup
+# Grok Build:
+python3 ~/.grok/skills/elves/scripts/install_doctor.py --startup
+```
+
+### Update or uninstall
+
+```bash
+# Update every host that already has Elves installed:
+python3 /path/to/elves/scripts/sync_installed_skills.py --apply --target all
+# Or update one host:
+python3 /path/to/elves/scripts/sync_installed_skills.py --apply --target grok
+# Uninstall: remove the skill root you installed (and Claude aliases only if you want them gone):
+rm -rf ~/.claude/skills/elves ~/.codex/skills/elves ~/.grok/skills/elves
 ```
 
 ### First run

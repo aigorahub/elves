@@ -227,6 +227,7 @@ INSTALLED_HELPER_PATH_PHRASES = {
         "active Elves skill root",
         "~/.claude/skills/elves",
         "~/.codex/skills/elves",
+        "~/.grok/skills/elves",
         "$ELVES_SKILL_ROOT/scripts/acceptance_contract.py",
         "$ELVES_SKILL_ROOT/scripts/elves_landing_check.py",
         "installed Elves bundle never requires a repo-only helper",
@@ -1896,21 +1897,29 @@ PUBLIC_WORDING_FORBIDDEN_PHRASES = [
     "Fable-like",
     "Fable-style",
     "inspired by Fable",
+    "Fable-powered",
     "cobbled together",
     "cobbled-together",
 ]
 
-# Persona claims that describe Cobbler as *being* Fable, matched
-# case-insensitively by the pattern engine. Bare model identifiers
-# (`Fable 5`, `claude-fable-5`) remain legitimate route-identity wording and
-# never match these patterns.
+# Persona claims that describe Cobbler as *being* Fable (or other host models as
+# product personas), matched case-insensitively. Bare model identifiers
+# (`Fable 5`, `claude-fable-5`, route tables) remain legitimate and must not match.
 PUBLIC_WORDING_FORBIDDEN_PATTERNS = [
     r"powered\s+by\s+fable",
     r"built\s+on\s+fable",
     r"backed\s+by\s+fable",
     r"driven\s+by\s+fable",
+    r"runs\s+on\s+fable",
     r"fable\s+under\s+the\s+hood",
     r"fable\s+persona",
+    # "is Fable" / "is a Fable …" product-persona claims (not "Fable 5 model").
+    r"\bis\s+(?:a\s+)?fable(?:\s+model|\s+persona|\s+agent)?\b(?!\s*[0-9])",
+    # Claude/Anthropic persona claims for Cobbler/Elves product identity.
+    r"powered\s+by\s+claude",
+    r"powered\s+by\s+anthropic",
+    r"claude\s+persona",
+    r"anthropic\s+persona",
 ]
 
 # --- Elves 2.3: thin AGENTS adapter + compact SKILL pins ---
@@ -2033,7 +2042,7 @@ if isinstance(IMPLEMENTER_HANDOFF_PHRASES, dict) and 'SKILL.md' in IMPLEMENTER_H
     IMPLEMENTER_HANDOFF_PHRASES['SKILL.md'] = ['Build On', 'owned surfaces', 'forbidden surfaces', 'acceptance evidence', 'blocking coordinator defect', 'HEAD / run-doc paths / route-session identity / output format']
 if isinstance(INSTALLED_HELPER_PATH_PHRASES, dict) and 'SKILL.md' in INSTALLED_HELPER_PATH_PHRASES:
     INSTALLED_HELPER_PATH_PHRASES = dict(INSTALLED_HELPER_PATH_PHRASES)
-    INSTALLED_HELPER_PATH_PHRASES['SKILL.md'] = ['source-checkout shorthand', 'active Elves skill root', '~/.claude/skills/elves', '~/.codex/skills/elves', '$ELVES_SKILL_ROOT/scripts/acceptance_contract.py', '$ELVES_SKILL_ROOT/scripts/elves_landing_check.py', 'installed Elves bundle never requires a repo-only helper']
+    INSTALLED_HELPER_PATH_PHRASES['SKILL.md'] = ['source-checkout shorthand', 'active Elves skill root', '~/.claude/skills/elves', '~/.codex/skills/elves', '~/.grok/skills/elves', '$ELVES_SKILL_ROOT/scripts/acceptance_contract.py', '$ELVES_SKILL_ROOT/scripts/elves_landing_check.py', 'installed Elves bundle never requires a repo-only helper']
 if isinstance(LANDING_CHECK_CONTRACT_PHRASES, dict) and 'SKILL.md' in LANDING_CHECK_CONTRACT_PHRASES:
     LANDING_CHECK_CONTRACT_PHRASES = dict(LANDING_CHECK_CONTRACT_PHRASES)
     LANDING_CHECK_CONTRACT_PHRASES['SKILL.md'] = ['$ELVES_SKILL_ROOT/scripts/elves_landing_check.py', '--session <session-path> --repo-root .', 'plan_path', 'equality assertion']

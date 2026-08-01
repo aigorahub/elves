@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.22.0"
+  version: "2.23.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -37,11 +37,11 @@ Grok Build also remains an **optional worker** under Claude Code or Codex when p
 (`grok-4.5` at `high` when the live catalog offers it). Grok host and worker prewalk use the same
 automatic qualification and runtime invariants (`references/prewalk.md`).
 
-Managed install targets remain `~/.claude/skills/elves` and `~/.codex/skills/elves`. Grok often
-discovers Elves via Claude skill compatibility; a native `~/.grok/skills` install is optional
-follow-up work, not a requirement to drive. Do not invent unsupported host surfaces for other
-products. If the session is an exotic non-supported host (not Claude, Codex, or Grok), refuse to
-stage and redirect to a supported driver.
+Managed install targets are `~/.claude/skills/elves`, `~/.codex/skills/elves`, and
+`~/.grok/skills/elves` (`sync_installed_skills.py --target claude|codex|grok`). All three are
+first-class main drivers. Do not invent unsupported host surfaces for other products. If the
+session is an exotic non-supported host (not Claude, Codex, or Grok), refuse to stage and redirect
+to a supported driver.
 
 **The user owns whether Elves may merge.** You never merge by default — the user merges when they
 return. Exceptions: explicit merge-on-green in Run Control, chat-to-land, or the Reviewed PR Landing
@@ -72,7 +72,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.22.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.23.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
@@ -231,13 +231,18 @@ required capability, then execute it without an extra confirmation prompt:
   `review <scope>`, plain / `--deep` / `--ultra` / `--max` (profile locks model + effort; never
   invent a free model slug), read-only vs qualified `--write`, and optional exact `--include`
   paths. State one short `Fugu route: …` line, then invoke the runner. Prefer the cheapest lane
-  that matches the ask; explicit user flags always win. Apply **Fugu economy**: host-native first
-  for inventory/triage/greps, default plain (`fugu/high`), narrow the packet before raising the
-  profile, prefer `--max-wait` over automatic `--deep`, never `--include` gitignored paths, and
-  use `--preflight` when includes or write mode are non-obvious. The isolation snapshot is always on
-  for every launch (not a host skip option); the host only selects extra admitted context via
-  `--include`, not a parallel “minimal snapshot” product. Full decision table:
-  `references/provider-shortcuts.md` (**Host routing when the user says "use Fugu"**).
+  that matches the ask; explicit user flags always win. **First paid call is plain** unless the
+  user set a flag. Prefer `--ultra` when a written report must survive exploration (reserved
+  synthesis); plain/deep die empty on wall timeout. Host-native first for inventory/triage/greps.
+  Prefer `--max-wait` over automatic `--deep`. **If any `--include`, run `--preflight` first**
+  (never gitignored paths). Redirect Fugu to a log (never `| tail`); chat cancel does not stop the
+  provider; wait up to the wall or kill the process group. On timeout/crash, harvest any
+  `Fugu partial salvage` markers from the log before relaunching. Put goal, paths, done-when, and
+  out of scope in the task string. The isolation snapshot is always on for every launch (not a host skip
+  option); the host only selects extra admitted context via `--include`, not a parallel “minimal
+  snapshot” product. Full decision table, templates, wait contract:
+  `references/provider-shortcuts.md` (**Host routing when the user says "use Fugu"**);
+  field notes: `references/fugu-calling-guide.md`.
   Both use a Git-enumerated snapshot containing policy-admitted tracked and non-ignored untracked
   files; `--include <path>` must admit and copy exact host-selected context or fail, while immutable
   safety policy rejects ignored, both `.env.*` and `*.env` credential-name families,
