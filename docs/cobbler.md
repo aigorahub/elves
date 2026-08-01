@@ -1,9 +1,9 @@
 # How Cobbler works
 
 For a full implementation run, you can simply ask: “Implement this plan while I’m offline.” The
-live Claude Code or Codex driver plans and reviews, while deterministic adaptive routing chooses a
-separate subscription-native worker by default or a permitted capability-qualified Grok worker.
-The choice and fallback remain inspectable; see
+live Claude Code, Codex, or Grok Build driver plans and reviews, while deterministic adaptive
+routing chooses a separate subscription-native worker by default or a permitted capability-qualified
+Grok worker (when Grok is not already the host). The choice and fallback remain inspectable; see
 [`../references/adaptive-worker-routing.md`](../references/adaptive-worker-routing.md).
 
 ![How Cobbler works](../assets/cobbler-infographic.png)
@@ -195,7 +195,8 @@ python3 scripts/cobbler_agents.py setup --json --dry-run
 ```
 
 Claude Code: `/setup-cobbler` or `/setup-council`. Codex: `$elves setup-cobbler` or
-`$elves setup-council` / natural language — not a top-level Codex slash.
+`$elves setup-council` / natural language — not a top-level Codex slash. Grok Build: natural
+language for the same setup intents (no Claude-style slash aliases).
 
 Onboarding interviews purpose→route choices, writes only ignored local `.elves/models.toml`
 (Never stage it), probes that routes work, and never pastes API keys into TOML/chat/Survival Guide.
@@ -238,11 +239,11 @@ guardrails.
 ## CouncilElves launch
 
 See [`references/councilelves-launch-prompt.md`](../references/councilelves-launch-prompt.md) for the
-plan→implement→review overview. **Default is host-native** (Claude Code or Codex implements
-itself). For trusted Grok full-run, the current normative path is one packet, one exact session, one
-launch, feature-branch progress, and a `parked_monitor` host. Optional external implementers and the
-host-import writer lease are capability upgrades when those tools exist. When using an external
-implementer, see
+plan→implement→review overview. **Default is host-native** (Claude Code, Codex, or Grok Build
+implements itself). For trusted Grok full-run as a **work driver** under Claude/Codex, the current
+normative path is one packet, one exact session, one launch, feature-branch progress, and a
+`parked_monitor` host. Optional external implementers and the host-import writer lease are capability
+upgrades when those tools exist. When using an external implementer, see
 [`references/grok-implementer-launch-prompt.md`](../references/grok-implementer-launch-prompt.md) and
 `python3 scripts/cobbler_agents.py implement …`. The earlier bounded-handoff design is retained only
 as historical context in
@@ -252,7 +253,7 @@ Before trusted full-run prepare, derive or validate the session Acceptance rows 
 authoritative plan with `scripts/acceptance_contract.py`, build the worker packet from those exact
 rows, and pass the canonical `--session` (or use the repo-root `.elves-session.json`). Prepare binds
 the plan, session, and packet mapping and launch revalidates it before Grok can spawn. The linked
-Grok recipe is the normative command sequence for both Claude Code and Codex hosts.
+Grok recipe is the normative command sequence for Claude Code, Codex, and Grok Build hosts.
 
 Trusted GitHub branch progress uses a canonical HTTPS origin plus an explicit launch-scoped push
 route (`--grant-github-push`, `GH_TOKEN`, or `GITHUB_TOKEN`); it never inherits the host Git config

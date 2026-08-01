@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A practical guide to installing Elves, running work, watching a worker, and reviewing the result in Claude Code or Codex.">
+  <meta name="description" content="A practical guide to installing Elves, running work, watching a worker, and reviewing the result in Claude Code, Codex, or Grok Build.">
   <meta name="theme-color" content="#172637">
   <title>Using Elves</title>
   <script>document.documentElement.classList.replace("no-js", "js");</script>
@@ -593,7 +593,7 @@
 
         <ol class="path">
           <li><span><strong>Plan.</strong> Agree on the outcome, constraints, acceptance criteria,
-            and risky areas with Claude Code or Codex.</span></li>
+            and risky areas with Claude Code, Codex, or Grok Build.</span></li>
           <li><span><strong>Work.</strong> Elves recommends a worker, gives it one complete packet,
             and shows its live output or provides an exact follow command before the driver
             parks.</span></li>
@@ -661,7 +661,10 @@ rm -rf "$ELVES_TMP"</code></pre>
 python3 ~/.claude/skills/elves/scripts/install_doctor.py --startup
 
 # Codex
-python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup</code></pre>
+python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup
+
+# Grok Build
+python3 ~/.grok/skills/elves/scripts/install_doctor.py --startup</code></pre>
         </div>
       </section>
 
@@ -808,7 +811,7 @@ python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup</code></pre>
           </thead>
           <tbody>
             <tr>
-              <td data-label="Situation">Claude Code or Codex only</td>
+              <td data-label="Situation">Single native host (Claude Code, Codex, or Grok Build)</td>
               <td data-label="Usual choice">Same model, lower effort</td>
               <td data-label="Why">Keeps the exact observed model identity on the subscription
                 already in use while leaving the stronger live driver available for review.</td>

@@ -19,6 +19,13 @@ All notable changes to the Elves skill are documented here.
   both record and byte caps.
 - Review context can include a bounded non-authoritative calibration trend.
 
+### Three-host doc parity
+
+- README, guide, SKILL, model-onboarding, runtime-helper-paths, and cobbler docs name Claude Code,
+  Codex, and Grok Build as first-class main drivers without Claude/Codex-only contradictions.
+- Guide install check block includes the Grok doctor command; helper-path docs include
+  `~/.grok/skills/elves`.
+
 ## [2.23.0] - 2026-08-01
 
 ### Grok first-class host install (#88, #101)

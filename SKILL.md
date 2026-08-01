@@ -2,7 +2,7 @@
 name: elves
 description: Autonomous multi-batch development agent for long unattended runs, reviewed-PR landing, Cobbler-first orchestration, and optional Fugu, Manus, Grok, or Devin provider shortcuts. Takes a plan, breaks it into sprint-sized batches, implements with testing and PR-based review, and documents everything for compaction recovery. Use when user says "run overnight", "I'm going offline", "implement this plan", "keep going without me", "do not stop", "I'll be back in the morning", "run this end-to-end", asks to get a subagent to review the diff from main, read PR comments, test, fix, and merge commit once green, types \land-pr or /land-pr, asks for `/cobbler`, `/council`, `/ec`, `/elves-council`, `/fugu`, `/manus`, `/grok`, or `/devin`, or says `$elves cobbler`.
 license: MIT
-compatibility: Works with Claude Code, Codex, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
+compatibility: Works with Claude Code, Codex, Grok Build, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
   version: "2.23.0"
@@ -77,8 +77,8 @@ installation, kickoff, worker choice, live progress, review, and landing. The re
 remain the detailed workflow contracts.
 
 **Runtime helper paths:** every `python3 scripts/...` example is **source-checkout shorthand**.
-In an installed Claude Code or Codex skill, resolve helpers from the **active Elves skill root**
-(`~/.claude/skills/elves` or `~/.codex/skills/elves`) while keeping the **target repository as the working directory**, or pass `--repo-root`. An **installed Elves bundle never requires a repo-only helper**.
+In an installed Claude Code, Codex, or Grok Build skill, resolve helpers from the **active Elves skill root**
+(`~/.claude/skills/elves`, `~/.codex/skills/elves`, or `~/.grok/skills/elves`) while keeping the **target repository as the working directory**, or pass `--repo-root`. An **installed Elves bundle never requires a repo-only helper**.
 See `references/runtime-helper-paths.md`.
 
 ## Reviewed PR Landing Command
@@ -173,6 +173,7 @@ Invocation:
 
 - Claude Code: `/cobbler <task>`, `/cobbler-mode`, `/setup-cobbler` (aliases `/council`, `/ec`, `/elves-council`, `/setup-council` remain)
 - Codex: `$elves cobbler: <task>`, `$elves council: <task>`, `$elves cobbler-mode`, `$elves setup-cobbler`, or natural language — **Do not invent top-level Codex slash commands**; **do not assume Codex has a top-level `/cobbler` command**
+- Grok Build: natural language for Cobbler intents (no Claude-style slash aliases)
 
 **Cobbler Mode** is current-thread chat state (**not durable run state**). Exit with "Cobbler Mode: off".
 
@@ -180,12 +181,12 @@ Invocation:
 
 ### Who implements (native default, optional extras)
 
-**Default: subscription-native worker** (Claude Code or Codex). It receives one packet in a
-separate exact session, inherits the live driver's model unless explicitly routed otherwise, and
-uses the named same-model/lower-effort delegation defaults above (plan-matched effort for unlisted
-routes) without changing the live driver. No Grok, OpenRouter, or external implement CLI is
-required. Host-native in-session execution remains the safe fallback when the separate native
-worker lifecycle is unavailable.
+**Default: subscription-native worker** on the live host (Claude Code, Codex, or Grok Build). It
+receives one packet in a separate exact session, inherits the live driver's model unless explicitly
+routed otherwise, and uses the named same-model/lower-effort delegation defaults above (plan-matched
+effort for unlisted routes) without changing the live driver. No optional external implement CLI is
+required for the native path. Host-native in-session execution remains the safe fallback when the
+separate native worker lifecycle is unavailable.
 
 Optional Grok Build is selected only when available **and permitted**. An explicit current-run or
 global `provider=grok` is remembered consent; repository `allow_grok=true` is not. Repository

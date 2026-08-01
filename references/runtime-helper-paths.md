@@ -8,7 +8,7 @@ Keep those two roots distinct.
 Commands written as `python3 scripts/<helper>.py ...` are source-checkout shorthand. Use that form
 only when the current checkout actually contains Elves' `scripts/` directory.
 
-## Installed Claude Code or Codex skill
+## Installed Claude Code, Codex, or Grok Build skill
 
 For an installed skill, set `ELVES_SKILL_ROOT` to the directory containing the active Elves
 `SKILL.md`, then invoke the helper by its absolute installed path:
@@ -20,13 +20,16 @@ ELVES_SKILL_ROOT="$HOME/.claude/skills/elves"
 # Codex global install (use this instead when Codex is the active host)
 ELVES_SKILL_ROOT="$HOME/.codex/skills/elves"
 
+# Grok Build global install (use this instead when Grok Build is the active host)
+ELVES_SKILL_ROOT="$HOME/.grok/skills/elves"
+
 python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" doctor \
   --repo-root "$PWD" --json
 ```
 
-A project-local install uses its active `.claude/skills/elves` or `.codex/skills/elves` directory
-instead. Resolve the path from the skill that was actually loaded; do not assume the global copy
-won when a project-local copy may shadow it.
+A project-local install uses its active `.claude/skills/elves`, `.codex/skills/elves`, or
+`.grok/skills/elves` directory instead. Resolve the path from the skill that was actually loaded; do
+not assume the global copy won when a project-local copy may shadow it.
 
 Keep the target repository as the working directory. Do not `cd` into the installed skill merely to
 make a relative helper path work. When the working directory is not the target repository, pass the
@@ -65,8 +68,8 @@ fail closed. Bundle smoke requires both paths.
 ## Source-only archives
 
 `docs/plans/` (historical plan archive) and `docs/elves/` (durable learnings and run memory for this
-source repo) are **source-checkout only**. They are not part of the installed Claude Code or Codex
-skill surface. Committed examples and templates remain non-identifying.
+source repo) are **source-checkout only**. They are not part of the installed Claude Code, Codex, or
+Grok Build skill surface. Committed examples and templates remain non-identifying.
 
 Repository-maintenance helpers such as `scripts/verify_repo.py`, `scripts/release_checklist.py`,
 and `scripts/check_repo_consistency.py` are intentionally not part of an installed bundle. Use one
