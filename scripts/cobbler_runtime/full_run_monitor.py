@@ -411,6 +411,39 @@ def monitor_full_run(
             last_batch_confidence = event_signal["confidence"]
             last_batch_unsure_about = event_signal["unsure_about"]
             last_batch_unsure_about_count = event_signal["unsure_about_count"]
+            # Persist structured sidecar for native-lane review triage when the
+            # batch event carries a confidence signal. Never raise into monitor.
+            if event_signal["confidence"] is not None or event_signal[
+                "unsure_about"
+            ] is not None or event_signal["unsure_about_count"] is not None:
+                try:
+                    from .confidence_sidecar import (  # noqa: PLC0415
+                        write_confidence_sidecar,
+                    )
+
+                    batch_value = ev.get("batch")
+                    key = (
+                        f"batch-{batch_value}"
+                        if isinstance(batch_value, int)
+                        and not isinstance(batch_value, bool)
+                        else "batch-unknown"
+                    )
+                    write_confidence_sidecar(
+                        Path(repo_root),
+                        key=key,
+                        payload={
+                            "confidence": event_signal["confidence"],
+                            "unsure_about": list(event_signal["unsure_about"] or []),
+                            "has_confidence": event_signal["confidence"] is not None,
+                            "has_unsure_answer": (
+                                event_signal["unsure_about"] is not None
+                                or event_signal["unsure_about_count"] is not None
+                            ),
+                            "source": "event",
+                        },
+                    )
+                except Exception:
+                    pass
 
     if not event_errors and not events_reused and event_signature is not None:
         cache["event_signature"] = event_signature
@@ -774,6 +807,30 @@ def monitor_full_run(
         cache["skipped_full_event_rescan"] = events_reused
         cache["skipped_deep_git_reconciliation"] = True
         cache["skipped_remote_all_ref_audit"] = True
+    # Cross-run calibration is triage-only. Record once on terminal outcomes;
+    # never raise into the monitor path.
+    if state.status in {"complete", "blocked", "failed", "stopped"}:
+        try:
+            from .confidence_sidecar import (  # noqa: PLC0415
+                latest_confidence_from_sidecars,
+                record_terminal_calibration,
+            )
+
+            conf = last_batch_confidence
+            if conf is None:
+                conf = latest_confidence_from_sidecars(Path(repo_root))
+            record_terminal_calibration(
+                Path(repo_root),
+                run_id=_expected_run_id(session_id),
+                adapter=str(state.adapter or ""),
+                model=str(state.model or ""),
+                effort=str(state.effort or ""),
+                status=str(state.status),
+                blocker=state.blocker,
+                confidence=conf,
+            )
+        except Exception:
+            pass
     save_state(repo_root, state)
 
     status = {

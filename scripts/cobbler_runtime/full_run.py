@@ -182,22 +182,46 @@ def _terminal_event_types_present(
 ) -> frozenset[str]:
     """Return terminal event types already present in a full-run events log.
 
-    Used only for fail-closed resume-prepare: a log that already carries
-    ``run_complete`` or ``blocked`` must not be rebuilt with a new
-    ``run_started``. Best-effort scan; unreadable logs return empty and other
-    guards still apply.
+    Used only for fail-closed resume-prepare / resume-launch: a log that already
+    carries ``run_complete`` or ``blocked`` must not be rebuilt with a new
+    ``run_started``.
+
+    Only a proven-absent log is treated as non-terminal. Unreadable, oversized,
+    non-regular, or otherwise unverifiable logs raise
+    ``full_run_resume_event_log_unverifiable`` so callers refuse before any write.
     """
     try:
-        if not repo_regular_file_exists(repo_root, events_path):
-            return frozenset()
+        exists = repo_regular_file_exists(repo_root, events_path)
+    except StorageError as exc:
+        raise ValidationIssue(
+            "full_run_resume_event_log_unverifiable",
+            f"Cannot verify terminal events: event log path is unsafe ({exc.code})",
+            path=str(events_path),
+            hint="Start a new session_id; do not rebuild a session whose event log cannot be verified",
+        ) from exc
+    if not exists:
+        return frozenset()
+    try:
         raw = _read_bounded_regular_bytes(
             events_path,
             max_bytes=MAX_EVENT_FILE_BYTES,
             label="event log",
             repo_root=repo_root,
         )
-    except Exception:
-        return frozenset()
+    except StorageError as exc:
+        raise ValidationIssue(
+            "full_run_resume_event_log_unverifiable",
+            f"Cannot verify terminal events: {exc}",
+            path=str(events_path),
+            hint="Start a new session_id; do not rebuild a session whose event log cannot be verified",
+        ) from exc
+    except OSError as exc:
+        raise ValidationIssue(
+            "full_run_resume_event_log_unverifiable",
+            f"Cannot verify terminal events: {type(exc).__name__}",
+            path=str(events_path),
+            hint="Start a new session_id; do not rebuild a session whose event log cannot be verified",
+        ) from exc
     found: set[str] = set()
     for raw_line in raw.splitlines():
         if not raw_line or len(raw_line) > MAX_EVENT_LINE_BYTES:
@@ -1301,6 +1325,34 @@ def build_worker_confidence_review_context(
         review_prompt_block = "\n".join(
             header_lines + kept_lines + [dropped_line] + footer_lines
         )
+    calibration_trend: dict[str, Any] | None = None
+    if repo_root is not None:
+        try:
+            from .confidence_sidecar import (  # noqa: PLC0415
+                calibration_trend_summary,
+            )
+
+            calibration_trend = calibration_trend_summary(Path(repo_root))
+        except Exception:
+            calibration_trend = None
+    trend_lines: list[str] = []
+    if calibration_trend and int(calibration_trend.get("sample_size") or 0) > 0:
+        trend_lines = [
+            "Cross-run calibration trend (triage only; never authority):",
+            f"- sample_size={calibration_trend.get('sample_size')}; "
+            f"high_confidence_product_blockers="
+            f"{calibration_trend.get('high_confidence_product_blockers')}",
+        ]
+    if trend_lines:
+        # Insert before the mandatory review rules footer.
+        prompt_parts = review_prompt_block.split("Review rules:")
+        if len(prompt_parts) == 2:
+            review_prompt_block = (
+                prompt_parts[0]
+                + "\n".join(trend_lines)
+                + "\nReview rules:"
+                + prompt_parts[1]
+            )
     return {
         "schema": "elves-worker-confidence-review-v1",
         "session_id": session_id,
@@ -1312,6 +1364,7 @@ def build_worker_confidence_review_context(
         "signals": rows,
         "omitted_signal_rows": omitted_signal_rows,
         "priority_areas": priority_areas,
+        "calibration_trend": calibration_trend,
         "review_policy": {
             "baseline_review_required": True,
             "confidence_can_reduce_scope": False,
@@ -6518,6 +6571,20 @@ def write_report(repo_root: Path, session_id: str, report: Mapping[str, Any]) ->
     payload["merge_authority"] = False
     path = full_run_root(repo_root, session_id) / "report.json"
     atomic_write_json(path, payload, repo_root=Path(repo_root))
+    # Native confidence sidecars are triage-only; failures here must not block
+    # accepting an otherwise valid report.
+    try:
+        from .confidence_sidecar import (  # noqa: PLC0415
+            write_sidecars_from_commit_messages,
+            write_sidecars_from_report,
+        )
+
+        write_sidecars_from_report(Path(repo_root), payload)
+        commits = payload.get("commits")
+        if isinstance(commits, list):
+            write_sidecars_from_commit_messages(Path(repo_root), commits)
+    except Exception:
+        pass
     return path
 
 @_locked_full_run
@@ -6754,6 +6821,25 @@ def reconstruct_missing_report(
     state.head = tip
     state.completed_at = state.completed_at or _utc_now()
     state.blocker = None
+    try:
+        from .confidence_sidecar import (  # noqa: PLC0415
+            latest_confidence_from_sidecars,
+            record_terminal_calibration,
+            write_sidecars_from_commit_messages,
+        )
+
+        write_sidecars_from_commit_messages(Path(repo_root), commit_rows)
+        record_terminal_calibration(
+            Path(repo_root),
+            run_id=_expected_run_id(session_id),
+            adapter=str(state.adapter or ""),
+            model=str(state.model or ""),
+            effort=str(state.effort or ""),
+            status="complete",
+            confidence=latest_confidence_from_sidecars(Path(repo_root)),
+        )
+    except Exception:
+        pass
     save_state(repo_root, state)
     return {
         "ok": True,

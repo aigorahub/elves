@@ -4,6 +4,21 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+### Full-run terminal event log fail-closed
+
+- Resume prepare/launch now refuse with `full_run_resume_event_log_unverifiable` when
+  `events.jsonl` is oversized, unreadable, non-regular, or otherwise unverifiable. Only a
+  proven-absent log is treated as non-terminal (closes the #96 fail-open residual).
+
+### Confidence production wiring and calibration store
+
+- Native report write, batch-complete monitor path, and host reconstruction write confidence
+  sidecars under `.elves/runtime/confidence/` (triage only).
+- Terminal outcomes append one idempotent calibration row per run; missing confidence is the
+  locked token `missing`. Store uses mandatory flock (when available) and atomic replace with
+  both record and byte caps.
+- Review context can include a bounded non-authoritative calibration trend.
+
 ## [2.23.0] - 2026-08-01
 
 ### Grok first-class host install (#88, #101)
