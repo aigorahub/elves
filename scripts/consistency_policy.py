@@ -234,12 +234,13 @@ INSTALLED_HELPER_PATH_PHRASES = {
     ],
     "references/runtime-helper-paths.md": [
         "## Source checkout shorthand",
-        "## Installed Claude Code or Codex skill",
+        "## Installed Claude Code, Codex, or Grok Build skill",
         "## Shipped call-site runtime deps",
         "## Source-only archives",
         "target repository as the working directory",
         "$HOME/.claude/skills/elves",
         "$HOME/.codex/skills/elves",
+        "$HOME/.grok/skills/elves",
         "scripts/acceptance_contract.py",
         "scripts/elves_landing_check.py",
         "scripts/worktree_gc.py",
@@ -1739,7 +1740,7 @@ SETUP_COBBLER_PHRASES = {
     ],
     "references/model-onboarding.md": [
         "Model Onboarding",
-        "Claude Code + Codex",
+        "Claude Code, Codex, and Grok Build",
         "Supported hosts (main drivers)",
         "not been our focus",
         "many have not been heavily",

@@ -5867,6 +5867,58 @@ class WorkerEffortAuthorityTests(unittest.TestCase):
             self.assertEqual(events_path.read_bytes(), after_append)
             self.assertEqual(after_append[: len(before)], before)
 
+    def test_resume_prepare_refuses_unverifiable_oversized_event_log(self) -> None:
+        """Unreadable/oversized event logs fail closed before any resume write."""
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            prep = self._fixture_prepare(repo, effort="low")
+            root = full_run_root(repo, "effort-explicitness")
+            events_path = Path(prep["events_path"])
+            state_path = root / "state.json"
+            report_path = root / "report.json"
+            # Snapshot protected artifacts before the refuse path.
+            before = {
+                "events": events_path.read_bytes(),
+                "state": state_path.read_bytes() if state_path.is_file() else b"",
+                "report": report_path.read_bytes() if report_path.is_file() else b"",
+            }
+            # Append a terminal event, then pad past the event-log byte ceiling.
+            state = load_state(repo, "effort-explicitness")
+            state.status = "complete"
+            state.pid = None
+            full_run_module.save_state(repo, state)
+            terminal = (
+                json.dumps(
+                    {
+                        "timestamp": "2026-08-01T00:00:00Z",
+                        "session_id": "effort-explicitness",
+                        "branch": "feat/x",
+                        "head": state.head or state.start_head,
+                        "batch": 0,
+                        "type": "run_complete",
+                        "summary": "done",
+                    }
+                )
+                + "\n"
+            )
+            pad = "x" * (full_run_module.MAX_EVENT_FILE_BYTES + 8)
+            events_path.write_bytes(before["events"] + terminal.encode("utf-8") + pad.encode("utf-8"))
+            after_pad = events_path.read_bytes()
+            state_after_pad = state_path.read_bytes()
+            with self.assertRaises(full_run_module.ValidationIssue) as ctx:
+                self._fixture_prepare(repo, effort=None, create=False)
+            self.assertEqual(
+                ctx.exception.code, "full_run_resume_event_log_unverifiable"
+            )
+            # No rewrite of the oversized log, state, or report.
+            self.assertEqual(events_path.read_bytes(), after_pad)
+            self.assertEqual(state_path.read_bytes(), state_after_pad)
+            if report_path.is_file():
+                self.assertEqual(
+                    report_path.read_bytes(),
+                    before["report"] if before["report"] else report_path.read_bytes(),
+                )
+
     def test_prepare_full_run_keeps_the_serialization_lock(self) -> None:
         # v2.10.2 terminal-review blocker: inserting resolve_worker_effort
         # between @_locked_full_run and prepare_full_run silently moved the

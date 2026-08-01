@@ -3,20 +3,20 @@
 ![Elves - they work while you sleep](assets/elves-banner.jpeg)
 
 Elves is an open-source Agent Skill for handing planned development or research work to a separate
-worker without locking the run to one model provider. The capable Claude Code or Codex driver
-plans and reviews; a subscription-native (or optional external) worker implements; durable run
-files let the work survive context compaction. You write the plan and own the merge decision. The
-agent does the middle.
+worker without locking the run to one model provider. The capable Claude Code, Codex, or Grok Build
+driver plans and reviews; a subscription-native (or optional external) worker implements; durable
+run files let the work survive context compaction. You write the plan and own the merge decision.
+The agent does the middle.
 
 **Current release: v2.23.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 **New to Elves?** Use the [practical user guide](https://aigorahub.github.io/elves/) — especially
 **[Paste this to your agent](https://aigorahub.github.io/elves/#agent-onboarding)** at the top.
-That copy-ready block installs Elves for Claude Code and/or Codex (whichever is available) and
-orients you. The guide also covers the first run, worker choice, live progress, review, and
-landing. This README is the repository reference: shell install, safety model, operations, and an
-index into the detailed contracts under [`references/`](references/).
+That copy-ready block installs Elves for Claude Code, Codex, and/or Grok Build (whichever is
+available) and orients you. The guide also covers the first run, worker choice, live progress,
+review, and landing. This README is the repository reference: shell install, safety model,
+operations, and an index into the detailed contracts under [`references/`](references/).
 
 **Supported main drivers:** Claude Code, Codex, and Grok Build. All three are first-class hosts:
 native skill install, doctor validation, automatic required-mode prewalk qualification, and
@@ -184,11 +184,11 @@ profile, and apply exact-HEAD `waive` entries — with no auto-promotion. See
 
 ## Who implements
 
-**Default: a subscription-native worker** (Claude Code or Codex) in a separate exact session — no
-external provider required. Optional work drivers when configured and permitted: trusted Grok
-Build full-run, Devin CLI, or other adapters. Missing optional provider access never blocks a
-native run. Repository `allow_grok=false` is an absolute veto. The host owns packets, protected
-refs, final gates, PR, and merge — always. Details:
+**Default: a subscription-native worker** on the live host (Claude Code, Codex, or Grok Build) in a
+separate exact session — no external provider required. Optional work drivers when configured and
+permitted: trusted Grok Build full-run under Claude/Codex, Devin CLI, or other adapters. Missing
+optional provider access never blocks a native run. Repository `allow_grok=false` is an absolute
+veto. The host owns packets, protected refs, final gates, PR, and merge — always. Details:
 [`references/adaptive-worker-routing.md`](references/adaptive-worker-routing.md),
 [`references/prewalk.md`](references/prewalk.md),
 [`references/grok-open-source-worker.md`](references/grok-open-source-worker.md),

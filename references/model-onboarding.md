@@ -1,40 +1,43 @@
-# Model Onboarding (Claude Code + Codex)
+# Model Onboarding (Claude Code, Codex, and Grok Build)
 
 Users need a clear way to **choose** which tools/models handle which jobs, **update** those
 choices later, and **verify** they work. Elves does this as a **host-mediated** flow: the agent
 interviews the user; the CLI inventories, stores preferences, and probes.
 
 Native-only remains fully valid. Onboarding is optional. The ordinary implementation default is a
-separate subscription-native worker on the current Claude Code or Codex account; the live main
-driver keeps planning and terminal review. Safe provider/effort convenience uses the shared XDG
-preferences in [`adaptive-worker-routing.md`](adaptive-worker-routing.md). The ignored
+separate subscription-native worker on the current host account (Claude Code, Codex, or Grok Build);
+the live main driver keeps planning and terminal review. Safe provider/effort convenience uses the
+shared XDG preferences in [`adaptive-worker-routing.md`](adaptive-worker-routing.md). The ignored
 `.elves/models.toml` remains the advanced per-repository profile map.
 
-The `python3 scripts/...` forms below are source-checkout shorthand. From an installed Claude Code
-or Codex skill, invoke the helper from the active Elves skill root while the target repository stays
-the working directory; see [`runtime-helper-paths.md`](runtime-helper-paths.md).
+The `python3 scripts/...` forms below are source-checkout shorthand. From an installed Claude Code,
+Codex, or Grok Build skill, invoke the helper from the active Elves skill root while the target
+repository stays the working directory; see [`runtime-helper-paths.md`](runtime-helper-paths.md).
 
 ## Supported hosts (main drivers)
 
-**Elves is designed and tested with Claude Code or Codex as the main driver** — the process that
-runs the skill and owns staging, canonical run memory, protected refs, PR actions, final gates,
-cumulative review, and merge. Host-native/legacy routes keep the per-batch loop in that driver. In
-trusted full-run, the exact registered `branch_progress` worker may commit/push only its assigned
-feature branch while the main driver parks. Untrusted workers remain detached and host-imported.
+**Supported main drivers are Claude Code, Codex, and Grok Build** — the process that runs the skill
+and owns staging, canonical run memory, protected refs, PR actions, final gates, cumulative review,
+and merge. Host-native/legacy routes keep the per-batch loop in that driver. In trusted full-run,
+the exact registered `branch_progress` worker may commit/push only its assigned feature branch while
+the main driver parks. Untrusted workers remain detached and host-imported.
 
 | Host | How to start onboarding |
 | --- | --- |
 | **Claude Code** (supported main driver) | `/setup-cobbler` or natural language: “set up my model routes” / “onboard models” |
 | **Codex** (supported main driver) | `$elves setup-cobbler` or natural language — **not** a top-level Codex slash command |
+| **Grok Build** (supported main driver) | natural language for the same intents; install root `~/.grok/skills/elves` (`--target grok`) |
 
-Both supported hosts follow the same operator CLI (`plan` → `apply` → `show` → `probe`) and the
-same host-mediated protocol below. Do not invent different product rules per host.
+All three supported hosts follow the same operator CLI (`plan` → `apply` → `show` → `probe`) and the
+same host-mediated protocol below. Do not invent different product rules per host. Grok may also
+discover Elves via Claude skill compatibility when `~/.claude/skills/elves` is present. Grok remains
+an optional **work driver** under Claude/Codex when permitted.
 
 ### Main driver vs work driver
 
 | Term | Meaning | Default |
 | --- | --- | --- |
-| **Main driver** (orchestrator) | Runs Elves: skill, stage/start, Cobbler, canonical memory, protected refs, PR actions, final gates/review, merge, and either the host loop or parked supervisor | **Claude Code or Codex** only |
+| **Main driver** (orchestrator) | Runs Elves: skill, stage/start, Cobbler, canonical memory, protected refs, PR actions, final gates/review, merge, and either the host loop or parked supervisor | **Claude Code, Codex, or Grok Build** |
 | **Work driver** (laborer) | Host-native/legacy batch labor, trusted full-run assigned-feature-branch labor, or untrusted detached labor under the main driver | host-native, or Grok / OpenCode / Antigravity / … |
 
 **Yes — from inside the main driver you can assign the actual work to another tool.** Example: Claude
@@ -44,9 +47,9 @@ the main driver prepares each packet, launches/resumes, validates, and reviews e
 trusted full-run, it prepares one packet/session and parks until terminal/safety wake, then performs
 one cumulative validation/review and lands only when the user's merge policy authorizes it.
 
-Other tools are **not** supported main drivers. Prefer Claude Code or Codex for validation,
-synthesis, canonical memory, protected refs, PR actions, final review, and merge. Trusted
-assigned-feature-branch commit/push is the narrow full-run exception.
+Tools outside Claude Code, Codex, and Grok Build are **not** supported main drivers. Prefer a
+supported host for validation, synthesis, canonical memory, protected refs, PR actions, final review,
+and merge. Trusted assigned-feature-branch commit/push is the narrow full-run exception.
 
 ### Exotic main drivers (may or may not work)
 
@@ -55,12 +58,6 @@ that loads Elves and owns the overnight session. We are **not** designing for th
 have **not** dogfooded it. It **may or may not work**. Do not treat success stories or recipes as a
 product guarantee. If you try it and care about the project: **prefer a PR** (skill load path,
 headless loop, session recovery, docs) so others benefit.
-
-**Grok Build is a supported main driver** alongside Claude Code and Codex. Prefer the native skill
-root `~/.grok/skills/elves` (install with the README Grok one-liner / `--target grok` from a source
-checkout). Grok may also discover Elves via Claude skill compatibility when
-`~/.claude/skills/elves` is present. Grok remains an optional **work driver** under Claude/Codex
-when permitted.
 
 ### Work drivers and optional lenses (also incomplete coverage)
 
@@ -77,10 +74,11 @@ Adapters and recipes exist so people can try them. Expect rough edges, version d
 
 ### Testing honesty and contributions
 
-What we design and dogfood against: **Claude Code or Codex as main driver**, mostly **host-native**
-labor, with selective checks on a few optional paths when credentials allow. Optional and exotic
-routes (OpenCode, Antigravity CLI, Gemini CLI, OpenRouter panels, Muse, AlphaEvolve, work-driver
-matrices) are documented so people can try them, but they **have not been our focus**, and **many have not been heavily** tested — including cases without maintainer subscriptions or installs.
+What we design and dogfood against: **Claude Code, Codex, or Grok Build as main driver**, mostly
+**host-native** labor, with selective checks on a few optional paths when credentials allow.
+Optional and exotic routes (OpenCode, Antigravity CLI, Gemini CLI, OpenRouter panels, Muse,
+AlphaEvolve, work-driver matrices) are documented so people can try them, but they **have not been our focus**, and **many have not been heavily** tested — including cases without maintainer
+subscriptions or installs.
 
 We are **not** thinking hard about every exotic main-driver or work-driver matrix right now.
 **Contributions welcome** — that is how the project gets more robust.
@@ -89,8 +87,8 @@ If something does not work:
 
 1. **Prefer a PR** with a fix, clearer error, recipe note, or test (especially exotic CLIs and
    work-driver combos we cannot exercise daily).
-2. Or **open an issue** with main driver (Claude Code / Codex / other), work driver if any, OS,
-   command, and what failed (**no secrets**).
+2. Or **open an issue** with main driver (Claude Code / Codex / Grok Build / other), work driver if
+   any, OS, command, and what failed (**no secrets**).
 
 Issue tracker: [github.com/aigorahub/elves/issues](https://github.com/aigorahub/elves/issues).
 
@@ -136,8 +134,8 @@ Guide. Env var **names** only.
 | Synthesis | host-native | host-native only preferred |
 | Math evolutionary search | off | alphaevolve (when gcloud + project runner exist) |
 
-`host-native` means the **current supported host** (Claude Code or Codex) owns that work — not
-Antigravity, Gemini CLI, or another optional tool.
+`host-native` means the **current supported host** (Claude Code, Codex, or Grok Build) owns that
+work — not Antigravity, Gemini CLI, or another optional tool.
 
 ### Within-family model tiers (Claude and Codex)
 
@@ -237,7 +235,7 @@ ambiguous “latest/continue”.**
 
 Google is consolidating coding-agent surfaces around **Antigravity** (Gemini CLI transitions into
 that family). Treat both as optional **subscription CLIs** when installed and the **host is still
-Claude Code or Codex**.
+Claude Code, Codex, or Grok Build**.
 
 **Not a supported Elves host.** Do not treat Antigravity or Gemini CLI as the main overnight driver.
 Support for them as the primary runtime is not our focus. As **optional lenses**, they are
