@@ -319,6 +319,48 @@ class GrokHostArmTests(unittest.TestCase):
         self.assertTrue(profiles["codex"]["launch_ready"])
         self.assertTrue(profiles["claude"]["launch_ready"])
 
+    def test_grok_launch_plan_is_prompt_file_non_yolo_and_api_key_only(self) -> None:
+        """#95: materialize packet via --prompt-file; never yolo/always-approve."""
+        from cobbler_runtime.host_profiles import (  # noqa: PLC0415
+            HostLaunchRequest,
+            resolve_host_profile,
+        )
+
+        profile = resolve_host_profile("grok")
+        self.assertFalse(profile.launch_ready)
+        self.assertEqual(profile.provider_secret_names, frozenset({"XAI_API_KEY"}))
+        create = profile.launch_plan(
+            HostLaunchRequest(
+                effort="high",
+                requested_model="grok-4.5",
+                cwd="/tmp/worktree",
+                git_write_roots=(),
+                session_id=None,
+                fixture_script=None,
+            )
+        )
+        self.assertEqual(create.prompt_file_flag, "--prompt-file")
+        self.assertFalse(create.stdin_packet)
+        argv = " ".join(create.argv)
+        self.assertIn("--permission-mode auto", argv)
+        self.assertNotIn("--yolo", argv)
+        self.assertNotIn("--always-approve", argv)
+        self.assertNotIn("dontAsk", argv)
+        resume = profile.launch_plan(
+            HostLaunchRequest(
+                effort="high",
+                requested_model="grok-4.5",
+                cwd="/tmp/worktree",
+                git_write_roots=(),
+                session_id="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                fixture_script=None,
+            )
+        )
+        self.assertIn("--resume", resume.argv)
+        self.assertEqual(resume.prompt_file_flag, "--prompt-file")
+        # Qualification artifacts never flip the host-level launch_ready gate.
+        self.assertFalse(resolve_host_profile("grok").launch_ready)
+
 
 class GrokNativeWorkerCliTests(unittest.TestCase):
     """B2-A2 (CLI surface): spec works for grok; launch fails closed."""

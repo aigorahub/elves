@@ -4,6 +4,8 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.23.0] - 2026-08-01
+
 ### Grok first-class host install (#88, #101)
 
 - `sync_installed_skills.py --target grok` installs `~/.grok/skills/elves` (first-class peer of
@@ -23,9 +25,20 @@ All notable changes to the Elves skill are documented here.
 
 ### Public wording and redaction honesty (#97, #98)
 
-- Wider persona/branding forbidden patterns (e.g. Fable-powered, runs on Fable, Claude persona).
+- Wider persona/branding forbidden patterns for product-identity claims (hyphenated Fable branding,
+  “runs on …” framing, and Claude/Anthropic persona claims).
 - Documented host-UI / third-party / MCP bypass surfaces that the built-in redaction filter does not
   cover (`references/adaptive-worker-routing.md`).
+
+### full_run monitor/await extraction (#92)
+
+- Move `monitor_full_run` and `await_full_run` to `cobbler_runtime/full_run_monitor.py` with lazy
+  re-export from `full_run` (behavior preserved; helpers re-bound so tests can still patch).
+
+### Grok prewalk launch path pins (#95)
+
+- Tests pin Grok non-yolo `--prompt-file` grammar, API-key-only auth names, and `launch_ready=false`
+  so qualification evidence alone never opens single-phase launch.
 
 ### Fugu calling guide (host routing)
 
