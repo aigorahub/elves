@@ -807,9 +807,19 @@ def monitor_full_run(
         cache["skipped_full_event_rescan"] = events_reused
         cache["skipped_deep_git_reconciliation"] = True
         cache["skipped_remote_all_ref_audit"] = True
-    # Cross-run calibration is triage-only. Record once on terminal outcomes;
-    # never raise into the monitor path.
-    if state.status in {"complete", "blocked", "failed", "stopped"}:
+    # Cross-run calibration is triage-only. Record once on settled terminal
+    # outcomes; never raise into the monitor path. Skip intermediate
+    # driver_wake_reconcile blocked so a later host reconstruction can record
+    # complete honestly under the same run_id.
+    settle_for_calibration = state.status in {
+        "complete",
+        "failed",
+        "stopped",
+    } or (
+        state.status == "blocked"
+        and state.next_action != "driver_wake_reconcile"
+    )
+    if settle_for_calibration:
         try:
             from .confidence_sidecar import (  # noqa: PLC0415
                 latest_confidence_from_sidecars,
