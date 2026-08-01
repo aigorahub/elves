@@ -85,13 +85,16 @@ subtree disappearance and fail closed on other audit errors. macOS read-only cle
 not proof of recursive descendant absence.
 Profiles remain regular `fugu/high`, `fugu/xhigh` with `--deep`, `fugu-ultra-v1.1/high` with
 `--ultra`, and `fugu-ultra-v1.1/max` with `--max` for one narrow high-stakes gate on a 60-minute
-default wall budget. Prefer plain first; use `--max-wait` before automatic `--deep`. **Host Fugu routing:** when the user says “use Fugu” without an explicit
+default wall budget. Prefer plain first (first paid call is plain unless the user set a flag); use
+`--max-wait` before automatic `--deep`; if any `--include`, run `--preflight` first; prefer
+`--ultra` when a written report must survive exploration; redirect to a log (never `| tail`).
+**Host Fugu routing:** when the user says “use Fugu” without an explicit
 profile flag, the host agent chooses general vs review, plain / deep / ultra / max
 (profile locks model + effort; no free model slug), write mode, and optional `--include` paths
 before launch, states a short `Fugu route: …` line, and prefers the cheapest matching lane;
 explicit flags always win. The isolation snapshot is always on; the host only adds exact admitted
 context via `--include`. See `references/provider-shortcuts.md`
-(**Host routing when the user says "use Fugu"**).
+(**Host routing when the user says "use Fugu"**) and `references/fugu-calling-guide.md`.
 Regular/deep calls are ephemeral; Ultra and max reserve synthesis time and resume only the
 exact isolated session with further tools forbidden. Session state and raw events never leave the
 lane; events cross a bounded host-owned pipe, final output remains pinned to a no-follow

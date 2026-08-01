@@ -20,25 +20,28 @@ and run it.
 
 **Host Fugu routing (required when the user omits a profile flag).** Natural language "use Fugu"
 or plain `/fugu <task>` is **not** always bare `fugu/high`. Before launch, decide and state one
-short `Fugu route: …` line:
+short `Fugu route: …` line. Prefer the **cheapest** matching lane; **explicit user flags always win**.
+Profile **locks model + effort**.
 
-1. Task mode: general (default) vs `review <scope>` when the user asked for a review/audit.
-2. Profile (locks model + effort; mutually exclusive; explicit user flags always win):
-   plain → `fugu/high` (default; prefer first); `--deep` → `fugu/xhigh` (only when multi-module
-   design/security needs it); `--ultra` → `fugu-ultra-v1.1/high` (compact high-stakes with reserved
-   synthesis); `--max` → `fugu-ultra-v1.1/max` (one narrow gate, 60-minute wall). Prefer the
-   cheapest matching lane. Prefer `--max-wait` over automatic `--deep` for slightly long plain work.
-3. Write: read-only default; `--write` only with independent implementation authority on qualified
-   Linux bwrap PID-namespace (unavailable on macOS).
-4. Context: the isolation snapshot is always on. Default admitted tracked + safe non-ignored
-   untracked context is enough for most tasks; add exact `--include PATH` only for host-selected
-   files that must be admitted (never gitignored paths). There is no separate "minimal snapshot"
-   product. Use `--preflight` to validate includes/route without provider cost.
+1. Host-native first if `rg`/`git`/`gh` can finish in under a minute.
+2. Task mode: general (default) vs `review <scope>` when the user asked for a review/audit.
+3. Profile: **first paid call is plain** (`fugu/high`) unless the user set a flag. `--deep` only
+   after plain failed or for real multi-module/security xhigh need. Prefer `--ultra` over plain/deep
+   when the run **must** return a written report (reserved synthesis survives the wall; plain/deep
+   die empty on timeout). `--max` only for one already-tight high-stakes gate (Ultra/Max often run
+   20–60+ minutes). Prefer `--max-wait` over automatic `--deep` when you only need more wall.
+4. Write: read-only default; `--write` only with independent implementation authority on qualified
+   Linux bwrap PID-namespace (unavailable on macOS: say so in one line).
+5. Context: the isolation snapshot is always on. Put goal, paths, done-when, and out-of-scope in the
+   task string. Add exact `--include PATH` only for non-gitignored files; **if any include, run
+   `--preflight` first** and launch only when admitted. No separate "minimal snapshot" product.
+6. Capture: redirect to a log file (never `| tail` / `| head`). Chat cancel does not stop the
+   provider; wait up to the wall or kill the process group. Verify Fugu findings host-native before
+   acting.
 
-**Fugu economy:** host-native first for inventory/triage/greps; narrow the packet before raising
-the profile; default plain; fail-fast includes via preflight.
-
-Full decision table: `references/provider-shortcuts.md` (**Host routing when the user says "use Fugu"**).
+Full decision table, route templates, wait/poll contract, and field notes:
+`references/provider-shortcuts.md` (**Host routing when the user says "use Fugu"**) and
+`references/fugu-calling-guide.md`.
 
 Plain `/fugu <task>` is a general read-only task whose answer follows the request;
 `/fugu review <scope>` is the opinionated read-only review. Use `--write` only when the user's

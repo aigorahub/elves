@@ -231,13 +231,17 @@ required capability, then execute it without an extra confirmation prompt:
   `review <scope>`, plain / `--deep` / `--ultra` / `--max` (profile locks model + effort; never
   invent a free model slug), read-only vs qualified `--write`, and optional exact `--include`
   paths. State one short `Fugu route: …` line, then invoke the runner. Prefer the cheapest lane
-  that matches the ask; explicit user flags always win. Apply **Fugu economy**: host-native first
-  for inventory/triage/greps, default plain (`fugu/high`), narrow the packet before raising the
-  profile, prefer `--max-wait` over automatic `--deep`, never `--include` gitignored paths, and
-  use `--preflight` when includes or write mode are non-obvious. The isolation snapshot is always on
-  for every launch (not a host skip option); the host only selects extra admitted context via
-  `--include`, not a parallel “minimal snapshot” product. Full decision table:
-  `references/provider-shortcuts.md` (**Host routing when the user says "use Fugu"**).
+  that matches the ask; explicit user flags always win. **First paid call is plain** unless the
+  user set a flag. Prefer `--ultra` when a written report must survive exploration (reserved
+  synthesis); plain/deep die empty on wall timeout. Host-native first for inventory/triage/greps.
+  Prefer `--max-wait` over automatic `--deep`. **If any `--include`, run `--preflight` first**
+  (never gitignored paths). Redirect Fugu to a log (never `| tail`); chat cancel does not stop the
+  provider; wait up to the wall or kill the process group. Put goal, paths, done-when, and out of
+  scope in the task string. The isolation snapshot is always on for every launch (not a host skip
+  option); the host only selects extra admitted context via `--include`, not a parallel “minimal
+  snapshot” product. Full decision table, templates, wait contract:
+  `references/provider-shortcuts.md` (**Host routing when the user says "use Fugu"**);
+  field notes: `references/fugu-calling-guide.md`.
   Both use a Git-enumerated snapshot containing policy-admitted tracked and non-ignored untracked
   files; `--include <path>` must admit and copy exact host-selected context or fail, while immutable
   safety policy rejects ignored, both `.env.*` and `*.env` credential-name families,

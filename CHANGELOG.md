@@ -4,6 +4,21 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+### Fugu calling guide (host routing)
+
+- Collapse Fugu host routing into one decision path: host-native first, first paid call plain
+  unless the user set a flag, `--max-wait` before automatic `--deep`, **`--preflight` required when
+  any `--include` is present**, task strings name goal / paths / done-when / out of scope.
+- Profile choice by deliverable: plain/deep die empty on wall timeout; `--ultra`/`--max` reserve
+  synthesis so a written report can still return.
+- Add copy-paste `Fugu route:` templates and a wait/poll/capture contract: redirect to a log (never
+  `| tail`), chat cancel does not stop the provider, kill the process group to stop spend.
+- Companion field guide `references/fugu-calling-guide.md` (dogfood review runs + 2026 Claude Code /
+  Codex practice: scope before spend, ranked review prompts, verify findings host-native).
+- Field notes: Ultra/Max often run 20–60+ minutes and hit limits on open-ended prompts; keep those
+  lanes narrow (public 2026 operator reports + Elves dogfood).
+- Restate on SKILL, AGENTS, README, guide, and the Claude Fugu alias.
+
 ## [2.22.0] - 2026-08-01
 
 ### Full Linear backlog resolution

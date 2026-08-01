@@ -155,91 +155,117 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
 Natural language such as "use Fugu", "ask Fugu", or `/fugu <task>` **without** an explicit
 profile flag is **not** a request to always run bare `fugu/high`. The host agent (Claude Code or
 Codex) must choose the lane before launch, then invoke `run_fugu.sh` with the matching flags.
-`run_fugu.sh` itself does not score complexity: it only executes the profile the host selects.
+Flagless `/fugu` is **host-routed**. The **runner flag** table above is the model map only:
+`run_fugu.sh` itself **does not score complexity**; it only executes the profile the host selects.
+Prefer the **cheapest matching lane**. **Explicit user flags** (`--deep`, `--ultra`, `--max`,
+or plain) **always win**: never upgrade or downgrade them.
 
 **Always-true isolation facts.** Every successful Fugu launch uses a disposable
-kernel-isolated Git-enumerated snapshot. That isolation snapshot is not optional and is not a
+kernel-isolated Git-enumerated snapshot. That **isolation snapshot is not optional** and is not a
 second product the host can skip. What the host *does* choose is (1) whether Fugu is the right
-provider at all, (2) task mode, (3) profile (which locks model + effort + wall budget), (4) write
-mode, and (5) extra context via `--include`.
+provider at all, (2) task mode, (3) profile which **locks model + effort** plus wall budget,
+(4) write mode, and (5) extra context via `--include`.
 
-Decide in this order, then state the choice in one short line before launch
-(example: `Fugu route: general plain, default admitted snapshot, preflight ok`):
+State one short `Fugu route: …` line before every launch.
 
-### Fugu economy (benefit without the hassle)
+#### One decision path (do this in order)
 
-Fugu is paid wall time behind a fail-closed snapshot. Most host failures are **routing
-mistakes**, not provider defects. Apply this economy before every launch:
+1. **Should Fugu run at all?** Host-native first for inventory, greps, CHANGELOG/TODO triage, ticket
+   classification, and anything the driver can finish with `rg`/`git`/`gh` in under about a minute.
+   Explicit "use Fugu" authorizes paid usage when the remaining question needs high-reasoning on a
+   snapshot (design tradeoff, security review, hard correctness gate). It does **not** authorize
+   merge or protected-ref work. If the user named Fugu for a broad inventory, do the first pass
+   host-native and reserve Fugu for contested rows only (state that in the route line). Do not invent
+   an unprompted paid Fugu launch from this section alone.
 
-1. **Host-native first.** Inventory, greps, CHANGELOG/TODO classification, ticket triage against
-   main, and answers already visible in open files stay host-native. Do not spend a Fugu wall on
-   work the driver can finish with `rg`/`git`/`gh` in under a minute.
-2. **Narrow the packet before raising the profile.** One contested finding, one module, or one
-   PR scope beats a 29-item backlog dump at `--deep`. Prefer a second plain call over one broad
-   deep call.
-3. **Default plain (`fugu` / `high`, 10m).** Upgrade only when the remaining question is multi-module
-   design, security-sensitive correctness, or a true high-stakes gate. Do not treat "many files in
-   the repo" as automatic `--deep`.
-4. **Cap wall with `--max-wait SECONDS` before upgrading profile.** A tight plain task that needs
-   12 minutes should use plain + `--max-wait 900`, not a 20-minute deep launch.
-5. **Preflight before paid work when includes or write mode are non-trivial.**
-   `run_fugu.sh --preflight …` validates launcher, profile, wall, write eligibility, and every
-   `--include` path, then exits without calling the provider. Use it after drafting a non-obvious
-   route, or when the host is unsure a path is admissible.
-6. **Never `--include` gitignored paths.** Paths under ignored trees (for example `docs/audit/`)
-   fail closed before launch. Put host notes at a non-ignored path (repo-root untracked file is
-   fine) or rely on the default admitted snapshot.
+2. **Task mode.** Default **general** (analysis, design, investigation, implement-plan). Use
+   `review <scope>` only when the user asked for a review/audit/PR-diff with the P0-P3 contract.
+   Scope narrowly (paths, PR, or "current changes"). Never unbounded whole-repo tours when the ask
+   is focused.
 
-1. **Should Fugu run?** Prefer host-native tools for trivial lookups the driver can answer from
-   open files. Inside this section the user already named Fugu or an equivalent provider shortcut;
-   use that explicit intent to run a bounded high-reasoning pass when the task is worth the paid
-   call the user authorized (deep multi-file analysis, security-sensitive review, hard design
-   tradeoff, compact high-stakes gate). Explicit provider intent authorizes the call and its usage,
-   not merge or protected-ref authority. Do not invent an unprompted paid Fugu launch from this
-   section alone. If the user named Fugu for a broad inventory, the host may still keep the first
-   pass host-native and reserve Fugu for contested rows only (state that route).
+3. **Profile (first paid call is plain unless the user set a flag).** Profiles are mutually
+   exclusive; never pass two. Choose by **deliverable shape**, not by "how hard it sounds."
 
-2. **Task mode.** Default is **general** (analysis, design, investigation, implement-plan, other
-   deliverable). Use `review <scope>` only when the user asked for a review, audit, or PR/diff
-   findings with the P0-P3 contract. Scope the review narrowly (paths, PR, or "current changes")
-   rather than an unbounded whole-repo tour when the ask is focused.
+   | Signals | Choose | Model / effort | Default wall | On wall timeout |
+   |---|---|---|---:|---|
+   | Default for almost everything; first paid call; narrow Q&A that finishes inside the wall | plain (no flag) | `fugu` / `high` | 10m | killed; **nothing returned** |
+   | After plain failed or returned a thin answer; multi-module design; security where xhigh is required; still expected to finish inside the wall | `--deep` | `fugu` / `xhigh` | 20m | killed; **nothing returned** |
+   | Written report or audit that must survive heavy exploration (reserved synthesis on the same session) | `--ultra` | `fugu-ultra-v1.1` / `high` | 30m | synthesis phase still runs |
+   | One already-tight decision worth up to ~60 minutes | `--max` | `fugu-ultra-v1.1` / `max` | 60m | synthesis phase still runs |
 
-3. **Profile (model is locked to the profile).** Profiles are mutually exclusive; never pass two.
+   **Hard rules.** Explicit user flags always win. Do not pick `--deep` for backlog triage, issue
+   classification, or CHANGELOG archaeology. Do not pick `--ultra`/`--max` for greps, renames, or
+   single-file Q&A. Do not pick `--max` for broad multi-goal work; split the work. Prefer a
+   **second plain call** over one broad deep call. Prefer plain + `--max-wait SECONDS` over
+   automatic `--deep` when you only need more wall, not higher effort. A `--deep` run that dies
+   at the wall spent its whole budget and returned nothing; that is worse than a narrower plain
+   call or an `--ultra` report that reserves synthesis time. Field reports (2026 public use,
+   Sakana/Codex operator notes, and Elves dogfood): Ultra/Max often take 20–60+ minutes and hit
+   subscription limits mid-flight when prompts are open-ended; keep those lanes narrow. Day-1
+   mistake: do not crank effort to max for everything. The host cannot pick an arbitrary model
+   slug: the profile table is the map; Ultra/max resolve `fugu-ultra-v1.1` from the installed
+   catalog (never silent `fugu-ultra-v1.0`).
 
-   | Signals | Choose | Model / effort |
-   |---|---|---|
-   | Small, local, low-stakes; quick design sketch; light review of a small diff; most analysis | plain (no flag) | `fugu` / `high` |
-   | Multi-module design with real tradeoffs; medium review that already failed plain; implementation analysis where xhigh is required | `--deep` | `fugu` / `xhigh` |
-   | Compact high-stakes question that benefits from explore then reserved synthesis (security-sensitive review, hard correctness gate) | `--ultra` | `fugu-ultra-v1.1` / `high` |
-   | One narrow decision that must be right the first time, prompt already tight, worth up to ~60 minutes | `--max` | `fugu-ultra-v1.1` / `max` |
+4. **Write mode.** Default **read-only**. Pass `--write` only when (a) the user independently
+   authorized implementation, (b) task is general (not review), and (c) platform is qualified Linux
+   bwrap with a PID namespace. On macOS, omit `--write` and say so in one line if the user asked for
+   Fugu edits ("Fugu write unavailable on macOS; use host-native implement or a Linux write lane").
 
-   **Hard rules.** Explicit user flags (`--deep`, `--ultra`, `--max`, or plain) always win: never
-   upgrade or downgrade them. Prefer the cheapest lane that still matches the ask. Do not pick
-   `--max` for broad multi-goal work; split the work or stay at deep/ultra. Do not pick `--ultra`
-   or `--max` for routine greps, renames, or single-file Q&A. Do not pick `--deep` for backlog
-   triage, issue classification, or CHANGELOG archaeology. The host cannot pick an arbitrary
-   model slug: the profile table is the model map, and Ultra/max still resolve `fugu-ultra-v1.1`
-   from the installed catalog (never silent `fugu-ultra-v1.0`).
+5. **Context and `--include`.** The default admitted snapshot already has policy-admitted tracked
+   files and safe non-ignored untracked files. The runner does not paste file bodies into the
+   prompt. Still put **path names and the success shape in the task string** so the model does not
+   wander the tree. Add `--include PATH` only for host-selected files that must be admitted (fresh
+   untracked notes, specific configs). **Never** include secrets, `.env*` / `*.env`, ignored trees
+   (for example `docs/audit/`), `.git`, `.elves`, or executable agent config: fail closed with a
+   remediation hint **before** the provider launches. Put host notes at a **repo-root untracked**
+   path if you need a roster. **If any `--include` is present, run `--preflight` first** and only
+   launch when `include_admitted` lists the path. Prefer a few exact includes over inventing a
+   "minimal snapshot" product that does not exist.
 
-4. **Write mode.** Default **read-only**. Pass `--write` only when (a) the surrounding user request
-   independently authorizes implementation edits, (b) the task is general (not review), and
-   (c) the platform is qualified Linux bwrap with a PID namespace. On macOS, omit `--write` and
-   say so if the user asked for edits.
+6. **Prompt shape (what current agent guides converge on).** Write one precise question or ranked
+   review scope. Name all of: **goal**, **paths or surfaces**, **constraints / out of scope**,
+   **done-when** (tests, build, or report shape), and **verification** the model can run or the
+   host will re-check. For reviews: rank areas highest-value first, exclude findings the host
+   already fixed, require ordered P0-P3 with `file:line` and an explicit "nothing at this level"
+   when clean. Separate host-native research from the paid Fugu call: explore and thin the packet
+   first, then launch. Ultra/max must stay tight. Do not re-force the review rubric on a general
+   task. After settlement, treat Fugu findings as **leads**: re-read cited lines host-native before
+   implementing. Longer field notes and the failed-vs-succeeded review dogfood:
+   `references/fugu-calling-guide.md`.
 
-5. **Context selection (not a second snapshot product).** The default admitted snapshot already
-   includes policy-admitted tracked files and safe non-ignored untracked files. The runner does not
-   paste file bodies into the prompt, so breadth of admission is not the same as prompt-token cost;
-   relevance still belongs to Fugu and to host path hints. Add `--include PATH` for exact
-   host-selected files that matter and might otherwise be easy to miss (fresh untracked notes,
-   specific configs that are admitted). Never try to include secrets, `.env*` / `*.env`, ignored
-   dependency trees, `.git`, `.elves`, or executable agent config: the safety kernel rejects them
-   and exact includes that cannot be admitted fail closed **before** the provider is called, with a
-   remediation hint. Prefer a few exact includes over inventing a parallel "minimal snapshot" mode
-   that does not exist. When unsure, run `--preflight` first.
+#### Copy-paste route lines
 
-6. **Prompt shape.** Write a concrete task string (or review scope) that matches the chosen lane:
-   narrow for ultra/max, fuller for deep when the surface area is real. Do not re-force the review
-   rubric on a general task. Prefer one precise question over a multi-section audit dump.
+```text
+Fugu route: host-native only (no launch) — inventory/triage
+Fugu route: general plain, no include, wall 10m
+Fugu route: general plain --max-wait 900, no include
+Fugu route: general plain --preflight --include NOTE.md (launch only if admitted)
+Fugu route: review main...HEAD plain, paths: scripts/foo.py tests/test_foo.py
+Fugu route: review main...HEAD --deep (only after plain failed on this tip)
+Fugu route: review main...HEAD --ultra (report must return; ranked scope in task string)
+Fugu route: general --ultra, one decision: <question>
+```
+
+#### Wait, poll, capture, and cancel (operational)
+
+Wall limits are hard walls (not stream idle timeouts). While a launch runs:
+
+- **Redirect to a file.** `run_fugu.sh … > fugu.log 2>&1`. Never pipe through `| tail` or
+  `| head`: those buffer until the stream closes, so mid-run progress is invisible and a
+  timeout often yields only a truncated exploration trace. Read the log live if needed.
+- Do **not** treat "host stopped waiting on the log" as "Fugu stopped." The provider may keep
+  burning until wall or exit.
+- Prefer one long wait up to the profile wall (or `--max-wait`) over cancel/relaunch loops.
+- Intermediate tool spam is normal until settlement. The deliverable is the **final** answer
+  after exit 0.
+- To stop spend, kill the `run_fugu.sh` / isolation / `codex-fugu` process group deliberately; do
+  not assume chat cancel reaps the lane.
+- On exit 2 with `isolation_requested_path_*`, fix the path or drop `--include`, then preflight
+  again. Do not retry the same include.
+- On exit 124 / wall timeout, narrow the task or raise `--max-wait` deliberately; do not silent
+  escalate to `--max` for a broad prompt. If the work was a written report that died empty on
+  plain/deep, re-place once on `--ultra` with a ranked, budget-aware prompt (see
+  `references/fugu-calling-guide.md`).
 
 After settlement, report Fugu's answer and the route used. Never auto-apply a write handoff.
 
