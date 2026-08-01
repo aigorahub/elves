@@ -34,20 +34,31 @@ exploration trace with no conclusions.
     # Wrong: silent for 20 minutes, then a truncated trace
     run_fugu.sh --deep review "..." 2>&1 | tail -200
 
-    # Right: the file grows live and can be read mid-run
+    # Right: nothing swallows the output, and the timeout salvage can reach the file
     run_fugu.sh --deep review "..." > fugu-review.log 2>&1
 
-Read the log while the run is in flight. Two things are worth watching for:
+**How much of that is actually live depends on the profile, and the difference is worth
+knowing before you plan to babysit a run.** Measured on a real `--ultra` review: the file
+held the launcher's own preamble (context bundle, exclusions, phase banner) within
+seconds, and then stayed at exactly that size for the entire exploration phase. The
+model's tool-call trace never appeared. That is by design. Ultra parses the raw event
+stream itself, incrementally, under a bounded host pipe, and prints the final message
+pinned to a no-follow descriptor. On a plain or `--deep` one-shot the trace does pass
+through and you can watch it.
 
-- **Which files it is opening.** If it is 10 minutes in and still reading unrelated
-  source, the scope was too broad and the run will not reach a report. Kill it and
-  re-place the call rather than paying for the rest.
-- **Whether it is looping.** Repeated reads of the same file are a sign the prompt did not
-  give it a decision to make.
+So:
 
-If the host wants a single completion notification rather than a live view, that is a
-reason to background the process, not a reason to pipe it. Redirect to a file and watch
-the file.
+- **Plain / `--deep`:** the trace is visible mid-run. Watching is useful. If it is ten
+  minutes in and still reading unrelated source, the scope was too broad and it will not
+  reach a report. Kill it and re-place the call rather than paying for the rest. Repeated
+  reads of the same file mean the prompt did not give it a decision to make.
+- **`--ultra` / `--max`:** you get the preamble and then silence until it finishes. Do not
+  plan a run around watching it work; plan it around the prompt being right the first
+  time (section 4). A quiet log is not a hung run.
+
+Either way, do not pipe. The redirect is what lets the launcher's own salvage path write
+a partial report into the file when a run times out or dies, which a `tail` at the end of
+the pipeline would still be holding when the process is killed.
 
 ## 2. Profile choice is about the report, not about depth
 
@@ -156,7 +167,7 @@ These map cleanly onto Elves host routing; they are not Fugu-specific product cl
   grading its own work. Fugu is that second opinion only if the host does not paste a kitchen-
   sink chat history into the task string.
 - **Do not max everything.** Match model and effort to the task; public Fugu Ultra runs are
-  often 20–60+ minutes. Save `--max` for one narrow gate.
+  often 20-60+ minutes. Save `--max` for one narrow gate.
 
 ## 7. Timeout and crash salvage (do not waste the call)
 
