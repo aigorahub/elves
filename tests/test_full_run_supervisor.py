@@ -1738,15 +1738,19 @@ class FullRunReportValidationTests(unittest.TestCase):
             "material_transition": True,
             "unchanged_healthy_poll_silent": False,
         }
+        from cobbler_runtime import full_run_monitor as full_run_monitor_module
+
         with (
             mock.patch.object(
-                full_run_module,
+                full_run_monitor_module,
                 "monitor_full_run",
                 side_effect=[quiet, terminal],
             ),
-            mock.patch.object(full_run_module, "load_state", return_value=state),
             mock.patch.object(
-                full_run_module,
+                full_run_monitor_module, "load_state", return_value=state
+            ),
+            mock.patch.object(
+                full_run_monitor_module,
                 "_all_follow_events",
                 side_effect=[events_50, events_55],
             ),
@@ -1760,6 +1764,8 @@ class FullRunReportValidationTests(unittest.TestCase):
         self.assertIn("event 54", result["follow_stream_lines"][-1])
 
     def test_follow_resets_absolute_cursor_when_resume_attempt_rotates_log(self) -> None:
+        from cobbler_runtime import full_run_monitor as full_run_monitor_module
+
         def events(prefix: str, count: int) -> list[dict[str, object]]:
             return [
                 {
@@ -1790,15 +1796,17 @@ class FullRunReportValidationTests(unittest.TestCase):
         attempt_2 = mock.Mock(attempt=2, grok_auth_strategy=None)
         with (
             mock.patch.object(
-                full_run_module, "monitor_full_run", side_effect=[quiet, terminal]
+                full_run_monitor_module,
+                "monitor_full_run",
+                side_effect=[quiet, terminal],
             ),
             mock.patch.object(
-                full_run_module,
+                full_run_monitor_module,
                 "load_state",
                 side_effect=[attempt_1, attempt_2],
             ),
             mock.patch.object(
-                full_run_module,
+                full_run_monitor_module,
                 "_all_follow_events",
                 side_effect=[events("attempt-1", 3), events("attempt-2", 2)],
             ),

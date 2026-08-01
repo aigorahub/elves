@@ -882,7 +882,9 @@ def await_full_run(
     Returns the first monitor payload that is not an unchanged healthy park.
     Designed for one host tool call instead of model-turn polling.
     """
-    _refresh_helpers()
+    # Do not rebind helpers here: unit tests patch this module's load_state /
+    # _all_follow_events / monitor_full_run. monitor_full_run refreshes from
+    # full_run for its own production path.
     import time as _time  # noqa: PLC0415
 
     sleep = sleep_fn or _time.sleep
@@ -898,8 +900,7 @@ def await_full_run(
     while True:
         # Call the local monitor by name so public API snapshot AST inspection
         # can resolve the output shape. Unit tests that need a double should
-        # patch cobbler_runtime.full_run_monitor.monitor_full_run (or
-        # full_run.monitor_full_run after the lazy re-export is bound).
+        # patch cobbler_runtime.full_run_monitor.monitor_full_run.
         observed = monitor_full_run(
             repo_root,
             session_id=session_id,

@@ -110,9 +110,16 @@ class FollowModeTests(unittest.TestCase):
         with mock.patch(
             "cobbler_runtime.full_run_monitor.monitor_full_run", side_effect=fake_monitor
         ), mock.patch(
-            "cobbler_runtime.full_run.load_state"
-        ) as load_state:
-            load_state.return_value = mock.Mock(grok_auth_strategy="api_key")
+            "cobbler_runtime.full_run_monitor.load_state"
+        ) as load_state, mock.patch(
+            "cobbler_runtime.full_run_monitor._all_follow_events",
+            return_value=[],
+        ):
+            load_state.return_value = mock.Mock(
+                grok_auth_strategy="api_key",
+                attempt=1,
+                adapter="fixture",
+            )
             out = await_full_run(
                 Path("."),
                 session_id="s",
