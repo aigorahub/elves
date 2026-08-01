@@ -108,7 +108,7 @@ class FollowModeTests(unittest.TestCase):
             }
 
         with mock.patch(
-            "cobbler_runtime.full_run.monitor_full_run", side_effect=fake_monitor
+            "cobbler_runtime.full_run_monitor.monitor_full_run", side_effect=fake_monitor
         ), mock.patch(
             "cobbler_runtime.full_run.load_state"
         ) as load_state:
@@ -130,7 +130,7 @@ class FollowModeTests(unittest.TestCase):
 
     def test_quiet_opt_out(self) -> None:
         with mock.patch(
-            "cobbler_runtime.full_run.monitor_full_run",
+            "cobbler_runtime.full_run_monitor.monitor_full_run",
             return_value={
                 "state": "complete",
                 "next_action": "final_readiness",

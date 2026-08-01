@@ -895,11 +895,12 @@ def await_full_run(
     seen_attempt: int | None = None
     stream_lines: list[str] = []
     write = stream_writer
-    # Prefer a test double injected onto full_run when present; otherwise use
-    # this module's real monitor implementation.
-    monitor_fn = _fr.__dict__.get("monitor_full_run", monitor_full_run)
     while True:
-        observed = monitor_fn(
+        # Call the local monitor by name so public API snapshot AST inspection
+        # can resolve the output shape. Unit tests that need a double should
+        # patch cobbler_runtime.full_run_monitor.monitor_full_run (or
+        # full_run.monitor_full_run after the lazy re-export is bound).
+        observed = monitor_full_run(
             repo_root,
             session_id=session_id,
             stale_after_seconds=stale_after_seconds,

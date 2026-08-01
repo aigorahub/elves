@@ -173,6 +173,7 @@ class GoalAwaitAndMonitorDepthTests(unittest.TestCase):
 
     def test_await_returns_on_material_transition(self) -> None:
         from cobbler_runtime import full_run as fr
+        from cobbler_runtime import full_run_monitor as fr_mon
 
         calls = {"n": 0}
 
@@ -195,7 +196,7 @@ class GoalAwaitAndMonitorDepthTests(unittest.TestCase):
             }
 
         sleeps: list[float] = []
-        with mock.patch.object(fr, "monitor_full_run", side_effect=fake_monitor):
+        with mock.patch.object(fr_mon, "monitor_full_run", side_effect=fake_monitor):
             out = fr.await_full_run(
                 Path("."),
                 session_id="s",
