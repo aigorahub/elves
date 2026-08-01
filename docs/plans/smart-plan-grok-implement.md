@@ -51,7 +51,7 @@ it was allowed to be a coding agent again.
 
 ### Diagnosis in one line
 
-**Safety should gate batches, not breaths.**  
+**Safety should gate batches, not breaths.**
 **Grok should hold a persistent implementer session, not be re-invoked like a slow API.**
 
 ## Product model (two lanes)

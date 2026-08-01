@@ -696,6 +696,16 @@ Cobbler under top-level `cobbler` (wins over legacy `council`). See `config.json
 
 Learnings and `.ai-docs` outlive a single run. Keep them curated.
 
+## v2.22 runtime helpers (planning harvest, compact output, lanes)
+
+- **Any-model worker pin:** `resolve_user_specified_worker_model` + handoff cache keys
+  (`scripts/cobbler_runtime/worker_routing.py`; `references/adaptive-worker-routing.md`).
+- **Planning harvest:** `scripts/cobbler_runtime/planning_harvest.py` (beacons, discovery, modes,
+  lean summary, task sandbox, canvas, mission prep, goal assessor, review filter, merge-recovery lock).
+- **Tool output compact:** `scripts/cobbler_runtime/tool_output_compact.py`.
+- **Parallelves:** `validate_lane_staging` + `LaneSupervisor` in `parallel_lanes.py`.
+- **Fugu module:** `scripts/cobbler_runtime/fugu.py` (shim `run_fugu.sh`).
+
 ## Optional surfaces (outside normal critical path)
 
 Reports, notifications, provider routes, media generation, legacy bounded execution, and untrusted

@@ -13,7 +13,7 @@ import subprocess
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 from .config import load_json_file, load_toml_file
 from .host_profiles import resolve_host_profile, transport_for_host
@@ -185,6 +185,63 @@ def select_preferred_grok_worker_model(
     if default and default != GROK_RETIRED_COMPOSER_MODEL and capabilities.supports(default):
         return default
     return None
+
+
+def resolve_user_specified_worker_model(
+    *,
+    requested_model: str | None,
+    live_catalog: Mapping[str, Any] | Sequence[str] | None = None,
+    retired: frozenset[str] | None = None,
+) -> tuple[str | None, str]:
+    """Resolve an explicit user-pinned worker model against a live catalog.
+
+    Returns ``(model_id_or_none, policy_or_reason)``. Missing/retired/unlisted
+    models fail closed with ``None`` and a stable reason token. Prewalk and
+    prompt-cache eligibility remain separate: callers must still qualify the
+    host transport before claiming exact-session prewalk.
+    """
+    retired = retired or frozenset({GROK_RETIRED_COMPOSER_MODEL})
+    req = (requested_model or "").strip()
+    if not req or req == "auto":
+        return None, "no_explicit_worker_model"
+    if req in retired:
+        return None, f"model_retired:{req}"
+    catalog: set[str] = set()
+    if live_catalog is None:
+        return None, "live_catalog_unavailable"
+    if isinstance(live_catalog, Mapping):
+        for key in ("models", "available", "ids"):
+            val = live_catalog.get(key)
+            if isinstance(val, (list, tuple, set)):
+                catalog.update(str(x).strip() for x in val if str(x).strip())
+        # also accept mapping keys as model ids when values are truthy metadata
+        if not catalog:
+            catalog.update(str(k).strip() for k, v in live_catalog.items() if v and str(k).strip())
+    else:
+        catalog.update(str(x).strip() for x in live_catalog if str(x).strip())
+    if req not in catalog:
+        return None, f"model_unavailable:{req}"
+    return req, "explicit_user_catalog_pin"
+
+
+def handoff_cache_key(
+    *,
+    host: str,
+    guide_model: str | None,
+    worker_model: str | None,
+    worker_effort: str | None,
+    prewalk_mode: str,
+) -> str:
+    """Stable, non-secret key for reuse of qualified handoff/prewalk proof."""
+    payload = {
+        "host": host,
+        "guide_model": guide_model or "",
+        "worker_model": worker_model or "",
+        "worker_effort": worker_effort or "",
+        "prewalk_mode": prewalk_mode,
+    }
+    raw = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def _parse_live_model_catalog(stdout: str) -> tuple[tuple[str, ...], str | None]:

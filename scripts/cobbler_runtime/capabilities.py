@@ -174,3 +174,59 @@ def doctor_inventory(
             "doctor does not launch paid model turns unless an explicit smoke is requested",
         ],
     }
+
+
+def route_on_usage_pressure(
+    *,
+    remaining_quota: str | float | int | None,
+    rate_limited: bool = False,
+    alternate_provider: str | None = None,
+) -> dict[str, object]:
+    """Honest usage-pressure routing without inventing remaining quota.
+
+    When remaining quota is unknown, only explicit rate-limit signals may force
+    a documented alternate. Callers must pass harness-provided values only.
+    """
+    if rate_limited:
+        return {
+            "action": "failover" if alternate_provider else "backoff",
+            "reason": "rate_limited",
+            "alternate_provider": alternate_provider,
+            "quota_known": remaining_quota not in (None, "unknown", ""),
+        }
+    if remaining_quota in (None, "unknown", ""):
+        return {
+            "action": "continue",
+            "reason": "remaining_quota_unknown",
+            "alternate_provider": None,
+            "quota_known": False,
+        }
+    try:
+        value = float(remaining_quota)
+    except (TypeError, ValueError):
+        return {
+            "action": "continue",
+            "reason": "remaining_quota_unparseable",
+            "alternate_provider": None,
+            "quota_known": False,
+        }
+    if value <= 0:
+        return {
+            "action": "failover" if alternate_provider else "stop",
+            "reason": "quota_exhausted",
+            "alternate_provider": alternate_provider,
+            "quota_known": True,
+        }
+    if value < 0.1:
+        return {
+            "action": "prefer_alternate" if alternate_provider else "warn",
+            "reason": "quota_low",
+            "alternate_provider": alternate_provider,
+            "quota_known": True,
+        }
+    return {
+        "action": "continue",
+        "reason": "quota_ok",
+        "alternate_provider": None,
+        "quota_known": True,
+    }

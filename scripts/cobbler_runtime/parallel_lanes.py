@@ -10,6 +10,8 @@ Deterministic, model-free, read-only.
 
 from __future__ import annotations
 
+from dataclasses import asdict, dataclass
+
 import math
 import posixpath
 import re
@@ -505,3 +507,178 @@ def width_test(
         declined.append(DECLINE_HIGH_RISK)
 
     return {"parallel": not declined, "lanes": lane_ids, "declined": declined}
+
+
+def validate_lane_staging(
+    *,
+    plan_lanes: Sequence[Mapping[str, Any]],
+    session_lanes: Sequence[Mapping[str, Any]] | None,
+    worktree_paths: Mapping[str, str] | None = None,
+    branch_names: Mapping[str, str] | None = None,
+) -> list[ValidationIssue]:
+    """Phase 2: fail-closed staging validation for Parallelves lanes.
+
+    Checks that each plan lane has a session row, optional worktree path that
+    exists, and optional branch name. Model-free.
+    """
+    issues: list[ValidationIssue] = []
+    session_lanes = list(session_lanes or ())
+    by_id = {
+        str(row.get("id") or row.get("lane_id") or ""): row
+        for row in session_lanes
+        if str(row.get("id") or row.get("lane_id") or "")
+    }
+    worktree_paths = dict(worktree_paths or {})
+    branch_names = dict(branch_names or {})
+    if not plan_lanes:
+        return issues
+    for lane in plan_lanes:
+        lid = str(lane.get("id") or lane.get("lane_id") or "").strip()
+        if not lid:
+            issues.append(
+                ValidationIssue(
+                    "parallel_lanes_id_invalid",
+                    "Plan lane missing id",
+                )
+            )
+            continue
+        if lid not in by_id:
+            issues.append(
+                ValidationIssue(
+                    "parallel_lanes_session_missing",
+                    f"Session lacks lane row for plan lane {lid}",
+                    path=lid,
+                )
+            )
+            continue
+        wt = worktree_paths.get(lid) or by_id[lid].get("worktree_path")
+        if wt:
+            from pathlib import Path as _P
+
+            if not _P(str(wt)).is_dir():
+                issues.append(
+                    ValidationIssue(
+                        "parallel_lanes_worktree_missing",
+                        f"Lane {lid} worktree missing: {wt}",
+                        path=str(wt),
+                    )
+                )
+        br = branch_names.get(lid) or by_id[lid].get("branch")
+        if br is not None and not str(br).strip():
+            issues.append(
+                ValidationIssue(
+                    "parallel_lanes_branch_invalid",
+                    f"Lane {lid} has empty branch",
+                    path=lid,
+                )
+            )
+    # extra session lanes not in plan
+    plan_ids = {
+        str(l.get("id") or l.get("lane_id") or "")
+        for l in plan_lanes
+        if str(l.get("id") or l.get("lane_id") or "")
+    }
+    for lid in by_id:
+        if lid not in plan_ids:
+            issues.append(
+                ValidationIssue(
+                    "parallel_lanes_session_extra",
+                    f"Session lane {lid} not present in plan",
+                    path=lid,
+                )
+            )
+    return issues
+
+
+@dataclass
+class LaneRuntimeState:
+    """Runtime supervision snapshot for one parallel lane."""
+
+    lane_id: str
+    status: str  # pending | running | completed | failed | demoted_serial
+    worktree_path: str | None = None
+    branch: str | None = None
+    last_event: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+class LaneSupervisor:
+    """Minimal multi-lane runtime supervisor (Parallelves post-Phase-2).
+
+    Serial remains the default: callers must only construct this after the width
+    test recommends lanes. This supervisor records launch/monitor/reconcile
+    state; process spawning stays with the host dispatch layer.
+    """
+
+    def __init__(self) -> None:
+        self._lanes: dict[str, LaneRuntimeState] = {}
+
+    def register(self, lane_id: str, *, worktree_path: str | None = None, branch: str | None = None) -> None:
+        self._lanes[lane_id] = LaneRuntimeState(
+            lane_id=lane_id,
+            status="pending",
+            worktree_path=worktree_path,
+            branch=branch,
+        )
+
+    def mark_running(self, lane_id: str, event: str = "launched") -> None:
+        lane = self._require(lane_id)
+        self._lanes[lane_id] = LaneRuntimeState(
+            lane_id=lane.lane_id,
+            status="running",
+            worktree_path=lane.worktree_path,
+            branch=lane.branch,
+            last_event=event,
+        )
+
+    def mark_completed(self, lane_id: str, event: str = "completed") -> None:
+        lane = self._require(lane_id)
+        self._lanes[lane_id] = LaneRuntimeState(
+            lane_id=lane.lane_id,
+            status="completed",
+            worktree_path=lane.worktree_path,
+            branch=lane.branch,
+            last_event=event,
+        )
+
+    def mark_failed(self, lane_id: str, event: str) -> None:
+        lane = self._require(lane_id)
+        self._lanes[lane_id] = LaneRuntimeState(
+            lane_id=lane.lane_id,
+            status="failed",
+            worktree_path=lane.worktree_path,
+            branch=lane.branch,
+            last_event=event,
+        )
+
+    def demote_serial(self, lane_id: str, reason: str) -> None:
+        lane = self._require(lane_id)
+        self._lanes[lane_id] = LaneRuntimeState(
+            lane_id=lane.lane_id,
+            status="demoted_serial",
+            worktree_path=lane.worktree_path,
+            branch=lane.branch,
+            last_event=reason,
+        )
+
+    def reconcile(self) -> dict[str, Any]:
+        statuses = {lid: s.status for lid, s in self._lanes.items()}
+        running = [k for k, v in statuses.items() if v == "running"]
+        failed = [k for k, v in statuses.items() if v == "failed"]
+        completed = [k for k, v in statuses.items() if v == "completed"]
+        return {
+            "lane_count": len(self._lanes),
+            "running": running,
+            "failed": failed,
+            "completed": completed,
+            "all_terminal": not running and len(self._lanes) > 0,
+            "ok_to_integrate": not running and not failed and len(completed) == len(self._lanes),
+            "lanes": {k: v.to_dict() for k, v in self._lanes.items()},
+        }
+
+    def _require(self, lane_id: str) -> LaneRuntimeState:
+        if lane_id not in self._lanes:
+            raise KeyError(lane_id)
+        return self._lanes[lane_id]

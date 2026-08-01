@@ -204,3 +204,18 @@ Preferences cannot grant credentials, unattended approval bypass, destructive co
 refs, PR operations, or merge. A trusted assigned worker may advance only its registered feature
 branch when the packet grants that narrow authority. The driver retains canonical run memory,
 terminal proof/review, PR state, landing policy, and merge.
+
+## User-specified worker models (cross-family allowed)
+
+Operators may pin **any model id present in the authenticated live catalog** as the
+implementation worker. Resolution uses `resolve_user_specified_worker_model` in
+`scripts/cobbler_runtime/worker_routing.py`:
+
+- Unknown, retired, or unlisted ids **fail closed** with a stable reason token.
+- Same-family lower-effort defaults remain the zero-config path when no pin is set.
+- Grok remains capability-probed when selected; other providers require their existing
+  adapters and credentials.
+- Exact-session **prewalk** still requires transport qualification for that host/model
+  pair. Unqualified pins use honest one-packet / cold handoff semantics.
+- `handoff_cache_key(...)` derives a stable non-secret key for reusing successful
+  qualification/cache evidence across batches when routes match.

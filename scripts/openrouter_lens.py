@@ -40,35 +40,22 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from cobbler_runtime.context import is_secret_env_name, redact_structure, redact_text
+from cobbler_runtime.context import (
+    SECRET_FILE_NAMES as _CTX_SECRET_FILE_NAMES,
+    SECRET_PATH_PARTS as _CTX_SECRET_PATH_PARTS,
+    is_secret_env_name,
+    redact_structure,
+    redact_text,
+)
 from cobbler_runtime.schema import AMBIGUOUS_SESSION_TOKENS
 
 DEFAULT_MODEL = "openrouter/auto"
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
 SESSION_DIR_REL = Path(".elves") / "runtime" / "openrouter-sessions"
 _AMBIGUOUS = AMBIGUOUS_SESSION_TOKENS
-_SENSITIVE_PATH_PARTS = frozenset(
-    {".aws", ".git", ".gnupg", ".ssh", "credentials", "private-keys", "secrets"}
-)
-_SENSITIVE_FILE_NAMES = frozenset(
-    {
-        ".dockercfg",
-        ".git-credentials",
-        ".netrc",
-        ".npmrc",
-        ".pypirc",
-        "auth.json",
-        "credentials.json",
-        "id_dsa",
-        "id_ecdsa",
-        "id_ed25519",
-        "id_rsa",
-        "service-account.json",
-    }
-)
-_SENSITIVE_FILE_SUFFIXES = frozenset(
-    {".jks", ".key", ".keystore", ".p12", ".pem", ".pfx"}
-)
+_SENSITIVE_PATH_PARTS = frozenset(_CTX_SECRET_PATH_PARTS)
+_SENSITIVE_FILE_NAMES = frozenset(_CTX_SECRET_FILE_NAMES)
+_SENSITIVE_FILE_SUFFIXES = frozenset({".jks", ".key", ".keystore", ".p12", ".pem", ".pfx"})
 
 
 def _utc_now() -> str:

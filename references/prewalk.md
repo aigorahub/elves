@@ -210,3 +210,21 @@ events must bind the same exact session in both phases. The host records boolean
 identity, hashes, bounded redacted diagnostics, and packet count. It never stores model output or
 the random facts. The real prewalk lifecycle checks the same trajectory properties again against
 the task worktree.
+
+## Compaction de-qualification (P4)
+
+A **compaction event** (manual `/compact`, host auto-compact, or equivalent summary
+boundary) inside a **qualified exact-session prewalk** invalidates that session's
+`retained_safe` guide-fact guarantees for the remainder of the trajectory.
+
+After such a compaction:
+
+1. Treat continuation as **packet semantics** (cold facts from run docs), not as
+   proven retained guide instructions.
+2. Do **not** claim exact-session prewalk success for later batches on that session id
+   unless the pair is **re-qualified** with a fresh canary bound to the post-compact
+   session state.
+3. Record `prewalk_fallback: prewalk_dequalified_by_compaction` (or equivalent) in
+   route evidence.
+
+This rule is normative for Claude Code, Codex, and Grok Build hosts.

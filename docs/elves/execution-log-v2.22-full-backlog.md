@@ -3,7 +3,7 @@
 ## Run Digest
 
 - **Last updated:** 2026-08-01
-- **Current phase:** Staged / ready to execute
+- **Current phase:** Implementing / near terminal
 - **Active batch:** B0: Fugu economy baseline and run scaffolding
 - **Last completed batch:** none yet
 - **Next exact batch:** B0 then B1
@@ -12,6 +12,17 @@
 - **Deferred hygiene:** none
 
 ## Chronology
+
+### 2026-08-01 — Implement B1–B14 (consolidated)
+
+- Extracted `cobbler_runtime/fugu.py`; thin `run_fugu.sh` shim; import-safe `main`/`exec`.
+- Shared `SECRET_FILE_*` corpus; isolation/manus/openrouter_lens consumers.
+- Any-model worker pin + handoff_cache_key; adaptive-routing docs.
+- Compaction P3/P4 docs; Parallelves `validate_lane_staging` + `LaneSupervisor`.
+- `planning_harvest.py`, `tool_output_compact.py`, `summary_video.py`, usage routing,
+  rust/RTK assessment, debt disposition, tests in `test_v2_22_backlog_features.py`.
+- `verify_repo.py`: VERIFY OK (1439 unit tests).
+
 
 ### 2026-08-01 — Staging complete
 

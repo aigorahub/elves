@@ -28,7 +28,11 @@ from functools import lru_cache
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterator, Mapping, Sequence
 
-from .context import validate_credential_grant_names
+from .context import (
+    SECRET_FILE_GLOBS,
+    SECRET_FILE_NAMES,
+    validate_credential_grant_names,
+)
 from .schema import ELVES_SESSION_BASENAME, ValidationIssue
 
 
@@ -145,33 +149,13 @@ DEFAULT_EXCLUDED_DIR_NAMES: frozenset[str] = frozenset(
     }
 )
 
-DEFAULT_EXCLUDED_FILE_NAMES: frozenset[str] = frozenset(
+DEFAULT_EXCLUDED_FILE_NAMES: frozenset[str] = frozenset(SECRET_FILE_NAMES) | frozenset(
     {
-        ".env",
-        ".env.local",
-        ".env.production",
-        "models.toml",
         ELVES_SESSION_BASENAME,
-        ".netrc",
-        ".npmrc",
-        ".pypirc",
-        "credentials",
-        "credentials.json",
-        "service-account.json",
-        "id_rsa",
-        "id_ed25519",
     }
 )
 
-DEFAULT_EXCLUDED_FILE_GLOBS: tuple[str, ...] = (
-    ".env.*",
-    "*.env",
-    "*.pem",
-    "*.key",
-    "*.p12",
-    "*.pfx",
-    "*.keystore",
-)
+DEFAULT_EXCLUDED_FILE_GLOBS: tuple[str, ...] = SECRET_FILE_GLOBS
 
 DEFAULT_CONTEXT_MAX_FILES = 20_000
 DEFAULT_CONTEXT_MAX_BYTES = 512 * 1024 * 1024

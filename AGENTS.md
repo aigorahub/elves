@@ -166,3 +166,5 @@ divergence, fix this file to re-point at SKILL rather than re-forking protocol t
 ## Docs hygiene
 
 Treat stale user-facing docs as **PENDING-DOCS** until updated (see SKILL.md).
+
+Runtime helpers (v2.22): `planning_harvest`, `tool_output_compact`,

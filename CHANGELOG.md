@@ -4,7 +4,26 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+### v2.22.0 full backlog resolution (in flight on feat/v2.22-full-backlog-resolution)
+
+- User-specified worker models from the live catalog (`resolve_user_specified_worker_model`) with
+  fail-closed unavailable/retired ids; handoff cache keys for qualification reuse; docs in
+  `references/adaptive-worker-routing.md`.
+- Shared secret-file deny corpus in `cobbler_runtime.context` consumed by isolation, Manus, and
+  OpenRouter lens.
+- Extract `scripts/run_fugu.sh` Python body to `cobbler_runtime/fugu.py` (thin shell shim).
+- Compaction stewardship P3 (batch-boundary compact guidance) and P4 (prewalk compaction
+  de-qualification) documented.
+- Parallelves Phase 2 `validate_lane_staging` and runtime `LaneSupervisor`.
+- Planning harvest helpers (`planning_harvest.py`) for beacons, discovery, modes, lean summary,
+  task sandbox, canvas, mission prep, goal assessor, JIT batches, auto-plan, review filter,
+  merge-recovery scope lock.
+- Stdlib tool-output compact layer; usage-pressure routing without inventing quota; summary-video
+  storyboard builder; Rust/RTK assessment (no-go port; yes compact layer).
+
 ### Fugu economy: preflight, wall cap, and host routing
+
+ preflight, wall cap, and host routing
 
 - Add `run_fugu.sh --preflight` to validate launcher readiness, profile, wall budget, write
   eligibility, and every `--include` path, then print a launch plan and exit without calling the
