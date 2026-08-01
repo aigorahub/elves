@@ -8,6 +8,12 @@ resume without creating duplicate paid tasks.
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path as _P
+_scripts = _P(__file__).resolve().parent.parent
+if str(_scripts) not in sys.path:
+    sys.path.insert(0, str(_scripts))
+
 import argparse
 from contextlib import contextmanager
 import json
@@ -25,6 +31,15 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+try:
+    from .context import SECRET_FILE_NAMES as _SHARED_SECRET_FILE_NAMES
+    from .context import SECRET_PATH_PARTS as _SHARED_SECRET_PATH_PARTS
+except ImportError:  # script-style launch of this file
+    from cobbler_runtime.context import (  # type: ignore
+        SECRET_FILE_NAMES as _SHARED_SECRET_FILE_NAMES,
+        SECRET_PATH_PARTS as _SHARED_SECRET_PATH_PARTS,
+    )
+
 
 SCHEMA_VERSION = "manus-cobbler-v1"
 PROFILES = {"manus-1.6", "manus-1.6-lite", "manus-1.6-max"}
@@ -40,21 +55,9 @@ MAX_FAILED_TASK_ATTEMPTS = MAX_ITEMS * 2 + 10
 MIN_INTERVAL_SECONDS = 0.1
 DEFAULT_ATTACHMENT_LIMIT = 64 * 1024 * 1024
 PROVIDER_ATTACHMENT_LIMIT = 512 * 1024 * 1024
-SECRET_FILE_NAMES = {
-    ".env",
-    ".env.local",
-    ".env.production",
-    ".git-credentials",
-    ".netrc",
-    ".pgpass",
-    "credentials",
-    "credentials.json",
-    "id_ed25519",
-    "id_rsa",
-    "kubeconfig",
-}
-SECRET_FILE_SUFFIXES = {".key", ".p12", ".pem", ".pfx"}
-SECRET_PATH_PARTS = {".aws", ".docker", ".git", ".gnupg", ".kube", ".ssh"}
+SECRET_FILE_NAMES = frozenset(_SHARED_SECRET_FILE_NAMES)
+SECRET_FILE_SUFFIXES = frozenset({".jks", ".key", ".keystore", ".p12", ".pem", ".pfx"})
+SECRET_PATH_PARTS = frozenset(_SHARED_SECRET_PATH_PARTS)
 
 
 class ManusError(RuntimeError):

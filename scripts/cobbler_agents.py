@@ -50,10 +50,17 @@ from cobbler_runtime.parallel_lanes import (  # noqa: E402
     DECLINE_PARTITION_INVALID,
     DECLINE_PREFERENCE_OFF,
     LANES_TIMINGS_MAX_BYTES,
+    LaneSupervisor,
     load_lanes_from_plan,
     validate_lane_partition,
+    validate_lane_staging,
     width_test,
 )
+from cobbler_runtime.planning_harvest import (  # noqa: E402
+    lean_plan_summary,
+    planning_consistency_check,
+)
+from cobbler_runtime.tool_output_compact import compact_tool_output  # noqa: E402
 from cobbler_runtime.audit import (  # noqa: E402
     audit_lease_turn,
     build_audit_evidence,
@@ -483,10 +490,49 @@ def cmd_lanes(args: argparse.Namespace) -> int:
     if parallel_preference != "auto":
         decision["parallel"] = False
         decision["declined"].append(DECLINE_PREFERENCE_OFF)
+    # Phase 2 staging validation (session rows optional on pure plan-only plan).
+    session_lanes = [
+        {"id": lane["id"], "branch": lane.get("branch"), "worktree_path": lane.get("worktree_path")}
+        for lane in lanes
+        if isinstance(lane, dict) and lane.get("id")
+    ]
+    staging_issues = validate_lane_staging(
+        plan_lanes=lanes,
+        session_lanes=session_lanes,
+    )
+    supervisor = None
+    if decision.get("parallel") and not staging_issues:
+        supervisor = LaneSupervisor()
+        for lane in lanes:
+            lid = str(lane.get("id") or "")
+            if lid:
+                supervisor.register(
+                    lid,
+                    worktree_path=lane.get("worktree_path"),
+                    branch=lane.get("branch"),
+                )
+    plan_summary = None
+    consistency = None
+    try:
+        plan_text = plan_path.read_text(encoding="utf-8", errors="replace")
+        plan_summary = compact_tool_output(
+            lean_plan_summary(plan_text), max_lines=60
+        ).text
+        consistency = planning_consistency_check(
+            plan_text=plan_text,
+            session_plan_path=str(plan_path),
+            docs_touched=[],
+        )
+    except OSError:
+        plan_text = ""
     payload = {
         "ok": True,
-        "issues": [],
+        "issues": [issue.to_dict() for issue in staging_issues],
         "parallel_preference": parallel_preference,
+        "staging_ok": not staging_issues,
+        "supervisor": supervisor.reconcile() if supervisor is not None else None,
+        "plan_summary": plan_summary,
+        "planning_consistency": consistency,
         **decision,
     }
     return _emit_lanes_payload(args, payload, exit_code=0)

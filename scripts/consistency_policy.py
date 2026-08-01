@@ -1179,8 +1179,8 @@ CLAUDE_ALIAS_SKILL_PHRASES = {
     "aliases/claude/fugu/SKILL.md": [
         CLAUDE_ALIAS_MARKER,
         "name: fugu",
-        "/fugu [--deep|--ultra|--max] [--write] [--include PATH] <task>",
-        "/fugu [--deep|--ultra|--max] review <scope>",
+        "/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] <task>",
+        "/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] review <scope>",
         "Provider shortcut protocols",
         "run_fugu.sh",
         "codex-fugu",
@@ -2182,24 +2182,24 @@ FUGU_SHORTCUT_PROFILE_PHRASES = {
 # (The alias surface's grammar is pinned with the alias phrase group.)
 FUGU_INVOCATION_GRAMMAR_PHRASES = {
     "SKILL.md": [
-        "`/fugu [--deep|--ultra|--max] [--write] [--include PATH] <task>`",
-        "`/fugu [--deep|--ultra|--max] review <scope>`",
+        "`/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] <task>`",
+        "`/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] review <scope>`",
     ],
     "AGENTS.md": [
-        "`$elves fugu [--deep\\|--ultra\\|--max] [--write] [--include PATH] <task>`",
-        "`$elves fugu [--deep\\|--ultra\\|--max] review <scope>`",
+        "`$elves fugu [--deep\\|--ultra\\|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] <task>`",
+        "`$elves fugu [--deep\\|--ultra\\|--max] [--max-wait SECONDS] [--preflight] review <scope>`",
     ],
     "README.md": [
-        "`/fugu [--deep|--ultra|--max] [--write] [--include PATH] <task>`",
-        "`/fugu [--deep|--ultra|--max] review <scope>`",
+        "`/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] <task>`",
+        "`/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] review <scope>`",
     ],
     "guide/index.html": [
-        "<code>/fugu [--deep|--ultra|--max] [--write] [--include PATH] &lt;task&gt;</code>",
-        "<code>/fugu [--deep|--ultra|--max] review &lt;scope&gt;</code>",
+        "<code>/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] &lt;task&gt;</code>",
+        "<code>/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] review &lt;scope&gt;</code>",
     ],
     "references/provider-shortcuts.md": [
-        "`/fugu [--deep\\|--ultra\\|--max] [--write] [--include PATH] <task>`",
-        "`/fugu [--deep\\|--ultra\\|--max] review <scope>`",
+        "`/fugu [--deep\\|--ultra\\|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] <task>`",
+        "`/fugu [--deep\\|--ultra\\|--max] [--max-wait SECONDS] [--preflight] review <scope>`",
     ],
 }
 

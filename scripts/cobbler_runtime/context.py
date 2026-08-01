@@ -661,3 +661,54 @@ def new_run_id(prefix: str = "council") -> str:
     unique = uuid.uuid4().hex
     safe_prefix = (prefix or "council").replace("/", "-").replace(" ", "-")
     return f"{safe_prefix}-{stamp}-{unique}"
+
+
+# Shared secret *file* deny corpus (path names / globs / path parts). Consumers
+# may add site-specific extras; the union is the safety floor for isolation,
+# OpenRouter lens inputs, and Manus attachment rejection.
+SECRET_FILE_NAMES: frozenset[str] = frozenset(
+    {
+        ".env",
+        ".env.local",
+        ".env.production",
+        ".dockercfg",
+        ".git-credentials",
+        ".netrc",
+        ".npmrc",
+        ".pgpass",
+        ".pypirc",
+        "auth.json",
+        "credentials",
+        "credentials.json",
+        "id_dsa",
+        "id_ecdsa",
+        "id_ed25519",
+        "id_rsa",
+        "kubeconfig",
+        "models.toml",
+        "service-account.json",
+    }
+)
+SECRET_FILE_GLOBS: tuple[str, ...] = (
+    ".env.*",
+    "*.env",
+    "*.jks",
+    "*.key",
+    "*.keystore",
+    "*.p12",
+    "*.pem",
+    "*.pfx",
+)
+SECRET_PATH_PARTS: frozenset[str] = frozenset(
+    {
+        ".aws",
+        ".docker",
+        ".git",
+        ".gnupg",
+        ".kube",
+        ".ssh",
+        "credentials",
+        "private-keys",
+        "secrets",
+    }
+)

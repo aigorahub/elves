@@ -1019,6 +1019,9 @@ class LocalCliRunnerTests(unittest.TestCase):
             repo.mkdir()
             subprocess.run(["git", "init", "-q", str(repo)], check=True)
             (repo / ".env.local").write_text("SECRET=1\n", encoding="utf-8")
+            (repo / ".gitignore").write_text("generated/\n", encoding="utf-8")
+            (repo / "generated").mkdir()
+            (repo / "generated" / "note.md").write_text("ignored\n", encoding="utf-8")
             env = {
                 "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
                 "SAKANA_API_KEY": "test-sakana-key",
@@ -1036,6 +1039,14 @@ class LocalCliRunnerTests(unittest.TestCase):
                 env=env,
                 cwd=repo,
             )
+            ignored_context = run_script(
+                "run_fugu.sh",
+                "--include",
+                "generated/note.md",
+                "inspect ignored include",
+                env=env,
+                cwd=repo,
+            )
 
         self.assertEqual(missing_task.returncode, 2)
         self.assertIn("a general Fugu task is required", missing_task.stderr)
@@ -1043,6 +1054,57 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertIn("review mode is always read-only", review_write.stderr)
         self.assertEqual(forbidden_context.returncode, 2)
         self.assertIn("isolation_requested_path_forbidden", forbidden_context.stderr)
+        self.assertIn("Hint:", forbidden_context.stderr)
+        self.assertEqual(ignored_context.returncode, 2)
+        self.assertIn("isolation_requested_path_ignored", ignored_context.stderr)
+        self.assertIn("Gitignored paths fail closed", ignored_context.stderr)
+        self.assertNotIn("Fugu context bundle:", ignored_context.stdout + ignored_context.stderr)
+
+    def test_fugu_preflight_and_max_wait_do_not_launch_provider(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            capture = self.make_fugu_capture_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            (repo / "note.md").write_text("host note\n", encoding="utf-8")
+            env = {
+                "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                "SAKANA_API_KEY": "test-sakana-key",
+            }
+
+            preflight = run_script(
+                "run_fugu.sh",
+                "--preflight",
+                "--max-wait",
+                "42",
+                "--include",
+                "note.md",
+                "classify one contested issue",
+                env=env,
+                cwd=repo,
+            )
+            bad_wait = run_script(
+                "run_fugu.sh",
+                "--max-wait",
+                "not-a-number",
+                "task",
+                env=env,
+                cwd=repo,
+            )
+
+        self.assertEqual(preflight.returncode, 0, preflight.stderr)
+        self.assertIn("Fugu preflight: ok", preflight.stdout)
+        self.assertIn("wall_seconds: 42", preflight.stdout)
+        self.assertIn("model/effort: fugu/high", preflight.stdout)
+        self.assertIn("note.md", preflight.stdout)
+        # Capture fake only writes stdout when the provider is invoked.
+        self.assertNotIn("arg=<", preflight.stdout)
+        self.assertEqual(bad_wait.returncode, 2)
+        self.assertIn("wall budget must be numeric", bad_wait.stderr)
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
     def test_fugu_profiles_select_regular_deep_or_ultra_high(self) -> None:

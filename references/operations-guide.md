@@ -286,3 +286,19 @@ bundle, keep the target repository as the working directory, and pass the exact 
 path:
 
 ```bash
+
+## Batch boundaries as designated compaction points (P3)
+
+After a batch **Close** (run docs updated, acceptance recorded, commit pushed), the
+session is in a safe place for context compaction:
+
+- Interactive operators may run `/compact` (or the host equivalent) on the driver
+  session once the survival guide and execution log are current.
+- Drivers of long-lived supervised workers may issue a compact on the **worker**
+  session only when the host grammar supports it as a real compact (not echo), and
+  only at batch close — never mid-implement.
+- **Prewalk sessions are excluded** while exact-session qualification is active; see
+  compaction de-qualification in `references/prewalk.md`.
+
+When headless compact is version-dependent, verify on the installed CLI before
+claiming automation; otherwise document the interactive prompt only.

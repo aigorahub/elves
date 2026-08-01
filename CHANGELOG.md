@@ -4,6 +4,42 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+### v2.22.0 full backlog resolution (in flight on feat/v2.22-full-backlog-resolution)
+
+- User-specified worker models from the live catalog (`resolve_user_specified_worker_model`) with
+  fail-closed unavailable/retired ids; handoff cache keys for qualification reuse; docs in
+  `references/adaptive-worker-routing.md`.
+- Shared secret-file deny corpus in `cobbler_runtime.context` consumed by isolation, Manus, and
+  OpenRouter lens.
+- Extract `scripts/run_fugu.sh` Python body to `cobbler_runtime/fugu.py` (thin shell shim).
+- Compaction stewardship P3 (batch-boundary compact guidance) and P4 (prewalk compaction
+  de-qualification) documented.
+- Parallelves Phase 2 `validate_lane_staging` and runtime `LaneSupervisor`.
+- Planning harvest helpers (`planning_harvest.py`) for beacons, discovery, modes, lean summary,
+  task sandbox, canvas, mission prep, goal assessor, JIT batches, auto-plan, review filter,
+  merge-recovery scope lock.
+- Stdlib tool-output compact layer; usage-pressure routing without inventing quota; summary-video
+  storyboard builder; Rust/RTK assessment (no-go port; yes compact layer).
+
+### Fugu economy: preflight, wall cap, and host routing
+
+ preflight, wall cap, and host routing
+
+- Add `run_fugu.sh --preflight` to validate launcher readiness, profile, wall budget, write
+  eligibility, and every `--include` path, then print a launch plan and exit without calling the
+  provider. Hosts can confirm a non-obvious route before paying wall time.
+- Add `run_fugu.sh --max-wait SECONDS` as a first-class wall cap (same authority as
+  `SAKANA_FUGU_MAX_WAIT_SECONDS`) so slightly long plain work can stay on `fugu/high` instead of
+  automatic `--deep`.
+- Fail closed on bad `--include` paths **before** snapshot construction and provider launch, with
+  remediation hints (gitignored notes, missing files, policy-blocked paths). Shared helper:
+  `cobbler_runtime.isolation.preflight_requested_includes`.
+- Document **Fugu economy** host routing: host-native first for inventory/triage/greps, default
+  plain, narrow the packet before raising the profile, prefer `--max-wait` over automatic
+  `--deep`, never `--include` gitignored paths, use `--preflight` when includes or write mode are
+  non-obvious. Restated on SKILL, AGENTS, README, guide, alias, and
+  `references/provider-shortcuts.md`; grammar pins include the new flags.
+
 ## [2.21.0] - 2026-07-29
 
 ### Automatic prewalk qualification
