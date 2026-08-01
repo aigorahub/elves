@@ -53,7 +53,8 @@ assume `./scripts` belongs to the target repository and do not execute mappings 
   Prefer `--ultra` when a written report must return after heavy exploration. Host-native first for
   inventory/triage/greps; prefer `--max-wait` over automatic `--deep`; if any `--include`, run
   `--preflight` first (never gitignored paths); redirect to a log (never `| tail`); chat cancel does
-  not stop the provider. The isolation snapshot is always on; the host only adds exact admitted
+  not stop the provider; harvest `Fugu partial salvage` from the log on timeout/crash before
+  relaunch. The isolation snapshot is always on; the host only adds exact admitted
   context via `--include`, not a separate “minimal snapshot” mode. Full table:
   `references/provider-shortcuts.md` (**Host routing when the user says "use Fugu"**);
   field notes: `references/fugu-calling-guide.md`.

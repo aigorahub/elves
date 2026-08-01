@@ -236,8 +236,9 @@ required capability, then execute it without an extra confirmation prompt:
   synthesis); plain/deep die empty on wall timeout. Host-native first for inventory/triage/greps.
   Prefer `--max-wait` over automatic `--deep`. **If any `--include`, run `--preflight` first**
   (never gitignored paths). Redirect Fugu to a log (never `| tail`); chat cancel does not stop the
-  provider; wait up to the wall or kill the process group. Put goal, paths, done-when, and out of
-  scope in the task string. The isolation snapshot is always on for every launch (not a host skip
+  provider; wait up to the wall or kill the process group. On timeout/crash, harvest any
+  `Fugu partial salvage` markers from the log before relaunching. Put goal, paths, done-when, and
+  out of scope in the task string. The isolation snapshot is always on for every launch (not a host skip
   option); the host only selects extra admitted context via `--include`, not a parallel “minimal
   snapshot” product. Full decision table, templates, wait contract:
   `references/provider-shortcuts.md` (**Host routing when the user says "use Fugu"**);

@@ -1294,10 +1294,50 @@ class LocalCliRunnerTests(unittest.TestCase):
             )
 
         self.assertEqual(result.returncode, 2, result.stderr)
-        self.assertEqual(result.stdout, "")
-        self.assertNotIn("STALE_EXPLORATION_MESSAGE", result.stdout)
-        self.assertNotIn("STALE_EVENT_MESSAGE", result.stdout)
         self.assertIn("completed without a final message", result.stderr)
+        # Incomplete salvage may re-surface exploration agent text; it is never a clean pass.
+        self.assertIn("Fugu partial salvage", result.stdout)
+        self.assertIn("incomplete", result.stdout)
+        self.assertIn("STALE_EVENT_MESSAGE", result.stdout)
+        self.assertIn("--- end Fugu partial salvage ---", result.stdout)
+
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    def test_fugu_plain_timeout_salvages_partial_stream(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            fake = bin_dir / "codex-fugu"
+            fake.write_text(
+                "#!/bin/sh\n"
+                "while IFS= read -r LINE || [ -n \"$LINE\" ]; do :; done\n"
+                "printf 'PARTIAL_FINDING: auth refresh races on logout\\n'\n"
+                "trap 'exit 1' INT TERM\n"
+                "while :; do sleep 1; done\n",
+                encoding="utf-8",
+            )
+            fake.chmod(0o755)
+            self.make_fake(bin_dir, "codex")
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            result = run_script(
+                "run_fugu.sh",
+                "review partial stream",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "SAKANA_API_KEY": "test-sakana-key",
+                    "SAKANA_FUGU_MAX_WAIT_SECONDS": "1.5",
+                },
+                cwd=repo,
+            )
+
+        self.assertEqual(result.returncode, 124, result.stderr)
+        self.assertIn("terminating it", result.stderr)
+        self.assertIn("Fugu partial salvage", result.stdout)
+        self.assertIn("PARTIAL_FINDING: auth refresh races on logout", result.stdout)
+        self.assertIn("--- end Fugu partial salvage ---", result.stdout)
+        self.assertIn("salvaged", result.stderr)
 
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
     def test_fugu_ultra_resume_timeout_includes_bounded_shutdown(self) -> None:

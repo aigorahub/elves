@@ -158,6 +158,62 @@ These map cleanly onto Elves host routing; they are not Fugu-specific product cl
 - **Do not max everything.** Match model and effort to the task; public Fugu Ultra runs are
   often 20–60+ minutes. Save `--max` for one narrow gate.
 
+## 7. Timeout and crash salvage (do not waste the call)
+
+A dead lane used to mean zero usable text. The runner now **salvages** whatever partial
+provider text it already captured before exit:
+
+| Exit | Meaning | What the host should do |
+|---|---|---|
+| 0 | Clean final answer on stdout | Use it; verify findings host-native |
+| 124 | Wall timeout (or no synthesis budget) | Look for salvage markers below; treat as incomplete leads |
+| 125 | Cleanup could not settle processes | Salvage may still be present; kill any leftover process group if needed |
+| other non-zero | Provider/crash/validation | Salvage if markers present; fix route before re-spend |
+
+Salvage markers (stdout):
+
+```text
+--- Fugu partial salvage (<reason>; incomplete) ---
+…best available agent text or stream tail…
+--- end Fugu partial salvage ---
+```
+
+Rules for the host agent:
+
+1. **Never discard stdout after a non-zero exit.** Grep the log for `Fugu partial salvage`
+   before relaunching. Incomplete salvage is often enough to answer triage questions or to
+   write a tighter second call.
+2. **Do not treat salvage as a clean pass.** Exit code is still failure. Re-check every claim
+   against the tree.
+3. **Second call must be narrower.** Feed salvage into the next prompt as "already examined /
+   do not re-explore" rather than replaying the whole backlog.
+4. **Prefer `--ultra` when a written report must survive exploration.** Plain/deep still
+   salvage stream text when present, but they do not run a reserved synthesis turn.
+5. **Empty salvage** means the provider never emitted usable text (early kill, hung before
+   first message). Narrow scope or raise `--max-wait`; do not silent-upgrade to `--max`.
+
+The runner also tells the model the wall is finite and that partial findings beat silence.
+That only helps when the task string is already ranked and tight.
+
+## 8. Cleanup after Fugu (host hygiene)
+
+Isolation lanes are disposable and normally removed on exit. Host hygiene still matters:
+
+1. **Process group.** Chat cancel does not stop Fugu. To stop spend: kill the `run_fugu.sh`
+   process group (or the observed `codex-fugu` tree). Confirm with `pgrep -fl 'codex-fugu|run_fugu'`.
+2. **Logs.** Keep the redirect file (`fugu.log`). It is the only durable record of salvage and
+   diagnostics after the lane is destroyed.
+3. **Write handoffs.** Qualified `--write` may print
+   `Fugu isolated-write handoff: /tmp/elves-fugu-handoff-…`. That bundle is inert and never
+   auto-applied. Inspect it, then delete the directory when done so `/tmp` does not accumulate
+   audited copies.
+4. **Orphan isolation dirs.** If a hard kill interrupted cleanup, look for leftover
+   `elves-iso-*` under the system temp root used for the run and remove only those you own
+   after confirming no live process still uses them.
+5. **Preflight residue.** `--preflight` does not launch the provider and leaves no lane.
+6. **Do not re-run the same broken include.** Exit 2 with `isolation_requested_path_*` needs a
+   path fix first; retrying burns nothing only if you stay on `--preflight`.
+
 ## Quick reference
 
     # Narrow question, default model (first paid call)
@@ -171,5 +227,8 @@ These map cleanly onto Elves host routing; they are not Fugu-specific product cl
 
     # Confirm the call shape without spending a budget
     run_fugu.sh --ultra --preflight --include NOTE.md review "<scope>"
+
+    # After any non-zero exit: search salvage before relaunching
+    rg -n "Fugu partial salvage|end Fugu partial salvage" fugu.log
 
 Never: `| tail`, `| head`, or any pipe stage that buffers. Redirect, then read the file.

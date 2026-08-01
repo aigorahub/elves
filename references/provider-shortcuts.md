@@ -246,7 +246,7 @@ Fugu route: review main...HEAD --ultra (report must return; ranked scope in task
 Fugu route: general --ultra, one decision: <question>
 ```
 
-#### Wait, poll, capture, and cancel (operational)
+#### Wait, poll, capture, cancel, salvage, and cleanup (operational)
 
 Wall limits are hard walls (not stream idle timeouts). While a launch runs:
 
@@ -256,18 +256,28 @@ Wall limits are hard walls (not stream idle timeouts). While a launch runs:
 - Do **not** treat "host stopped waiting on the log" as "Fugu stopped." The provider may keep
   burning until wall or exit.
 - Prefer one long wait up to the profile wall (or `--max-wait`) over cancel/relaunch loops.
-- Intermediate tool spam is normal until settlement. The deliverable is the **final** answer
-  after exit 0.
+- Intermediate tool spam is normal until settlement. Exit 0 prints the clean final answer.
+- **Timeout/crash salvage.** On wall timeout (124), provider crash, or incomplete Ultra
+  synthesis, the runner prints any captured partial agent text between
+  `--- Fugu partial salvage (…; incomplete) ---` markers on stdout when something usable was
+  captured. The exit code stays non-zero. Hosts must harvest that text before relaunching so a
+  paid call is not fully wasted. Empty salvage means the provider never emitted text: narrow
+  the prompt or raise `--max-wait`, do not silent-escalate to `--max`.
 - To stop spend, kill the `run_fugu.sh` / isolation / `codex-fugu` process group deliberately; do
-  not assume chat cancel reaps the lane.
+  not assume chat cancel reaps the lane. Confirm with process listing if needed.
 - On exit 2 with `isolation_requested_path_*`, fix the path or drop `--include`, then preflight
   again. Do not retry the same include.
-- On exit 124 / wall timeout, narrow the task or raise `--max-wait` deliberately; do not silent
-  escalate to `--max` for a broad prompt. If the work was a written report that died empty on
-  plain/deep, re-place once on `--ultra` with a ranked, budget-aware prompt (see
+- On exit 124 / wall timeout: first read salvage from the log; then narrow the task or raise
+  `--max-wait` deliberately. If the work was a written report that died empty on plain/deep,
+  re-place once on `--ultra` with a ranked, budget-aware prompt (see
   `references/fugu-calling-guide.md`).
+- **Cleanup.** Isolation lanes are removed on normal exit. Keep `fugu.log`. Delete inspected
+  write handoffs under `/tmp/elves-fugu-handoff-*` when finished. After a hard kill, remove only
+  owned leftover `elves-iso-*` temp dirs with no live process. Details:
+  `references/fugu-calling-guide.md` sections 7–8.
 
-After settlement, report Fugu's answer and the route used. Never auto-apply a write handoff.
+After settlement, report Fugu's answer (or salvage) and the route used. Never auto-apply a write
+handoff.
 
 - **Manus:** requires `MANUS_API_KEY`. The ordinary form creates one private `manus-1.6-max` task
   through `https://api.manus.ai/v2/task.create` with `x-manus-api-key`, explicitly empty

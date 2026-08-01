@@ -19,6 +19,16 @@ All notable changes to the Elves skill are documented here.
   lanes narrow (public 2026 operator reports + Elves dogfood).
 - Restate on SKILL, AGENTS, README, guide, and the Claude Fugu alias.
 
+### Fugu timeout/crash salvage
+
+- Plain/deep capture provider stdout/stderr on a host pipe and, on wall timeout or non-zero exit,
+  emit any salvageable partial text between `Fugu partial salvage` markers (exit code still fails).
+- Ultra emits the same salvage markers from `--output-last-message` and captured `agent_message`
+  events when exploration/synthesis times out, crashes, or ends without a clean final.
+- Prompts tell the model the wall is finite and partial findings beat silence.
+- Host guide: harvest salvage before relaunch; cleanup tips for process groups, logs, write
+  handoffs, and leftover isolation dirs.
+
 ## [2.22.0] - 2026-08-01
 
 ### Full Linear backlog resolution

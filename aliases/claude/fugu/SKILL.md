@@ -36,8 +36,9 @@ Profile **locks model + effort**.
    task string. Add exact `--include PATH` only for non-gitignored files; **if any include, run
    `--preflight` first** and launch only when admitted. No separate "minimal snapshot" product.
 6. Capture: redirect to a log file (never `| tail` / `| head`). Chat cancel does not stop the
-   provider; wait up to the wall or kill the process group. Verify Fugu findings host-native before
-   acting.
+   provider; wait up to the wall or kill the process group. On timeout/crash, harvest any
+   `Fugu partial salvage` markers before relaunch. Verify findings host-native; clean up handoffs
+   and leftover process groups (see `references/fugu-calling-guide.md`).
 
 Full decision table, route templates, wait/poll contract, and field notes:
 `references/provider-shortcuts.md` (**Host routing when the user says "use Fugu"**) and
