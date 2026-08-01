@@ -66,15 +66,16 @@ Codex users should not need or expect a top-level `/cobbler` command.
 ### Optional provider shortcuts
 
 Focused provider tasks do not require a full Elves run. Claude Code gets
-`/fugu [--deep|--ultra|--max] [--write] [--include PATH] <task>` and
-`/fugu [--deep|--ultra|--max] review <scope>`,
+`/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] <task>` and
+`/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] review <scope>`,
 `/manus <topic>`, `/grok <instructions>`, and `/devin <instructions>`; Codex uses the equivalent
 `$elves fugu|manus|grok|devin …` forms or natural language. Plain Fugu follows the requested
 analysis, design, investigation, or other task; `fugu review` keeps the read-only P0-P3 review
 contract. Both receive a bounded snapshot of policy-admitted tracked and non-ignored untracked
 files. `--include` records an exact host-selected path but cannot override exclusions for ignored
 trees, credentials, operational state, executable agent configuration, unsafe links/file types, or
-repository escapes; the exact path must actually be admitted and copied. Both `.env.*` and
+repository escapes; the exact path must actually be admitted and copied, and gitignored includes
+fail closed before the provider launches (use `--preflight` to check). Both `.env.*` and
 `*.env` dotenv-name families plus host-owned internal namespaces are always excluded. General tasks
 remain read-only unless the user independently authorizes implementation and the host selects
 `--write`; that route additionally requires qualified recursive Linux bwrap PID-namespace
@@ -84,7 +85,7 @@ subtree disappearance and fail closed on other audit errors. macOS read-only cle
 not proof of recursive descendant absence.
 Profiles remain regular `fugu/high`, `fugu/xhigh` with `--deep`, `fugu-ultra-v1.1/high` with
 `--ultra`, and `fugu-ultra-v1.1/max` with `--max` for one narrow high-stakes gate on a 60-minute
-default wall budget. **Host Fugu routing:** when the user says “use Fugu” without an explicit
+default wall budget. Prefer plain first; use `--max-wait` before automatic `--deep`. **Host Fugu routing:** when the user says “use Fugu” without an explicit
 profile flag, the host agent chooses general vs review, plain / deep / ultra / max
 (profile locks model + effort; no free model slug), write mode, and optional `--include` paths
 before launch, states a short `Fugu route: …` line, and prefers the cheapest matching lane;

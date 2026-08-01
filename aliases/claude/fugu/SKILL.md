@@ -9,8 +9,9 @@ disable-model-invocation: true
 # Fugu Task or Review
 
 This is the Elves-managed Claude Code alias for
-`/fugu [--deep|--ultra|--max] [--write] [--include PATH] <task>` and
-`/fugu [--deep|--ultra|--max] review <scope>`.
+`/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] <task>`
+and
+`/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] review <scope>`.
 
 Load the installed `elves` skill's **Provider shortcut protocols** and
 `references/provider-shortcuts.md`. Resolve `scripts/run_fugu.sh` from the active Elves skill root,
@@ -23,14 +24,19 @@ short `Fugu route: …` line:
 
 1. Task mode: general (default) vs `review <scope>` when the user asked for a review/audit.
 2. Profile (locks model + effort; mutually exclusive; explicit user flags always win):
-   plain → `fugu/high` (routine); `--deep` → `fugu/xhigh` (harder multi-file work); `--ultra` →
-   `fugu-ultra-v1.1/high` (compact high-stakes with reserved synthesis); `--max` →
-   `fugu-ultra-v1.1/max` (one narrow gate, 60-minute wall). Prefer the cheapest matching lane.
+   plain → `fugu/high` (default; prefer first); `--deep` → `fugu/xhigh` (only when multi-module
+   design/security needs it); `--ultra` → `fugu-ultra-v1.1/high` (compact high-stakes with reserved
+   synthesis); `--max` → `fugu-ultra-v1.1/max` (one narrow gate, 60-minute wall). Prefer the
+   cheapest matching lane. Prefer `--max-wait` over automatic `--deep` for slightly long plain work.
 3. Write: read-only default; `--write` only with independent implementation authority on qualified
    Linux bwrap PID-namespace (unavailable on macOS).
 4. Context: the isolation snapshot is always on. Default admitted tracked + safe non-ignored
    untracked context is enough for most tasks; add exact `--include PATH` only for host-selected
-   files that must be admitted. There is no separate "minimal snapshot" product.
+   files that must be admitted (never gitignored paths). There is no separate "minimal snapshot"
+   product. Use `--preflight` to validate includes/route without provider cost.
+
+**Fugu economy:** host-native first for inventory/triage/greps; narrow the packet before raising
+the profile; default plain; fail-fast includes via preflight.
 
 Full decision table: `references/provider-shortcuts.md` (**Host routing when the user says "use Fugu"**).
 
