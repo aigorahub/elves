@@ -4,6 +4,29 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+### Grok first-class host install (#88, #101)
+
+- `sync_installed_skills.py --target grok` installs `~/.grok/skills/elves` (first-class peer of
+  Claude/Codex). `--target all` remains update-only for existing roots.
+- README and guide ship copy-paste one-liners for Claude Code, Codex, and Grok Build.
+- Removed obsolete “Grok unsupported as main driver / discovery-only” public wording.
+
+### Full-run resume over terminal sessions (#96)
+
+- `prepare_full_run` / resume launch refuse when `events.jsonl` already contains `run_complete` or
+  `blocked` (`full_run_resume_prepare_terminal`); state and events stay unchanged.
+
+### Confidence sidecar and calibration (#94, #93)
+
+- `cobbler_runtime.confidence_sidecar`: native-lane JSON sidecars under `.elves/runtime/confidence/`
+  and bounded calibration JSONL (triage only, never landing authority).
+
+### Public wording and redaction honesty (#97, #98)
+
+- Wider persona/branding forbidden patterns (e.g. Fable-powered, runs on Fable, Claude persona).
+- Documented host-UI / third-party / MCP bypass surfaces that the built-in redaction filter does not
+  cover (`references/adaptive-worker-routing.md`).
+
 ### Fugu calling guide (host routing)
 
 - Collapse Fugu host routing into one decision path: host-native first, first paid call plain

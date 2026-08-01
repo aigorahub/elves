@@ -1896,21 +1896,29 @@ PUBLIC_WORDING_FORBIDDEN_PHRASES = [
     "Fable-like",
     "Fable-style",
     "inspired by Fable",
+    "Fable-powered",
     "cobbled together",
     "cobbled-together",
 ]
 
-# Persona claims that describe Cobbler as *being* Fable, matched
-# case-insensitively by the pattern engine. Bare model identifiers
-# (`Fable 5`, `claude-fable-5`) remain legitimate route-identity wording and
-# never match these patterns.
+# Persona claims that describe Cobbler as *being* Fable (or other host models as
+# product personas), matched case-insensitively. Bare model identifiers
+# (`Fable 5`, `claude-fable-5`, route tables) remain legitimate and must not match.
 PUBLIC_WORDING_FORBIDDEN_PATTERNS = [
     r"powered\s+by\s+fable",
     r"built\s+on\s+fable",
     r"backed\s+by\s+fable",
     r"driven\s+by\s+fable",
+    r"runs\s+on\s+fable",
     r"fable\s+under\s+the\s+hood",
     r"fable\s+persona",
+    # "is Fable" / "is a Fable …" product-persona claims (not "Fable 5 model").
+    r"\bis\s+(?:a\s+)?fable(?:\s+model|\s+persona|\s+agent)?\b(?!\s*[0-9])",
+    # Claude/Anthropic persona claims for Cobbler/Elves product identity.
+    r"powered\s+by\s+claude",
+    r"powered\s+by\s+anthropic",
+    r"claude\s+persona",
+    r"anthropic\s+persona",
 ]
 
 # --- Elves 2.3: thin AGENTS adapter + compact SKILL pins ---

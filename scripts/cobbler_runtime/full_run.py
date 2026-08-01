@@ -173,6 +173,53 @@ from .storage import (
 
 FULL_RUN_REL = Path(".elves") / "runtime" / "implement" / "full-run"
 TERMINAL_EVENT_TYPES = frozenset({"run_complete", "blocked"})
+
+
+def _terminal_event_types_present(
+    events_path: Path,
+    *,
+    repo_root: Path,
+) -> frozenset[str]:
+    """Return terminal event types already present in a full-run events log.
+
+    Used only for fail-closed resume-prepare: a log that already carries
+    ``run_complete`` or ``blocked`` must not be rebuilt with a new
+    ``run_started``. Best-effort scan; unreadable logs return empty and other
+    guards still apply.
+    """
+    try:
+        if not repo_regular_file_exists(repo_root, events_path):
+            return frozenset()
+        raw = _read_bounded_regular_bytes(
+            events_path,
+            max_bytes=MAX_EVENT_FILE_BYTES,
+            label="event log",
+            repo_root=repo_root,
+        )
+    except Exception:
+        return frozenset()
+    found: set[str] = set()
+    for raw_line in raw.splitlines():
+        if not raw_line or len(raw_line) > MAX_EVENT_LINE_BYTES:
+            continue
+        try:
+            line = raw_line.decode("utf-8").strip()
+        except UnicodeDecodeError:
+            continue
+        if not line:
+            continue
+        try:
+            event = json.loads(line)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if not isinstance(event, dict):
+            continue
+        etype = event.get("type")
+        if isinstance(etype, str) and etype in TERMINAL_EVENT_TYPES:
+            found.add(etype)
+    return frozenset(found)
+
+
 DEFAULT_STALE_SECONDS = 300
 # Darwin process-group reaping is slower under CI load; give the exact recorded
 # supervisor a little longer to leave the group before failing closed.
@@ -3809,6 +3856,20 @@ def prepare_full_run(
                 path=str(state_path),
                 hint="Stop the existing run first",
             )
+        # Terminally-evented sessions must not be rebuilt: appending run_started
+        # after run_complete/blocked makes every later event fail ordering.
+        terminal_types = _terminal_event_types_present(
+            root / "events.jsonl",
+            repo_root=Path(repo_root),
+        )
+        if terminal_types:
+            raise ValidationIssue(
+                "full_run_resume_prepare_terminal",
+                "Refusing resume prepare over a session whose event log is already "
+                f"terminal ({', '.join(sorted(terminal_types))})",
+                path=str(root / "events.jsonl"),
+                hint="Start a new session_id; do not rebuild a completed or blocked run",
+            )
         prior_state_data = existing
     if not create and explicit_effort is None and prior_state_data is not None:
         prior_effort = str(prior_state_data.get("effort") or "").strip().lower()
@@ -4446,6 +4507,19 @@ def _prepare_resume_attempt(repo_root: Path, state: FullRunState) -> str:
             )
         state.supervision_canary_passed = _run_supervision_canary(
             Path(state.supervisor_executable)
+        )
+    root = full_run_root(repo_root, state.session_id)
+    terminal_types = _terminal_event_types_present(
+        root / "events.jsonl",
+        repo_root=Path(repo_root),
+    )
+    if terminal_types:
+        raise ValidationIssue(
+            "full_run_resume_prepare_terminal",
+            "Refusing resume launch over a session whose event log is already "
+            f"terminal ({', '.join(sorted(terminal_types))})",
+            path=str(root / "events.jsonl"),
+            hint="Start a new session_id; do not rebuild a completed or blocked run",
         )
     _archive_and_reset_resume_attempt(repo_root, state, checkpoint_head=checkpoint)
     return checkpoint
