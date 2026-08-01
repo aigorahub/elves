@@ -227,6 +227,7 @@ INSTALLED_HELPER_PATH_PHRASES = {
         "active Elves skill root",
         "~/.claude/skills/elves",
         "~/.codex/skills/elves",
+        "~/.grok/skills/elves",
         "$ELVES_SKILL_ROOT/scripts/acceptance_contract.py",
         "$ELVES_SKILL_ROOT/scripts/elves_landing_check.py",
         "installed Elves bundle never requires a repo-only helper",
@@ -2041,7 +2042,7 @@ if isinstance(IMPLEMENTER_HANDOFF_PHRASES, dict) and 'SKILL.md' in IMPLEMENTER_H
     IMPLEMENTER_HANDOFF_PHRASES['SKILL.md'] = ['Build On', 'owned surfaces', 'forbidden surfaces', 'acceptance evidence', 'blocking coordinator defect', 'HEAD / run-doc paths / route-session identity / output format']
 if isinstance(INSTALLED_HELPER_PATH_PHRASES, dict) and 'SKILL.md' in INSTALLED_HELPER_PATH_PHRASES:
     INSTALLED_HELPER_PATH_PHRASES = dict(INSTALLED_HELPER_PATH_PHRASES)
-    INSTALLED_HELPER_PATH_PHRASES['SKILL.md'] = ['source-checkout shorthand', 'active Elves skill root', '~/.claude/skills/elves', '~/.codex/skills/elves', '$ELVES_SKILL_ROOT/scripts/acceptance_contract.py', '$ELVES_SKILL_ROOT/scripts/elves_landing_check.py', 'installed Elves bundle never requires a repo-only helper']
+    INSTALLED_HELPER_PATH_PHRASES['SKILL.md'] = ['source-checkout shorthand', 'active Elves skill root', '~/.claude/skills/elves', '~/.codex/skills/elves', '~/.grok/skills/elves', '$ELVES_SKILL_ROOT/scripts/acceptance_contract.py', '$ELVES_SKILL_ROOT/scripts/elves_landing_check.py', 'installed Elves bundle never requires a repo-only helper']
 if isinstance(LANDING_CHECK_CONTRACT_PHRASES, dict) and 'SKILL.md' in LANDING_CHECK_CONTRACT_PHRASES:
     LANDING_CHECK_CONTRACT_PHRASES = dict(LANDING_CHECK_CONTRACT_PHRASES)
     LANDING_CHECK_CONTRACT_PHRASES['SKILL.md'] = ['$ELVES_SKILL_ROOT/scripts/elves_landing_check.py', '--session <session-path> --repo-root .', 'plan_path', 'equality assertion']

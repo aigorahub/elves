@@ -38,11 +38,13 @@ VERSION_RE = re.compile(r'^\s*version:\s*"([^"]+)"\s*$', re.MULTILINE)
 GLOBAL_INSTALLS = {
     "claude": Path.home() / ".claude" / "skills" / "elves",
     "codex": Path.home() / ".codex" / "skills" / "elves",
+    "grok": Path.home() / ".grok" / "skills" / "elves",
 }
 
 LOCAL_INSTALL_SUFFIXES = {
     "claude": Path(".claude") / "skills" / "elves",
     "codex": Path(".codex") / "skills" / "elves",
+    "grok": Path(".grok") / "skills" / "elves",
 }
 
 LEGACY_INSTALLS = {
@@ -319,6 +321,8 @@ def infer_platform(path: Path) -> str | None:
         return "claude"
     if "/.codex/skills/elves" in path_str or "/.agents/skills/elves" in path_str:
         return "codex"
+    if "/.grok/skills/elves" in path_str:
+        return "grok"
     return None
 
 
@@ -328,7 +332,12 @@ def infer_scope(path: Path) -> str:
     for global_path in GLOBAL_INSTALLS.values():
         if global_path.exists() and resolved == global_path.resolve():
             return "global"
-    if "/.claude/skills/elves" in path_str or "/.codex/skills/elves" in path_str or "/.agents/skills/elves" in path_str:
+    if (
+        "/.claude/skills/elves" in path_str
+        or "/.codex/skills/elves" in path_str
+        or "/.agents/skills/elves" in path_str
+        or "/.grok/skills/elves" in path_str
+    ):
         return "project-local"
     return "repo-checkout"
 
@@ -357,7 +366,7 @@ def build_recommendations(
 
     installs_by_key = {(install.platform, install.scope): install for install in installs}
 
-    for platform in ("claude", "codex"):
+    for platform in ("claude", "codex", "grok"):
         local_install = installs_by_key.get((platform, "project-local"))
         global_install = installs_by_key.get((platform, "global"))
         if local_install and global_install and local_install.version != global_install.version:

@@ -108,7 +108,7 @@ provider usage, but not merge, protected-ref, secret, or approval-bypass authori
   observe/propose/promote/waive learning stays under `.elves/runtime/landing-profile/` with no
   auto-promotion (`references/project-landing-profiles.md`)
 - **Helper paths:** `python3 scripts/...` is **source-checkout shorthand**; installed skills
-  (`~/.claude/skills/elves` or `~/.codex/skills/elves`) resolve helpers from the
+  (`~/.claude/skills/elves`, `~/.codex/skills/elves`, or `~/.grok/skills/elves`) resolve helpers from the
   **active Elves skill root** while keeping the target repository as the working directory. An
   installed Elves bundle never requires a repo-only helper (`references/runtime-helper-paths.md`)
 - **Stop control:** honor the **Stop Gate** and `continuation_guard`; no final response while
