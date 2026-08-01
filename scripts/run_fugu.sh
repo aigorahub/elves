@@ -7,15 +7,17 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 usage() {
   cat <<'EOF'
 Usage:
-  run_fugu.sh [--deep|--ultra|--max] [--include PATH]... [--write] [--] <task...>
-  run_fugu.sh [--deep|--ultra|--max] [--include PATH]... review [scope...]
+  run_fugu.sh [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight]
+              [--include PATH]... [--write] [--] <task...>
+  run_fugu.sh [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight]
+              [--include PATH]... review [scope...]
 
 Profiles:
-  default   fugu at high effort
-  --deep    fugu at xhigh effort
-  --ultra   fugu-ultra-v1.1 at high effort with exact-session synthesis
+  default   fugu at high effort (10m wall) — prefer this first
+  --deep    fugu at xhigh effort (20m wall)
+  --ultra   fugu-ultra-v1.1 at high effort with exact-session synthesis (30m)
   --max     fugu-ultra-v1.1 at max effort with exact-session synthesis and a
-            long wall budget, for one narrow high-stakes gate
+            long wall budget (60m), for one narrow high-stakes gate
 
 Modes:
   task      The default. Follow the requested task without a review-only rubric.
@@ -23,16 +25,26 @@ Modes:
   --write   Allow a general task to edit only its disposable snapshot and export an
             audited handoff on qualified Linux bwrap hosts. It is unavailable on
             macOS. The handoff is never applied automatically.
+  --preflight
+            Validate launcher, profile, wall, write eligibility, and --include
+            paths, then print a launch plan and exit without calling the provider.
+  --max-wait SECONDS
+            Cap the hard wall clock for this launch (also via
+            SAKANA_FUGU_MAX_WAIT_SECONDS). Prefer this over upgrading to --deep
+            when the task is narrow but the default plain wall is too short.
 
 Safe non-ignored worktree files are eligible context by default. --include names an
-exact additional repository file for the safety layer to admit or reject. Use -- to
-treat a task beginning with the word "review" as a general task.
+exact additional repository file for the safety layer to admit or reject. Gitignored
+paths fail closed before the provider launches. Use -- to treat a task beginning
+with the word "review" as a general task.
 EOF
 }
 
 PROFILE="routine"
 MODE="task"
 WRITE_MODE="0"
+PREFLIGHT_MODE="0"
+MAX_WAIT_OVERRIDE=""
 INCLUDE_PATHS=()
 TASK_ARGS=()
 while [ "$#" -gt 0 ]; do
@@ -59,6 +71,18 @@ while [ "$#" -gt 0 ]; do
         exit 2
       fi
       PROFILE="ultra"
+      shift
+      ;;
+    --max-wait)
+      if [ "$#" -lt 2 ]; then
+        echo "Error: --max-wait requires a positive number of seconds." >&2
+        exit 2
+      fi
+      MAX_WAIT_OVERRIDE="$2"
+      shift 2
+      ;;
+    --preflight)
+      PREFLIGHT_MODE="1"
       shift
       ;;
     --include)
@@ -137,7 +161,11 @@ case "$PROFILE" in
     DEFAULT_MAX_WAIT="3600"
     ;;
 esac
-MAX_WAIT="${SAKANA_FUGU_MAX_WAIT_SECONDS:-$DEFAULT_MAX_WAIT}"
+if [ -n "$MAX_WAIT_OVERRIDE" ]; then
+  MAX_WAIT="$MAX_WAIT_OVERRIDE"
+else
+  MAX_WAIT="${SAKANA_FUGU_MAX_WAIT_SECONDS:-$DEFAULT_MAX_WAIT}"
+fi
 
 if [ "$MODE" = "review" ] && [ "${#TASK_ARGS[@]}" -eq 0 ]; then
   TASK="Review the current repository changes against their appropriate base."
@@ -151,8 +179,8 @@ fi
 
 TODAY=$(date +%F)
 PYTHON_ARGS=(
-  "$MAX_WAIT" "$REPO_ROOT" "$MODEL" "$EFFORT" "$MODE" "$WRITE_MODE"
-  "$TASK" "$TODAY" "$SCRIPT_DIR"
+  "$MAX_WAIT" "$PREFLIGHT_MODE" "$REPO_ROOT" "$MODEL" "$EFFORT" "$MODE" "$WRITE_MODE"
+  "$TASK" "$TODAY" "$SCRIPT_DIR" "$PROFILE"
 )
 if [ "${#INCLUDE_PATHS[@]}" -gt 0 ]; then
   PYTHON_ARGS+=("${INCLUDE_PATHS[@]}")
@@ -181,16 +209,23 @@ import time
 try:
     max_wait = float(sys.argv[1])
 except ValueError as exc:
-    raise SystemExit("Error: SAKANA_FUGU_MAX_WAIT_SECONDS must be numeric.") from exc
+    print(
+        "Error: wall budget must be numeric (use --max-wait or SAKANA_FUGU_MAX_WAIT_SECONDS).",
+        file=sys.stderr,
+    )
+    raise SystemExit(2) from exc
 if not math.isfinite(max_wait) or max_wait <= 0:
-    raise SystemExit("Error: SAKANA_FUGU_MAX_WAIT_SECONDS must be finite and positive.")
+    print("Error: wall budget must be finite and positive.", file=sys.stderr)
+    raise SystemExit(2)
 
-repo_root = Path(sys.argv[2]).resolve()
-model, effort, mode = sys.argv[3:6]
-writable = sys.argv[6] == "1"
-task, today = sys.argv[7:9]
-script_dir = Path(sys.argv[9]).resolve()
-include_paths = tuple(sys.argv[10:])
+preflight_only = sys.argv[2] == "1"
+repo_root = Path(sys.argv[3]).resolve()
+model, effort, mode = sys.argv[4:7]
+writable = sys.argv[7] == "1"
+task, today = sys.argv[8:10]
+script_dir = Path(sys.argv[10]).resolve()
+profile_name = sys.argv[11]
+include_paths = tuple(sys.argv[12:])
 sys.path.insert(0, str(script_dir))
 
 from cobbler_runtime.isolation import (  # noqa: E402
@@ -198,6 +233,7 @@ from cobbler_runtime.isolation import (  # noqa: E402
     capture_snapshot_state,
     export_snapshot_handoff,
     isolated_lane,
+    preflight_requested_includes,
     provider_writable_tree_usage,
     source_path_allowed_at_original_location,
     wrap_argv_with_sandbox,
@@ -210,6 +246,47 @@ from cobbler_runtime.dispatch_external import (  # noqa: E402
     _terminate_supervised_descendants,
 )
 from cobbler_runtime.schema import ValidationIssue  # noqa: E402
+
+
+def _print_validation_issue(exc: ValidationIssue) -> None:
+    print(f"Error: Fugu isolation failed closed [{exc.code}]: {exc}", file=sys.stderr)
+    if exc.hint:
+        print(f"Hint: {exc.hint}", file=sys.stderr)
+
+
+try:
+    admitted_includes = preflight_requested_includes(
+        repo_root,
+        include_paths,
+        include_instructions_as_data=True,
+    )
+except ValidationIssue as exc:
+    _print_validation_issue(exc)
+    raise SystemExit(2) from exc
+
+if writable and not sys.platform.startswith("linux"):
+    write_note = "unavailable on this platform (needs Linux bwrap PID namespace)"
+elif writable:
+    write_note = "requested; qualified only after lane sandbox proves PID-namespace containment"
+else:
+    write_note = "read-only (default)"
+
+if preflight_only:
+    print("Fugu preflight: ok (provider not launched)")
+    print(f"  profile: {profile_name}")
+    print(f"  model/effort: {model}/{effort}")
+    print(f"  mode: {mode}")
+    print(f"  wall_seconds: {max_wait:g}")
+    print(f"  write: {write_note}")
+    print(f"  repo: {repo_root}")
+    if admitted_includes:
+        print("  include_admitted:")
+        for rel in admitted_includes:
+            print(f"    - {rel}")
+    else:
+        print("  include_admitted: (none; default snapshot only)")
+    print(f"  task_chars: {len(task)}")
+    raise SystemExit(0)
 
 
 if writable and sys.platform == "darwin":
@@ -1920,6 +1997,6 @@ process."""
             raise SystemExit(2)
         finish(0)
 except ValidationIssue as exc:
-    print(f"Error: Fugu isolation failed closed [{exc.code}]: {exc}", file=sys.stderr)
+    _print_validation_issue(exc)
     raise SystemExit(2) from exc
 PY

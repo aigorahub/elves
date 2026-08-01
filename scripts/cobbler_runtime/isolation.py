@@ -380,6 +380,78 @@ def _git_path_is_ignored(repo_root: Path, rel: str) -> bool:
     )
 
 
+def preflight_requested_includes(
+    repo_root: Path,
+    include_paths: Sequence[str],
+    *,
+    include_instructions_as_data: bool = False,
+    extra_exclude_globs: Sequence[str] = (),
+) -> tuple[str, ...]:
+    """Validate host ``--include`` paths before snapshot construction or provider launch.
+
+    Returns the normalized repository-relative paths that would be treated as
+    requested context. Raises :class:`ValidationIssue` with actionable codes and
+    hints so hosts can fix bad includes without paying isolation or provider cost.
+    """
+    if not include_paths:
+        return ()
+    root = repo_root.resolve()
+    extra_globs = _normalize_extra_exclude_globs(extra_exclude_globs)
+    tracked = set(_git_tracked_files(root))
+    untracked = set(_git_untracked_nonignored_files(root))
+    requested = _normalize_include_paths(root, include_paths)
+    for rel in requested:
+        if (
+            _should_exclude(rel, extra_globs=extra_globs)
+            or _is_executable_agent_config(rel)
+            or _is_internal_snapshot_path(rel)
+            or (_is_instruction_surface(rel) and not include_instructions_as_data)
+        ):
+            raise ValidationIssue(
+                "isolation_requested_path_forbidden",
+                f"Requested context is excluded by immutable safety policy: {rel}",
+                path=str(root / rel),
+                hint=(
+                    "Do not --include credentials, .env* / *.env names, executable "
+                    "agent config, or other policy-blocked paths. Use default "
+                    "admitted snapshot context or a policy-safe source file."
+                ),
+            )
+        if rel in tracked or rel in untracked:
+            continue
+        if _git_path_is_ignored(root, rel):
+            raise ValidationIssue(
+                "isolation_requested_path_ignored",
+                f"Requested context is ignored and cannot be admitted: {rel}",
+                path=str(root / rel),
+                hint=(
+                    "Gitignored paths fail closed before Fugu launches. Move the "
+                    "note to a non-ignored path (for example a repo-root untracked "
+                    "file) or drop --include and rely on the default admitted snapshot."
+                ),
+            )
+        try:
+            info = (root / rel).lstat()
+        except OSError as exc:
+            raise ValidationIssue(
+                "isolation_requested_path_missing",
+                f"Requested context file is missing or unreadable: {rel}",
+                path=str(root / rel),
+                hint=(
+                    "Pass an existing repository-relative file path to --include, "
+                    "or omit --include when the default snapshot already has the file."
+                ),
+            ) from exc
+        if stat.S_ISDIR(info.st_mode):
+            raise ValidationIssue(
+                "isolation_requested_path_directory",
+                f"Requested context must name one file, not a directory: {rel}",
+                path=str(root / rel),
+                hint="--include accepts one file path per flag, not a directory tree.",
+            )
+    return requested
+
+
 def _normalize_extra_exclude_globs(patterns: Sequence[str]) -> tuple[str, ...]:
     normalized: list[str] = []
     for raw in patterns:
@@ -1181,45 +1253,18 @@ def create_tracked_snapshot(spec: IsolationSpec) -> IsolatedLane:
         untracked = (
             _git_untracked_nonignored_files(repo_root) if spec.include_untracked else []
         )
-        requested = _normalize_include_paths(repo_root, spec.include_paths)
+        requested = preflight_requested_includes(
+            repo_root,
+            spec.include_paths,
+            include_instructions_as_data=spec.include_instructions_as_data,
+            extra_exclude_globs=extra_globs,
+        )
         requested_set = set(requested)
         for rel in requested:
-            if (
-                _should_exclude(rel, extra_globs=extra_globs)
-                or _is_executable_agent_config(rel)
-                or _is_internal_snapshot_path(rel)
-                or (
-                    _is_instruction_surface(rel)
-                    and not spec.include_instructions_as_data
-                )
-            ):
-                raise ValidationIssue(
-                    "isolation_requested_path_forbidden",
-                    f"Requested context is excluded by immutable safety policy: {rel}",
-                    path=str(repo_root / rel),
-                )
             if rel in tracked_set or rel in untracked:
                 continue
-            if _git_path_is_ignored(repo_root, rel):
-                raise ValidationIssue(
-                    "isolation_requested_path_ignored",
-                    f"Requested context is ignored and cannot be admitted: {rel}",
-                    path=str(repo_root / rel),
-                )
-            try:
-                info = (repo_root / rel).lstat()
-            except OSError as exc:
-                raise ValidationIssue(
-                    "isolation_requested_path_missing",
-                    f"Requested context file is missing or unreadable: {rel}",
-                    path=str(repo_root / rel),
-                ) from exc
-            if stat.S_ISDIR(info.st_mode):
-                raise ValidationIssue(
-                    "isolation_requested_path_directory",
-                    f"Requested context must name one file, not a directory: {rel}",
-                    path=str(repo_root / rel),
-                )
+            # preflight_requested_includes already proved these are non-ignored,
+            # non-directory files that should join the untracked candidate list.
             untracked.append(rel)
         candidates = [(rel, True) for rel in tracked]
         candidates.extend((rel, False) for rel in untracked if rel not in tracked_set)

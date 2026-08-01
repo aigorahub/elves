@@ -221,18 +221,21 @@ When an explicit request matches one of these provider tags, resolve the runner 
 Elves skill root**, keep the target repository as the working directory, validate its arguments and
 required capability, then execute it without an extra confirmation prompt:
 
-- `/fugu [--deep|--ultra|--max] [--write] [--include PATH] <task>` or “use Fugu …” →
-  `scripts/run_fugu.sh [--deep|--ultra|--max] <task>` for a bounded general `codex-fugu` task whose
+- `/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] <task>` or “use Fugu …” →
+  `scripts/run_fugu.sh [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] <task>` for a bounded general `codex-fugu` task whose
   output follows the request rather than a forced review rubric.
-  `/fugu [--deep|--ultra|--max] review <scope>`, `$elves fugu [--deep|--ultra|--max] review
+  `/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] review <scope>`, `$elves fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] review
   <scope>`, or “do a Fugu review …” selects the explicit read-only review contract.
   **Host Fugu routing:** when the user says “use Fugu” (or plain `/fugu` / `$elves fugu`) without
   an explicit profile flag, the host agent must choose the lane before launch: general vs
   `review <scope>`, plain / `--deep` / `--ultra` / `--max` (profile locks model + effort; never
   invent a free model slug), read-only vs qualified `--write`, and optional exact `--include`
   paths. State one short `Fugu route: …` line, then invoke the runner. Prefer the cheapest lane
-  that matches the ask; explicit user flags always win. The isolation snapshot is always on for
-  every launch (not a host skip option); the host only selects extra admitted context via
+  that matches the ask; explicit user flags always win. Apply **Fugu economy**: host-native first
+  for inventory/triage/greps, default plain (`fugu/high`), narrow the packet before raising the
+  profile, prefer `--max-wait` over automatic `--deep`, never `--include` gitignored paths, and
+  use `--preflight` when includes or write mode are non-obvious. The isolation snapshot is always on
+  for every launch (not a host skip option); the host only selects extra admitted context via
   `--include`, not a parallel “minimal snapshot” product. Full decision table:
   `references/provider-shortcuts.md` (**Host routing when the user says "use Fugu"**).
   Both use a Git-enumerated snapshot containing policy-admitted tracked and non-ignored untracked

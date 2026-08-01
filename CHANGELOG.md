@@ -4,6 +4,23 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+### Fugu economy: preflight, wall cap, and host routing
+
+- Add `run_fugu.sh --preflight` to validate launcher readiness, profile, wall budget, write
+  eligibility, and every `--include` path, then print a launch plan and exit without calling the
+  provider. Hosts can confirm a non-obvious route before paying wall time.
+- Add `run_fugu.sh --max-wait SECONDS` as a first-class wall cap (same authority as
+  `SAKANA_FUGU_MAX_WAIT_SECONDS`) so slightly long plain work can stay on `fugu/high` instead of
+  automatic `--deep`.
+- Fail closed on bad `--include` paths **before** snapshot construction and provider launch, with
+  remediation hints (gitignored notes, missing files, policy-blocked paths). Shared helper:
+  `cobbler_runtime.isolation.preflight_requested_includes`.
+- Document **Fugu economy** host routing: host-native first for inventory/triage/greps, default
+  plain, narrow the packet before raising the profile, prefer `--max-wait` over automatic
+  `--deep`, never `--include` gitignored paths, use `--preflight` when includes or write mode are
+  non-obvious. Restated on SKILL, AGENTS, README, guide, alias, and
+  `references/provider-shortcuts.md`; grammar pins include the new flags.
+
 ## [2.21.0] - 2026-07-29
 
 ### Automatic prewalk qualification

@@ -33,7 +33,7 @@ authenticated live catalog (`references/adaptive-worker-routing.md`).
 | Cobbler | `$elves cobbler: <task>` or "Ask the Cobbler…" |
 | Cobbler Mode | `$elves cobbler-mode` or natural "Cobbler Mode: on/off" |
 | Setup | `$elves setup-cobbler` / `$elves setup-council` |
-| Provider shortcut | `$elves fugu [--deep\|--ultra\|--max] [--write] [--include PATH] <task>` / `$elves fugu [--deep\|--ultra\|--max] review <scope>`, `$elves manus [--wide\|--fanout] …`, `$elves grok <instructions>`, or `$elves devin <instructions>` |
+| Provider shortcut | `$elves fugu [--deep\|--ultra\|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] <task>` / `$elves fugu [--deep\|--ultra\|--max] [--max-wait SECONDS] [--preflight] review <scope>`, `$elves manus [--wide\|--fanout] …`, `$elves grok <instructions>`, or `$elves devin <instructions>` |
 | Land PR | natural language; `\land-pr` / `/land-pr` when the host maps them |
 
 ### Provider subprocess capabilities map
@@ -42,14 +42,17 @@ For explicit provider-shortcut intent, follow SKILL.md **Provider shortcut proto
 `references/provider-shortcuts.md`. Resolve helpers from the active installed skill root; do not
 assume `./scripts` belongs to the target repository and do not execute mappings blindly:
 
-- General Fugu task → `run_fugu.sh [--deep|--ultra|--max] [--write] [--include PATH] <task>`; explicit
-  review → `run_fugu.sh [--deep|--ultra|--max] review <scope>`. General output follows the task instead
+- General Fugu task → `run_fugu.sh [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] <task>`; explicit
+  review → `run_fugu.sh [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] review <scope>`. General output follows the task instead
   of a forced review rubric; review retains read-only base/change evidence and ordered findings.
   **Host Fugu routing:** natural “use Fugu” without an explicit profile flag is host-routed. Before
   launch, choose general vs `review <scope>`, plain / `--deep` / `--ultra` / `--max`
   (profile locks model + effort; no free model slug), read-only vs qualified `--write`, and
   optional `--include` paths; state one short `Fugu route: …` line; prefer the cheapest matching
-  lane; explicit user flags always win. The isolation snapshot is always on; the host only adds
+  lane; explicit user flags always win. Apply Fugu economy: host-native first for
+  inventory/triage/greps, default plain (`fugu/high`), narrow before upgrading profile, prefer
+  `--max-wait` over automatic `--deep`, never `--include` gitignored paths, use `--preflight` when
+  includes/write are non-obvious. The isolation snapshot is always on; the host only adds
   exact admitted context via `--include`, not a separate “minimal snapshot” mode. Full table:
   `references/provider-shortcuts.md` (**Host routing when the user says "use Fugu"**).
   Both receive a bounded policy-admitted tracked plus non-ignored-untracked snapshot. The host may
