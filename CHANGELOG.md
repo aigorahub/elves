@@ -4,6 +4,8 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.23.1] - 2026-08-01
+
 ### Full-run terminal event log fail-closed
 
 - Resume prepare/launch now refuse with `full_run_resume_event_log_unverifiable` when
