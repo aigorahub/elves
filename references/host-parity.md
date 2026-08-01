@@ -6,7 +6,7 @@ prewalk contract.
 
 | Concern | Claude Code | Codex | Grok Build (host) |
 |---------|-------------|-------|-------------------|
-| Skill load | Project/global Agent Skill | Project/global Agent Skill | Claude-compat and/or native skill discovery |
+| Skill load | Project/global Agent Skill (`~/.claude/skills/elves`) | Project/global Agent Skill (`~/.codex/skills/elves`) | Native skill (`~/.grok/skills/elves`) and/or Claude-compat discovery |
 | Primary invoke | `/elves`, natural language | `$elves`, natural language | natural language (no invented top-level slash map) |
 | Cobbler | `/cobbler`, `/cobbler-mode` | `$elves cobbler: …`, natural chat | natural language |
 | Setup | `/setup-cobbler` | `$elves setup-cobbler` | natural language / scripts |
@@ -22,9 +22,10 @@ prewalk contract.
 Claude and Codex read safe worker preferences from the same XDG file and make the same
 deterministic decision. Transport syntax differs; packet, authority, fallback, follow, and
 terminal-review semantics do not. See [`adaptive-worker-routing.md`](adaptive-worker-routing.md).
-When checking a route, pass `--host claude` from Claude Code and `--host codex` from Codex so any
-native fallback uses the live driver's transport. Grok as **optional worker** under Claude/Codex
-is unchanged. Native `~/.grok/skills` install remains optional (#88).
+When checking a route, pass `--host claude` from Claude Code, `--host codex` from Codex, or
+`--host grok` from Grok Build so any native fallback uses the live driver's transport. Grok as
+**optional worker** under Claude/Codex is unchanged. Native install:
+`sync_installed_skills.py --apply --target grok`.
 
 Provider shortcuts preserve the same route semantics and authority on both hosts; only Claude Code
 installs the four slash aliases. Codex must use the main skill surface. See

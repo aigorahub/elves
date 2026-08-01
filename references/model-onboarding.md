@@ -56,11 +56,10 @@ have **not** dogfooded it. It **may or may not work**. Do not treat success stor
 product guarantee. If you try it and care about the project: **prefer a PR** (skill load path,
 headless loop, session recovery, docs) so others benefit.
 
-**Grok Build as main driver is explicitly unsupported.** Grok often *discovers* Elves via Claude
-skill compatibility when `~/.claude/skills/elves` is present. The skill must **refuse to stage or
-run** from Grok as orchestrator and redirect the user to Claude Code or Codex. Grok’s supported
-role is **optional work driver** under those hosts. A native `~/.grok/skills/elves` install target
-and full Grok host parity are tracked as future work, not current product.
+**Grok Build is a supported main driver** alongside Claude Code and Codex. Prefer native install
+`python3 scripts/sync_installed_skills.py --apply --target grok` → `~/.grok/skills/elves`. Grok
+may also discover Elves via Claude skill compatibility when `~/.claude/skills/elves` is present.
+Grok remains an optional **work driver** under Claude/Codex when permitted.
 
 ### Work drivers and optional lenses (also incomplete coverage)
 

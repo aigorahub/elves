@@ -540,30 +540,31 @@
     <main id="main">
       <section id="agent-onboarding">
         <h2>New here? Paste this to your agent</h2>
-        <p class="lede">Open Claude Code or Codex in any directory, paste the block below, and let
-          the agent install Elves and explain how it works. Shell install steps are optional if
-          you prefer them: see <a href="#install">Install Elves</a>.</p>
+        <p class="lede">Open Claude Code, Codex, or Grok Build in any directory, paste the block
+          below, and let the agent install Elves and explain how it works. Shell install steps are
+          optional if you prefer them: see <a href="#install">Install Elves</a>.</p>
 
         <div class="code-block">
           <button class="copy" type="button" data-copy="agent-onboard">Copy</button>
-          <pre><code id="agent-onboard">Install Elves for whichever coding agents I have on this machine (Claude Code and/or Codex), then explain how Elves works. Do not start an implementation run unless I ask.
+          <pre><code id="agent-onboard">Install Elves for whichever coding agents I have on this machine (Claude Code, Codex, and/or Grok Build), then explain how Elves works. Do not start an implementation run unless I ask.
 
 1. Detect availability:
    - Claude Code: `claude` on PATH and/or `~/.claude`
    - Codex: `codex` on PATH and/or `~/.codex`
-   Install only for hosts that are actually present. If both exist, install both.
+   - Grok Build: `grok` on PATH and/or `~/.grok`
+   Install only for hosts that are actually present. If several exist, install each with an explicit target (do not rely on `all` for first-time install).
 
 2. Install from a temporary clone of https://github.com/aigorahub/elves.git:
    ELVES_TMP="$(mktemp -d)"
-   git clone https://github.com/aigorahub/elves.git "$ELVES_TMP/elves"
-   python3 "$ELVES_TMP/elves/scripts/sync_installed_skills.py" --apply --target &lt;claude|codex|all&gt;
+   git clone --depth 1 https://github.com/aigorahub/elves.git "$ELVES_TMP/elves"
+   python3 "$ELVES_TMP/elves/scripts/sync_installed_skills.py" --apply --target &lt;claude|codex|grok&gt;
    rm -rf "$ELVES_TMP"
-   Use target `claude`, `codex`, or `all` to match what you detected.
-   Requires Python 3.10 or newer.
+   Use target `claude`, `codex`, or `grok` to match what you detected. Requires Python 3.10 or newer.
 
 3. Validate each install you performed:
    python3 ~/.claude/skills/elves/scripts/install_doctor.py --startup
    python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup
+   python3 ~/.grok/skills/elves/scripts/install_doctor.py --startup
 
 4. In plain language, explain:
    - Elves is a skill for Claude Code, Codex, and Grok Build (those are the supported main drivers).
@@ -578,8 +579,9 @@
         <div class="note">
           <strong>Hosts.</strong> Supported main drivers are <strong>Claude Code</strong>,
           <strong>Codex</strong>, and <strong>Grok Build</strong>. Required prewalk uses the same
-          automatic qualification contract on each host. Managed skill install targets remain Claude and Codex roots; Grok often
-          discovers Elves via Claude skill compatibility. Devin and OpenCode stay optional workers.
+          automatic qualification contract on each host. Managed skill install targets:
+          <code>~/.claude/skills/elves</code>, <code>~/.codex/skills/elves</code>, and
+          <code>~/.grok/skills/elves</code>. Devin and OpenCode stay optional workers.
         </div>
       </section>
 
@@ -617,7 +619,7 @@
             <div class="code-block">
               <button class="copy" type="button" data-copy="install-claude">Copy</button>
               <pre><code id="install-claude">ELVES_TMP="$(mktemp -d)"
-git clone https://github.com/aigorahub/elves.git "$ELVES_TMP/elves"
+git clone --depth 1 https://github.com/aigorahub/elves.git "$ELVES_TMP/elves"
 python3 "$ELVES_TMP/elves/scripts/sync_installed_skills.py" --apply --target claude
 rm -rf "$ELVES_TMP"</code></pre>
             </div>
@@ -630,12 +632,25 @@ rm -rf "$ELVES_TMP"</code></pre>
             <div class="code-block">
               <button class="copy" type="button" data-copy="install-codex">Copy</button>
               <pre><code id="install-codex">ELVES_TMP="$(mktemp -d)"
-git clone https://github.com/aigorahub/elves.git "$ELVES_TMP/elves"
+git clone --depth 1 https://github.com/aigorahub/elves.git "$ELVES_TMP/elves"
 python3 "$ELVES_TMP/elves/scripts/sync_installed_skills.py" --apply --target codex
 rm -rf "$ELVES_TMP"</code></pre>
             </div>
             <p>Use natural language or <code>$elves</code> skill forms. Do not invent Claude's
               top-level slash aliases in Codex.</p>
+          </article>
+
+          <article class="host">
+            <h3>Grok Build</h3>
+            <div class="code-block">
+              <button class="copy" type="button" data-copy="install-grok">Copy</button>
+              <pre><code id="install-grok">ELVES_TMP="$(mktemp -d)"
+git clone --depth 1 https://github.com/aigorahub/elves.git "$ELVES_TMP/elves"
+python3 "$ELVES_TMP/elves/scripts/sync_installed_skills.py" --apply --target grok
+rm -rf "$ELVES_TMP"</code></pre>
+            </div>
+            <p>Installs <code>~/.grok/skills/elves</code> for native discovery. Use natural
+              language; do not invent Claude slash aliases.</p>
           </article>
         </div>
 

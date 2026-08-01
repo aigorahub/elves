@@ -37,11 +37,11 @@ Grok Build also remains an **optional worker** under Claude Code or Codex when p
 (`grok-4.5` at `high` when the live catalog offers it). Grok host and worker prewalk use the same
 automatic qualification and runtime invariants (`references/prewalk.md`).
 
-Managed install targets remain `~/.claude/skills/elves` and `~/.codex/skills/elves`. Grok often
-discovers Elves via Claude skill compatibility; a native `~/.grok/skills` install is optional
-follow-up work, not a requirement to drive. Do not invent unsupported host surfaces for other
-products. If the session is an exotic non-supported host (not Claude, Codex, or Grok), refuse to
-stage and redirect to a supported driver.
+Managed install targets are `~/.claude/skills/elves`, `~/.codex/skills/elves`, and
+`~/.grok/skills/elves` (`sync_installed_skills.py --target claude|codex|grok`). All three are
+first-class main drivers. Do not invent unsupported host surfaces for other products. If the
+session is an exotic non-supported host (not Claude, Codex, or Grok), refuse to stage and redirect
+to a supported driver.
 
 **The user owns whether Elves may merge.** You never merge by default — the user merges when they
 return. Exceptions: explicit merge-on-green in Run Control, chat-to-land, or the Reviewed PR Landing

@@ -73,6 +73,7 @@ class SyncInstalledSkillsTests(unittest.TestCase):
         self.sync.TARGETS["claude"]["root"] = home / ".claude" / "skills" / "elves"
         self.sync.TARGETS["claude"]["alias_root"] = home / ".claude" / "skills"
         self.sync.TARGETS["codex"]["root"] = home / ".codex" / "skills" / "elves"
+        self.sync.TARGETS["grok"]["root"] = home / ".grok" / "skills" / "elves"
         return repo, home
 
     def test_apply_creates_missing_claude_aliases(self) -> None:
@@ -144,6 +145,32 @@ class SyncInstalledSkillsTests(unittest.TestCase):
 
             self.assertEqual(problems, [])
             self.assertFalse((home / ".claude" / "skills" / "cobbler").exists())
+
+    def test_grok_apply_installs_native_skill_root_without_claude_aliases(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            _, home = self.configure_temp_repo(tmpdir)
+
+            problems = self.sync.apply_target("grok")
+
+            self.assertEqual(problems, [])
+            installed = home / ".grok" / "skills" / "elves"
+            self.assertTrue((installed / "SKILL.md").exists())
+            self.assertTrue((installed / "scripts" / "cobbler_runtime").is_dir())
+            self.assertFalse((home / ".claude" / "skills" / "cobbler").exists())
+            ok, check_problems = self.sync.check_target("grok")
+            self.assertTrue(ok, check_problems)
+
+    def test_target_all_skips_missing_grok_root_until_explicit_apply(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            _, home = self.configure_temp_repo(tmpdir)
+            self.assertEqual(self.sync.apply_target("claude"), [])
+            # Grok root does not exist yet; `all` is update-only.
+            selected = self.sync.selected_targets("all")
+            self.assertIn("claude", selected)
+            self.assertNotIn("grok", selected)
+            self.assertFalse((home / ".grok" / "skills" / "elves").exists())
+            self.assertEqual(self.sync.apply_target("grok"), [])
+            self.assertIn("grok", self.sync.selected_targets("all"))
 
     def test_apply_removes_repo_only_helpers_from_installed_copy(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
