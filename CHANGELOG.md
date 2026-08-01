@@ -4,7 +4,9 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
-### v2.22.0 full backlog resolution (in flight on feat/v2.22-full-backlog-resolution)
+## [2.22.0] - 2026-08-01
+
+### Full Linear backlog resolution
 
 - User-specified worker models from the live catalog (`resolve_user_specified_worker_model`) with
   fail-closed unavailable/retired ids; handoff cache keys for qualification reuse; docs in
