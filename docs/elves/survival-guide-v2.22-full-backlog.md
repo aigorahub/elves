@@ -78,9 +78,9 @@ regular merge commit, post-merge version bump, and an X announcement draft in ch
 
 ## Next exact action
 
-1. Finish staging: write session JSON, sync-session, validate acceptance, push branch, open or update PR.
-2. Begin B0 acceptance evidence (branch pushed, validate PASS).
-3. Continue B1 (AIG-238 any-model handoffs).
+1. Close B0 acceptance (tripwire, validate PASS, PR #235, plan/survival/log on branch).
+2. Implement B1 (AIG-238 any-model worker handoffs + prewalk/caching).
+3. Continue B2→B15 without stopping until Master Acceptance.
 
 ## Active plan
 

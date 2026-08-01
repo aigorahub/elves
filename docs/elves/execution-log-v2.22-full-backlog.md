@@ -3,15 +3,23 @@
 ## Run Digest
 
 - **Last updated:** 2026-08-01
-- **Current phase:** Staging
+- **Current phase:** Staged / ready to execute
 - **Active batch:** B0: Fugu economy baseline and run scaffolding
 - **Last completed batch:** none yet
 - **Next exact batch:** B0 then B1
-- **Active PR:** not created yet (branch will open PR after push)
+- **Active PR:** #235
 - **Docs promoted this run:** none yet
 - **Deferred hygiene:** none
 
 ## Chronology
+
+### 2026-08-01 — Staging complete
+
+- `acceptance_contract.py sync-session --write` and `validate`: **PASS**
+- Pushed `feat/v2.22-full-backlog-resolution`; opened PR **#235**
+- Session `.elves-session.json` local (gitignored); `stop_allowed: false`
+- Launch-ready for B0 evidence close then B1 (AIG-238)
+
 
 ### 2026-08-01 — Staging
 
