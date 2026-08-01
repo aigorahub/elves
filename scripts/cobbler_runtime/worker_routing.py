@@ -221,7 +221,7 @@ def resolve_user_specified_worker_model(
         catalog.update(str(x).strip() for x in live_catalog if str(x).strip())
     if req not in catalog:
         return None, f"model_unavailable:{req}"
-    return req, "explicit_user_catalog_pin"
+    return req, "explicit_catalog_model_pin"
 
 
 def handoff_cache_key(
@@ -1034,10 +1034,25 @@ def decide_worker_route(
             # explicit worker.grok_model pin of "auto" is never a catalog member.
             if requested_for_select == "auto":
                 candidate = None
+                model_policy = "auto_placeholder"
             else:
-                candidate = select_preferred_grok_worker_model(
-                    grok_info, requested=requested_for_select
+                # Explicit user pin against the live catalog (fail-closed if absent).
+                pinned, pin_policy = resolve_user_specified_worker_model(
+                    requested_model=requested_for_select,
+                    live_catalog=list(grok_info.models),
                 )
+                if requested_for_select:
+                    candidate = pinned
+                    model_policy = pin_policy
+                else:
+                    candidate = select_preferred_grok_worker_model(
+                        grok_info, requested=None
+                    )
+                    model_policy = (
+                        "preferred_grok_worker_model"
+                        if candidate == GROK_WORKER_MODEL
+                        else "authenticated_live_catalog_default"
+                    )
             goal_qualified = bool(
                 grok_info.goal_mode_behaviorally_verified
                 and grok_info.goal_behavioral_evidence
@@ -1046,11 +1061,13 @@ def decide_worker_route(
             if candidate and not core_unavailable:
                 selected_provider = "grok"
                 selected_model = candidate
-                if requested_grok_model is not None:
-                    model_policy = "explicit_catalog_model_pin"
-                elif candidate == GROK_WORKER_MODEL:
+                if requested_grok_model is not None and model_policy.startswith(
+                    "explicit"
+                ):
+                    pass  # keep pin_policy
+                elif candidate == GROK_WORKER_MODEL and not requested_for_select:
                     model_policy = "preferred_grok_worker_model"
-                else:
+                elif not requested_for_select:
                     model_policy = "authenticated_live_catalog_default"
                 goal_mode = goal_qualified
                 reasons.append("permitted_grok_capability_matches_plan")

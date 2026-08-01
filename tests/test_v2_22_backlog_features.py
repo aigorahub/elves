@@ -51,7 +51,7 @@ class WorkerHandoffTests(unittest.TestCase):
             live_catalog=["claude-opus-5", "gpt-5.6"],
         )
         self.assertEqual(model, "claude-opus-5")
-        self.assertEqual(policy, "explicit_user_catalog_pin")
+        self.assertEqual(policy, "explicit_catalog_model_pin")
         missing, reason = resolve_user_specified_worker_model(
             requested_model="nope",
             live_catalog=["claude-opus-5"],
@@ -153,6 +153,11 @@ Ship the demo feature safely.
         )
         self.assertFalse(lock["ok"])
         self.assertIn("README.md", lock["violations"])
+        bypass = merge_recovery_scope_lock(
+            allowed_paths=["scripts/"],
+            attempted_paths=["scripts/../.env.local"],
+        )
+        self.assertFalse(bypass["ok"])
 
     def test_discover_and_resolve_modes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

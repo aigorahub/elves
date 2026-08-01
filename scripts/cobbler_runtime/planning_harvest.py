@@ -14,7 +14,7 @@ import json
 import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any, Mapping, Sequence
 
 
 BEACON_SCHEMA = "elves-plan-beacon-v1"
@@ -405,12 +405,23 @@ def merge_recovery_scope_lock(
     attempted_paths: Sequence[str],
 ) -> dict[str, Any]:
     """Fail closed when merge-recovery edits leave the declared scope."""
-    allowed = {p.rstrip("/") for p in allowed_paths}
+    from posixpath import normpath
+
+    def _norm(path: str) -> str:
+        n = normpath(path.replace("\\", "/"))
+        if n.startswith("/") or n == ".." or n.startswith("../"):
+            return ""  # force violation
+        return n.lstrip("./")
+
+    allowed = {_norm(p) for p in allowed_paths}
+    allowed.discard("")
     bad = []
     for path in attempted_paths:
-        ok = any(
-            path == a or path.startswith(a.rstrip("/") + "/") for a in allowed
-        )
+        n = _norm(path)
+        if not n:
+            bad.append(path)
+            continue
+        ok = any(n == a or n.startswith(a.rstrip("/") + "/") for a in allowed)
         if not ok:
             bad.append(path)
     return {
