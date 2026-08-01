@@ -26,7 +26,7 @@ All notable changes to the Elves skill are documented here.
 ### Public wording and redaction honesty (#97, #98)
 
 - Wider persona/branding forbidden patterns for product-identity claims (hyphenated Fable branding,
-  “runs on …” framing, and Claude/Anthropic persona claims).
+  “runs on …” framing, and host-vendor persona claims).
 - Documented host-UI / third-party / MCP bypass surfaces that the built-in redaction filter does not
   cover (`references/adaptive-worker-routing.md`).
 
