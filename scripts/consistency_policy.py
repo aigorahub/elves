@@ -178,6 +178,24 @@ SINGLE_KICKOFF_PHRASES = {
     ],
 }
 
+FUTILE_REDRIVE_GUARD_PHRASES = {
+    "SKILL.md": [
+        "redrive_futile:workspace_unchanged",
+        "manufacture futility",
+        "do not repeat the previous approach",
+        "redrive record-failure|evaluate|status",
+    ],
+    "references/e2e-chat-to-land.md": [
+        "redrive_futile:workspace_unchanged",
+        "manufacture futility",
+        "do not repeat the previous approach",
+    ],
+    "references/glossary.md": [
+        "redrive_futile:workspace_unchanged",
+        "Futile re-drive",
+    ],
+}
+
 SINGLE_KICKOFF_FORBIDDEN_PHRASES = {
     "README.md": [
         "Use the launch template from the same reference file in a fresh call",

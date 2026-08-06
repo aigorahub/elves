@@ -139,11 +139,22 @@ host accepts any reported batch as complete):
 
 If incomplete:
 
-1. Write a **gap packet** (remaining criteria, files, commands, exact session id).
-2. **Re-drive** the same work driver (prefer exact session resume after interruption) up to
-   `labor re-drive budget`. Do not turn a healthy trusted full-run into per-batch prompting.
-3. If still incomplete: host finishes the gap **or** hard-stop with remaining contract listed.
-4. Log every re-drive under **Decisions made** / execution log.
+1. Write a **gap packet** (remaining criteria, files, commands, exact session id) that states
+   what changed since the previous attempt — or the explicit line "workspace unchanged since the
+   previous failed attempt — do not repeat the previous approach". The guard output below
+   supplies the correct variant.
+2. **Guard first:** record the failure fingerprint at classification time
+   (`cobbler_agents.py redrive record-failure --batch <B#>`), then classify the candidate
+   (`… redrive evaluate --batch <B#>`). `redrive_futile:workspace_unchanged` still consumes one
+   unit of the labor re-drive budget, forbids relaunching the identical packet, and jumps
+   straight to step 4. Fingerprint capture errors and over-cap trees always count as changed; a
+   fingerprint failure can never manufacture futility.
+3. Otherwise **re-drive** the same work driver (prefer exact session resume after interruption)
+   up to `labor re-drive budget`. Do not turn a healthy trusted full-run into per-batch
+   prompting.
+4. If still incomplete (or futile): host finishes the gap **or** hard-stop with remaining
+   contract listed.
+5. Log every re-drive and every futile classification under **Decisions made** / execution log.
 
 Never silently absorb a partial work-driver turn into batch `status: complete`.
 

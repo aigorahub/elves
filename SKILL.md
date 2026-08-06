@@ -361,6 +361,15 @@ refreshed at each milestone and never committed — so a cold re-drive starts or
 gate or worker runs triggers a health check (near-zero CPU time against long wall time is the
 hang signature). After repeated transient deaths in one batch, the driver may split the batch or
 take it host-native without that counting against the budget; document the decision.
+Before consuming the re-drive budget for a **substantive** failure, run the deterministic futile
+re-drive guard (`cobbler_agents.py redrive record-failure|evaluate|status`): a re-drive candidate
+whose worktree fingerprint is identical to the previous substantive failure of the same batch is
+classified `redrive_futile:workspace_unchanged` — it still consumes one unit of the re-drive
+budget, the identical packet is never relaunched, and the driver escalates (split the batch,
+host-native takeover, or hard stop). Fingerprint capture errors and over-cap trees always count as
+changed; a fingerprint failure can never manufacture futility. Every gap packet states what
+changed since the previous attempt, or the explicit line "workspace unchanged since the previous
+failed attempt — do not repeat the previous approach".
 
 **Exact-session prewalk.** Optional prewalk means one worker trajectory:
 guide route → bounded TODO + first meaningful task edit + private checkpoint → automatic exact-ID,

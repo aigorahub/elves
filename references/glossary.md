@@ -10,6 +10,13 @@ in this file, it is not project vocabulary — plain English wins.
   one answer. *Quick Cobbler* = read-only one-off answer; *Cobbler Mode* = current-thread chat
   state; *Cobbler session state* = durable run state in the survival guide and session file.
 - **Council** — deprecated alias of Cobbler, kept for invocation compatibility only.
+- **Futile re-drive** — a substantive-failure re-drive candidate whose worktree fingerprint is
+  identical to the previous substantive failure of the same batch (same failure class):
+  classified `redrive_futile:workspace_unchanged`, it still consumes one unit of the re-drive
+  budget, forbids relaunching the identical packet, and requires escalation. Deterministic guard:
+  `cobbler_agents.py redrive record-failure|evaluate|status`; overnight value: no budget burned
+  re-running an unchanged workspace. Fingerprint errors always count as changed (fail-closed
+  toward allowing the re-drive).
 - **Chat-to-work** — end-to-end run that stops at a landable PR; the user merges.
 - **Chat-to-land** — the same run with an explicit in-session user authorization to merge.
 - **Full-run** — trusted delegation shape: one packet, worker owns internal batches on the feature
