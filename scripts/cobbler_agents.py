@@ -516,6 +516,38 @@ def cmd_salvage(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_continuity(args: argparse.Namespace) -> int:
+    """Continuity watchdog manager: templates + config only; OS owns the timer."""
+
+    from cobbler_runtime import continuity as _ct
+
+    repo_root = Path(args.repo_root or ".")
+    action = args.continuity_action
+    try:
+        if action == "install":
+            payload: dict[str, Any] = _ct.install(
+                repo_root,
+                {
+                    "repo_root": str(repo_root.resolve()),
+                    "session_id": args.session_id,
+                    "branch": args.branch,
+                    "start_head": args.start_head,
+                    "packet": args.packet,
+                    "interval_seconds": args.interval,
+                    "auto_resume": bool(args.auto_resume),
+                },
+            )
+        elif action == "remove":
+            payload = _ct.remove(repo_root)
+        else:
+            payload = _ct.status(repo_root)
+    except _ct.ContinuityError as exc:
+        print(json.dumps({"ok": False, "code": exc.code, "error": exc.message}))
+        return 1
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return 0
+
+
 def cmd_lanes(args: argparse.Namespace) -> int:
     """Read-only lane validation and width-test recommendation; never launches."""
 
@@ -2723,6 +2755,41 @@ def build_parser() -> argparse.ArgumentParser:
     )
     salvage_tail.add_argument("--json", action="store_true")
     salvage_tail.set_defaults(func=cmd_salvage)
+
+    continuity = sub.add_parser(
+        "continuity",
+        help=(
+            "Continuity resume watchdog manager: writes config + launchd/systemd "
+            "templates only; activation stays operator-owned; default detect-and-report"
+        ),
+    )
+    continuity_sub = continuity.add_subparsers(dest="continuity_action", required=True)
+    continuity_install = continuity_sub.add_parser(
+        "install", help="Write watchdog config and OS-timer templates (never activates)"
+    )
+    continuity_install.add_argument("--repo-root", default=None)
+    continuity_install.add_argument("--session-id", required=True)
+    continuity_install.add_argument("--branch", required=True)
+    continuity_install.add_argument("--start-head", required=True)
+    continuity_install.add_argument("--packet", required=True)
+    continuity_install.add_argument(
+        "--interval", type=int, default=900, help="Timer interval seconds (default 900)"
+    )
+    continuity_install.add_argument(
+        "--auto-resume",
+        action="store_true",
+        help="Opt in to actual relaunch; default is detect-and-report (--check)",
+    )
+    continuity_install.add_argument("--json", action="store_true")
+    continuity_install.set_defaults(func=cmd_continuity)
+    for _cont_name, _cont_help in (
+        ("status", "Report config/template presence and last watchdog fire"),
+        ("remove", "Delete config and templates (log kept); idempotent"),
+    ):
+        _cont_item = continuity_sub.add_parser(_cont_name, help=_cont_help)
+        _cont_item.add_argument("--repo-root", default=None)
+        _cont_item.add_argument("--json", action="store_true")
+        _cont_item.set_defaults(func=cmd_continuity)
 
     route_worker = sub.add_parser(
         "route-worker",
