@@ -239,6 +239,12 @@ credential, origin, branch, worktree, ancestry, clean-tip, protected-ref, and re
 worker merge/tag/protected-ref/PR/landing authority; test integrity; independent terminal review;
 final CI.
 
+The optional **continuity watchdog** stays outside the kernel's authority surfaces: an
+operator-owned OS timer that Elves never activates itself, detect-and-report by default, and
+every safety decision delegated to `full-run-prepare --resume` — it never resumes a terminal
+run and holds no landing, merge, or credential authority
+(`references/operations-guide.md`).
+
 **Forbidden commands.** Never: `git reset --hard`, `git checkout .`, `git clean -fd`, force push,
 rebase on shared branches, `rm -rf` outside scope, operating on another agent's checkout.
 

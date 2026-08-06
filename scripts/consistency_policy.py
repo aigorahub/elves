@@ -242,6 +242,18 @@ CURRENT_STATE_AUDIT_PHRASES = {
     ],
 }
 
+CONTINUITY_WATCHDOG_PHRASES = {
+    "references/operations-guide.md": [
+        "never resumes a terminal run",
+        "the OS owns the timer",
+        "continuity install",
+    ],
+    "references/glossary.md": [
+        "Continuity watchdog",
+        "never resumes a terminal run",
+    ],
+}
+
 SALVAGE_PREVIEW_PHRASES = {
     "SKILL.md": [
         "salvage tail --log",

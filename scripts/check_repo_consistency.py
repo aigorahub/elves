@@ -113,6 +113,13 @@ def main() -> int:
             if phrase not in text:
                 errors.append(f"{label}: missing current-state-audit phrase `{phrase}`")
 
+    for label, phrases in CONTINUITY_WATCHDOG_PHRASES.items():
+        path = REPO_ROOT / label
+        text = read_text(path)
+        for phrase in phrases:
+            if phrase not in text:
+                errors.append(f"{label}: missing continuity-watchdog phrase `{phrase}`")
+
     for label, phrases in EFFORT_GUARDRAIL_PHRASES.items():
         path = REPO_ROOT / label
         text = read_text(path)

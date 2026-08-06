@@ -8,6 +8,20 @@ Moved from the README so the front page stays a front page; content unchanged.
 
 This is the most common failure mode for overnight runs. If your machine sleeps, the session stops. Handle this before you walk away.
 
+**Continuity watchdog (opt-in, trusted full-runs only).** When the session dies anyway, an
+operator-owned OS timer can re-enter a resumable full-run:
+`cobbler_agents.py continuity install --session-id … --branch … --start-head … --packet …`
+writes the watchdog config plus launchd/systemd user-timer **templates** and prints the exact
+activation commands — Elves never runs `launchctl` or `systemctl` and activates nothing itself;
+the OS owns the timer. Default posture is detect-and-report (`--check` + notification);
+relaunching requires the explicit `--auto-resume` opt-in. Every fire is a stateless
+claim-before-act check (overlapping fires are single-flight; missed fires coalesce), and every
+safety decision belongs to `full-run-prepare --resume`: a possibly-live run refuses, and the
+watchdog **never resumes a terminal run** — terminal or unverifiable event logs refuse
+byte-for-byte unchanged (v2.23 semantics). It holds no landing, merge, or credential authority,
+and cannot revive host-native driver sessions (those need the recovery read order in a fresh
+session). `continuity status|remove` manage it; removal is idempotent.
+
 ### macOS
 
 ```bash

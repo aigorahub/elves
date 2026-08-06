@@ -192,6 +192,31 @@
 
 ---
 
+## 2026-08-05 · B6 · Contract + Validate + Close (high risk)
+
+- **Behaviors:** continuity watchdog — `cobbler_runtime/continuity.py` (config, launchd/systemd
+  template rendering, install/status/remove — **never activates**; activation commands printed
+  for the operator), `scripts/resume_watchdog.py` (stateless fire: single-flight flock claim →
+  `full-run-prepare --resume` as the single authority — `--check` detect-and-report default,
+  relaunch only with explicit `auto_resume` → `full-run-launch --resume`; bounded log; quiet on
+  live; terminal logged, never resumed), `continuity install|status|remove` CLI verbs.
+- **Premise correction (plan amendment under B6):** the "not a runtime scheduler" pin is
+  Parallelves-scoped and stays untouched; B6-A4 amended accordingly — boundary language pinned
+  on operations-guide/README/glossary via `CONTINUITY_WATCHDOG_PHRASES` instead.
+- **Doctor disposition:** install_doctor integration evaluated and skipped as misplaced — doctor
+  audits skill installs, not per-repo run state; `continuity status` is the status surface
+  (anti-accretion call, plan task closed as evaluated).
+- **Validation:** continuity suite 8/8 — including the flagship integration test: the watchdog
+  drives the REAL production `full-run-prepare --resume` gate ladder (session required → clean
+  worktree → start-head match → canonical origin → packet acceptance ids) and the terminal
+  fixture refuses with `full_run_resume_prepare_terminal`, full-run state **byte-identical**
+  before/after. Single-flight contention proven; templates deterministic; module source contains
+  no subprocess/launchctl/systemctl and no authority strings (static asserts). Combined run with
+  `test_full_run_supervisor` + consistency = 272 tests OK, consistency exit 0.
+- B6 complete.
+
+---
+
 ## 2026-08-05 · Staging (driver: Claude Fable 5, staging-only session)
 
 **What happened:** Plan authored from the 2026-08-05 prime-agent deep-comparison analysis and
