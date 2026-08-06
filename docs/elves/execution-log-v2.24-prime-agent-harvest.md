@@ -138,6 +138,27 @@
 
 ---
 
+## 2026-08-05 · B3 · Contract + Validate + Close
+
+- **Behaviors:** observed-usage ledger (`usage_ledger.py` + `cobbler_agents.py usage
+  aggregate|status|panel`): strict aggregation through `parse_usage_payload` (unknown stays
+  literal `unobserved`, never zero), advisory ceiling with observed input+output basis
+  (cache-read counters structurally excluded), `usage_ceiling_checkpoint` classification (never
+  a stop, never routing input), additive `usage_observed` session block, Session Budget lines,
+  escaped bounded report panel. `HostProfile.reports_usage` capability metadata on all four
+  rows. Calibration rows gain bounded optional `usage` (old rows tolerated). Docs:
+  survival-guide-template Session Budget + Forbidden Stop Reasons line;
+  schema-and-acceptance §Observed usage; `USAGE_OBSERVED_PHRASES` pins + engine loop.
+- **Implement slice:** `d022d94` (38 tests OK incl. confidence + host-profile regressions).
+- **Validation:** consistency exit 0; focused suites incl. `test_native_worker_hardening`
+  (launch specs unaffected by the new field) = 125 tests OK. Routing non-influence proven by
+  CLI fixture (identical route-worker output with and without a populated usage block).
+- **Honesty boundary held:** no quota inference anywhere; #199's `route_on_usage_pressure`
+  untouched.
+- B3 complete.
+
+---
+
 ## 2026-08-05 · Staging (driver: Claude Fable 5, staging-only session)
 
 **What happened:** Plan authored from the 2026-08-05 prime-agent deep-comparison analysis and

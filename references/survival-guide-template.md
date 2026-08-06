@@ -142,6 +142,11 @@ section.
 - **Time budget:** ~[N] hours _("unlimited" if open-ended)_
 - **Average batch time so far:** [Xm] _(update after each batch)_
 - **Batches remaining:** [N of M]
+- **Observed usage so far:** [totals from `cobbler_agents.py usage status`, or the literal
+  `unobserved`] _(observed transport reports only; observed ≠ billed; cache reads excluded from
+  ceilings; unknown is never a number)_
+- **Usage ceiling (advisory):** [N tokens, or "none"] — crossing is a checkpoint and a
+  notification, never a stop and never a routing input
 
 ---
 
@@ -189,6 +194,8 @@ These are not valid reasons to stop the run while work remains:
 - The user is silent or offline
 - You wrote a useful summary
 - The current batch is complete but later batches remain
+- The advisory usage ceiling was crossed (observed-usage ledger: checkpoint and notify, never a
+  stop)
 - You feel unsure whether to continue
 - **The remaining work feels like a lot for one turn.** It is supposed to. The volume of work is the entire reason this run exists. The user set it up precisely so you would carry all of it through unattended. "This is a lot for one turn" is the feeling this run is designed to defeat, not a signal to stop.
 - **This feels like a natural place to pause and check in.** There is no one to check in with. A clean batch boundary is the middle of the work, not the end. Go straight to the next batch.

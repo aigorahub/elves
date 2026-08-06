@@ -213,6 +213,20 @@ LEARNINGS_LEDGER_PHRASES = {
     ],
 }
 
+USAGE_OBSERVED_PHRASES = {
+    "references/survival-guide-template.md": [
+        "Observed usage so far",
+        "observed ≠ billed",
+        "never a stop",
+    ],
+    "references/schema-and-acceptance.md": [
+        "usage_observed",
+        "usage_ceiling_checkpoint",
+        "never a routing",
+        "observed ≠ billed",
+    ],
+}
+
 SINGLE_KICKOFF_FORBIDDEN_PHRASES = {
     "README.md": [
         "Use the launch template from the same reference file in a fresh call",

@@ -100,37 +100,37 @@
       "acceptance": [
         {
           "criterion": "Fixture streams for each `reports_usage` transport aggregate to correct totals; a transport without usage yields literal `unobserved` completeness (never zero) \u2014 test-pinned.",
-          "evidence": "",
+          "evidence": "test_totals_and_completeness_complete + test_unobserved_route_yields_partial_never_zero + test_all_unobserved_is_literal_unobserved (claude/codex payload shapes; unobserved literal, no zeros).",
           "id": "B3-A1",
-          "met": false
+          "met": true
         },
         {
           "criterion": "Ceiling crossing produces a checkpoint event and notification and does not stop, park differently, or alter routing (fixture proves identical route decisions with and without the ledger).",
-          "evidence": "",
+          "evidence": "test_under_and_crossed_checkpoint_never_stop (usage_ceiling_checkpoint classification, no stop semantics) + RoutingUnaffectedTests CLI fixture: identical route-worker output with and without usage block.",
           "id": "B3-A2",
-          "met": false
+          "met": true
         },
         {
           "criterion": "Cache-read exclusion from ceiling comparison test-pinned; docs state observed \u2260 billed.",
-          "evidence": "",
+          "evidence": "test_cache_read_fields_are_structurally_excluded (basis 15 with 999k cache tokens present); observed-ne-billed stated in template, schema doc, module, and rendered lines (pinned).",
           "id": "B3-A3",
-          "met": false
+          "met": true
         },
         {
           "criterion": "Calibration store: old rows read cleanly; new rows with the usage field round-trip; caps and idempotence tests still green (regression preservation).",
-          "evidence": "",
+          "evidence": "test_optional_usage_field_roundtrip_and_absence + full tests.test_confidence_sidecar suite green (caps/idempotence preserved; old rows lack usage key cleanly).",
           "id": "B3-A4",
-          "met": false
+          "met": true
         },
         {
           "criterion": "Elves Report fixture renders the usage panel when data exists and omits it cleanly when everything is `unobserved`.",
-          "evidence": "",
+          "evidence": "test_panel_renders_data_and_omits_unobserved (escaped route names; empty string when unobserved).",
           "id": "B3-A5",
-          "met": false
+          "met": true
         }
       ],
       "id": "B3",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "acceptance": [
