@@ -4,6 +4,72 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.24.0] - 2026-08-06
+
+Five mechanisms adapted — design only, with attribution, no vendored code — from
+[PrimeIntellect-ai/prime-agent](https://github.com/PrimeIntellect-ai/prime-agent) (MIT, upstream
+`c98941a2a5cf40faecf9b4648ac3c304abf48fd3`), following the 2026-08-05 deep comparison.
+
+### Futile re-drive guard (worktree fingerprint)
+
+- `cobbler_runtime/worktree_fingerprint.py` + `cobbler_agents.py redrive
+  record-failure|evaluate|status`: a substantive-failure re-drive candidate whose
+  content-addressed worktree fingerprint (mtime-independent; `.elves/runtime/` excluded; bounded
+  hashing) matches the previous failure of the same batch classifies
+  `redrive_futile:workspace_unchanged` — one budget unit still charged, identical relaunch
+  forbidden, escalation required. Capture errors and over-cap trees always count as changed; a
+  fingerprint failure can never manufacture futility. Gap packets now always carry the delta
+  line; labor-completeness and worker-failure contracts wire the guard in.
+
+### Learnings ledger
+
+- `cobbler_runtime/learnings_ledger.py` + `cobbler_agents.py learnings
+  validate|apply|rollback|digest|migrate`: typed create/update/retire edits on id-tagged `[L#]`
+  entries (evidence pointer required on create; retire never deletes), tracked
+  `learnings-history.jsonl` before/after rows with inverse-edit rollback and `rollback_of`
+  provenance, marker-fenced bounded digest read first at orient, and explicit idempotent
+  migrate. Freehand learnings stay fully valid; the ledger never reflows content it did not edit.
+
+### Observed-usage ledger
+
+- `cobbler_runtime/usage_ledger.py` + `cobbler_agents.py usage aggregate|status|panel`: strictly
+  observed transport usage aggregated into an additive `usage_observed` session block, Session
+  Budget lines, and an Elves Report panel. Unknown stays the literal `unobserved` (never zero);
+  the advisory ceiling basis is observed input+output only (cache reads structurally excluded);
+  crossing a user-set ceiling is a `usage_ceiling_checkpoint` — never a stop, never a routing
+  input. `HostProfile` rows gain `reports_usage` capability metadata; calibration rows gain a
+  bounded optional `usage` field with old-row tolerance. No quota inference anywhere.
+
+### Worker-death salvage previews
+
+- `cobbler_runtime/salvage.py` + `cobbler_agents.py salvage tail`: bounded redacted tail of the
+  follow log on worker-death/hang/malformed-completion wakes, attached to wake context, gap
+  packets, and the execution log as untrusted output that is never a completion report. Unified
+  with the Fugu partial-salvage precedent.
+
+### Continuity resume watchdog (opt-in)
+
+- `cobbler_runtime/continuity.py` + `scripts/resume_watchdog.py` + `cobbler_agents.py continuity
+  install|status|remove`: an operator-owned OS timer (launchd/systemd user-unit templates — Elves
+  never activates them) re-checks a trusted full-run after the host session dies.
+  Detect-and-report by default (`full-run-prepare --resume --check`); explicit `--auto-resume`
+  to relaunch; single-flight claim per fire; a possibly-live run refuses quietly and a terminal
+  or unverifiable run refuses byte-for-byte unchanged (v2.23 semantics, integration-tested
+  through the full production gate ladder). No landing, merge, or credential authority.
+
+### Contract-language harvests
+
+- Pre-Final Guard, open-ended guide, and kickoff templates gain the current-state-audit sentence
+  (audit every requirement at the current HEAD; never rely on memory of earlier work);
+  council-workflow documents the optional two-stage cheap-gate pre-check.
+
+### Recorded upstream defect (pre-existing)
+
+- The dispatch suite's 18 external-lane tests are stale against the v2.23 fail-closed
+  containment gates (`24bef11`/`3549db0`): external command-override lanes can no longer spawn
+  on any platform, so those tests fail at v2.23.1 on every machine. Diagnosed, recorded as this
+  run's regression baseline, and left for a dedicated reconciliation.
+
 ## [2.23.1] - 2026-08-01
 
 ### Fugu calling guide: Ultra log is quiet by design
