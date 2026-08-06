@@ -61,6 +61,37 @@ from cobbler_runtime.planning_harvest import (  # noqa: E402
     planning_consistency_check,
 )
 from cobbler_runtime.tool_output_compact import compact_tool_output  # noqa: E402
+from cobbler_runtime.worktree_fingerprint import (  # noqa: E402
+    evaluate_redrive,
+    guard_status as redrive_guard_status,
+    record_failure as redrive_record_failure,
+)
+from cobbler_runtime.learnings_ledger import (  # noqa: E402
+    LedgerError,
+    apply_edits as learnings_apply_edits,
+    migrate_file as learnings_migrate_file,
+    regenerate_digest_file as learnings_regenerate_digest,
+    rollback_last as learnings_rollback_last,
+    validate_file as learnings_validate_file,
+)
+from cobbler_runtime.usage_ledger import (  # noqa: E402
+    USAGE_BLOCK_KEY,
+    aggregate as usage_aggregate_records,
+    ceiling_check as usage_ceiling_check,
+    report_panel_html as usage_report_panel_html,
+    session_budget_lines as usage_session_budget_lines,
+    write_session_block as usage_write_session_block,
+)
+from cobbler_runtime.salvage import (  # noqa: E402
+    harvest_tail as salvage_harvest_tail,
+    render_block as salvage_render_block,
+)
+from cobbler_runtime.continuity import (  # noqa: E402
+    ContinuityError,
+    install as continuity_install,
+    remove as continuity_remove,
+    status as continuity_status,
+)
 from cobbler_runtime.audit import (  # noqa: E402
     audit_lease_turn,
     build_audit_evidence,
@@ -409,24 +440,23 @@ def _load_lane_timings(path: Path) -> dict[str, Any]:
 def cmd_redrive(args: argparse.Namespace) -> int:
     """Deterministic futile re-drive guard: record/evaluate worktree fingerprints."""
 
-    from cobbler_runtime import worktree_fingerprint as _wf
-
     repo_root = Path(args.repo_root or ".")
     action = args.redrive_action
     try:
         if action == "record-failure":
-            payload: dict[str, Any] = _wf.record_failure(
+            payload: dict[str, Any] = redrive_record_failure(
                 repo_root, batch=args.batch, failure_class=args.failure_class
             )
         elif action == "evaluate":
-            payload = _wf.evaluate_redrive(
+            decision = evaluate_redrive(
                 repo_root,
                 batch=args.batch,
                 failure_class=args.failure_class,
                 budget=args.budget,
-            ).to_dict()
+            )
+            payload = decision.to_dict()
         else:
-            payload = _wf.guard_status(repo_root, batch=args.batch)
+            payload = redrive_guard_status(repo_root, batch=args.batch)
     except OSError as exc:
         print(json.dumps({"ok": False, "error": f"redrive state unavailable: {exc}"}))
         return 1
@@ -437,24 +467,22 @@ def cmd_redrive(args: argparse.Namespace) -> int:
 def cmd_learnings(args: argparse.Namespace) -> int:
     """Learnings ledger: validate|apply|rollback|digest|migrate on a learnings file."""
 
-    from cobbler_runtime import learnings_ledger as _ll
-
     path = Path(args.file)
     action = args.learnings_action
     try:
         if action == "validate":
-            payload: dict[str, Any] = _ll.validate_file(path)
+            payload: dict[str, Any] = learnings_validate_file(path)
         elif action == "apply":
             raw = json.loads(Path(args.edits_file).read_text(encoding="utf-8"))
             edits = raw["edits"] if isinstance(raw, dict) else raw
-            payload = _ll.apply_edits(path, edits, run_id=args.run_id)
+            payload = learnings_apply_edits(path, edits, run_id=args.run_id)
         elif action == "rollback":
-            payload = _ll.rollback_last(path, run_id=args.run_id)
+            payload = learnings_rollback_last(path, run_id=args.run_id)
         elif action == "digest":
-            payload = _ll.regenerate_digest_file(path)
+            payload = learnings_regenerate_digest(path)
         else:
-            payload = _ll.migrate_file(path)
-    except _ll.LedgerError as exc:
+            payload = learnings_migrate_file(path)
+    except LedgerError as exc:
         print(json.dumps({"ok": False, "code": exc.code, "error": exc.message}))
         return 1
     except (OSError, ValueError, KeyError) as exc:
@@ -467,8 +495,6 @@ def cmd_learnings(args: argparse.Namespace) -> int:
 def cmd_usage(args: argparse.Namespace) -> int:
     """Observed-usage ledger: aggregate transport reports; advisory ceiling only."""
 
-    from cobbler_runtime import usage_ledger as _ul
-
     action = args.usage_action
     try:
         if action == "aggregate":
@@ -477,23 +503,23 @@ def cmd_usage(args: argparse.Namespace) -> int:
                 for line in Path(args.records_file).read_text(encoding="utf-8").splitlines()
                 if line.strip()
             ]
-            block = _ul.aggregate(rows)
+            block = usage_aggregate_records(rows)
             payload: dict[str, Any] = {"usage_observed": block}
             if args.session:
-                _ul.write_session_block(Path(args.session), block)
+                usage_write_session_block(Path(args.session), block)
                 payload["session_updated"] = args.session
-            payload["ceiling"] = _ul.ceiling_check(block, args.ceiling)
-            payload["session_budget_lines"] = _ul.session_budget_lines(block, args.ceiling)
+            payload["ceiling"] = usage_ceiling_check(block, args.ceiling)
+            payload["session_budget_lines"] = usage_session_budget_lines(block, args.ceiling)
         elif action == "panel":
             data = json.loads(Path(args.session).read_text(encoding="utf-8"))
-            block = data.get(_ul.USAGE_BLOCK_KEY) or {"completeness": "unobserved"}
-            payload = {"html": _ul.report_panel_html(block)}
+            block = data.get(USAGE_BLOCK_KEY) or {"completeness": "unobserved"}
+            payload = {"html": usage_report_panel_html(block)}
         else:  # status
             data = json.loads(Path(args.session).read_text(encoding="utf-8"))
-            block = data.get(_ul.USAGE_BLOCK_KEY) or {"completeness": "unobserved"}
+            block = data.get(USAGE_BLOCK_KEY) or {"completeness": "unobserved"}
             payload = {
                 "usage_observed": block,
-                "ceiling": _ul.ceiling_check(block, args.ceiling),
+                "ceiling": usage_ceiling_check(block, args.ceiling),
             }
     except (OSError, ValueError, KeyError) as exc:
         print(json.dumps({"ok": False, "code": "usage_input_invalid", "error": str(exc)}))
@@ -505,12 +531,14 @@ def cmd_usage(args: argparse.Namespace) -> int:
 def cmd_salvage(args: argparse.Namespace) -> int:
     """Bounded redacted tail of a worker follow log (untrusted salvage)."""
 
-    from cobbler_runtime import salvage as _sv
-
-    result = _sv.harvest_tail(Path(args.log), max_bytes=args.max_bytes)
+    result = salvage_harvest_tail(Path(args.log), max_bytes=args.max_bytes)
     payload = {
-        **{key: value for key, value in result.items() if key != "text"},
-        "block": _sv.render_block(result, title=args.title),
+        "present": result.get("present", False),
+        "bytes": result.get("bytes"),
+        "truncated": result.get("truncated"),
+        "source": result.get("source"),
+        "reason": result.get("reason"),
+        "block": salvage_render_block(result, title=args.title),
     }
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0
@@ -519,13 +547,11 @@ def cmd_salvage(args: argparse.Namespace) -> int:
 def cmd_continuity(args: argparse.Namespace) -> int:
     """Continuity watchdog manager: templates + config only; OS owns the timer."""
 
-    from cobbler_runtime import continuity as _ct
-
     repo_root = Path(args.repo_root or ".")
     action = args.continuity_action
     try:
         if action == "install":
-            payload: dict[str, Any] = _ct.install(
+            payload: dict[str, Any] = continuity_install(
                 repo_root,
                 {
                     "repo_root": str(repo_root.resolve()),
@@ -538,10 +564,10 @@ def cmd_continuity(args: argparse.Namespace) -> int:
                 },
             )
         elif action == "remove":
-            payload = _ct.remove(repo_root)
+            payload = continuity_remove(repo_root)
         else:
-            payload = _ct.status(repo_root)
-    except _ct.ContinuityError as exc:
+            payload = continuity_status(repo_root)
+    except ContinuityError as exc:
         print(json.dumps({"ok": False, "code": exc.code, "error": exc.message}))
         return 1
     print(json.dumps(payload, indent=2, sort_keys=True))
