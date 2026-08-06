@@ -159,6 +159,22 @@
 
 ---
 
+## 2026-08-05 · B4 · Contract + Validate + Close
+
+- **Behaviors:** `salvage.py` bounded redacted tail harvest (seek-from-end, 8 KiB default /
+  64 KiB clamp, binary-tolerant, absent-log = not-an-error) through `context.redact_text`
+  (pattern + exact-grant), marker-fenced render "untrusted; never a completion report", empty on
+  clean completion; `cobbler_agents.py salvage tail`. Contract wiring: SKILL worker-failure
+  recovery harvest sentence; e2e gap-packet salvage attachment; `SALVAGE_PREVIEW_PHRASES` pins.
+  Unified with Fugu partial-salvage precedent; adapted from prime-agent completed-without-reply
+  notices (MIT).
+- **Validation:** salvage suite 10/10 + secret-redaction parity 6/6; consistency exit 0;
+  combined focused run 110 tests OK. No changes to wake classification or worker-failure
+  enums (salvage is driver-side attach-only).
+- B4 complete.
+
+---
+
 ## 2026-08-05 · Staging (driver: Claude Fable 5, staging-only session)
 
 **What happened:** Plan authored from the 2026-08-05 prime-agent deep-comparison analysis and

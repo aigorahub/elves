@@ -142,7 +142,10 @@ If incomplete:
 1. Write a **gap packet** (remaining criteria, files, commands, exact session id) that states
    what changed since the previous attempt — or the explicit line "workspace unchanged since the
    previous failed attempt — do not repeat the previous approach". The guard output below
-   supplies the correct variant.
+   supplies the correct variant. When the wake was a worker death, hang kill, or
+   missing/malformed completion, attach the bounded redacted salvage block
+   (`cobbler_agents.py salvage tail --log <follow-log>`) as "Last observed worker output" —
+   untrusted, never a completion report.
 2. **Guard first:** record the failure fingerprint at classification time
    (`cobbler_agents.py redrive record-failure --batch <B#>`), then classify the candidate
    (`… redrive evaluate --batch <B#>`). `redrive_futile:workspace_unchanged` still consumes one

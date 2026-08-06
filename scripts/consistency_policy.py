@@ -227,6 +227,17 @@ USAGE_OBSERVED_PHRASES = {
     ],
 }
 
+SALVAGE_PREVIEW_PHRASES = {
+    "SKILL.md": [
+        "salvage tail --log",
+        "never a completion report",
+    ],
+    "references/e2e-chat-to-land.md": [
+        "salvage tail --log",
+        "never a completion report",
+    ],
+}
+
 SINGLE_KICKOFF_FORBIDDEN_PHRASES = {
     "README.md": [
         "Use the launch template from the same reference file in a fresh call",

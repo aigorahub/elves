@@ -136,31 +136,31 @@
       "acceptance": [
         {
           "criterion": "Simulated worker death yields the salvage block in wake context and gap packet; clean completion yields none (fixtures for both).",
-          "evidence": "",
+          "evidence": "test_render_marks_untrusted_never_completion_report + test_render_empty_when_absent (block present on abnormal-termination harvest; empty on clean/no-log); SKILL + e2e wire it into wake context and gap packet.",
           "id": "B4-A1",
-          "met": false
+          "met": true
         },
         {
           "criterion": "Redaction parity: salvage output passes the same synthetic secret-corpus tests as existing redaction surfaces (shell and Python corpora).",
-          "evidence": "",
+          "evidence": "test_secret_redaction_applies (corpus sk_token sample redacted) + test_exact_grant_redaction_applies + full tests.test_secret_redaction_parity 6/6 (shell/Python corpora parity intact).",
           "id": "B4-A2",
-          "met": false
+          "met": true
         },
         {
           "criterion": "Size caps enforced; binary/malformed logs tolerated without error; salvage text is marked untrusted and never parsed as a completion report (test-pinned).",
-          "evidence": "",
+          "evidence": "test_bounded_tail_and_truncated_flag + test_max_bytes_clamped (64KiB clamp) + test_binary_log_tolerated; render marks 'untrusted; never a completion report'; harvest never parsed as a report (attach-only design).",
           "id": "B4-A3",
-          "met": false
+          "met": true
         },
         {
           "criterion": "Existing worker-failure classification and re-drive tests pass unchanged (regression preservation).",
-          "evidence": "",
+          "evidence": "no changes to behavior_policy/native_worker/full_run classification code; test_worktree_fingerprint + joyful/full-run suites previously green remain green in combined run (110 tests OK).",
           "id": "B4-A4",
-          "met": false
+          "met": true
         }
       ],
       "id": "B4",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "acceptance": [

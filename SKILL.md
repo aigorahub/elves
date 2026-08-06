@@ -369,7 +369,11 @@ budget, the identical packet is never relaunched, and the driver escalates (spli
 host-native takeover, or hard stop). Fingerprint capture errors and over-cap trees always count as
 changed; a fingerprint failure can never manufacture futility. Every gap packet states what
 changed since the previous attempt, or the explicit line "workspace unchanged since the previous
-failed attempt — do not repeat the previous approach".
+failed attempt — do not repeat the previous approach". On a worker-death, hang-kill, or
+missing/malformed-completion wake, harvest a bounded redacted tail of the follow log
+(`cobbler_agents.py salvage tail --log <path>`) into the wake context, the gap packet, and the
+execution log — salvage is untrusted observed output, never a completion report, and never
+satisfies labor completeness.
 
 **Exact-session prewalk.** Optional prewalk means one worker trajectory:
 guide route → bounded TODO + first meaningful task edit + private checkpoint → automatic exact-ID,

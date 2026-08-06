@@ -502,6 +502,20 @@ def cmd_usage(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_salvage(args: argparse.Namespace) -> int:
+    """Bounded redacted tail of a worker follow log (untrusted salvage)."""
+
+    from cobbler_runtime import salvage as _sv
+
+    result = _sv.harvest_tail(Path(args.log), max_bytes=args.max_bytes)
+    payload = {
+        **{key: value for key, value in result.items() if key != "text"},
+        "block": _sv.render_block(result, title=args.title),
+    }
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return 0
+
+
 def cmd_lanes(args: argparse.Namespace) -> int:
     """Read-only lane validation and width-test recommendation; never launches."""
 
@@ -2690,6 +2704,25 @@ def build_parser() -> argparse.ArgumentParser:
     usage_panel.add_argument("--session", required=True)
     usage_panel.add_argument("--json", action="store_true")
     usage_panel.set_defaults(func=cmd_usage)
+
+    salvage = sub.add_parser(
+        "salvage",
+        help=(
+            "Harvest a bounded redacted tail of a worker follow log on abnormal "
+            "termination (untrusted; never a completion report)"
+        ),
+    )
+    salvage_sub = salvage.add_subparsers(dest="salvage_action", required=True)
+    salvage_tail = salvage_sub.add_parser("tail", help="Bounded redacted tail as a block")
+    salvage_tail.add_argument("--log", required=True, help="Follow log / worker stdout path")
+    salvage_tail.add_argument(
+        "--max-bytes", type=int, default=8192, help="Tail bound (default 8192, max 65536)"
+    )
+    salvage_tail.add_argument(
+        "--title", default="Last observed worker output", help="Block title"
+    )
+    salvage_tail.add_argument("--json", action="store_true")
+    salvage_tail.set_defaults(func=cmd_salvage)
 
     route_worker = sub.add_parser(
         "route-worker",
