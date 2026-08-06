@@ -227,6 +227,21 @@ USAGE_OBSERVED_PHRASES = {
     ],
 }
 
+CURRENT_STATE_AUDIT_PHRASES = {
+    "SKILL.md": [
+        "the current state against every requirement",
+        "memory of earlier work",
+    ],
+    "references/open-ended-guide.md": [
+        "the current state against every requirement",
+        "memory of earlier work",
+    ],
+    "references/kickoff-prompt-template.md": [
+        "the current state against every requirement",
+        "memory of earlier work",
+    ],
+}
+
 SALVAGE_PREVIEW_PHRASES = {
     "SKILL.md": [
         "salvage tail --log",

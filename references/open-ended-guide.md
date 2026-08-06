@@ -6,7 +6,7 @@ This reference covers detailed patterns for open-ended runs where the user's int
 
 The default Elves workflow is built around finite runs: a plan with batches, a time budget, and a Final Completion step. That works for overnight implementation runs with a known return time. But some work has no natural done state: exploratory QA, UX audits, bug hunting, backlog generation, continuous improvement sweeps. For those tasks, reaching a checkpoint is a relaunch point, not a stopping point.
 
-Open-ended mode changes the run-control semantics so the agent continues autonomously until the user explicitly stops it or a true blocker is reached.
+Open-ended mode changes the run-control semantics so the agent continues autonomously until the user explicitly stops it or a true blocker is reached. Before any candidate final response, audit the current state against every requirement at the current HEAD — do not rely on intent, partial progress, or memory of earlier work.
 
 This includes checkpointed open-ended runs where the user says some version of:
 - "Have something ready by 8am, but keep going after that."

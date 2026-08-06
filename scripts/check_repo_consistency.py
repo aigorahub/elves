@@ -106,6 +106,13 @@ def main() -> int:
             if phrase not in text:
                 errors.append(f"{label}: missing salvage-preview phrase `{phrase}`")
 
+    for label, phrases in CURRENT_STATE_AUDIT_PHRASES.items():
+        path = REPO_ROOT / label
+        text = read_text(path)
+        for phrase in phrases:
+            if phrase not in text:
+                errors.append(f"{label}: missing current-state-audit phrase `{phrase}`")
+
     for label, phrases in EFFORT_GUARDRAIL_PHRASES.items():
         path = REPO_ROOT / label
         text = read_text(path)

@@ -166,25 +166,25 @@
       "acceptance": [
         {
           "criterion": "Every added normative sentence has its pin; consistency checker green.",
-          "evidence": "",
+          "evidence": "CURRENT_STATE_AUDIT_PHRASES pins the restated audit sentence on all three surfaces; council pre-check is single-surface (no restatement -> no pin, reasoning logged); consistency exit 0.",
           "id": "B5-A1",
-          "met": false
+          "met": true
         },
         {
           "criterion": "Wording appears on all surfaces that restate the affected contracts (SKILL.md, relevant references, guide) with no contradictions introduced.",
-          "evidence": "",
+          "evidence": "Audit sentence present in SKILL Pre-Final Guard, open-ended-guide, kickoff template (both variants); no contradictions (consistency corpus green incl. NONSTOP pins untouched).",
           "id": "B5-A2",
-          "met": false
+          "met": true
         },
         {
           "criterion": "Docs-only diff: no behavior or code change in this batch (verified by test suite passing untouched).",
-          "evidence": "",
+          "evidence": "Diff: 4 markdown surfaces + consistency_policy/check_repo_consistency (pin infrastructure only); zero runtime modules; test suite untouched and green.",
           "id": "B5-A3",
-          "met": false
+          "met": true
         }
       ],
       "id": "B5",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "acceptance": [

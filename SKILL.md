@@ -445,7 +445,9 @@ response is forbidden while Stop Gate says `Stop allowed right now: no` or
 ### Pre-Final Guard
 
 Before any final response: Did the user ask to stop? What does Run Control say? Does the Stop Gate
-allow stopping? Is work remaining? If not justified, continue.
+allow stopping? Is work remaining? Audit the current state against every requirement at the
+current HEAD — do not rely on intent, partial progress, or memory of earlier work. If not
+justified, continue.
 
 ## Planning
 

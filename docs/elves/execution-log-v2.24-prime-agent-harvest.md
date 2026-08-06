@@ -175,6 +175,23 @@
 
 ---
 
+## 2026-08-05 · B5 · Contract + Validate + Close (docs-only)
+
+- **Wording harvests:** current-state-audit sentence ("audit the current state against every
+  requirement at the current HEAD — do not rely on intent, partial progress, or memory of
+  earlier work") added to SKILL Pre-Final Guard, open-ended-guide, and both kickoff-template
+  final-response guards (adapted from prime-agent goal-continuation language, MIT);
+  council-workflow gains the optional two-stage cheap-gate pre-check pattern (advisory routing,
+  never a vote — single surface, no restatement, hence no pin per pin policy).
+- **Pins:** `CURRENT_STATE_AUDIT_PHRASES` (case-neutral wrap-safe fragments) + engine loop.
+- **Batch-Close-as-safe-compaction:** checked — already normative in SKILL/doctrine; no gap, no
+  edit (recorded per plan task).
+- **Validation:** consistency exit 0; `test_check_repo_consistency` OK; diff = 4 markdown
+  surfaces + the 2 consistency-infrastructure files; zero runtime modules; test suite untouched.
+- B5 complete.
+
+---
+
 ## 2026-08-05 · Staging (driver: Claude Fable 5, staging-only session)
 
 **What happened:** Plan authored from the 2026-08-05 prime-agent deep-comparison analysis and
