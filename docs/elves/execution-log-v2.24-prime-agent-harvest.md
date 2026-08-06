@@ -93,6 +93,33 @@
 
 ---
 
+## 2026-08-05 · B2 · Contract
+
+- **Behaviors:** learnings ledger for id-tagged `[L#]` entries in `learnings.md` — typed
+  create/update/retire edits (evidence required on create; retire moves under
+  `## Retired Learnings` per template semantics), tracked `learnings-history.jsonl` sidecar
+  (rows with before/after + reason/evidence/expect/run_id; caps 500 records / 256 KiB; flock +
+  atomic writes; cap-full refuses loudly rather than silently dropping), inverse-edit rollback
+  with `rollback_of` provenance, marker-fenced bounded digest (≤40 lines × ≤120 chars, id
+  order) regenerated only between its markers, optional idempotent `migrate` assigning ids to
+  freehand dated bullets under active category headings. Freehand/legacy content byte-preserved;
+  edit verbs refuse on id-less files with a migrate hint; re-parse under lock before apply;
+  unparseable input refuses without modifying the file.
+- **Design source:** prime-agent `/refine` edit-proposal shape (CRUD + before/after snapshots +
+  append-only history + inverse rollback), adapted with attribution; Elves keeps markdown as the
+  authoritative human-readable surface (project scope prime-agent lacks).
+- **Build on:** confidence-store idiom (caps, flock, atomic replace), redrive state idiom (B1),
+  argparse hub pattern.
+- **Blast radius:** new module + `learnings` CLI verbs + `references/learnings-template.md` +
+  SKILL.md orient/document deltas + review-subagent audit rule + glossary + pins + tests. The
+  live `docs/elves/learnings.md` is NOT migrated in this batch (legacy mode stays valid).
+- **Acceptance mapping:** B2-A1 round-trip; B2-A2 digest bounds/markers/byte-preservation;
+  B2-A3 legacy tolerance + migrate hint; B2-A4 re-parse + refuse-don't-destroy; B2-A5 history
+  caps/flock parity.
+- **Risk:** standard. **Caution:** the ledger never reflows or reorders content it did not edit.
+
+---
+
 ## 2026-08-05 · Staging (driver: Claude Fable 5, staging-only session)
 
 **What happened:** Plan authored from the 2026-08-05 prime-agent deep-comparison analysis and

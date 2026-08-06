@@ -434,6 +434,36 @@ def cmd_redrive(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_learnings(args: argparse.Namespace) -> int:
+    """Learnings ledger: validate|apply|rollback|digest|migrate on a learnings file."""
+
+    from cobbler_runtime import learnings_ledger as _ll
+
+    path = Path(args.file)
+    action = args.learnings_action
+    try:
+        if action == "validate":
+            payload: dict[str, Any] = _ll.validate_file(path)
+        elif action == "apply":
+            raw = json.loads(Path(args.edits_file).read_text(encoding="utf-8"))
+            edits = raw["edits"] if isinstance(raw, dict) else raw
+            payload = _ll.apply_edits(path, edits, run_id=args.run_id)
+        elif action == "rollback":
+            payload = _ll.rollback_last(path, run_id=args.run_id)
+        elif action == "digest":
+            payload = _ll.regenerate_digest_file(path)
+        else:
+            payload = _ll.migrate_file(path)
+    except _ll.LedgerError as exc:
+        print(json.dumps({"ok": False, "code": exc.code, "error": exc.message}))
+        return 1
+    except (OSError, ValueError, KeyError) as exc:
+        print(json.dumps({"ok": False, "code": "learnings_input_invalid", "error": str(exc)}))
+        return 1
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return 0
+
+
 def cmd_lanes(args: argparse.Namespace) -> int:
     """Read-only lane validation and width-test recommendation; never launches."""
 
@@ -2571,6 +2601,31 @@ def build_parser() -> argparse.ArgumentParser:
                 "--budget", type=int, default=3, help="Re-drive budget (default 3)"
             )
         _redrive_item.set_defaults(func=cmd_redrive)
+
+    learnings = sub.add_parser(
+        "learnings",
+        help=(
+            "Learnings ledger: typed create/update/retire edits with history, "
+            "rollback, bounded digest, and explicit migrate"
+        ),
+    )
+    learnings_sub = learnings.add_subparsers(dest="learnings_action", required=True)
+    for _learn_name, _learn_help in (
+        ("validate", "Parse a learnings file and report managed/freehand counts"),
+        ("apply", "Apply typed edits from --edits-file (JSON)"),
+        ("rollback", "Invert the most recent non-rollback history row"),
+        ("digest", "Ensure and regenerate the bounded digest block"),
+        ("migrate", "Assign ids to freehand dated bullets (explicit, idempotent)"),
+    ):
+        _learn_item = learnings_sub.add_parser(_learn_name, help=_learn_help)
+        _learn_item.add_argument("--file", required=True, help="Path to the learnings file")
+        _learn_item.add_argument("--run-id", default=None, help="Run id recorded in history")
+        _learn_item.add_argument("--json", action="store_true")
+        if _learn_name == "apply":
+            _learn_item.add_argument(
+                "--edits-file", required=True, help="JSON file: {\"edits\": [...]}"
+            )
+        _learn_item.set_defaults(func=cmd_learnings)
 
     route_worker = sub.add_parser(
         "route-worker",
