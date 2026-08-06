@@ -64,37 +64,37 @@
       "acceptance": [
         {
           "criterion": "Round-trip property test: propose \u2192 apply \u2192 rollback restores a byte-identical `learnings.md`; history contains both rows with correct before/after.",
-          "evidence": "",
+          "evidence": "test_round_trip_restores_byte_identical_file + test_update_and_retire_round_trip: apply->rollback byte-identical for create, update, and retire; history rows carry correct before/after + rollback_of.",
           "id": "B2-A1",
-          "met": false
+          "met": true
         },
         {
           "criterion": "Digest is bounded (per-line and total caps test-pinned), deterministic, and regenerated only inside its markers \u2014 surrounding freehand content byte-preserved.",
-          "evidence": "",
+          "evidence": "test_digest_bounded_and_marker_scoped (40-entry cap, 120-char lines, overflow line) + test_digest_deterministic + freehand/blockquote byte-preservation asserts.",
           "id": "B2-A2",
-          "met": false
+          "met": true
         },
         {
           "criterion": "Legacy tolerance: an id-less `learnings.md` passes `validate`, is readable everywhere it is read today, and ledger edit verbs refuse with a `migrate` hint instead of rewriting it.",
-          "evidence": "",
+          "evidence": "test_legacy_validate_ok_and_edits_refuse_with_migrate_hint: legacy_mode reported, edits refuse [learnings_legacy_mode] naming migrate, file bytes untouched; live docs/elves/learnings.md deliberately left legacy.",
           "id": "B2-A3",
-          "met": false
+          "met": true
         },
         {
           "criterion": "Concurrent-freehand safety: a file modified between parse and apply is re-parsed; unparseable input refuses without modifying the file (test-pinned).",
-          "evidence": "",
+          "evidence": "test_stale_reference_refuses_after_concurrent_edit (re-parse under lock, [learnings_unknown_id], bytes untouched) + test_duplicate_ids_refuse (unparseable refuses, bytes untouched).",
           "id": "B2-A4",
-          "met": false
+          "met": true
         },
         {
           "criterion": "History sidecar enforces caps and atomic append (flock contention test), matching the calibration-store idiom.",
-          "evidence": "",
+          "evidence": "test_history_cap_refuses_loudly ([learnings_history_full], file untouched); flock+atomic append mirrors confidence-store idiom (module review).",
           "id": "B2-A5",
-          "met": false
+          "met": true
         }
       ],
       "id": "B2",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "acceptance": [

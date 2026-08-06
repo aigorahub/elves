@@ -85,6 +85,13 @@ def main() -> int:
             if phrase not in text:
                 errors.append(f"{label}: missing futile re-drive guard phrase `{phrase}`")
 
+    for label, phrases in LEARNINGS_LEDGER_PHRASES.items():
+        path = REPO_ROOT / label
+        text = read_text(path)
+        for phrase in phrases:
+            if phrase not in text:
+                errors.append(f"{label}: missing learnings ledger phrase `{phrase}`")
+
     for label, phrases in EFFORT_GUARDRAIL_PHRASES.items():
         path = REPO_ROOT / label
         text = read_text(path)

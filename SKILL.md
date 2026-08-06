@@ -709,7 +709,15 @@ Cobbler under top-level `cobbler` (wins over legacy `council`). See `config.json
 
 ## Skill Memory
 
-Learnings and `.ai-docs` outlive a single run. Keep them curated.
+Learnings and `.ai-docs` outlive a single run. Keep them curated. Id-tagged learnings
+(`- [L3] …`) are managed by the learnings ledger
+(`cobbler_agents.py learnings validate|apply|rollback|digest|migrate`): creates require an
+evidence pointer (execution-log entry or commit) and may record an `(expect: …)` validation
+note; retire moves entries under Retired Learnings, never deletes; every applied edit appends
+before/after to the tracked `learnings-history.jsonl` sidecar with inverse-edit rollback; and
+the bounded `## Digest` block is read first at orient, pulling full entries on demand. Freehand
+dated learnings stay fully valid; `migrate` is explicit and idempotent; the ledger never
+reflows, reorders, or rewrites content it did not edit.
 
 ## v2.22 runtime helpers (planning harvest, compact output, lanes)
 

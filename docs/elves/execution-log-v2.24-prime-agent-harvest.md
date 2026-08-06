@@ -120,6 +120,24 @@
 
 ---
 
+## 2026-08-05 · B2 · Validate + Close
+
+- **Implement slice:** `7ff97e7` (module + `learnings` CLI verbs + 12 tests). Tests caught two
+  real bugs pre-commit (digest lines re-parsing as duplicate entries; rollback removing the
+  digest copy instead of the real entry) and one byte-preservation nuance (empty-section insert
+  position) — all fixed root-cause in the module, no test weakening.
+- **Docs:** learnings-template §Ledger; SKILL §Skill Memory ledger paragraph; review-subagent
+  learnings-audit rule; glossary "Learnings ledger"; `LEARNINGS_LEDGER_PHRASES` pins + engine
+  loop.
+- **Validation (impact path, py3.12):** consistency exit 0; focused suites
+  `test_check_repo_consistency` + `test_learnings_ledger` = 99 tests OK; earlier combined run
+  with fingerprint + CLI-storage suites also green.
+- **Deliberate scope hold:** the live `docs/elves/learnings.md` stays in legacy mode this batch
+  (per contract); migration is the operator's explicit choice later.
+- B2 complete.
+
+---
+
 ## 2026-08-05 · Staging (driver: Claude Fable 5, staging-only session)
 
 **What happened:** Plan authored from the 2026-08-05 prime-agent deep-comparison analysis and

@@ -248,7 +248,9 @@ Mark BLOCKING if: a shared surface was modified without verifying consumers, a f
 
 Before calling the batch clean, verify that the relevant docs moved with the code:
 - run-state drift -> survival guide or execution log
-- reusable lesson -> `learnings.md`
+- reusable lesson -> `learnings.md` (ledger edits are auditable like code: a create's evidence
+  pointer must resolve to a real execution-log entry or commit; retires land under Retired
+  Learnings, never delete; `learnings-history.jsonl` shows the before/after)
 - stable repo truth -> `.ai-docs/architecture.md`, `.ai-docs/conventions.md`, or `.ai-docs/gotchas.md`
 - human-facing behavior -> README / CHANGELOG / config docs
 

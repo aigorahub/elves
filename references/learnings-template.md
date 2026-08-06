@@ -41,6 +41,29 @@ with a short note about what changed.
 
 ---
 
+## Ledger (ids, history, rollback, digest)
+
+Entries may carry stable ids:
+
+```markdown
+- [L3] [2026-08-05] Lesson text. (evidence: execution-log 2026-08-05 B2 | commit 7ff97e7) (expect: how a later run validates it)
+```
+
+Id-tagged entries are managed by the learnings ledger
+(`cobbler_agents.py learnings validate|apply|rollback|digest|migrate`):
+
+- **create** requires a non-empty evidence pointer; `(expect: …)` records how a future run can
+  validate the lesson.
+- **retire** moves the entry under `## Retired Learnings` (never deletes). Every applied edit
+  appends a before/after row to the tracked `learnings-history.jsonl` sidecar (bounded caps —
+  a full history refuses loudly rather than dropping rows), and **rollback** applies the inverse
+  edit with `rollback_of` provenance.
+- A bounded `## Digest` block (at most 40 one-line entries) is regenerated only between its
+  HTML-comment markers. Read the digest first at orient; pull full entries on demand.
+- Freehand dated bullets (`- [YYYY-MM-DD] …`) remain fully valid. Ledger edit verbs refuse on an
+  id-less file with a `migrate` hint; `migrate` is explicit, idempotent, and never automatic.
+  The ledger never reflows, reorders, or rewrites content it did not edit.
+
 ## Promotion Destinations
 
 Use this file as the durable promotion inbox, not the final resting place for every lesson:

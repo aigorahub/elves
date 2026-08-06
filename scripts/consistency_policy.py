@@ -196,6 +196,23 @@ FUTILE_REDRIVE_GUARD_PHRASES = {
     ],
 }
 
+LEARNINGS_LEDGER_PHRASES = {
+    "SKILL.md": [
+        "learnings validate|apply|rollback|digest|migrate",
+        "learnings-history.jsonl",
+        "never deletes",
+    ],
+    "references/learnings-template.md": [
+        "learnings validate|apply|rollback|digest|migrate",
+        "learnings-history.jsonl",
+        "never automatic",
+    ],
+    "references/glossary.md": [
+        "Learnings ledger",
+        "learnings-history.jsonl",
+    ],
+}
+
 SINGLE_KICKOFF_FORBIDDEN_PHRASES = {
     "README.md": [
         "Use the launch template from the same reference file in a fresh call",

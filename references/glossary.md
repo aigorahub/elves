@@ -10,6 +10,12 @@ in this file, it is not project vocabulary — plain English wins.
   one answer. *Quick Cobbler* = read-only one-off answer; *Cobbler Mode* = current-thread chat
   state; *Cobbler session state* = durable run state in the survival guide and session file.
 - **Council** — deprecated alias of Cobbler, kept for invocation compatibility only.
+- **Learnings ledger** — lifecycle manager for id-tagged (`[L#]`) entries in `learnings.md`:
+  typed create/update/retire edits with required evidence pointers, tracked
+  `learnings-history.jsonl` before/after rows, inverse-edit rollback, and a bounded digest read
+  first at orient. Freehand learnings stay valid; overnight value: wrong lessons are auditable
+  and reversible instead of silently misleading future runs. Verbs:
+  `cobbler_agents.py learnings validate|apply|rollback|digest|migrate`.
 - **Futile re-drive** — a substantive-failure re-drive candidate whose worktree fingerprint is
   identical to the previous substantive failure of the same batch (same failure class):
   classified `redrive_futile:workspace_unchanged`, it still consumes one unit of the re-drive
