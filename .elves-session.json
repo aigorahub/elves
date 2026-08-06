@@ -258,9 +258,9 @@
     "default_for_session": true
   },
   "continuation_guard": {
-    "next_required_action": "launch trusted full-run per survival guide Next action",
-    "reason": "staging-only session per explicit user instruction; run not launched",
-    "stop_allowed": true
+    "stop_allowed": false,
+    "reason": "/goal complete the elves run active (2026-08-05); run launched",
+    "next_required_action": "complete B0 residual rows, then B1 per plan order"
   },
   "driver_authorized": false,
   "master_acceptance": [

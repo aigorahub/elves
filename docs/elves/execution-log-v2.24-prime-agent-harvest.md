@@ -2,11 +2,50 @@
 
 ## Run Digest
 
-- **Status:** staged; not launched.
-- **Tip at staging:** `5b374fdf8cdfe53f11b724fb6c58f7c858210484` (base, no run commits yet)
-- **Batches:** 0/8 complete (B0 partially satisfied by staging; see entry below)
-- **Blockers:** none. One environmental constraint recorded: aigorahub push denied under this
-  machine's auth → cross-fork PR path.
+- **Status:** executing (launched 2026-08-05 via `/goal complete the elves run`).
+- **Tip at staging:** `5b374fdf8cdfe53f11b724fb6c58f7c858210484`; staging commit `83b895e`.
+- **Batches:** 0/8 complete — B0 in progress.
+- **Blockers:** none. Environmental constraints: aigorahub push denied (cross-fork PR path);
+  `claude` CLI absent → host-native execution fallback.
+
+---
+
+## 2026-08-05 · Launch (driver: Claude Fable 5, host-native)
+
+- Controlling instruction changed: `/goal complete the elves run` — supersedes staging-only.
+  Stop Gate → `no`; `continuation_guard.stop_allowed=false`; Current Phase → executing.
+- Preflight re-run: green, same 3 explained warnings.
+- **Work-driver decision:** `which claude` → not found; `native-worker spec` reachable but the
+  worker transport binary is absent ⇒ separate native worker lifecycle **unavailable** in this
+  harness. Engaged the pre-recorded **host-native fallback** (survival guide Run Control). Per
+  contract this consumes no re-drive budget. This session is now driver + implementer running
+  the Core Loop per batch.
+- Baseline `verify_repo.py --ci` started (result recorded under B0).
+
+---
+
+## 2026-08-05 · B1 · Contract
+
+- **Behaviors:** deterministic worktree fingerprint (content-addressed; mtime-independent;
+  `.elves/runtime/` excluded; bounded hashing with over-cap marker; errors degrade to `changed`)
+  + futile re-drive guard (record substantive failure → evaluate next candidate → classify
+  `redrive_futile:workspace_unchanged` on identical tree + same failure class; charge budget;
+  forbid identical relaunch; escalate) exposed as `cobbler_agents.py redrive
+  record-failure|evaluate|status`; contract wiring in SKILL.md worker-failure recovery +
+  e2e-chat-to-land labor completeness + review-subagent delta note + glossary; consistency pins.
+- **Where it lives (decision):** the runtime has no code-level re-drive loop (re-drive budget is
+  a docs contract; monitor emits `driver_wake_*` only) — so the mechanism is a deterministic
+  driver-facing helper + state under `.elves/runtime/redrive/`, mandated by the contracts, not a
+  patch into `full_run.py` internals. Serves full-run and legacy bounded routes identically.
+- **Build on:** `confidence_sidecar.py` storage idiom (repo-root + `.elves/runtime/`, atomic
+  write, bounded JSONL), house subprocess rules (DEVNULL stdin, explicit timeout), argparse hub.
+- **Acceptance mapping:** B1-A1 determinism/exclusions tests; B1-A2 error/over-cap ⇒ changed +
+  transient-exempt untouched; B1-A3 guard fixture (futile classification, budget charge, no
+  identical relaunch, escalation + events + log snippet); B1-A4 gap-packet delta line mandated in
+  contracts + evaluate output provides it; B1-A5 existing suites untouched/green.
+- **Blast radius:** new module + new CLI verb + 4 reference docs + SKILL.md paragraph + glossary
+  + consistency pins + new test file. No changes to monitor/full_run code paths.
+- **Risk:** standard. **Caution:** read-only git plumbing only; no temp files inside the repo.
 
 ---
 

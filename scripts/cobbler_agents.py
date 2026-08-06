@@ -406,6 +406,34 @@ def _load_lane_timings(path: Path) -> dict[str, Any]:
     return data
 
 
+def cmd_redrive(args: argparse.Namespace) -> int:
+    """Deterministic futile re-drive guard: record/evaluate worktree fingerprints."""
+
+    from cobbler_runtime import worktree_fingerprint as _wf
+
+    repo_root = Path(args.repo_root or ".")
+    action = args.redrive_action
+    try:
+        if action == "record-failure":
+            payload: dict[str, Any] = _wf.record_failure(
+                repo_root, batch=args.batch, failure_class=args.failure_class
+            )
+        elif action == "evaluate":
+            payload = _wf.evaluate_redrive(
+                repo_root,
+                batch=args.batch,
+                failure_class=args.failure_class,
+                budget=args.budget,
+            ).to_dict()
+        else:
+            payload = _wf.guard_status(repo_root, batch=args.batch)
+    except OSError as exc:
+        print(json.dumps({"ok": False, "error": f"redrive state unavailable: {exc}"}))
+        return 1
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return 0
+
+
 def cmd_lanes(args: argparse.Namespace) -> int:
     """Read-only lane validation and width-test recommendation; never launches."""
 
@@ -2513,6 +2541,36 @@ def build_parser() -> argparse.ArgumentParser:
     lanes_plan.add_argument("--risk", choices=("low", "standard", "high"), default="standard")
     lanes_plan.add_argument("--json", action="store_true")
     lanes_plan.set_defaults(func=cmd_lanes)
+
+    redrive = sub.add_parser(
+        "redrive",
+        help=(
+            "Futile re-drive guard: fingerprint the worktree and classify re-drive "
+            "candidates (record-failure|evaluate|status)"
+        ),
+    )
+    redrive_sub = redrive.add_subparsers(dest="redrive_action", required=True)
+    for _redrive_name, _redrive_help in (
+        ("record-failure", "Record the current worktree fingerprint for a substantive failure"),
+        ("evaluate", "Classify the next re-drive candidate against the recorded failure"),
+        ("status", "Read-only guard state for one batch"),
+    ):
+        _redrive_item = redrive_sub.add_parser(_redrive_name, help=_redrive_help)
+        _redrive_item.add_argument(
+            "--repo-root", default=None, help="Run worktree root (default: cwd)"
+        )
+        _redrive_item.add_argument("--batch", required=True, help="Batch id, e.g. B3")
+        _redrive_item.add_argument(
+            "--failure-class",
+            default="substantive",
+            help="Failure class label (transient failures never reach this guard)",
+        )
+        _redrive_item.add_argument("--json", action="store_true")
+        if _redrive_name == "evaluate":
+            _redrive_item.add_argument(
+                "--budget", type=int, default=3, help="Re-drive budget (default 3)"
+            )
+        _redrive_item.set_defaults(func=cmd_redrive)
 
     route_worker = sub.add_parser(
         "route-worker",
