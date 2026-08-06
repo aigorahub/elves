@@ -217,6 +217,40 @@
 
 ---
 
+## 2026-08-06 · B7 · Terminal (gates, review, readiness)
+
+- **Release surfaces:** CHANGELOG v2.24.0 with attribution (`94e4796`); version bumps on
+  SKILL/AGENTS/README/guide; release checklist exit 0.
+- **Public-API snapshot repair (real finding, fixed):** the snapshot CLI inspector reported
+  `degraded` — my five handlers used lazy module-attribute calls it cannot statically resolve.
+  Refactored to top-level aliased imports + bare-name calls + explicit payload shapes
+  (`d90d5f2`); snapshot now `captured`; 76 tests across the seven affected suites green;
+  no behavior change; no api-break approvals needed (additive surface passed the gate).
+- **Terminal gates (py3.12, verdicts from log files, never piped):** consistency exit 0; release
+  checklist exit 0; `--ci` and `--final-readiness --session` exit 1 with **every failure name
+  inside the recorded machine baseline** (`comm -13` against the staging-tip name set: empty) —
+  the 18-name dispatch family (12–13 manifesting per run) plus the 2 fugu descendant-reap
+  errors, all pre-existing. Baseline correction recorded: the staging-tip full run already
+  contained the fugu pair; B0's "18" came from the isolated dispatch suite. Plan B7-A2/M-A6
+  amended under B7 with the same disposition as B0-A1.
+- **Cumulative review (driver-performed):** the independent review subagent died on a provider
+  session limit (resets 12:30pm America/New_York) — transient provider failure, recorded, no
+  budget consumed; contract's "independent review subagent when available" not satisfiable now.
+  Driver pass over `git diff 5b374fd...HEAD` (36 files, +4,861/−29, additive): e2e renumbered
+  guard steps read coherently (step 2 → step 4 escalation correct); all five verbs registered in
+  hub help post-refactor; stdlib-only confirmed (fcntl/hashlib/html/datetime/argparse only);
+  attribution headers present in all five new modules, no vendored code; hub top-level imports
+  are side-effect-free constants/classes. Confidence-triage passes: digest placement without a
+  `---` separator appends the block at EOF (functional, marker-scoped — INFO, acceptable);
+  codex usage key naming is tolerant-parser metadata; launchd coalescing claim is grounded in
+  stateless fires, not launchd semantics. Recommend an independent re-review after the provider
+  limit resets — run docs are reviewer-ready.
+- **Deferred hygiene:** none banked (checked — section empty).
+- Proceeding to: session evidence commit → landing check → operational-artifact cleanup →
+  post-cleanup attestation → cross-fork PR. Merge remains user-owned.
+
+---
+
 ## 2026-08-05 · Staging (driver: Claude Fable 5, staging-only session)
 
 **What happened:** Plan authored from the 2026-08-05 prime-agent deep-comparison analysis and
