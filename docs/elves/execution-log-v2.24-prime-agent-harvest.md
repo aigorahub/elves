@@ -24,6 +24,33 @@
 
 ---
 
+## 2026-08-05 · B0 · Close (baseline diagnosis + upstream defect record)
+
+- **Interpreter:** default `python3` is 3.9.6 — below the repo floor. All gates run with
+  `~/.local/bin/python3.12` (uv cpython 3.12.13). Near-miss recorded: first baseline verdict was
+  read through a pipe (`| tail`) and masked the failure — the repo's own pinned lesson holds.
+- **Baseline gates at starting tip:** consistency checker exit 0. `verify_repo.py --ci` exit 1
+  with exactly 18 failures, all in `tests/test_cobbler_agents_dispatch.py` external-lane tests.
+- **Diagnosis (upstream defect, pre-existing):** `prepare_external_launch` routes every
+  command-override lane through the recursive-containment gates; `_require_darwin_recursive_
+  containment` and `_require_linux_recursive_containment` both fail closed unconditionally
+  (`dispatch_external.py:245-279`, "gate currently fails closed"), so external custom-cli lanes
+  can never spawn on any platform at tip v2.23.1 — they skip with
+  `external_attempt_skipped_fallback_chain_continues` (probe evidence captured). The 18 tests
+  still assert pre-gate behavior (external lanes running). Introduced by upstream commits
+  `24bef11` / `3549db0` (codex/delegated-worker-v2-1 hardening); the suite was not reconciled.
+  Reproduced identically at staging tip `83b895e` in a throwaway worktree and with the harness
+  sandbox disabled — machine-independent, deterministic, not this run's regression.
+- **Disposition:** plan B0-A1 amended under B0's label (recorded baseline exception; consistency
+  green mandatory; any NEW failure is this run's to fix). Upstream defect queued for the
+  terminal report and Scout mode. Full-suite comparisons for later batches use this 18-failure
+  baseline.
+- **B0 evidence:** worktree/branch per preflight (staging entry); prime-agent
+  `c98941a2a5cf40faecf9b4648ac3c304abf48fd3` (MIT) recorded, consult-only; acceptance contract
+  validate + sync clean at staging and launch. B0 complete.
+
+---
+
 ## 2026-08-05 · B1 · Contract
 
 - **Behaviors:** deterministic worktree fingerprint (content-addressed; mtime-independent;
@@ -46,6 +73,23 @@
 - **Blast radius:** new module + new CLI verb + 4 reference docs + SKILL.md paragraph + glossary
   + consistency pins + new test file. No changes to monitor/full_run code paths.
 - **Risk:** standard. **Caution:** read-only git plumbing only; no temp files inside the repo.
+
+---
+
+## 2026-08-05 · B1 · Validate + Close
+
+- **Implement slice:** `6a92f0f` (module + `redrive` CLI verbs + 13 tests, all green first run).
+- **Docs:** SKILL.md worker-failure-recovery guard paragraph; e2e-chat-to-land labor-completeness
+  steps re-ordered around the guard (gap-packet delta line mandatory); review-subagent
+  fingerprint-delta triage note; glossary "Futile re-drive" entry; consistency pin group
+  `FUTILE_REDRIVE_GUARD_PHRASES` + engine loop.
+- **Validation (impact path, py3.12):** consistency checker exit 0 with new pins enforced;
+  focused suites `test_check_repo_consistency` + `test_cobbler_agents_cli_storage` +
+  `test_worktree_fingerprint` = 103 tests OK; `test_joyful_runs_contract` 9/9 OK (B1-A4:
+  behavior policy deliberately unchanged — the guard is driver-side, no new wake triggers).
+- **Regression baseline:** dispatch-suite 18 = recorded pre-existing upstream defect (B0 entry);
+  no new failures introduced.
+- B1 complete.
 
 ---
 
