@@ -464,6 +464,44 @@ def cmd_learnings(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_usage(args: argparse.Namespace) -> int:
+    """Observed-usage ledger: aggregate transport reports; advisory ceiling only."""
+
+    from cobbler_runtime import usage_ledger as _ul
+
+    action = args.usage_action
+    try:
+        if action == "aggregate":
+            rows = [
+                json.loads(line)
+                for line in Path(args.records_file).read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            block = _ul.aggregate(rows)
+            payload: dict[str, Any] = {"usage_observed": block}
+            if args.session:
+                _ul.write_session_block(Path(args.session), block)
+                payload["session_updated"] = args.session
+            payload["ceiling"] = _ul.ceiling_check(block, args.ceiling)
+            payload["session_budget_lines"] = _ul.session_budget_lines(block, args.ceiling)
+        elif action == "panel":
+            data = json.loads(Path(args.session).read_text(encoding="utf-8"))
+            block = data.get(_ul.USAGE_BLOCK_KEY) or {"completeness": "unobserved"}
+            payload = {"html": _ul.report_panel_html(block)}
+        else:  # status
+            data = json.loads(Path(args.session).read_text(encoding="utf-8"))
+            block = data.get(_ul.USAGE_BLOCK_KEY) or {"completeness": "unobserved"}
+            payload = {
+                "usage_observed": block,
+                "ceiling": _ul.ceiling_check(block, args.ceiling),
+            }
+    except (OSError, ValueError, KeyError) as exc:
+        print(json.dumps({"ok": False, "code": "usage_input_invalid", "error": str(exc)}))
+        return 1
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return 0
+
+
 def cmd_lanes(args: argparse.Namespace) -> int:
     """Read-only lane validation and width-test recommendation; never launches."""
 
@@ -2626,6 +2664,32 @@ def build_parser() -> argparse.ArgumentParser:
                 "--edits-file", required=True, help="JSON file: {\"edits\": [...]}"
             )
         _learn_item.set_defaults(func=cmd_learnings)
+
+    usage = sub.add_parser(
+        "usage",
+        help=(
+            "Observed-usage ledger: aggregate transport-reported usage into the "
+            "session; advisory ceiling checkpoints only (never a stop, never routing)"
+        ),
+    )
+    usage_sub = usage.add_subparsers(dest="usage_action", required=True)
+    usage_aggregate = usage_sub.add_parser(
+        "aggregate", help="Aggregate a JSONL of {route, payload} observations"
+    )
+    usage_aggregate.add_argument("--records-file", required=True, help="JSONL observations")
+    usage_aggregate.add_argument("--session", default=None, help="Session JSON to update")
+    usage_aggregate.add_argument("--ceiling", type=int, default=None, help="Advisory tokens")
+    usage_aggregate.add_argument("--json", action="store_true")
+    usage_aggregate.set_defaults(func=cmd_usage)
+    usage_status = usage_sub.add_parser("status", help="Read the session usage block")
+    usage_status.add_argument("--session", required=True)
+    usage_status.add_argument("--ceiling", type=int, default=None)
+    usage_status.add_argument("--json", action="store_true")
+    usage_status.set_defaults(func=cmd_usage)
+    usage_panel = usage_sub.add_parser("panel", help="Render the Elves Report usage panel")
+    usage_panel.add_argument("--session", required=True)
+    usage_panel.add_argument("--json", action="store_true")
+    usage_panel.set_defaults(func=cmd_usage)
 
     route_worker = sub.add_parser(
         "route-worker",
