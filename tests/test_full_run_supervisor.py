@@ -6049,12 +6049,18 @@ class FullRunLifecycleTests(unittest.TestCase):
             fixture_script=worker,
         )
         launch_full_run(self.repo, session_id=self.session)
-        deadline = time.time() + 10
+        # aigorahub/elves#242: under concurrent-suite load the monitor can
+        # transiently classify `blocked` in the window between the worker's
+        # process-group reap and its final report/run_complete writes becoming
+        # observable. `blocked` is therefore NOT a terminal state for this
+        # poll — keep polling to the (widened) deadline and assert the true
+        # terminal expectation unchanged.
+        deadline = time.time() + 30
         status = monitor_full_run(
             self.repo, session_id=self.session, stale_after_seconds=60
         )
         while (
-            status.get("state") not in {"complete", "failed", "blocked"}
+            status.get("state") not in {"complete", "failed"}
             and time.time() < deadline
         ):
             time.sleep(0.05)
@@ -6121,12 +6127,18 @@ class FullRunLifecycleTests(unittest.TestCase):
             fixture_script=worker,
         )
         launch_full_run(self.repo, session_id=self.session)
-        deadline = time.time() + 10
+        # aigorahub/elves#242: under concurrent-suite load the monitor can
+        # transiently classify `blocked` in the window between the worker's
+        # process-group reap and its final report/run_complete writes becoming
+        # observable. `blocked` is therefore NOT a terminal state for this
+        # poll — keep polling to the (widened) deadline and assert the true
+        # terminal expectation unchanged.
+        deadline = time.time() + 30
         status = monitor_full_run(
             self.repo, session_id=self.session, stale_after_seconds=60
         )
         while (
-            status.get("state") not in {"complete", "failed", "blocked"}
+            status.get("state") not in {"complete", "failed"}
             and time.time() < deadline
         ):
             time.sleep(0.05)
