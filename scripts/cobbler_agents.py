@@ -537,9 +537,10 @@ def cmd_salvage(args: argparse.Namespace) -> int:
         "bytes": result.get("bytes"),
         "truncated": result.get("truncated"),
         "source": result.get("source"),
-        "reason": result.get("reason"),
         "block": salvage_render_block(result, title=args.title),
     }
+    if result.get("reason") is not None:
+        payload["reason"] = result["reason"]
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0
 

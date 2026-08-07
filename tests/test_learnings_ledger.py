@@ -210,6 +210,23 @@ class LedgerDigestTests(unittest.TestCase):
             self.assertEqual(path.read_bytes(), first)
 
 
+class LedgerDigestPlacementTests(unittest.TestCase):
+    def test_digest_without_separator_lands_before_first_section(self) -> None:
+        # aigorahub/elves#249 item 2: no `---` in the file — digest goes after
+        # the intro block, before the first `##` section, not at EOF.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "learnings.md"
+            path.write_text(
+                "# Project Learnings\n\nIntro prose.\n\n"
+                "## Repo Conventions\n\n- [L1] entry (evidence: e)\n",
+                encoding="utf-8",
+            )
+            ll.regenerate_digest_file(path)
+            text = path.read_text()
+            self.assertLess(text.index(ll.DIGEST_BEGIN), text.index("## Repo Conventions"))
+            self.assertIn("- [L1] entry", text)
+
+
 class LedgerLegacyTests(unittest.TestCase):
     def test_legacy_validate_ok_and_edits_refuse_with_migrate_hint(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -349,7 +349,12 @@ def ensure_digest_block(lines: list[str]) -> list[str]:
     try:
         anchor = lines.index("---") + 1
     except ValueError:
-        anchor = len(lines)
+        # aigorahub/elves#249: no separator — place the digest right after the
+        # title/intro block (before the first `##` section) instead of at EOF.
+        anchor = next(
+            (i for i, line in enumerate(lines) if line.startswith("## ")),
+            len(lines),
+        )
     block = ["", f"## {DIGEST_HEADING}", "", DIGEST_BEGIN, DIGEST_END]
     return lines[:anchor] + block + lines[anchor:]
 
