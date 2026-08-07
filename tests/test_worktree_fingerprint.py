@@ -190,6 +190,22 @@ class RedriveGuardTests(unittest.TestCase):
             self.assertEqual(after["attempts_used"], 0)
 
 
+class RedriveEventCapTests(unittest.TestCase):
+    def test_events_capped_by_record_count(self) -> None:
+        # Advisory telemetry drops silently at both caps (bytes and records);
+        # the records cap must actually be enforced, not just declared.
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _make_repo(Path(tmp))
+            for n in range(wf.EVENTS_MAX_RECORDS + 25):
+                wf._append_event(repo, {"event": "probe", "n": n})
+            events = (
+                (repo / ".elves" / "runtime" / "redrive" / wf.EVENTS_FILE_NAME)
+                .read_text(encoding="utf-8")
+                .splitlines()
+            )
+            self.assertEqual(len(events), wf.EVENTS_MAX_RECORDS)
+
+
 class RedriveCliTests(unittest.TestCase):
     def _run_cli(self, repo: Path, *args: str) -> dict:
         completed = subprocess.run(

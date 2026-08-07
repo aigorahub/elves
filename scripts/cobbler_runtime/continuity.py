@@ -98,6 +98,14 @@ def read_config(repo_root: Path | str) -> dict[str, Any]:
             raise ContinuityError(
                 "continuity_config_invalid", f"stored config lacks `{key}`"
             )
+    if not isinstance(data.get("auto_resume", False), bool):
+        # Fail closed on hand-edited configs: a string like "false" is truthy
+        # in Python, which would silently invert the operator's intent for the
+        # single most safety-relevant knob this module owns.
+        raise ContinuityError(
+            "continuity_config_invalid",
+            "auto_resume must be a JSON boolean (true/false), not a string",
+        )
     return data
 
 

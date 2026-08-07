@@ -280,6 +280,23 @@ class WatchdogSafetyTests(unittest.TestCase):
             log = (ct.continuity_dir(repo) / ct.LOG_FILE_NAME).read_text(encoding="utf-8")
             self.assertIn("terminal_refused", log)
 
+    def test_string_auto_resume_fails_closed(self) -> None:
+        # Adversarial-review W-3: a hand-edited '"auto_resume": "false"' is
+        # truthy in Python; the read path must refuse rather than silently
+        # invert the operator's intent.
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _feature_repo(Path(tmp))
+            ct.write_config(repo, _config_for(repo))
+            cfg = ct.config_path(repo)
+            data = json.loads(cfg.read_text())
+            data["auto_resume"] = "false"
+            cfg.write_text(json.dumps(data), encoding="utf-8")
+            with self.assertRaises(ct.ContinuityError) as ctx:
+                ct.read_config(repo)
+            self.assertEqual(ctx.exception.code, "continuity_config_invalid")
+            outcome = resume_watchdog.main(["--repo-root", str(repo)])
+            self.assertEqual(outcome, 1)
+
     def test_watchdog_holds_no_authority_or_grants(self) -> None:
         watchdog_source = (SCRIPTS / "resume_watchdog.py").read_text(encoding="utf-8")
         continuity_source = (SCRIPTS / "cobbler_runtime" / "continuity.py").read_text(

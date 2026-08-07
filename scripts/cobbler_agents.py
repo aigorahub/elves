@@ -485,7 +485,7 @@ def cmd_learnings(args: argparse.Namespace) -> int:
     except LedgerError as exc:
         print(json.dumps({"ok": False, "code": exc.code, "error": exc.message}))
         return 1
-    except (OSError, ValueError, KeyError) as exc:
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
         print(json.dumps({"ok": False, "code": "learnings_input_invalid", "error": str(exc)}))
         return 1
     print(json.dumps(payload, indent=2, sort_keys=True))

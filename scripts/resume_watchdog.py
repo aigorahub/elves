@@ -91,7 +91,9 @@ def run_once(repo_root: Path, *, now: float | None = None) -> dict:
         ]
         if config.get("session"):
             prepare_args.extend(["--session", str(config["session"])])
-        auto_resume = bool(config.get("auto_resume", False))
+        # Belt to read_config's type validation: only the literal boolean True
+        # ever relaunches; any other value stays detect-and-report.
+        auto_resume = config.get("auto_resume") is True
         if not auto_resume:
             prepare_args.append("--check")
         prepared = _run_hub(config, prepare_args)

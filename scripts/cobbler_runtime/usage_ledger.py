@@ -117,7 +117,7 @@ def ceiling_check(
 
     if ceiling is None:
         return {"status": CEILING_NO_CEILING, "basis_tokens": ceiling_basis_tokens(usage_block)}
-    if not isinstance(ceiling, int) or ceiling <= 0:
+    if isinstance(ceiling, bool) or not isinstance(ceiling, int) or ceiling <= 0:
         raise ValueError("usage ceiling must be a positive integer token count")
     basis = ceiling_basis_tokens(usage_block)
     if basis is None:

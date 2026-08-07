@@ -91,6 +91,23 @@ class RenderTests(unittest.TestCase):
             block = sv.render_block(sv.harvest_tail(Path(tmp) / "nope.log"))
             self.assertEqual(block, "")
 
+    def test_wake_context_and_gap_packet_fixture_blocks(self) -> None:
+        # B4-A1 / M-A4 as written: both driver surfaces, from one simulated
+        # dead-worker log — wake-context block and gap-packet block present on
+        # abnormal termination, both absent on clean completion (no log tail
+        # harvested at all in that path).
+        with tempfile.TemporaryDirectory() as tmp:
+            log = Path(tmp) / "follow.log"
+            log.write_text("worker died mid-batch after pushing B3 slice\n", encoding="utf-8")
+            harvest = sv.harvest_tail(log)
+            wake_block = sv.render_block(harvest, title="Wake context: last observed worker output")
+            gap_block = sv.render_block(harvest, title="Gap packet: last observed worker output")
+            for block in (wake_block, gap_block):
+                self.assertIn("untrusted; never a completion report", block)
+                self.assertIn("pushing B3 slice", block)
+            clean = sv.render_block(sv.harvest_tail(Path(tmp) / "absent.log"))
+            self.assertEqual(clean, "")
+
     def test_truncated_title_suffix(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             log = Path(tmp) / "follow.log"

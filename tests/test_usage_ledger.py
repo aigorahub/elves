@@ -97,6 +97,9 @@ class CeilingTests(unittest.TestCase):
     def test_invalid_ceiling_rejected(self) -> None:
         with self.assertRaises(ValueError):
             ul.ceiling_check(self._block(), 0)
+        # bool is an int subclass; True must not become "ceiling 1".
+        with self.assertRaises(ValueError):
+            ul.ceiling_check(self._block(), True)
 
 
 class SessionAndRenderTests(unittest.TestCase):

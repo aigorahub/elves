@@ -168,6 +168,51 @@ def validate_file(path: Path) -> dict[str, Any]:
     }
 
 
+def _body_index(lines: list[str], absolute: int) -> int:
+    """Digest-invariant coordinate for a line: digest interior excluded.
+
+    The digest block is the only region whose length changes as entries come
+    and go, so positions counted outside it stay valid across regenerations —
+    which is what makes rollback byte-identical for mid-section entries.
+    """
+
+    body = 0
+    in_digest = False
+    for index, line in enumerate(lines):
+        if index == absolute:
+            return body
+        if line == DIGEST_BEGIN:
+            in_digest = True
+            body += 1
+            continue
+        if line == DIGEST_END:
+            in_digest = False
+            body += 1
+            continue
+        if not in_digest:
+            body += 1
+    return body
+
+
+def _absolute_index(lines: list[str], body_target: int) -> int:
+    body = 0
+    in_digest = False
+    for index, line in enumerate(lines):
+        if not in_digest and body == body_target:
+            return index
+        if line == DIGEST_BEGIN:
+            in_digest = True
+            body += 1
+            continue
+        if line == DIGEST_END:
+            in_digest = False
+            body += 1
+            continue
+        if not in_digest:
+            body += 1
+    return len(lines)
+
+
 def _history_record_count(path: Path) -> int:
     hist = history_path(path)
     if not hist.is_file():
@@ -178,22 +223,39 @@ def _history_record_count(path: Path) -> int:
         return 0
 
 
-def _append_history(path: Path, record: dict[str, Any]) -> None:
+def _history_capacity_check(path: Path, rows_needed: int) -> None:
+    """Refuse BEFORE any mutation when the history cannot take every row.
+
+    Checking capacity up front keeps refuse-don't-destroy exact on the cap
+    path: no phantom rows for edits that never applied, and no applied edit
+    without its provenance row.
+    """
+
     hist = history_path(path)
-    line = json.dumps(record, sort_keys=True)
-    exists = hist.is_file()
-    if exists:
-        size = hist.stat().st_size
-        if size > HISTORY_MAX_BYTES or _history_record_count(path) >= HISTORY_MAX_RECORDS:
-            raise LedgerError(
-                "learnings_history_full",
-                f"{hist} is at its cap ({HISTORY_MAX_RECORDS} records / "
-                f"{HISTORY_MAX_BYTES} bytes); archive it explicitly before more edits",
-            )
+    if not hist.is_file():
+        return
+    size = hist.stat().st_size
+    if (
+        size > HISTORY_MAX_BYTES
+        or _history_record_count(path) + rows_needed > HISTORY_MAX_RECORDS
+    ):
+        raise LedgerError(
+            "learnings_history_full",
+            f"{hist} cannot take {rows_needed} more row(s) within its cap "
+            f"({HISTORY_MAX_RECORDS} records / {HISTORY_MAX_BYTES} bytes); "
+            "archive it explicitly before more edits",
+        )
+
+
+def _append_history_rows(path: Path, records: list[dict[str, Any]]) -> None:
+    """All-or-nothing append of every row under one lock."""
+
+    hist = history_path(path)
+    body = "".join(json.dumps(record, sort_keys=True) + "\n" for record in records)
     with open(hist, "a", encoding="utf-8") as handle:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
         try:
-            handle.write(line + "\n")
+            handle.write(body)
         finally:
             fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
@@ -398,19 +460,25 @@ def apply_edits(
                 elif action == "update":
                     entry = doc.entries[int(str(edit["id"])[1:])]
                     before_line = lines[entry.line_index]
+                    before_body = _body_index(lines, entry.line_index)
                     new_line = f"- [L{entry.entry_id}] {str(edit['text']).strip()}"
                     lines[entry.line_index] = new_line
                     applied.append(
                         {
                             "action": "update",
                             "id": f"L{entry.entry_id}",
-                            "before": {"line": before_line, "section": entry.section},
+                            "before": {
+                                "line": before_line,
+                                "section": entry.section,
+                                "line_index": before_body,
+                            },
                             "after": {"line": new_line, "section": entry.section},
                         }
                     )
                 else:  # retire
                     entry = doc.entries[int(str(edit["id"])[1:])]
                     before_line = lines[entry.line_index]
+                    before_body = _body_index(lines, entry.line_index)
                     retired_line = (
                         f"- [L{entry.entry_id}] {entry.text} -> retired because "
                         f"{str(edit['reason']).strip()}"
@@ -423,17 +491,22 @@ def apply_edits(
                         {
                             "action": "retire",
                             "id": f"L{entry.entry_id}",
-                            "before": {"line": before_line, "section": entry.section},
+                            "before": {
+                                "line": before_line,
+                                "section": entry.section,
+                                "line_index": before_body,
+                            },
                             "after": {"line": retired_line, "section": RETIRED_HEADING},
                         }
                     )
             lines = _regenerate_digest(lines)
             new_text = _serialize(lines, doc.trailing_newline)
+            _history_capacity_check(path, len(applied))
             record_id = f"h{int(time.time() * 1000)}-{os.getpid()}-{next(_RECORD_SEQ)}"
+            rows = []
             for index, item in enumerate(applied):
                 source = edits[index]
-                _append_history(
-                    path,
+                rows.append(
                     {
                         "schema": LEDGER_SCHEMA,
                         "record_id": f"{record_id}-{index}",
@@ -444,9 +517,10 @@ def apply_edits(
                         "evidence": str(source.get("evidence", "")).strip(),
                         "expect": str(source.get("expect", "")).strip(),
                         **item,
-                    },
+                    }
                 )
             _atomic_write(path, new_text)
+            _append_history_rows(path, rows)
             return {
                 "applied": len(applied),
                 "ids": [item["id"] for item in applied],
@@ -505,6 +579,7 @@ def rollback_last(path: Path, *, run_id: str | None = None) -> dict[str, Any]:
     with open(lock, "w", encoding="utf-8") as lock_handle:
         fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
         try:
+            _history_capacity_check(path, 1)
             text, doc = _read_doc(path)
             lines = list(doc.lines)
             after = target.get("after") or {}
@@ -512,27 +587,37 @@ def rollback_last(path: Path, *, run_id: str | None = None) -> dict[str, Any]:
             if after.get("line"):
                 _remove_exact_line(lines, after["line"], "learnings_rollback_conflict")
             if before and before.get("line"):
-                doc_now = parse_text(_serialize(lines, doc.trailing_newline))
-                insert_at = _section_insert_index(doc_now, before["section"])
+                if before.get("line_index") is not None:
+                    # Digest-invariant positional restore: the entry returns
+                    # to its exact original spot, so an apply→rollback pair is
+                    # byte-identical even for mid-section entries.
+                    insert_at = _absolute_index(lines, int(before["line_index"]))
+                else:
+                    # Legacy history rows (no recorded position): section-end
+                    # append, content-identical only.
+                    doc_now = parse_text(_serialize(lines, doc.trailing_newline))
+                    insert_at = _section_insert_index(doc_now, before["section"])
                 lines.insert(insert_at, before["line"])
             lines = _regenerate_digest(lines)
             _atomic_write(path, _serialize(lines, doc.trailing_newline))
-            _append_history(
+            _append_history_rows(
                 path,
-                {
-                    "schema": LEDGER_SCHEMA,
-                    "record_id": f"h{int(time.time() * 1000)}-{os.getpid()}-{next(_RECORD_SEQ)}-rb",
-                    "ts": _dt.datetime.now(_dt.timezone.utc).isoformat(),
-                    "run_id": run_id,
-                    "rollback_of": target["record_id"],
-                    "action": f"rollback:{target['action']}",
-                    "id": target.get("id"),
-                    "before": after or None,
-                    "after": before,
-                    "reason": f"inverse of {target['record_id']}",
-                    "evidence": "",
-                    "expect": "",
-                },
+                [
+                    {
+                        "schema": LEDGER_SCHEMA,
+                        "record_id": f"h{int(time.time() * 1000)}-{os.getpid()}-{next(_RECORD_SEQ)}-rb",
+                        "ts": _dt.datetime.now(_dt.timezone.utc).isoformat(),
+                        "run_id": run_id,
+                        "rollback_of": target["record_id"],
+                        "action": f"rollback:{target['action']}",
+                        "id": target.get("id"),
+                        "before": after or None,
+                        "after": before,
+                        "reason": f"inverse of {target['record_id']}",
+                        "evidence": "",
+                        "expect": "",
+                    }
+                ],
             )
             return {"rolled_back": target["record_id"], "id": target.get("id")}
         finally:

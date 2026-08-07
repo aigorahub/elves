@@ -308,5 +308,142 @@ class LedgerSafetyTests(unittest.TestCase):
             self.assertEqual(path.read_bytes(), before)
 
 
+MID_SECTION = """# Project Learnings
+
+---
+
+## Digest
+
+<!-- elves:learnings-digest:begin -->
+<!-- elves:learnings-digest:end -->
+
+## Repo Conventions
+
+- [L1] [2026-08-01] First entry. (evidence: a)
+- [L2] [2026-08-02] Middle entry. (evidence: b)
+- [L3] [2026-08-03] Last entry. (evidence: c)
+
+## Retired Learnings
+"""
+
+
+class LedgerPositionalRollbackTests(unittest.TestCase):
+    """Adversarial-review BLOCKING-1: byte-identity must hold mid-section."""
+
+    def test_mid_section_update_rollback_byte_identical(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = _write(Path(tmp), MID_SECTION)
+            ll.regenerate_digest_file(path)
+            baseline = path.read_bytes()
+            ll.apply_edits(
+                path,
+                [{"action": "update", "id": "L2", "text": "[2026-08-02] Edited middle.", "reason": "r"}],
+            )
+            ll.rollback_last(path)
+            self.assertEqual(path.read_bytes(), baseline)
+
+    def test_mid_section_retire_rollback_byte_identical(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = _write(Path(tmp), MID_SECTION)
+            ll.regenerate_digest_file(path)
+            baseline = path.read_bytes()
+            ll.apply_edits(
+                path,
+                [{"action": "retire", "id": "L2", "reason": "mid retire"}],
+            )
+            ll.rollback_last(path)
+            self.assertEqual(path.read_bytes(), baseline)
+
+
+class LedgerCapBoundaryTests(unittest.TestCase):
+    """Adversarial-review WARNING-1: refuse-don't-destroy exact at the caps."""
+
+    def _fill_history(self, path: Path, rows: int) -> None:
+        hist = ll.history_path(path)
+        body = "".join(
+            json.dumps({"record_id": f"pre{i}", "action": "update"}) + "\n"
+            for i in range(rows)
+        )
+        hist.write_text(body, encoding="utf-8")
+
+    def test_batch_over_cap_refuses_with_no_phantom_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = _write(Path(tmp), MID_SECTION)
+            self._fill_history(path, ll.HISTORY_MAX_RECORDS - 1)
+            before_file = path.read_bytes()
+            edits = [
+                {"action": "update", "id": "L1", "text": "x1", "reason": "r"},
+                {"action": "update", "id": "L2", "text": "x2", "reason": "r"},
+            ]
+            with self.assertRaises(ll.LedgerError) as ctx:
+                ll.apply_edits(path, edits)
+            self.assertEqual(ctx.exception.code, "learnings_history_full")
+            self.assertEqual(path.read_bytes(), before_file)
+            rows = ll.history_path(path).read_text().splitlines()
+            self.assertEqual(len(rows), ll.HISTORY_MAX_RECORDS - 1)
+
+    def test_rollback_at_cap_refuses_without_rewriting_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = _write(Path(tmp), MID_SECTION)
+            ll.apply_edits(
+                path,
+                [{"action": "update", "id": "L1", "text": "changed", "reason": "r"}],
+            )
+            after_apply = path.read_bytes()
+            hist = ll.history_path(path)
+            existing = hist.read_text()
+            filler = "".join(
+                json.dumps({"record_id": f"fill{i}", "action": "update"}) + "\n"
+                for i in range(ll.HISTORY_MAX_RECORDS - 1)
+            )
+            hist.write_text(filler + existing, encoding="utf-8")
+            with self.assertRaises(ll.LedgerError) as ctx:
+                ll.rollback_last(path)
+            self.assertEqual(ctx.exception.code, "learnings_history_full")
+            self.assertEqual(path.read_bytes(), after_apply)
+
+
+class LedgerContentionTests(unittest.TestCase):
+    """B2-A5: real cross-process flock contention on the history append."""
+
+    def test_concurrent_process_applies_keep_history_coherent(self) -> None:
+        import subprocess as sp
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = _write(Path(tmp), MID_SECTION)
+            script = (
+                "import sys; sys.path.insert(0, sys.argv[3]);"
+                "from pathlib import Path;"
+                "from cobbler_runtime import learnings_ledger as ll;"
+                "ll.apply_edits(Path(sys.argv[1]),"
+                "[{'action':'create','category':'Repo Conventions',"
+                "'text':'from '+sys.argv[2],'evidence':'e'+sys.argv[2],"
+                "'reason':'r'}])"
+            )
+            procs = [
+                sp.Popen(
+                    [sys.executable, "-c", script, str(path), tag, str(SCRIPTS)],
+                    stdin=sp.DEVNULL,
+                    stdout=sp.PIPE,
+                    stderr=sp.PIPE,
+                )
+                for tag in ("alpha", "beta")
+            ]
+            for proc in procs:
+                _, err = proc.communicate(timeout=60)
+                self.assertEqual(proc.returncode, 0, err.decode())
+            text = path.read_text()
+            self.assertIn("from alpha", text)
+            self.assertIn("from beta", text)
+            rows = [
+                json.loads(line)
+                for line in ll.history_path(path).read_text().splitlines()
+                if line.strip()
+            ]
+            self.assertEqual(len(rows), 2)
+            self.assertEqual(len({row["record_id"] for row in rows}), 2)
+            ll.validate_file(path)
+
+
 if __name__ == "__main__":
     unittest.main()

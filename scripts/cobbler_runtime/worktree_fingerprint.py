@@ -283,6 +283,13 @@ def _save_state(repo_root: Path, batch: str, state: dict[str, Any]) -> Path:
 
 
 def _append_event(repo_root: Path, record: dict[str, Any]) -> None:
+    """Advisory telemetry: bounded by bytes AND records, drops silently at cap.
+
+    Unlike the learnings history (audit data, refuses loudly), these events
+    are triage breadcrumbs — losing the newest past the cap never blocks a
+    re-drive decision, so silent drop is the deliberate posture here.
+    """
+
     directory = _redrive_dir(Path(repo_root))
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / EVENTS_FILE_NAME
@@ -290,8 +297,15 @@ def _append_event(repo_root: Path, record: dict[str, Any]) -> None:
     with open(path, "a", encoding="utf-8") as handle:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
         try:
-            if path.stat().st_size <= EVENTS_MAX_BYTES:
-                handle.write(line + "\n")
+            stat = path.stat()
+            if stat.st_size <= EVENTS_MAX_BYTES:
+                record_count = sum(
+                    1
+                    for candidate in path.read_text(encoding="utf-8").splitlines()
+                    if candidate.strip()
+                )
+                if record_count < EVENTS_MAX_RECORDS:
+                    handle.write(line + "\n")
         finally:
             fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
