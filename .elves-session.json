@@ -268,7 +268,7 @@
         },
         {
           "criterion": "Full `verify_repo.py --ci` on this machine goes fully green, or any residual failure is re-diagnosed and recorded with the same rigor (no unexplained residue).",
-          "evidence": "Strongest form achieved: full verify_repo --ci VERIFY OK, zero failures/errors (b8-verify2.log) \u2014 the entire prior machine baseline (18 dispatch + 2 reap + 10 unmasked runner + 1 ledger race) root-caused and resolved; no unexplained residue.",
+          "evidence": "Strongest form achieved: full verify_repo --ci VERIFY OK, zero failures/errors (b8-verify2.log) \u2014 the entire prior machine baseline (18 dispatch + 2 reap + 10 unmasked runner + 1 ledger race) root-caused and resolved; no unexplained residue. Binding single-tenant --final-readiness at 5e5f40f: VERIFY OK, 1512 tests, zero failures (b8-final3.log). One supervisor lifecycle test flaked only under concurrent-suite load (documented timing family; 3/3 green isolated; green in every clean run) \u2014 episode recorded.",
           "id": "B8-A3",
           "met": true
         },
@@ -288,9 +288,9 @@
     "default_for_session": true
   },
   "continuation_guard": {
-    "next_required_action": "complete B0 residual rows, then B1 per plan order",
-    "reason": "/goal complete the elves run active (2026-08-05); run launched",
-    "stop_allowed": false
+    "next_required_action": "none \u2014 Final Completion reached (complete_without_merge)",
+    "reason": "run complete: all batches B0-B8 evidenced, binding final-readiness VERIFY OK, landable PR open; merge user-owned",
+    "stop_allowed": true
   },
   "driver_authorized": false,
   "landing_outcome": "complete_without_merge",
