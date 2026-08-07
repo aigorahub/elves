@@ -34,6 +34,10 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          # evidence-review diffs cumulatively against the default branch;
+          # the default shallow single-branch fetch cannot resolve that ref.
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "${{ matrix.python }}"
