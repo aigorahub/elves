@@ -61,6 +61,37 @@ from cobbler_runtime.planning_harvest import (  # noqa: E402
     planning_consistency_check,
 )
 from cobbler_runtime.tool_output_compact import compact_tool_output  # noqa: E402
+from cobbler_runtime.worktree_fingerprint import (  # noqa: E402
+    evaluate_redrive,
+    guard_status as redrive_guard_status,
+    record_failure as redrive_record_failure,
+)
+from cobbler_runtime.learnings_ledger import (  # noqa: E402
+    LedgerError,
+    apply_edits as learnings_apply_edits,
+    migrate_file as learnings_migrate_file,
+    regenerate_digest_file as learnings_regenerate_digest,
+    rollback_last as learnings_rollback_last,
+    validate_file as learnings_validate_file,
+)
+from cobbler_runtime.usage_ledger import (  # noqa: E402
+    USAGE_BLOCK_KEY,
+    aggregate as usage_aggregate_records,
+    ceiling_check as usage_ceiling_check,
+    report_panel_html as usage_report_panel_html,
+    session_budget_lines as usage_session_budget_lines,
+    write_session_block as usage_write_session_block,
+)
+from cobbler_runtime.salvage import (  # noqa: E402
+    harvest_tail as salvage_harvest_tail,
+    render_block as salvage_render_block,
+)
+from cobbler_runtime.continuity import (  # noqa: E402
+    ContinuityError,
+    install as continuity_install,
+    remove as continuity_remove,
+    status as continuity_status,
+)
 from cobbler_runtime.audit import (  # noqa: E402
     audit_lease_turn,
     build_audit_evidence,
@@ -404,6 +435,144 @@ def _load_lane_timings(path: Path) -> dict[str, Any]:
                 path=str(path),
             )
     return data
+
+
+def cmd_redrive(args: argparse.Namespace) -> int:
+    """Deterministic futile re-drive guard: record/evaluate worktree fingerprints."""
+
+    repo_root = Path(args.repo_root or ".")
+    action = args.redrive_action
+    try:
+        if action == "record-failure":
+            payload: dict[str, Any] = redrive_record_failure(
+                repo_root, batch=args.batch, failure_class=args.failure_class
+            )
+        elif action == "evaluate":
+            decision = evaluate_redrive(
+                repo_root,
+                batch=args.batch,
+                failure_class=args.failure_class,
+                budget=args.budget,
+            )
+            payload = decision.to_dict()
+        else:
+            payload = redrive_guard_status(repo_root, batch=args.batch)
+    except OSError as exc:
+        print(json.dumps({"ok": False, "error": f"redrive state unavailable: {exc}"}))
+        return 1
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return 0
+
+
+def cmd_learnings(args: argparse.Namespace) -> int:
+    """Learnings ledger: validate|apply|rollback|digest|migrate on a learnings file."""
+
+    path = Path(args.file)
+    action = args.learnings_action
+    try:
+        if action == "validate":
+            payload: dict[str, Any] = learnings_validate_file(path)
+        elif action == "apply":
+            raw = json.loads(Path(args.edits_file).read_text(encoding="utf-8"))
+            edits = raw["edits"] if isinstance(raw, dict) else raw
+            payload = learnings_apply_edits(path, edits, run_id=args.run_id)
+        elif action == "rollback":
+            payload = learnings_rollback_last(path, run_id=args.run_id)
+        elif action == "digest":
+            payload = learnings_regenerate_digest(path)
+        else:
+            payload = learnings_migrate_file(path)
+    except LedgerError as exc:
+        print(json.dumps({"ok": False, "code": exc.code, "error": exc.message}))
+        return 1
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
+        print(json.dumps({"ok": False, "code": "learnings_input_invalid", "error": str(exc)}))
+        return 1
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return 0
+
+
+def cmd_usage(args: argparse.Namespace) -> int:
+    """Observed-usage ledger: aggregate transport reports; advisory ceiling only."""
+
+    action = args.usage_action
+    try:
+        if action == "aggregate":
+            rows = [
+                json.loads(line)
+                for line in Path(args.records_file).read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            block = usage_aggregate_records(rows)
+            payload: dict[str, Any] = {"usage_observed": block}
+            if args.session:
+                usage_write_session_block(Path(args.session), block)
+                payload["session_updated"] = args.session
+            payload["ceiling"] = usage_ceiling_check(block, args.ceiling)
+            payload["session_budget_lines"] = usage_session_budget_lines(block, args.ceiling)
+        elif action == "panel":
+            data = json.loads(Path(args.session).read_text(encoding="utf-8"))
+            block = data.get(USAGE_BLOCK_KEY) or {"completeness": "unobserved"}
+            payload = {"html": usage_report_panel_html(block)}
+        else:  # status
+            data = json.loads(Path(args.session).read_text(encoding="utf-8"))
+            block = data.get(USAGE_BLOCK_KEY) or {"completeness": "unobserved"}
+            payload = {
+                "usage_observed": block,
+                "ceiling": usage_ceiling_check(block, args.ceiling),
+            }
+    except (OSError, ValueError, KeyError) as exc:
+        print(json.dumps({"ok": False, "code": "usage_input_invalid", "error": str(exc)}))
+        return 1
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return 0
+
+
+def cmd_salvage(args: argparse.Namespace) -> int:
+    """Bounded redacted tail of a worker follow log (untrusted salvage)."""
+
+    result = salvage_harvest_tail(Path(args.log), max_bytes=args.max_bytes)
+    payload = {
+        "present": result.get("present", False),
+        "bytes": result.get("bytes"),
+        "truncated": result.get("truncated"),
+        "source": result.get("source"),
+        "block": salvage_render_block(result, title=args.title),
+    }
+    if result.get("reason") is not None:
+        payload["reason"] = result["reason"]
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return 0
+
+
+def cmd_continuity(args: argparse.Namespace) -> int:
+    """Continuity watchdog manager: templates + config only; OS owns the timer."""
+
+    repo_root = Path(args.repo_root or ".")
+    action = args.continuity_action
+    try:
+        if action == "install":
+            payload: dict[str, Any] = continuity_install(
+                repo_root,
+                {
+                    "repo_root": str(repo_root.resolve()),
+                    "session_id": args.session_id,
+                    "branch": args.branch,
+                    "start_head": args.start_head,
+                    "packet": args.packet,
+                    "interval_seconds": args.interval,
+                    "auto_resume": bool(args.auto_resume),
+                },
+            )
+        elif action == "remove":
+            payload = continuity_remove(repo_root)
+        else:
+            payload = continuity_status(repo_root)
+    except ContinuityError as exc:
+        print(json.dumps({"ok": False, "code": exc.code, "error": exc.message}))
+        return 1
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return 0
 
 
 def cmd_lanes(args: argparse.Namespace) -> int:
@@ -2513,6 +2682,141 @@ def build_parser() -> argparse.ArgumentParser:
     lanes_plan.add_argument("--risk", choices=("low", "standard", "high"), default="standard")
     lanes_plan.add_argument("--json", action="store_true")
     lanes_plan.set_defaults(func=cmd_lanes)
+
+    redrive = sub.add_parser(
+        "redrive",
+        help=(
+            "Futile re-drive guard: fingerprint the worktree and classify re-drive "
+            "candidates (record-failure|evaluate|status)"
+        ),
+    )
+    redrive_sub = redrive.add_subparsers(dest="redrive_action", required=True)
+    for _redrive_name, _redrive_help in (
+        ("record-failure", "Record the current worktree fingerprint for a substantive failure"),
+        ("evaluate", "Classify the next re-drive candidate against the recorded failure"),
+        ("status", "Read-only guard state for one batch"),
+    ):
+        _redrive_item = redrive_sub.add_parser(_redrive_name, help=_redrive_help)
+        _redrive_item.add_argument(
+            "--repo-root", default=None, help="Run worktree root (default: cwd)"
+        )
+        _redrive_item.add_argument("--batch", required=True, help="Batch id, e.g. B3")
+        _redrive_item.add_argument(
+            "--failure-class",
+            default="substantive",
+            help="Failure class label (transient failures never reach this guard)",
+        )
+        _redrive_item.add_argument("--json", action="store_true")
+        if _redrive_name == "evaluate":
+            _redrive_item.add_argument(
+                "--budget", type=int, default=3, help="Re-drive budget (default 3)"
+            )
+        _redrive_item.set_defaults(func=cmd_redrive)
+
+    learnings = sub.add_parser(
+        "learnings",
+        help=(
+            "Learnings ledger: typed create/update/retire edits with history, "
+            "rollback, bounded digest, and explicit migrate"
+        ),
+    )
+    learnings_sub = learnings.add_subparsers(dest="learnings_action", required=True)
+    for _learn_name, _learn_help in (
+        ("validate", "Parse a learnings file and report managed/freehand counts"),
+        ("apply", "Apply typed edits from --edits-file (JSON)"),
+        ("rollback", "Invert the most recent non-rollback history row"),
+        ("digest", "Ensure and regenerate the bounded digest block"),
+        ("migrate", "Assign ids to freehand dated bullets (explicit, idempotent)"),
+    ):
+        _learn_item = learnings_sub.add_parser(_learn_name, help=_learn_help)
+        _learn_item.add_argument("--file", required=True, help="Path to the learnings file")
+        _learn_item.add_argument("--run-id", default=None, help="Run id recorded in history")
+        _learn_item.add_argument("--json", action="store_true")
+        if _learn_name == "apply":
+            _learn_item.add_argument(
+                "--edits-file", required=True, help="JSON file: {\"edits\": [...]}"
+            )
+        _learn_item.set_defaults(func=cmd_learnings)
+
+    usage = sub.add_parser(
+        "usage",
+        help=(
+            "Observed-usage ledger: aggregate transport-reported usage into the "
+            "session; advisory ceiling checkpoints only (never a stop, never routing)"
+        ),
+    )
+    usage_sub = usage.add_subparsers(dest="usage_action", required=True)
+    usage_aggregate = usage_sub.add_parser(
+        "aggregate", help="Aggregate a JSONL of {route, payload} observations"
+    )
+    usage_aggregate.add_argument("--records-file", required=True, help="JSONL observations")
+    usage_aggregate.add_argument("--session", default=None, help="Session JSON to update")
+    usage_aggregate.add_argument("--ceiling", type=int, default=None, help="Advisory tokens")
+    usage_aggregate.add_argument("--json", action="store_true")
+    usage_aggregate.set_defaults(func=cmd_usage)
+    usage_status = usage_sub.add_parser("status", help="Read the session usage block")
+    usage_status.add_argument("--session", required=True)
+    usage_status.add_argument("--ceiling", type=int, default=None)
+    usage_status.add_argument("--json", action="store_true")
+    usage_status.set_defaults(func=cmd_usage)
+    usage_panel = usage_sub.add_parser("panel", help="Render the Elves Report usage panel")
+    usage_panel.add_argument("--session", required=True)
+    usage_panel.add_argument("--json", action="store_true")
+    usage_panel.set_defaults(func=cmd_usage)
+
+    salvage = sub.add_parser(
+        "salvage",
+        help=(
+            "Harvest a bounded redacted tail of a worker follow log on abnormal "
+            "termination (untrusted; never a completion report)"
+        ),
+    )
+    salvage_sub = salvage.add_subparsers(dest="salvage_action", required=True)
+    salvage_tail = salvage_sub.add_parser("tail", help="Bounded redacted tail as a block")
+    salvage_tail.add_argument("--log", required=True, help="Follow log / worker stdout path")
+    salvage_tail.add_argument(
+        "--max-bytes", type=int, default=8192, help="Tail bound (default 8192, max 65536)"
+    )
+    salvage_tail.add_argument(
+        "--title", default="Last observed worker output", help="Block title"
+    )
+    salvage_tail.add_argument("--json", action="store_true")
+    salvage_tail.set_defaults(func=cmd_salvage)
+
+    continuity = sub.add_parser(
+        "continuity",
+        help=(
+            "Continuity resume watchdog manager: writes config + launchd/systemd "
+            "templates only; activation stays operator-owned; default detect-and-report"
+        ),
+    )
+    continuity_sub = continuity.add_subparsers(dest="continuity_action", required=True)
+    continuity_install = continuity_sub.add_parser(
+        "install", help="Write watchdog config and OS-timer templates (never activates)"
+    )
+    continuity_install.add_argument("--repo-root", default=None)
+    continuity_install.add_argument("--session-id", required=True)
+    continuity_install.add_argument("--branch", required=True)
+    continuity_install.add_argument("--start-head", required=True)
+    continuity_install.add_argument("--packet", required=True)
+    continuity_install.add_argument(
+        "--interval", type=int, default=900, help="Timer interval seconds (default 900)"
+    )
+    continuity_install.add_argument(
+        "--auto-resume",
+        action="store_true",
+        help="Opt in to actual relaunch; default is detect-and-report (--check)",
+    )
+    continuity_install.add_argument("--json", action="store_true")
+    continuity_install.set_defaults(func=cmd_continuity)
+    for _cont_name, _cont_help in (
+        ("status", "Report config/template presence and last watchdog fire"),
+        ("remove", "Delete config and templates (log kept); idempotent"),
+    ):
+        _cont_item = continuity_sub.add_parser(_cont_name, help=_cont_help)
+        _cont_item.add_argument("--repo-root", default=None)
+        _cont_item.add_argument("--json", action="store_true")
+        _cont_item.set_defaults(func=cmd_continuity)
 
     route_worker = sub.add_parser(
         "route-worker",

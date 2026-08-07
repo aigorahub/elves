@@ -156,6 +156,7 @@ terminal or safety wake.
 If this is a delivery checkpoint, log it, push it, and continue immediately. Do not stop at the checkpoint.
 Do not wait for me to acknowledge checkpoints, summaries, or clean commits. If work remains, keep going.
 Do not send a final response unless the survival guide Stop Gate says stopping is allowed or a true blocker forces it.
+Before any final response, audit the current state against every requirement at the current HEAD — do not rely on intent, partial progress, or memory of earlier work.
 Use your judgment. Work in small batches and commit frequently.
 Make the commit subjects read like progress reports.
 Mid-run: impact-path validation (selected tests / touched E2E). Terminal: full suite or project full gate, then drain deferred hygiene.
@@ -183,6 +184,7 @@ terminal or safety wake.
 This checkpoint is for delivery only. Log it, push it, and continue immediately. Do not stop at 7:30am ET.
 Do not wait for me to acknowledge checkpoints, summaries, or clean commits. If work remains, keep going.
 Do not send a final response unless the survival guide Stop Gate says stopping is allowed or a true blocker forces it.
+Before any final response, audit the current state against every requirement at the current HEAD — do not rely on intent, partial progress, or memory of earlier work.
 Use your judgment. Work in small batches and commit frequently.
 Make the commit subjects read like progress reports.
 Mid-run: impact-path validation (selected tests / touched E2E). Terminal: full suite or project full gate, then drain deferred hygiene.

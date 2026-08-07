@@ -178,6 +178,93 @@ SINGLE_KICKOFF_PHRASES = {
     ],
 }
 
+FUTILE_REDRIVE_GUARD_PHRASES = {
+    "SKILL.md": [
+        "redrive_futile:workspace_unchanged",
+        "manufacture futility",
+        "do not repeat the previous approach",
+        "redrive record-failure|evaluate|status",
+    ],
+    "references/e2e-chat-to-land.md": [
+        "redrive_futile:workspace_unchanged",
+        "manufacture futility",
+        "do not repeat the previous approach",
+    ],
+    "references/glossary.md": [
+        "redrive_futile:workspace_unchanged",
+        "Futile re-drive",
+    ],
+}
+
+LEARNINGS_LEDGER_PHRASES = {
+    "SKILL.md": [
+        "learnings validate|apply|rollback|digest|migrate",
+        "learnings-history.jsonl",
+        "never deletes",
+    ],
+    "references/learnings-template.md": [
+        "learnings validate|apply|rollback|digest|migrate",
+        "learnings-history.jsonl",
+        "never automatic",
+    ],
+    "references/glossary.md": [
+        "Learnings ledger",
+        "learnings-history.jsonl",
+    ],
+}
+
+USAGE_OBSERVED_PHRASES = {
+    "references/survival-guide-template.md": [
+        "Observed usage so far",
+        "observed ≠ billed",
+        "never a stop",
+    ],
+    "references/schema-and-acceptance.md": [
+        "usage_observed",
+        "usage_ceiling_checkpoint",
+        "never a routing",
+        "observed ≠ billed",
+    ],
+}
+
+CURRENT_STATE_AUDIT_PHRASES = {
+    "SKILL.md": [
+        "the current state against every requirement",
+        "memory of earlier work",
+    ],
+    "references/open-ended-guide.md": [
+        "the current state against every requirement",
+        "memory of earlier work",
+    ],
+    "references/kickoff-prompt-template.md": [
+        "the current state against every requirement",
+        "memory of earlier work",
+    ],
+}
+
+CONTINUITY_WATCHDOG_PHRASES = {
+    "references/operations-guide.md": [
+        "never resumes a terminal run",
+        "the OS owns the timer",
+        "continuity install",
+    ],
+    "references/glossary.md": [
+        "Continuity watchdog",
+        "never resumes a terminal run",
+    ],
+}
+
+SALVAGE_PREVIEW_PHRASES = {
+    "SKILL.md": [
+        "salvage tail --log",
+        "never a completion report",
+    ],
+    "references/e2e-chat-to-land.md": [
+        "salvage tail --log",
+        "never a completion report",
+    ],
+}
+
 SINGLE_KICKOFF_FORBIDDEN_PHRASES = {
     "README.md": [
         "Use the launch template from the same reference file in a fresh call",

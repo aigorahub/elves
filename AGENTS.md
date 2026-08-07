@@ -1,5 +1,5 @@
 ---
-version: "2.23.1"
+version: "2.24.2"
 ---
 
 # Elves: Codex repository adapter
@@ -24,6 +24,18 @@ Use Cobbler via `$elves cobbler: <task>`, `$elves council: <task>`, or natural l
 from **Grok Build goal mode**, the optional worker capability that is a
 capability-proven enhancement with a recorded one-packet fallback; Grok models come only from the
 authenticated live catalog (`references/adaptive-worker-routing.md`).
+
+## v2.24 run tools (host-neutral)
+
+The v2.24 helpers — futile re-drive guard (`redrive`), learnings ledger (`learnings`),
+observed-usage ledger (`usage`), salvage previews (`salvage`), and the continuity watchdog
+manager (`continuity`) — are **host-neutral CLI helpers** with identical semantics on Claude
+Code, Codex, and Grok Build: invoke them as
+`python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" <verb> …` from any host. They are
+advisory instruments (never landing, merge, credential, or routing authority), there are **no
+per-host slash surfaces for them** — do not invent top-level Codex or Grok commands — and the
+workflow contracts that mandate them (SKILL.md worker-failure recovery, labor completeness,
+Skill Memory) apply to all three hosts unchanged. See the guide's "v2.24 run tools" section.
 
 ## Codex invocation (host-honest)
 

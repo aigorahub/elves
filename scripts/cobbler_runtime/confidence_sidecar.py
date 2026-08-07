@@ -161,6 +161,7 @@ def append_calibration_record(
     effort: str,
     confidence: str | None,
     outcome: str,
+    usage: Mapping[str, Any] | None = None,
 ) -> None:
     """Append one bounded calibration record (gitignored runtime file).
 
@@ -182,6 +183,19 @@ def append_calibration_record(
         "confidence": conf,
         "outcome": outcome,
     }
+    if usage:
+        # Additive optional field (readers tolerate absence): bounded observed
+        # counts only — never invented, never quota.
+        bounded_usage: dict[str, Any] = {}
+        for key in ("input_tokens", "output_tokens", "total_tokens"):
+            value = usage.get(key)
+            if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+                bounded_usage[key] = value
+        cost = usage.get("cost_usd")
+        if isinstance(cost, (int, float)) and not isinstance(cost, bool) and cost >= 0:
+            bounded_usage["cost_usd"] = round(float(cost), 4)
+        if bounded_usage:
+            record["usage"] = bounded_usage
     path = calibration_path(repo_root)
     path.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
     line = json.dumps(record, sort_keys=True) + "\n"

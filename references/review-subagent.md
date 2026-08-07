@@ -248,7 +248,9 @@ Mark BLOCKING if: a shared surface was modified without verifying consumers, a f
 
 Before calling the batch clean, verify that the relevant docs moved with the code:
 - run-state drift -> survival guide or execution log
-- reusable lesson -> `learnings.md`
+- reusable lesson -> `learnings.md` (ledger edits are auditable like code: a create's evidence
+  pointer must resolve to a real execution-log entry or commit; retires land under Retired
+  Learnings, never delete; `learnings-history.jsonl` shows the before/after)
 - stable repo truth -> `.ai-docs/architecture.md`, `.ai-docs/conventions.md`, or `.ai-docs/gotchas.md`
 - human-facing behavior -> README / CHANGELOG / config docs
 
@@ -418,7 +420,10 @@ If everything is clean, say: "Final readiness review clean."
 The coordinator consolidates all blocking findings into one revision, resolves or replies to PR
 comments, updates `.elves-session.json`, and reruns validation affected by that revision. A
 delta-only re-review checks the fixes and unresolved blockers; advisory suggestions do not reopen
-settled work. Before cleanup, require the target project's single terminal broad gate plus
+settled work. When the coordinator supplies a worktree-fingerprint delta between review rounds
+(`cobbler_agents.py redrive` state), a repeated blocker claim against an identical tree is
+triage signal for the reviewer — flag it explicitly; like all confidence signals it is never
+authority. Before cleanup, require the target project's single terminal broad gate plus
 `python3 "$ELVES_SKILL_ROOT/scripts/elves_landing_check.py" --session <session-path> --repo-root .`
 from a clean worktree. A repository-specific aggregate verifier is additional proof only when the
 target checkout itself provides one; installed Elves never depends on a repo-only helper. After an

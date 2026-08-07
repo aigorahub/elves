@@ -205,6 +205,10 @@ class HostProfile:
     identity_from_stream_required: bool
     provider_secret_names: frozenset[str]
     grants_git_write_roots: bool
+    # Where this transport reports observed usage, if anywhere. Capability
+    # metadata for the observed-usage ledger: a transport without a usage
+    # surface stays literal "unobserved" — never estimated, never zero.
+    reports_usage: str
     launch_plan: Callable[[HostLaunchRequest], HostLaunchPlan]
     # Installed-binary help probe (no model calls). None => not probeable.
     executable: str | None
@@ -242,6 +246,7 @@ HOST_PROFILES: tuple[HostProfile, ...] = (
         identity_from_stream_required=True,
         provider_secret_names=frozenset({"OPENAI_API_KEY", "CODEX_API_KEY"}),
         grants_git_write_roots=True,
+        reports_usage="turn_completed_token_usage",
         launch_plan=_codex_launch_plan,
         executable="codex",
         version_argv=("--version",),
@@ -264,6 +269,7 @@ HOST_PROFILES: tuple[HostProfile, ...] = (
         identity_from_stream_required=False,
         provider_secret_names=frozenset({"ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN"}),
         grants_git_write_roots=True,
+        reports_usage="stream_json_result_usage",
         launch_plan=_claude_launch_plan,
         executable="claude",
         version_argv=("--version",),
@@ -288,6 +294,7 @@ HOST_PROFILES: tuple[HostProfile, ...] = (
         identity_from_stream_required=False,
         provider_secret_names=frozenset(),
         grants_git_write_roots=False,
+        reports_usage="fixture_replay",
         launch_plan=_fixture_launch_plan,
         executable=None,
         version_argv=(),
@@ -317,6 +324,7 @@ HOST_PROFILES: tuple[HostProfile, ...] = (
         # trusted full-run lane, which is not wired at this seam yet.
         provider_secret_names=frozenset({"XAI_API_KEY"}),
         grants_git_write_roots=True,
+        reports_usage="stream_usage_events",
         launch_plan=_grok_launch_plan,
         executable="grok",
         version_argv=("--version",),

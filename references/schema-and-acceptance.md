@@ -29,6 +29,31 @@ the **path is recorded**, not that the file is tracked. `acceptance_contract.py 
 advisory `worker_packet_missing` warning — never a blocking issue and never an exit-code change —
 when a delegable session lacks the recorded path. Host-native runs legitimately skip the packet.
 
+## Observed usage (optional, additive)
+
+A session may carry a `usage_observed` block written by
+`cobbler_agents.py usage aggregate --records-file <observations.jsonl> --session <path>`:
+
+```json
+{
+  "usage_observed": {
+    "schema": 1,
+    "completeness": "complete | partial | unobserved",
+    "total": {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0, "cost_usd": 0.0},
+    "by_route": [{"route": "<label>", "observed": true}],
+    "note": "observed transport reports only; observed ≠ billed"
+  }
+}
+```
+
+Honesty contract: only transport-reported usage is recorded; a route without reports stays
+`observed: false` and an empty ledger keeps the literal string `unobserved` as `total` — unknown
+is never a number and never zero. The advisory ceiling basis is observed input+output tokens
+only; cache-read counters are structurally excluded. Crossing a user-set ceiling produces a
+`usage_ceiling_checkpoint` classification and a notification — never a stop and never a routing
+input. The block is additive: absent in older sessions, ignored by every authority check, and
+never landing evidence.
+
 ### Optional explicit handoff v1
 
 The v2.8 advisory path above remains the compatibility default. A coordinator opts into strict

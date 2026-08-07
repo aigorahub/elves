@@ -8,7 +8,7 @@ driver plans and reviews; a subscription-native (or optional external) worker im
 run files let the work survive context compaction. You write the plan and own the merge decision.
 The agent does the middle.
 
-**Current release: v2.23.1**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.24.2**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 **New to Elves?** Use the [practical user guide](https://aigorahub.github.io/elves/) — especially
@@ -238,6 +238,12 @@ authority are independent; **Landable is plan Acceptance with proof**, not green
 credential, origin, branch, worktree, ancestry, clean-tip, protected-ref, and redaction checks; no
 worker merge/tag/protected-ref/PR/landing authority; test integrity; independent terminal review;
 final CI.
+
+The optional **continuity watchdog** stays outside the kernel's authority surfaces: an
+operator-owned OS timer that Elves never activates itself, detect-and-report by default, and
+every safety decision delegated to `full-run-prepare --resume` — it never resumes a terminal
+run and holds no landing, merge, or credential authority
+(`references/operations-guide.md`).
 
 **Forbidden commands.** Never: `git reset --hard`, `git checkout .`, `git clean -fd`, force push,
 rebase on shared branches, `rm -rf` outside scope, operating on another agent's checkout.

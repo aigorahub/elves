@@ -10,6 +10,26 @@ in this file, it is not project vocabulary — plain English wins.
   one answer. *Quick Cobbler* = read-only one-off answer; *Cobbler Mode* = current-thread chat
   state; *Cobbler session state* = durable run state in the survival guide and session file.
 - **Council** — deprecated alias of Cobbler, kept for invocation compatibility only.
+- **Continuity watchdog** — opt-in, operator-owned OS timer (launchd/systemd user unit) that
+  re-checks a trusted full-run after the host session dies: detect-and-report by default,
+  explicit `--auto-resume` to relaunch, single-flight claim per fire, and every safety decision
+  delegated to `full-run-prepare --resume` — it never resumes a terminal run and holds no
+  landing or merge authority. Overnight value: a machine-sleep or session death no longer
+  strands a healthy full-run until morning. Verbs: `cobbler_agents.py continuity
+  install|status|remove`; Elves never activates the timer itself.
+- **Learnings ledger** — lifecycle manager for id-tagged (`[L#]`) entries in `learnings.md`:
+  typed create/update/retire edits with required evidence pointers, tracked
+  `learnings-history.jsonl` before/after rows, inverse-edit rollback, and a bounded digest read
+  first at orient. Freehand learnings stay valid; overnight value: wrong lessons are auditable
+  and reversible instead of silently misleading future runs. Verbs:
+  `cobbler_agents.py learnings validate|apply|rollback|digest|migrate`.
+- **Futile re-drive** — a substantive-failure re-drive candidate whose worktree fingerprint is
+  identical to the previous substantive failure of the same batch (same failure class):
+  classified `redrive_futile:workspace_unchanged`, it still consumes one unit of the re-drive
+  budget, forbids relaunching the identical packet, and requires escalation. Deterministic guard:
+  `cobbler_agents.py redrive record-failure|evaluate|status`; overnight value: no budget burned
+  re-running an unchanged workspace. Fingerprint errors always count as changed (fail-closed
+  toward allowing the re-drive).
 - **Chat-to-work** — end-to-end run that stops at a landable PR; the user merges.
 - **Chat-to-land** — the same run with an explicit in-session user authorization to merge.
 - **Full-run** — trusted delegation shape: one packet, worker owns internal batches on the feature

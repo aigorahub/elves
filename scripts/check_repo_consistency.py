@@ -78,6 +78,48 @@ def main() -> int:
             if phrase not in text:
                 errors.append(f"{label}: missing non-stop guardrail phrase `{phrase}`")
 
+    for label, phrases in FUTILE_REDRIVE_GUARD_PHRASES.items():
+        path = REPO_ROOT / label
+        text = read_text(path)
+        for phrase in phrases:
+            if phrase not in text:
+                errors.append(f"{label}: missing futile re-drive guard phrase `{phrase}`")
+
+    for label, phrases in LEARNINGS_LEDGER_PHRASES.items():
+        path = REPO_ROOT / label
+        text = read_text(path)
+        for phrase in phrases:
+            if phrase not in text:
+                errors.append(f"{label}: missing learnings ledger phrase `{phrase}`")
+
+    for label, phrases in USAGE_OBSERVED_PHRASES.items():
+        path = REPO_ROOT / label
+        text = read_text(path)
+        for phrase in phrases:
+            if phrase not in text:
+                errors.append(f"{label}: missing observed-usage phrase `{phrase}`")
+
+    for label, phrases in SALVAGE_PREVIEW_PHRASES.items():
+        path = REPO_ROOT / label
+        text = read_text(path)
+        for phrase in phrases:
+            if phrase not in text:
+                errors.append(f"{label}: missing salvage-preview phrase `{phrase}`")
+
+    for label, phrases in CURRENT_STATE_AUDIT_PHRASES.items():
+        path = REPO_ROOT / label
+        text = read_text(path)
+        for phrase in phrases:
+            if phrase not in text:
+                errors.append(f"{label}: missing current-state-audit phrase `{phrase}`")
+
+    for label, phrases in CONTINUITY_WATCHDOG_PHRASES.items():
+        path = REPO_ROOT / label
+        text = read_text(path)
+        for phrase in phrases:
+            if phrase not in text:
+                errors.append(f"{label}: missing continuity-watchdog phrase `{phrase}`")
+
     for label, phrases in EFFORT_GUARDRAIL_PHRASES.items():
         path = REPO_ROOT / label
         text = read_text(path)

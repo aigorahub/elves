@@ -99,6 +99,15 @@ let the coordinator record the material outcome in existing Elves memory. Use na
 Quick Cobbler should not edit files, create branches, open PRs, install packages, or mutate run
 state. It inspects, thinks, and recommends.
 
+### Two-stage cheap gate (optional pattern)
+
+Before convening a full multi-lane council or a heavy optional pass (high-risk review add-on,
+adversarial lens), a coordinator may run one small yes/no pre-check — "does this decision
+actually need independent lanes, and what should they focus on?" — and skip the expensive pass
+when the answer is no. The pre-check is advisory routing, never a vote, never evidence, and
+never a substitute for the terminal review. Prefer it when council spend is material and the
+need is uncertain; skip it when the phase already mandates a council.
+
 ## Provider-Backed Council (Optional Routing)
 
 Provider-backed council is not a third Cobbler mode. It is optional routing for selected roles when

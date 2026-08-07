@@ -114,6 +114,13 @@ silently deleting it.
 - [2026-04-11] Treat stale docs as `PENDING-DOCS`, not as a vague warning. If recovery docs,
   durable docs, or human docs lag behind a behavior change, the batch is not clean yet.
 
+- [2026-08-06] A code-inspection diagnosis that never exercises the failing path is a hypothesis,
+  not a finding: v2.24's "stale dispatch tests, red everywhere" conclusion came from probing the
+  product call path while the tests wrap a gate-neutralizing boundary helper; a two-minute
+  interpreter-swap discriminator (system python vs uv python as the lane child) found the real
+  cause — the uv-interpreter sandbox-allowlist gap. Run the discriminator before writing the
+  diagnosis. (evidence: v2.24 B8, aigorahub/elves#241)
+
 ## Product and Domain Invariants
 
 - [2026-07-17] Native-worker prewalk is a trajectory property, never a packet-format improvement.

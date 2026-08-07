@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Grok Build, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.23.1"
+  version: "2.24.2"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -72,7 +72,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.23.1):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.24.2):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
@@ -361,6 +361,19 @@ refreshed at each milestone and never committed — so a cold re-drive starts or
 gate or worker runs triggers a health check (near-zero CPU time against long wall time is the
 hang signature). After repeated transient deaths in one batch, the driver may split the batch or
 take it host-native without that counting against the budget; document the decision.
+Before consuming the re-drive budget for a **substantive** failure, run the deterministic futile
+re-drive guard (`cobbler_agents.py redrive record-failure|evaluate|status`): a re-drive candidate
+whose worktree fingerprint is identical to the previous substantive failure of the same batch is
+classified `redrive_futile:workspace_unchanged` — it still consumes one unit of the re-drive
+budget, the identical packet is never relaunched, and the driver escalates (split the batch,
+host-native takeover, or hard stop). Fingerprint capture errors and over-cap trees always count as
+changed; a fingerprint failure can never manufacture futility. Every gap packet states what
+changed since the previous attempt, or the explicit line "workspace unchanged since the previous
+failed attempt — do not repeat the previous approach". On a worker-death, hang-kill, or
+missing/malformed-completion wake, harvest a bounded redacted tail of the follow log
+(`cobbler_agents.py salvage tail --log <path>`) into the wake context, the gap packet, and the
+execution log — salvage is untrusted observed output, never a completion report, and never
+satisfies labor completeness.
 
 **Exact-session prewalk.** Optional prewalk means one worker trajectory:
 guide route → bounded TODO + first meaningful task edit + private checkpoint → automatic exact-ID,
@@ -432,7 +445,9 @@ response is forbidden while Stop Gate says `Stop allowed right now: no` or
 ### Pre-Final Guard
 
 Before any final response: Did the user ask to stop? What does Run Control say? Does the Stop Gate
-allow stopping? Is work remaining? If not justified, continue.
+allow stopping? Is work remaining? Audit the current state against every requirement at the
+current HEAD — do not rely on intent, partial progress, or memory of earlier work. If not
+justified, continue.
 
 ## Planning
 
@@ -700,7 +715,29 @@ Cobbler under top-level `cobbler` (wins over legacy `council`). See `config.json
 
 ## Skill Memory
 
-Learnings and `.ai-docs` outlive a single run. Keep them curated.
+Learnings and `.ai-docs` outlive a single run. Keep them curated. Id-tagged learnings
+(`- [L3] …`) are managed by the learnings ledger
+(`cobbler_agents.py learnings validate|apply|rollback|digest|migrate`): creates require an
+evidence pointer (execution-log entry or commit) and may record an `(expect: …)` validation
+note; retire moves entries under Retired Learnings (creating that section at EOF when missing),
+never deletes; every applied edit appends before/after to the tracked `learnings-history.jsonl`
+sidecar with inverse-edit rollback (**one history row per edit** — one `rollback` undoes only
+the latest row; repeat to walk further); the file is written before history so a crash cannot
+invent phantom applied edits; and the bounded `## Digest` block is read first at orient, pulling
+full entries on demand. Freehand dated learnings stay fully valid; `migrate` is explicit and
+idempotent; the ledger never reflows, reorders, or rewrites content it did not edit.
+
+## v2.24 run tools (host-neutral)
+
+The five v2.24 helpers — futile re-drive guard (`redrive`), learnings ledger (`learnings`),
+observed-usage ledger (`usage`), salvage previews (`salvage`), and the continuity watchdog
+manager (`continuity`) — are **host-neutral CLI helpers** with identical semantics on Claude
+Code, Codex, and Grok Build. Invoke as
+`python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" <verb> …` from any host; do **not** invent
+per-host slash surfaces for them. They are advisory instruments (never landing, merge,
+credential, or routing authority). Continuity only writes OS timer templates — Elves never
+activates them. Usage ceilings are checkpoints, never stops. See the guide's "v2.24 run tools"
+section, `references/host-parity.md`, and `AGENTS.md` (Codex adapter pointer).
 
 ## v2.22 runtime helpers (planning harvest, compact output, lanes)
 
@@ -722,7 +759,9 @@ lanes remain useful but are not the default happy path.
 Claude Code, Codex, and Grok Build provide the same workflow and prewalk safety contract.
 Exact-session prewalk preserves the same qualification, trajectory, checkpoint, visibility,
 fallback, and authority semantics on every host; supervised transport syntax may differ.
-See `references/host-parity.md`.
+The v2.24 run tools (`redrive`, `learnings`, `usage`, `salvage`, `continuity`) share one CLI
+surface and one honesty boundary on every host — see **v2.24 run tools (host-neutral)** above
+and `references/host-parity.md`.
 **Codex Goals** are optional continuation plumbing — distinct from **Grok Build goal mode**.
 
 ## Compatibility notes

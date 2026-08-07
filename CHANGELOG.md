@@ -4,6 +4,136 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.24.2] - 2026-08-07
+
+Maintainer land polish after dual Fugu + host review of the v2.24.1 harvest PR.
+
+### Learnings ledger operator honesty
+
+- `retire` creates a missing `## Retired Learnings` section at EOF instead of refusing on
+  hand-rolled files (mirrors digest ensure).
+- Documented: rollback is **per history row**, not per multi-edit `apply` batch; the learnings
+  file is written before history so a crash cannot invent phantom applied edits (a death in the
+  gap can leave an applied edit without a rollback row).
+
+### Host parity
+
+- SKILL.md gains the same **v2.24 run tools (host-neutral)** pointer already on AGENTS.md and
+  `references/host-parity.md`, so Claude Code and Grok Build hosts that read only SKILL see the
+  five helpers and the no-slash-surface rule.
+
+## [2.24.1] - 2026-08-07
+
+Review-hardening release: three independent adversarial reviews of the v2.24.0 harvest, every
+finding fixed, plus first cross-platform CI.
+
+### Ledger correctness (from reviews two and three)
+
+- Rollback restores entries at their exact original position via digest-invariant body
+  coordinates recorded in history rows — apply→rollback is byte-identical for mid-section
+  update and retire (previously the restore appended at section end). A drift guard keeps the
+  restore in its recorded section when body lines were inserted above between apply and
+  rollback (freehand edits, or the digest block being newly created) — falling back to
+  content-safe section placement instead of silently mis-sectioning or wrongly retiring the
+  entry.
+- History capacity is prechecked before any mutation and rows append all-or-nothing under one
+  lock: no phantom rows for refused batches, no rewrite-then-raise at the cap, record ids
+  unique within one millisecond.
+
+### Continuity watchdog fail-closed config
+
+- `read_config` refuses a non-boolean `auto_resume` (a hand-edited `"false"` string no longer
+  silently enables relaunch); the watchdog relaunches only on the literal boolean `true`.
+
+### Cross-platform CI (first ever)
+
+- `.github/workflows/ci.yml` runs the full `verify_repo --ci` battery on push/PR: macOS
+  authoritative, ubuntu 3.10/3.12 observational with bubblewrap until the Linux flip decision.
+  First runs green on all three cells — including the suite's first-ever Linux completions,
+  empirically validating the uv-interpreter fix's Linux paths.
+
+### Host parity and polish
+
+- v2.24 run tools declared host-neutral on the Codex adapter and `references/host-parity.md`:
+  identical CLI semantics on Claude Code, Codex, and Grok Build, no per-host slash surfaces.
+- Monitor lifecycle test polls hardened against transient `blocked` under concurrent-suite
+  load; `plan_batch_required` names legacy `### B# ·` headings with the exact canonical
+  rewrite; learnings digest placement without a `---` separator lands before the first
+  section; salvage CLI omits a null `reason`; fingerprint events enforce their record cap;
+  boolean "ceilings" rejected; malformed learnings-edit rows get typed refusals.
+
+## [2.24.0] - 2026-08-06
+
+Five mechanisms adapted — design only, with attribution, no vendored code — from
+[PrimeIntellect-ai/prime-agent](https://github.com/PrimeIntellect-ai/prime-agent) (MIT, upstream
+`c98941a2a5cf40faecf9b4648ac3c304abf48fd3`), following the 2026-08-05 deep comparison.
+
+### Futile re-drive guard (worktree fingerprint)
+
+- `cobbler_runtime/worktree_fingerprint.py` + `cobbler_agents.py redrive
+  record-failure|evaluate|status`: a substantive-failure re-drive candidate whose
+  content-addressed worktree fingerprint (mtime-independent; `.elves/runtime/` excluded; bounded
+  hashing) matches the previous failure of the same batch classifies
+  `redrive_futile:workspace_unchanged` — one budget unit still charged, identical relaunch
+  forbidden, escalation required. Capture errors and over-cap trees always count as changed; a
+  fingerprint failure can never manufacture futility. Gap packets now always carry the delta
+  line; labor-completeness and worker-failure contracts wire the guard in.
+
+### Learnings ledger
+
+- `cobbler_runtime/learnings_ledger.py` + `cobbler_agents.py learnings
+  validate|apply|rollback|digest|migrate`: typed create/update/retire edits on id-tagged `[L#]`
+  entries (evidence pointer required on create; retire never deletes), tracked
+  `learnings-history.jsonl` before/after rows with inverse-edit rollback and `rollback_of`
+  provenance, marker-fenced bounded digest read first at orient, and explicit idempotent
+  migrate. Freehand learnings stay fully valid; the ledger never reflows content it did not edit.
+
+### Observed-usage ledger
+
+- `cobbler_runtime/usage_ledger.py` + `cobbler_agents.py usage aggregate|status|panel`: strictly
+  observed transport usage aggregated into an additive `usage_observed` session block, Session
+  Budget lines, and an Elves Report panel. Unknown stays the literal `unobserved` (never zero);
+  the advisory ceiling basis is observed input+output only (cache reads structurally excluded);
+  crossing a user-set ceiling is a `usage_ceiling_checkpoint` — never a stop, never a routing
+  input. `HostProfile` rows gain `reports_usage` capability metadata; calibration rows gain a
+  bounded optional `usage` field with old-row tolerance. No quota inference anywhere.
+
+### Worker-death salvage previews
+
+- `cobbler_runtime/salvage.py` + `cobbler_agents.py salvage tail`: bounded redacted tail of the
+  follow log on worker-death/hang/malformed-completion wakes, attached to wake context, gap
+  packets, and the execution log as untrusted output that is never a completion report. Unified
+  with the Fugu partial-salvage precedent.
+
+### Continuity resume watchdog (opt-in)
+
+- `cobbler_runtime/continuity.py` + `scripts/resume_watchdog.py` + `cobbler_agents.py continuity
+  install|status|remove`: an operator-owned OS timer (launchd/systemd user-unit templates — Elves
+  never activates them) re-checks a trusted full-run after the host session dies.
+  Detect-and-report by default (`full-run-prepare --resume --check`); explicit `--auto-resume`
+  to relaunch; single-flight claim per fire; a possibly-live run refuses quietly and a terminal
+  or unverifiable run refuses byte-for-byte unchanged (v2.23 semantics, integration-tested
+  through the full production gate ladder). No landing, merge, or credential authority.
+
+### Contract-language harvests
+
+- Pre-Final Guard, open-ended guide, and kickoff templates gain the current-state-audit sentence
+  (audit every requirement at the current HEAD; never rely on memory of earlier work);
+  council-workflow documents the optional two-stage cheap-gate pre-check.
+
+### macOS sandbox: uv-managed interpreters recognized (fix)
+
+- `_narrow_runtime_root` now recognizes uv-managed *interpreter installs*
+  (`…/uv/python/cpython-<ver>-<platform>/bin/…`) as one narrow versioned runtime root, the same
+  class as the adjacent pyenv/asdf cases (uv *tools* were already covered). Without this, any
+  sandboxed lane child running a uv python died importing its own stdlib (`exit 1`, empty
+  stdout) — which made all 18 external-lane dispatch tests fail on uv-based development
+  machines. An earlier diagnosis in this release's history recorded those tests as "stale
+  against the containment gates / red on every platform"; deeper root-causing refuted that —
+  the suite's test boundary neutralizes the gates correctly, and the failures were this
+  uv-allowlist gap all along (proven by an interpreter-swap discriminator). The dispatch suite
+  is fully green under uv interpreters after the fix.
+
 ## [2.23.1] - 2026-08-01
 
 ### Fugu calling guide: Ultra log is quiet by design

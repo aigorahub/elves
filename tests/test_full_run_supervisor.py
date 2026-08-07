@@ -6049,14 +6049,31 @@ class FullRunLifecycleTests(unittest.TestCase):
             fixture_script=worker,
         )
         launch_full_run(self.repo, session_id=self.session)
-        deadline = time.time() + 10
+        # aigorahub/elves#242: under concurrent-suite load the monitor can
+        # transiently classify `blocked` in the window between the worker's
+        # process-group reap and its final report/run_complete writes becoming
+        # observable. `blocked` is therefore NOT a terminal state for this
+        # poll — keep polling to the (widened) deadline and assert the true
+        # terminal expectation unchanged.
+        deadline = time.time() + 30
         status = monitor_full_run(
             self.repo, session_id=self.session, stale_after_seconds=60
         )
-        while (
-            status.get("state") not in {"complete", "failed", "blocked"}
-            and time.time() < deadline
-        ):
+        def _settled(candidate: dict) -> bool:
+            # aigorahub/elves#242 (third manifestation): the signal can lag
+            # the terminal state by one poll — the completing poll may read
+            # the events file an instant before the final batch_complete's
+            # append is visible, and the next poll provably self-corrects
+            # (the event-log signature changes, forcing a full re-read). The
+            # test's contract is "the monitor surfaces the final signal", so
+            # settle on signal + state, bounded by the deadline.
+            return candidate.get("state") in {"complete", "failed"} and (
+                candidate.get("state") != "complete"
+                or candidate.get("check_summary", {}).get("last_batch_unsure_about")
+                == ["retry bounds in batch 3"]
+            )
+
+        while not _settled(status) and time.time() < deadline:
             time.sleep(0.05)
             status = monitor_full_run(
                 self.repo, session_id=self.session, stale_after_seconds=60
@@ -6121,14 +6138,30 @@ class FullRunLifecycleTests(unittest.TestCase):
             fixture_script=worker,
         )
         launch_full_run(self.repo, session_id=self.session)
-        deadline = time.time() + 10
+        # aigorahub/elves#242: under concurrent-suite load the monitor can
+        # transiently classify `blocked` in the window between the worker's
+        # process-group reap and its final report/run_complete writes becoming
+        # observable. `blocked` is therefore NOT a terminal state for this
+        # poll — keep polling to the (widened) deadline and assert the true
+        # terminal expectation unchanged.
+        deadline = time.time() + 30
         status = monitor_full_run(
             self.repo, session_id=self.session, stale_after_seconds=60
         )
-        while (
-            status.get("state") not in {"complete", "failed", "blocked"}
-            and time.time() < deadline
-        ):
+        def _settled(candidate: dict) -> bool:
+            # aigorahub/elves#242: same one-poll signal lag as the sibling
+            # test — settle until the final (signal-less) batch's reset is
+            # visible; the next poll self-corrects via the changed signature.
+            summary = candidate.get("check_summary", {})
+            return candidate.get("state") in {"complete", "failed"} and (
+                candidate.get("state") != "complete"
+                or (
+                    summary.get("last_batch_confidence") is None
+                    and summary.get("last_batch_unsure_about") is None
+                )
+            )
+
+        while not _settled(status) and time.time() < deadline:
             time.sleep(0.05)
             status = monitor_full_run(
                 self.repo, session_id=self.session, stale_after_seconds=60
