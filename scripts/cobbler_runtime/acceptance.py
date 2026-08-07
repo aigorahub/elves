@@ -502,10 +502,26 @@ def parse_plan_acceptance_contract(markdown: str) -> PlanAcceptanceContract:
     )
     if stable_mode:
         if not batch_ids and not batch_matches:
+            # aigorahub/elves#248: pre-v2.23-era plans used `### B0 · Name`
+            # headings, which look fine but never match the canonical
+            # grammar — say so explicitly instead of leaving the operator to
+            # diff heading shapes by eye.
+            legacy_headings = re.findall(
+                r"(?m)^#{2,3}\s+(B\d+)\s*[·:.\-–—]", text
+            )
+            hint = (
+                f"Found {len(legacy_headings)} legacy heading(s) like "
+                f"`### {legacy_headings[0]} · Name` — rewrite each as "
+                f"`### Batch {legacy_headings[0][1:]} [{legacy_headings[0]}]: Name` "
+                "(canonical grammar; see references/plan-template.md)."
+                if legacy_headings
+                else None
+            )
             issues.append(
                 AcceptanceIssue(
                     "plan_batch_required",
-                    "Stable-ID plans require at least one canonical Batch heading with B#-A# Acceptance.",
+                    "Stable-ID plans require at least one canonical Batch heading with B#-A# Acceptance."
+                    + (f" {hint}" if hint else ""),
                 )
             )
         elif batch_ids and not any(

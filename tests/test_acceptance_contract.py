@@ -500,6 +500,41 @@ class AcceptanceContractCliTests(unittest.TestCase):
             {issue["code"] for issue in json.loads(result.stdout)["issues"]},
         )
 
+    def test_plan_batch_required_hints_at_legacy_headings(self) -> None:
+        # aigorahub/elves#248: pre-v2.23 plans used `### B0 · Name`; the
+        # refusal must say how to migrate instead of only naming the grammar.
+        self.write_plan(
+            "# Legacy plan\n\n## Batches\n\n"
+            "### B0 · Land the thing\n\n"
+            "**Acceptance criteria:**\n\n- [ ] [B0-A1] It lands.\n\n"
+            "## Master Acceptance\n\n- [ ] [M-A1] Done.\n"
+        )
+        self.write_session(
+            {
+                "plan_path": "plan.md",
+                "batches": [],
+                "master_acceptance": [
+                    {"id": "M-A1", "criterion": "Done.", "met": False, "evidence": ""}
+                ],
+            }
+        )
+        result = self.run_cli(
+            "validate",
+            "--plan",
+            self.plan_path.name,
+            "--session",
+            self.session_path.name,
+            "--json",
+        )
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        issues = {
+            issue["code"]: issue["message"]
+            for issue in json.loads(result.stdout)["issues"]
+        }
+        self.assertIn("plan_batch_required", issues)
+        self.assertIn("legacy heading", issues["plan_batch_required"])
+        self.assertIn("### Batch 0 [B0]: Name", issues["plan_batch_required"])
+
     def test_validate_rejects_duplicate_b0_session_aliases(self) -> None:
         self.write_plan()
         session = session_for_plan()
