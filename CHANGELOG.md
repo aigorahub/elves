@@ -4,6 +4,46 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.24.1] - 2026-08-07
+
+Review-hardening release: three independent adversarial reviews of the v2.24.0 harvest, every
+finding fixed, plus first cross-platform CI.
+
+### Ledger correctness (from reviews two and three)
+
+- Rollback restores entries at their exact original position via digest-invariant body
+  coordinates recorded in history rows — apply→rollback is byte-identical for mid-section
+  update and retire (previously the restore appended at section end). A drift guard keeps the
+  restore in its recorded section when body lines were inserted above between apply and
+  rollback (freehand edits, or the digest block being newly created) — falling back to
+  content-safe section placement instead of silently mis-sectioning or wrongly retiring the
+  entry.
+- History capacity is prechecked before any mutation and rows append all-or-nothing under one
+  lock: no phantom rows for refused batches, no rewrite-then-raise at the cap, record ids
+  unique within one millisecond.
+
+### Continuity watchdog fail-closed config
+
+- `read_config` refuses a non-boolean `auto_resume` (a hand-edited `"false"` string no longer
+  silently enables relaunch); the watchdog relaunches only on the literal boolean `true`.
+
+### Cross-platform CI (first ever)
+
+- `.github/workflows/ci.yml` runs the full `verify_repo --ci` battery on push/PR: macOS
+  authoritative, ubuntu 3.10/3.12 observational with bubblewrap until the Linux flip decision.
+  First runs green on all three cells — including the suite's first-ever Linux completions,
+  empirically validating the uv-interpreter fix's Linux paths.
+
+### Host parity and polish
+
+- v2.24 run tools declared host-neutral on the Codex adapter and `references/host-parity.md`:
+  identical CLI semantics on Claude Code, Codex, and Grok Build, no per-host slash surfaces.
+- Monitor lifecycle test polls hardened against transient `blocked` under concurrent-suite
+  load; `plan_batch_required` names legacy `### B# ·` headings with the exact canonical
+  rewrite; learnings digest placement without a `---` separator lands before the first
+  section; salvage CLI omits a null `reason`; fingerprint events enforce their record cap;
+  boolean "ceilings" rejected; malformed learnings-edit rows get typed refusals.
+
 ## [2.24.0] - 2026-08-06
 
 Five mechanisms adapted — design only, with attribution, no vendored code — from

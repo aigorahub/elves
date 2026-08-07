@@ -101,6 +101,18 @@ documented above and in [`adaptive-worker-routing.md`](adaptive-worker-routing.m
 follow the same subscription-native default and optional-provider rules as any worker; nothing in
 this section launches lanes at runtime.
 
+## v2.24 run-tool parity
+
+The v2.24 helpers (`redrive`, `learnings`, `usage`, `salvage`, `continuity`) have **identical
+semantics on Claude Code, Codex, and Grok Build**: they are host-neutral CLI helpers invoked as
+`python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" <verb> …` with the target repository as
+the working directory, on every host. No per-host slash aliases exist for them and none should
+be invented; Grok Build reaches them through natural language or direct CLI exactly like the
+other hosts. Their honesty boundaries are host-invariant: advisory-only signals, never landing,
+merge, credential, or routing authority; the continuity watchdog never activates OS timers on
+any host; `HostProfile.reports_usage` records each transport's usage surface honestly, with
+absence staying the literal `unobserved` everywhere.
+
 ## Do not confuse
 
 - **Codex Goals** — host continuation plumbing for long Codex sessions. Not Grok.

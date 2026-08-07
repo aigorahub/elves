@@ -372,6 +372,65 @@ class LedgerPositionalRollbackTests(unittest.TestCase):
             self.assertEqual(path.read_bytes(), baseline)
 
 
+class LedgerDriftGuardTests(unittest.TestCase):
+    """Round-3 review W1: positional restore must not drift across sections."""
+
+    def test_digest_block_insertion_between_apply_and_rollback(self) -> None:
+        # Pure ledger-verb sequence: apply on a digest-less file, then the
+        # digest verb inserts its 5-line block near the top, then rollback.
+        # The recorded body coordinate now points above/elsewhere — the guard
+        # must fall back to section placement, never mis-section the entry.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "learnings.md"
+            path.write_text(
+                "# Project Learnings\n\n## Alpha Notes\n\n- [L1] alpha (evidence: a)\n\n"
+                "## Repo Conventions\n\n- [L2] first (evidence: b)\n- [L3] second (evidence: c)\n\n"
+                "## Retired Learnings\n",
+                encoding="utf-8",
+            )
+            ll.apply_edits(
+                path,
+                [{"action": "update", "id": "L3", "text": "edited", "reason": "r"}],
+            )
+            ll.regenerate_digest_file(path)
+            ll.rollback_last(path)
+            doc = ll.parse_text(path.read_text())
+            self.assertEqual(doc.entries[3].section, "Repo Conventions")
+            self.assertFalse(doc.entries[3].retired)
+            self.assertIn("second", doc.entries[3].text)
+
+    def test_freehand_lines_above_cannot_retire_restored_entry(self) -> None:
+        # Freehand insertions above the entry's section between apply and
+        # rollback previously shifted the restore into the PREVIOUS section —
+        # catastrophically, a Retired section directly above silently retired
+        # an active learning. The guard must keep it active in its section.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "learnings.md"
+            path.write_text(
+                "# Project Learnings\n\n## Retired Learnings\n\n"
+                "- [L9] old -> retired because done\n\n"
+                "## Repo Conventions\n\n- [L1] keep me (evidence: a)\n",
+                encoding="utf-8",
+            )
+            ll.apply_edits(
+                path,
+                [{"action": "update", "id": "L1", "text": "keep me edited", "reason": "r"}],
+            )
+            text = path.read_text()
+            path.write_text(
+                text.replace(
+                    "## Retired Learnings",
+                    "Freehand context line one.\nFreehand context line two.\n\n## Retired Learnings",
+                ),
+                encoding="utf-8",
+            )
+            ll.rollback_last(path)
+            doc = ll.parse_text(path.read_text())
+            self.assertEqual(doc.entries[1].section, "Repo Conventions")
+            self.assertFalse(doc.entries[1].retired)
+            self.assertIn("keep me", doc.entries[1].text)
+
+
 class LedgerCapBoundaryTests(unittest.TestCase):
     """Adversarial-review WARNING-1: refuse-don't-destroy exact at the caps."""
 

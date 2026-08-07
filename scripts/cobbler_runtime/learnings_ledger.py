@@ -194,6 +194,19 @@ def _body_index(lines: list[str], absolute: int) -> int:
     return body
 
 
+def _section_at(lines: list[str], index: int) -> str:
+    """Heading of the section containing ``index`` (digest interior has none)."""
+
+    section = ""
+    for position, line in enumerate(lines):
+        if position >= index:
+            break
+        heading = HEADING_RE.match(line)
+        if heading:
+            section = heading.group(1)
+    return section
+
+
 def _absolute_index(lines: list[str], body_target: int) -> int:
     body = 0
     in_digest = False
@@ -592,14 +605,28 @@ def rollback_last(path: Path, *, run_id: str | None = None) -> dict[str, Any]:
             if after.get("line"):
                 _remove_exact_line(lines, after["line"], "learnings_rollback_conflict")
             if before and before.get("line"):
+                insert_at = None
                 if before.get("line_index") is not None:
                     # Digest-invariant positional restore: the entry returns
                     # to its exact original spot, so an apply→rollback pair is
                     # byte-identical even for mid-section entries.
-                    insert_at = _absolute_index(lines, int(before["line_index"]))
-                else:
-                    # Legacy history rows (no recorded position): section-end
-                    # append, content-identical only.
+                    candidate = _absolute_index(lines, int(before["line_index"]))
+                    # Round-3 review W1: if body lines were inserted ABOVE the
+                    # entry between apply and rollback (freehand edits, or the
+                    # digest block being newly created by `learnings digest`),
+                    # the recorded coordinate can drift into a different
+                    # section — silently mis-sectioning (or worse, wrongly
+                    # retiring) the restored entry. Positional restore is only
+                    # trusted when it still lands in the recorded section.
+                    if (
+                        before.get("section")
+                        and _section_at(lines, candidate) != before["section"]
+                    ):
+                        candidate = None
+                    insert_at = candidate
+                if insert_at is None:
+                    # Section-based fallback (also the legacy-row path):
+                    # content-safe, section-end placement.
                     doc_now = parse_text(_serialize(lines, doc.trailing_newline))
                     insert_at = _section_insert_index(doc_now, before["section"])
                 lines.insert(insert_at, before["line"])
