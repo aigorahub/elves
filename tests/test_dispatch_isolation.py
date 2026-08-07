@@ -2146,6 +2146,23 @@ class IsolationSandboxRegressionTests(unittest.TestCase):
             ),
             Path("/Users/fixture/.local/share/uv/tools/ruff"),
         )
+        # A shadowing ancestor literally named `uv` must not defeat the match
+        # (review W-1): the scan considers every ("uv", "python") adjacency.
+        self.assertEqual(
+            _narrow_runtime_root(
+                Path(
+                    "/Users/uv/.local/share/uv/python/"
+                    "cpython-3.12.13-macos-aarch64-none/bin/python3.12"
+                )
+            ),
+            Path(
+                "/Users/uv/.local/share/uv/python/"
+                "cpython-3.12.13-macos-aarch64-none"
+            ),
+        )
+        self.assertIsNone(
+            _narrow_runtime_root(Path("/opt/uv/other/bin/thing"))
+        )
 
     def test_bwrap_never_mounts_entire_hidden_agent_install_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

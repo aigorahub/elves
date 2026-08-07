@@ -1880,16 +1880,19 @@ def _narrow_runtime_root(path: Path) -> Path | None:
     if ".pyenv" in parts and "versions" in parts and "bin" in parts:
         bin_index = len(parts) - 1 - tuple(reversed(parts)).index("bin")
         return Path(*parts[:bin_index])
-    if "uv" in parts and "python" in parts and "bin" in parts:
+    if "bin" in parts:
         # uv-managed interpreter installs:
         # .../uv/python/cpython-<ver>-<platform>/bin/python3.x. One immutable
         # versioned interpreter distribution whose sibling lib/ tree is the
-        # runtime, exactly like the pyenv/asdf cases above.
-        uv_index = parts.index("uv")
-        if len(parts) > uv_index + 1 and parts[uv_index + 1] == "python":
-            bin_index = len(parts) - 1 - tuple(reversed(parts)).index("bin")
-            if bin_index > uv_index + 2:
-                return Path(*parts[:bin_index])
+        # runtime, exactly like the pyenv/asdf cases above. Scan every
+        # ("uv", "python") adjacency like the markers loop — an ancestor
+        # directory literally named `uv` must not shadow the real install.
+        for uv_index in range(len(parts) - 2):
+            if parts[uv_index : uv_index + 2] == ("uv", "python"):
+                bin_index = len(parts) - 1 - tuple(reversed(parts)).index("bin")
+                if bin_index > uv_index + 2:
+                    return Path(*parts[:bin_index])
+                break
     if ".asdf" in parts and "installs" in parts and "bin" in parts:
         bin_index = len(parts) - 1 - tuple(reversed(parts)).index("bin")
         return Path(*parts[:bin_index])
