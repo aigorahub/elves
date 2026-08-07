@@ -63,12 +63,18 @@ Five mechanisms adapted — design only, with attribution, no vendored code — 
   (audit every requirement at the current HEAD; never rely on memory of earlier work);
   council-workflow documents the optional two-stage cheap-gate pre-check.
 
-### Recorded upstream defect (pre-existing)
+### macOS sandbox: uv-managed interpreters recognized (fix)
 
-- The dispatch suite's 18 external-lane tests are stale against the v2.23 fail-closed
-  containment gates (`24bef11`/`3549db0`): external command-override lanes can no longer spawn
-  on any platform, so those tests fail at v2.23.1 on every machine. Diagnosed, recorded as this
-  run's regression baseline, and left for a dedicated reconciliation.
+- `_narrow_runtime_root` now recognizes uv-managed *interpreter installs*
+  (`…/uv/python/cpython-<ver>-<platform>/bin/…`) as one narrow versioned runtime root, the same
+  class as the adjacent pyenv/asdf cases (uv *tools* were already covered). Without this, any
+  sandboxed lane child running a uv python died importing its own stdlib (`exit 1`, empty
+  stdout) — which made all 18 external-lane dispatch tests fail on uv-based development
+  machines. An earlier diagnosis in this release's history recorded those tests as "stale
+  against the containment gates / red on every platform"; deeper root-causing refuted that —
+  the suite's test boundary neutralizes the gates correctly, and the failures were this
+  uv-allowlist gap all along (proven by an interpreter-swap discriminator). The dispatch suite
+  is fully green under uv interpreters after the fix.
 
 ## [2.23.1] - 2026-08-01
 

@@ -1078,6 +1078,44 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" preferences reset</code></
           merge permission cannot be stored as preferences.</p>
       </section>
 
+      <section id="v224-tools">
+        <h2>v2.24 run tools</h2>
+        <p>Five driver-facing helpers landed in v2.24 (design adapted, with attribution, from
+          PrimeIntellect's prime-agent, MIT). All are advisory instruments for the run — none of
+          them grants landing, merge, credential, or routing authority.</p>
+
+        <div class="code-block">
+          <button class="copy" type="button" data-copy="v224-code">Copy</button>
+          <pre><code id="v224-code"># Futile re-drive guard: never burn budget re-running an unchanged workspace
+python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" redrive record-failure --batch B3
+python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" redrive evaluate --batch B3 --budget 3
+
+# Learnings ledger: auditable, reversible durable memory (freehand files stay valid)
+python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" learnings validate --file learnings.md
+python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" learnings apply --file learnings.md --edits-file edits.json
+python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" learnings rollback --file learnings.md
+
+# Observed usage: morning cost visibility; unknown stays "unobserved", never zero
+python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" usage aggregate --records-file usage.jsonl --session .elves-session.json
+
+# Salvage: bounded redacted tail of a dead worker's follow log (never a completion report)
+python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" salvage tail --log .elves/runtime/follow.log
+
+# Continuity watchdog (opt-in): OS-owned timer re-checks a full-run after the session dies
+python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" continuity install --session-id RUN --branch BR --start-head SHA --packet PACKET
+python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" continuity status</code></pre>
+        </div>
+
+        <p>Honesty boundaries: the re-drive guard fails toward <em>changed</em> (a fingerprint
+          error can never manufacture futility); usage ceilings are advisory checkpoints, never
+          stops and never routing inputs; salvage text is untrusted observed output; the
+          continuity watchdog only writes templates — Elves never activates the timer, defaults
+          to detect-and-report, and never resumes a terminal run. Details:
+          <code>references/e2e-chat-to-land.md</code>, <code>references/learnings-template.md</code>,
+          <code>references/schema-and-acceptance.md</code>, and
+          <code>references/operations-guide.md</code>.</p>
+      </section>
+
       <section id="troubleshooting">
         <h2>Troubleshooting</h2>
 

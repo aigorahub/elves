@@ -2124,6 +2124,29 @@ class IsolationSandboxRegressionTests(unittest.TestCase):
             ),
         )
 
+    def test_uv_interpreter_install_runtime_root_is_one_versioned_dist(self) -> None:
+        # v2.24 B8: uv-managed interpreter installs are a narrow versioned
+        # runtime root (same class as pyenv/asdf) — without this, sandboxed
+        # lane children running a uv python die importing their own stdlib.
+        executable = Path(
+            "/Users/fixture/.local/share/uv/python/"
+            "cpython-3.12.13-macos-aarch64-none/bin/python3.12"
+        )
+        self.assertEqual(
+            _narrow_runtime_root(executable),
+            Path(
+                "/Users/fixture/.local/share/uv/python/"
+                "cpython-3.12.13-macos-aarch64-none"
+            ),
+        )
+        # uv *tools* keep their existing narrower mapping.
+        self.assertEqual(
+            _narrow_runtime_root(
+                Path("/Users/fixture/.local/share/uv/tools/ruff/bin/ruff")
+            ),
+            Path("/Users/fixture/.local/share/uv/tools/ruff"),
+        )
+
     def test_bwrap_never_mounts_entire_hidden_agent_install_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
