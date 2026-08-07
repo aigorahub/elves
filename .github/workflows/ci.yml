@@ -1,0 +1,49 @@
+name: CI
+
+# aigorahub/elves#244: the full verify_repo --ci battery (compile, secret scan,
+# api-break gate, consistency-adjacent smokes, 1,500+ unit tests) previously ran
+# nowhere in CI — which is how a machine-class gap (the uv-interpreter sandbox
+# allowlist, fixed in v2.24) shipped unnoticed. macOS is the authoritative cell;
+# the Linux cells are observational (continue-on-error) until aigorahub/elves#245
+# verifies the bwrap-side paths that have only ever been platform-skipped.
+
+on:
+  push:
+    branches: ["main", "feat/**", "release/**", "codex/**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    name: verify_repo --ci (${{ matrix.os }}, py${{ matrix.python }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            python: "3.12"
+            observational: false
+          - os: ubuntu-latest
+            python: "3.12"
+            observational: true
+          - os: ubuntu-latest
+            python: "3.10"
+            observational: true
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.observational }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "${{ matrix.python }}"
+      - name: Install bubblewrap (Linux sandbox backend — aigorahub/elves#245)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap
+      - name: Git identity for test fixtures
+        run: |
+          git config --global user.email "ci@elves.invalid"
+          git config --global user.name "Elves CI"
+          git config --global init.defaultBranch main
+      - name: verify_repo --ci
+        run: python scripts/verify_repo.py --ci
