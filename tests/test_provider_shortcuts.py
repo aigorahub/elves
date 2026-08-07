@@ -34,6 +34,11 @@ class SlowBody:
         self.interval = interval
 
 
+_SUITE_PYTHON_SHIM = tempfile.TemporaryDirectory(prefix="elves-suite-python-")
+_SUITE_PYTHON_LINK = Path(_SUITE_PYTHON_SHIM.name) / "python3"
+_SUITE_PYTHON_LINK.symlink_to(sys.executable)
+
+
 def run_script(
     name: str,
     *args: str,
@@ -44,6 +49,12 @@ def run_script(
     merged = os.environ.copy()
     if env:
         merged.update(env)
+    # v2.24 B8: runner scripts resolve bare `python3` and enforce the >=3.10
+    # repo floor. On hosts whose system python3 is older (macOS ships 3.9)
+    # while the suite runs a uv/pyenv interpreter, the runners must see the
+    # suite's own interpreter — the shim provides only `python3`, so per-test
+    # fake tool dirs later in PATH keep winning for every other name.
+    merged["PATH"] = f"{_SUITE_PYTHON_SHIM.name}{os.pathsep}{merged.get('PATH', '')}"
     return subprocess.run(
         [str(SCRIPTS / name), *args],
         cwd=cwd,

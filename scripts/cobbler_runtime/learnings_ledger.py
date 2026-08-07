@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import fcntl
+import itertools
 import json
 import os
 import re
@@ -32,6 +33,10 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+# Millisecond timestamps collide for consecutive applies in the same process;
+# record ids must stay unique or rollback provenance dedup conflates edits.
+_RECORD_SEQ = itertools.count()
 
 LEDGER_SCHEMA = 1
 ENTRY_RE = re.compile(r"^- \[L(\d+)\] (.*)$")
@@ -424,7 +429,7 @@ def apply_edits(
                     )
             lines = _regenerate_digest(lines)
             new_text = _serialize(lines, doc.trailing_newline)
-            record_id = f"h{int(time.time() * 1000)}-{os.getpid()}"
+            record_id = f"h{int(time.time() * 1000)}-{os.getpid()}-{next(_RECORD_SEQ)}"
             for index, item in enumerate(applied):
                 source = edits[index]
                 _append_history(
@@ -516,7 +521,7 @@ def rollback_last(path: Path, *, run_id: str | None = None) -> dict[str, Any]:
                 path,
                 {
                     "schema": LEDGER_SCHEMA,
-                    "record_id": f"h{int(time.time() * 1000)}-{os.getpid()}-rb",
+                    "record_id": f"h{int(time.time() * 1000)}-{os.getpid()}-{next(_RECORD_SEQ)}-rb",
                     "ts": _dt.datetime.now(_dt.timezone.utc).isoformat(),
                     "run_id": run_id,
                     "rollback_of": target["record_id"],

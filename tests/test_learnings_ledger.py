@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = REPO_ROOT / "scripts"
@@ -254,6 +255,31 @@ class LedgerSafetyTests(unittest.TestCase):
                 )
             self.assertEqual(ctx.exception.code, "learnings_unknown_id")
             self.assertEqual(path.read_bytes(), before)
+
+    def test_record_ids_unique_within_same_millisecond(self) -> None:
+        # v2.24 B8 regression: consecutive applies in one millisecond must not
+        # share a record_id, or rollback provenance dedup conflates the edits
+        # (manifested as [learnings_history_empty] on the second rollback).
+        with tempfile.TemporaryDirectory() as tmp:
+            path = _write(Path(tmp), SAMPLE)
+            with mock.patch("cobbler_runtime.learnings_ledger.time.time", return_value=1_000_000.0):
+                ll.apply_edits(
+                    path,
+                    [{"action": "update", "id": "L1", "text": "one", "reason": "r"}],
+                )
+                ll.apply_edits(
+                    path,
+                    [{"action": "update", "id": "L1", "text": "two", "reason": "r"}],
+                )
+                ll.rollback_last(path)
+                ll.rollback_last(path)
+            rows = [
+                json.loads(line)
+                for line in ll.history_path(path).read_text().splitlines()
+            ]
+            ids = [row["record_id"] for row in rows]
+            self.assertEqual(len(ids), len(set(ids)), ids)
+            self.assertIn("[2026-08-01]", path.read_text())
 
     def test_history_cap_refuses_loudly(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
