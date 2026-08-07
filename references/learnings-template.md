@@ -54,10 +54,18 @@ Id-tagged entries are managed by the learnings ledger
 
 - **create** requires a non-empty evidence pointer; `(expect: …)` records how a future run can
   validate the lesson.
-- **retire** moves the entry under `## Retired Learnings` (never deletes). Every applied edit
-  appends a before/after row to the tracked `learnings-history.jsonl` sidecar (bounded caps —
+- **retire** moves the entry under `## Retired Learnings` (never deletes). If that heading is
+  missing on a hand-rolled file, retire creates it at EOF rather than refusing. Every applied
+  edit appends a before/after row to the tracked `learnings-history.jsonl` sidecar (bounded caps —
   a full history refuses loudly rather than dropping rows), and **rollback** applies the inverse
   edit with `rollback_of` provenance.
+- **Rollback is per history row, not per apply batch.** A multi-edit `learnings apply` writes one
+  history row per edit; one `learnings rollback` undoes only the most recent non-rolled-back row.
+  Repeat rollback to walk further back.
+- **Provenance ordering:** the file is written before its history rows. A process death in that
+  narrow gap can leave an applied edit without a rollback row (refuse-don't-destroy still holds;
+  re-apply or hand-edit if needed). History is never written before the doc so a crash cannot
+  invent phantom applied edits.
 - A bounded `## Digest` block (at most 40 one-line entries) is regenerated only between its
   HTML-comment markers. Read the digest first at orient; pull full entries on demand.
 - Freehand dated bullets (`- [YYYY-MM-DD] …`) remain fully valid. Ledger edit verbs refuse on an

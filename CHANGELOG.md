@@ -4,6 +4,24 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.24.2] - 2026-08-07
+
+Maintainer land polish after dual Fugu + host review of the v2.24.1 harvest PR.
+
+### Learnings ledger operator honesty
+
+- `retire` creates a missing `## Retired Learnings` section at EOF instead of refusing on
+  hand-rolled files (mirrors digest ensure).
+- Documented: rollback is **per history row**, not per multi-edit `apply` batch; the learnings
+  file is written before history so a crash cannot invent phantom applied edits (a death in the
+  gap can leave an applied edit without a rollback row).
+
+### Host parity
+
+- SKILL.md gains the same **v2.24 run tools (host-neutral)** pointer already on AGENTS.md and
+  `references/host-parity.md`, so Claude Code and Grok Build hosts that read only SKILL see the
+  five helpers and the no-slash-surface rule.
+
 ## [2.24.1] - 2026-08-07
 
 Review-hardening release: three independent adversarial reviews of the v2.24.0 harvest, every

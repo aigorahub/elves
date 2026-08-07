@@ -174,6 +174,34 @@ class LedgerApplyRollbackTests(unittest.TestCase):
                 )
             self.assertEqual(ctx.exception.code, "learnings_evidence_required")
 
+    def test_retire_creates_missing_retired_section(self) -> None:
+        """Hand-rolled files without ## Retired Learnings still accept retire."""
+        hand_rolled = """# Project Learnings
+
+## Repo Conventions
+
+- [L1] [2026-08-01] A live lesson. (evidence: commit abc)
+
+## Known Traps
+
+- [L3] [2026-08-02] A trap. (evidence: commit def)
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = _write(Path(tmp), hand_rolled)
+            ll.apply_edits(
+                path,
+                [{"action": "retire", "id": "L1", "reason": "superseded"}],
+            )
+            text = path.read_text()
+            self.assertIn("## Retired Learnings", text)
+            self.assertIn("-> retired because superseded", text)
+            self.assertNotIn(
+                "- [L1] [2026-08-01] A live lesson. (evidence: commit abc)\n",
+                text.split("## Retired Learnings")[0],
+            )
+            # Sibling managed entry untouched.
+            self.assertIn("- [L3] [2026-08-02] A trap. (evidence: commit def)", text)
+
 
 class LedgerDigestTests(unittest.TestCase):
     def test_digest_bounded_and_marker_scoped(self) -> None:

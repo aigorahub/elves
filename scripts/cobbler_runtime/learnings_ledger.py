@@ -283,6 +283,21 @@ def _render_created_line(
     return f"- [L{entry_id}] [{today}] {text}{suffix}"
 
 
+def _ensure_section_heading(lines: list[str], section: str) -> list[str]:
+    """Append ``## section`` at EOF when missing (never reorders existing content)."""
+
+    for line in lines:
+        heading = HEADING_RE.match(line)
+        if heading and heading.group(1) == section:
+            return lines
+    result = list(lines)
+    if result and result[-1].strip():
+        result.append("")
+    result.append(f"## {section}")
+    result.append("")
+    return result
+
+
 def _section_insert_index(doc: ParsedDoc, section: str) -> int:
     """Index AFTER the last content line of ``section`` (before next heading)."""
 
@@ -502,6 +517,9 @@ def apply_edits(
                         f"{str(edit['reason']).strip()}"
                     )
                     del lines[entry.line_index]
+                    # Hand-rolled files may omit the template's Retired section;
+                    # create it at EOF rather than refuse (mirrors digest ensure).
+                    lines = _ensure_section_heading(lines, RETIRED_HEADING)
                     doc_after_delete = parse_text(_serialize(lines, doc.trailing_newline))
                     insert_at = _section_insert_index(doc_after_delete, RETIRED_HEADING)
                     lines.insert(insert_at, retired_line)

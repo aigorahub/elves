@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Grok Build, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.24.1"
+  version: "2.24.2"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -72,7 +72,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.24.1):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.24.2):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
@@ -719,11 +719,25 @@ Learnings and `.ai-docs` outlive a single run. Keep them curated. Id-tagged lear
 (`- [L3] …`) are managed by the learnings ledger
 (`cobbler_agents.py learnings validate|apply|rollback|digest|migrate`): creates require an
 evidence pointer (execution-log entry or commit) and may record an `(expect: …)` validation
-note; retire moves entries under Retired Learnings, never deletes; every applied edit appends
-before/after to the tracked `learnings-history.jsonl` sidecar with inverse-edit rollback; and
-the bounded `## Digest` block is read first at orient, pulling full entries on demand. Freehand
-dated learnings stay fully valid; `migrate` is explicit and idempotent; the ledger never
-reflows, reorders, or rewrites content it did not edit.
+note; retire moves entries under Retired Learnings (creating that section at EOF when missing),
+never deletes; every applied edit appends before/after to the tracked `learnings-history.jsonl`
+sidecar with inverse-edit rollback (**one history row per edit** — one `rollback` undoes only
+the latest row; repeat to walk further); the file is written before history so a crash cannot
+invent phantom applied edits; and the bounded `## Digest` block is read first at orient, pulling
+full entries on demand. Freehand dated learnings stay fully valid; `migrate` is explicit and
+idempotent; the ledger never reflows, reorders, or rewrites content it did not edit.
+
+## v2.24 run tools (host-neutral)
+
+The five v2.24 helpers — futile re-drive guard (`redrive`), learnings ledger (`learnings`),
+observed-usage ledger (`usage`), salvage previews (`salvage`), and the continuity watchdog
+manager (`continuity`) — are **host-neutral CLI helpers** with identical semantics on Claude
+Code, Codex, and Grok Build. Invoke as
+`python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" <verb> …` from any host; do **not** invent
+per-host slash surfaces for them. They are advisory instruments (never landing, merge,
+credential, or routing authority). Continuity only writes OS timer templates — Elves never
+activates them. Usage ceilings are checkpoints, never stops. See the guide's "v2.24 run tools"
+section, `references/host-parity.md`, and `AGENTS.md` (Codex adapter pointer).
 
 ## v2.22 runtime helpers (planning harvest, compact output, lanes)
 
@@ -745,7 +759,9 @@ lanes remain useful but are not the default happy path.
 Claude Code, Codex, and Grok Build provide the same workflow and prewalk safety contract.
 Exact-session prewalk preserves the same qualification, trajectory, checkpoint, visibility,
 fallback, and authority semantics on every host; supervised transport syntax may differ.
-See `references/host-parity.md`.
+The v2.24 run tools (`redrive`, `learnings`, `usage`, `salvage`, `continuity`) share one CLI
+surface and one honesty boundary on every host — see **v2.24 run tools (host-neutral)** above
+and `references/host-parity.md`.
 **Codex Goals** are optional continuation plumbing — distinct from **Grok Build goal mode**.
 
 ## Compatibility notes
