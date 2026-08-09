@@ -366,7 +366,7 @@ def build_recommendations(
 
     installs_by_key = {(install.platform, install.scope): install for install in installs}
 
-    for platform in ("claude", "codex", "grok"):
+    for platform in ("claude", "codex", "grok", "omp"):
         local_install = installs_by_key.get((platform, "project-local"))
         global_install = installs_by_key.get((platform, "global"))
         if local_install and global_install and local_install.version != global_install.version:

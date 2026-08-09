@@ -181,7 +181,7 @@ def _copy_managed_bundle(repo_root: Path, dest_root: Path, *, host: str) -> None
         for required in ("SKILL.md", "AGENTS.md"):
             if not (dest_root / required).is_file():
                 raise RuntimeError(f"{host.title()} bundle missing {required}")
-        if host in {"codex", "grok"}:
+        if host in {"codex", "grok", "omp"}:
             if (dest_root / "aliases").exists():
                 raise RuntimeError(
                     f"{host.title()} bundle must not contain Claude aliases"
@@ -645,7 +645,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--host",
-        choices=("all", "claude", "codex", "grok"),
+        choices=("all", "claude", "codex", "grok", "omp"),
         default="all",
         help="Which installed-bundle shape to smoke",
     )
@@ -666,7 +666,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Emit machine-readable JSON results",
     )
     args = parser.parse_args(argv)
-    hosts = ["claude", "codex", "grok"] if args.host == "all" else [args.host]
+    hosts = ["claude", "codex", "grok", "omp"] if args.host == "all" else [args.host]
     results = [smoke_host(h, repo_root=args.repo_root, keep=args.keep) for h in hosts]
     ok = all(bool(r["ok"]) for r in results)
     if args.json:

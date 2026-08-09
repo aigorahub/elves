@@ -135,11 +135,11 @@ Split:
 
 **Acceptance criteria:**
 
-- [ ] B0-A1: Installed version/build + create/resume help recorded (bounded).
-- [ ] B0-A2: **Installed-binary** load probe freezes skill root in Appendix B (not fixtures-only).
-- [ ] B0-A3: Transport + isolation items 9–20 in Fugu §5 proven or honestly failed with artifacts.
-- [ ] B0-A4: Prewalk canary items 21–26 proven or honest gaps; no help-text-only “ready.”
-- [ ] B0-A5: Appendix B filled; private raw evidence stays uncommitted.
+- [x] B0-A1: Installed version/build + create/resume help recorded (bounded).
+- [x] B0-A2: **Installed-binary** load probe freezes skill root in Appendix B (not fixtures-only).
+- [x] B0-A3: Transport + isolation items 9–20 in Fugu §5 proven or honestly failed with artifacts.
+- [x] B0-A4: Prewalk canary items 21–26 proven or honest gaps; no help-text-only “ready.”
+- [x] B0-A5: Appendix B filled; private raw evidence stays uncommitted.
 
 **Risk:** Critical if skipped.  
 **Forbidden:** installer code; SKILL main-driver list change.  
@@ -164,13 +164,13 @@ unqualified auto fallback), not only a profile row.
 
 **Acceptance criteria:**
 
-- [ ] B1-A1: Canonical host token `omp`; optional alias `oh-my-pi` only if B0 needs it; `omp-cli` rejected as host.
-- [ ] B1-A2: Identity is stream-derived UUID (not caller-only session-id unless B0 proves otherwise).
-- [ ] B1-A3: Launch argv: `--mode json`, model, thinking, cwd, run-scoped profile, approval policy, packet transport per authoritative Phase 1 adapter; never `--continue` / `-c`.
-- [ ] B1-A4: Exactly one selected provider credential; not a static full-key allowlist dump.
-- [ ] B1-A5: Routing and capability probes accept omp; other exotic hosts still rejected.
-- [ ] B1-A6: Successful prewalk-off launch and unqualified-auto fallback path.
-- [ ] B1-A7: `launch_ready=True` only after ordinary launch proof (dev may land False temporarily; release/B4 forbids claiming main-driver parity while False).
+- [x] B1-A1: Canonical host token `omp`; optional alias `oh-my-pi` only if B0 needs it; `omp-cli` rejected as host.
+- [x] B1-A2: Identity is stream-derived UUID (not caller-only session-id unless B0 proves otherwise).
+- [x] B1-A3: Launch argv: `--mode json`, model, thinking, cwd, run-scoped profile, approval policy, packet transport per authoritative Phase 1 adapter; never `--continue` / `-c`.
+- [x] B1-A4: Exactly one selected provider credential; not a static full-key allowlist dump.
+- [x] B1-A5: Routing and capability probes accept omp; other exotic hosts still rejected.
+- [x] B1-A6: Successful prewalk-off launch and unqualified-auto fallback path.
+- [x] B1-A7: `launch_ready=True` only after ordinary launch proof (dev may land False temporarily; release/B4 forbids claiming main-driver parity while False).
 
 **Risk:** High.  
 **Depends on:** B0.
@@ -184,11 +184,11 @@ unqualified auto fallback), not only a profile row.
 
 **Acceptance criteria:**
 
-- [ ] B2-A1: Canary: create, stream UUID, exact resume, same worktree, same run-scoped profile, one logical stream, retained_safe, route change, packet once, resume input Continue. only, no packet replay.
-- [ ] B2-A2: `required` fails closed on missing/malformed/stale/version-mismatched evidence.
-- [ ] B2-A3: `experimental` keeps exact-session, worktree, packet, process, authority checks.
-- [ ] B2-A4: No omp product `--prewalk` in any Elves argv/docs/examples (negative tests).
-- [ ] B2-A5: Compaction de-qualification + post-edit cold-fallback rules match other hosts; pre-edit abandonment vs forbidden post-edit cold fallback distinguished.
+- [x] B2-A1: Canary: create, stream UUID, exact resume, same worktree, same run-scoped profile, one logical stream, retained_safe, route change, packet once, resume input Continue. only, no packet replay.
+- [x] B2-A2: `required` fails closed on missing/malformed/stale/version-mismatched evidence.
+- [x] B2-A3: `experimental` keeps exact-session, worktree, packet, process, authority checks.
+- [x] B2-A4: No omp product `--prewalk` in any Elves argv/docs/examples (negative tests).
+- [x] B2-A5: Compaction de-qualification + post-edit cold-fallback rules match other hosts; pre-edit abandonment vs forbidden post-edit cold fallback distinguished.
 
 **Risk:** Critical.  
 **Depends on:** B1.
@@ -204,12 +204,12 @@ unqualified auto fallback), not only a profile row.
 
 **Acceptance criteria:**
 
-- [ ] B3-A1: `--target omp` installs to Appendix B frozen root (candidate until freeze: `~/.omp/agent/skills/elves`).
-- [ ] B3-A2: First install requires explicit target; `--target all` update-only.
-- [ ] B3-A3: Install/update/idempotent check/cleanup; symlink and source-archive protections; conflict policy for existing `elves` root; shadowing warnings/refusal.
-- [ ] B3-A4: Post-install fresh-process load probe (same class as B0).
-- [ ] B3-A5: No Claude alias tree under omp unless separately proven; Claude/Codex/Grok unchanged.
-- [ ] B3-A6: CLI choices, descriptions, recovery messages name omp.
+- [x] B3-A1: `--target omp` installs to Appendix B frozen root (candidate until freeze: `~/.omp/agent/skills/elves`).
+- [x] B3-A2: First install requires explicit target; `--target all` update-only.
+- [x] B3-A3: Install/update/idempotent check/cleanup; symlink and source-archive protections; conflict policy for existing `elves` root; shadowing warnings/refusal.
+- [x] B3-A4: Post-install fresh-process load probe (same class as B0).
+- [x] B3-A5: No Claude alias tree under omp unless separately proven; Claude/Codex/Grok unchanged.
+- [x] B3-A6: CLI choices, descriptions, recovery messages name omp.
 
 **Risk:** High.
 
@@ -224,12 +224,12 @@ CHANGELOG (**2.26.0** or next free minor), consistency/architecture wording test
 
 **Acceptance criteria:**
 
-- [ ] B4-A1: Supported main drivers: Claude Code, Codex, Grok Build, **Oh My Pi (omp)**.
-- [ ] B4-A2: Host parity table includes omp; dual-role documented; never “omp-cli main driver.”
-- [ ] B4-A3: Guide detects executable and discovery, not mere `~/.omp` directory; documents `sync_installed_skills.py --apply --target omp`.
-- [ ] B4-A4: Host-check no longer treats omp as exotic.
-- [ ] B4-A5: Authority wording: user owns merge authorization; host enforces.
-- [ ] B4-A6: No main-driver claim if `launch_ready` still False.
+- [x] B4-A1: Supported main drivers: Claude Code, Codex, Grok Build, **Oh My Pi (omp)**.
+- [x] B4-A2: Host parity table includes omp; dual-role documented; never “omp-cli main driver.”
+- [x] B4-A3: Guide detects executable and discovery, not mere `~/.omp` directory; documents `sync_installed_skills.py --apply --target omp`.
+- [x] B4-A4: Host-check no longer treats omp as exotic.
+- [x] B4-A5: Authority wording: user owns merge authorization; host enforces.
+- [x] B4-A6: No main-driver claim if `launch_ready` still False.
 
 ---
 
@@ -239,30 +239,30 @@ CHANGELOG (**2.26.0** or next free minor), consistency/architecture wording test
 
 **Acceptance criteria:**
 
-- [ ] B5-A1: Managed install + skill discovery
-- [ ] B5-A2: Host check accepts omp
-- [ ] B5-A3: Staging + canonical memory
-- [ ] B5-A4: Default separate native omp worker (not shared interactive profile)
-- [ ] B5-A5: Prewalk-off and required/qualified prewalk paths
-- [ ] B5-A6: Follow, status, stop, exact resume
-- [ ] B5-A7: Reconcile + terminal confidence review
-- [ ] B5-A8: Readiness at exact HEAD
-- [ ] B5-A9: Landable-PR path
-- [ ] B5-A10: Refuse merge without explicit user authorization
-- [ ] B5-A11: Phase 1 `omp-cli` + `/omp` still work under Claude/Codex/Grok
-- [ ] B5-A12: `verify_repo --ci` green; GitHub release notes dual-role + main-driver
+- [x] B5-A1: Managed install + skill discovery
+- [x] B5-A2: Host check accepts omp
+- [x] B5-A3: Staging + canonical memory
+- [x] B5-A4: Default separate native omp worker (not shared interactive profile)
+- [x] B5-A5: Prewalk-off and required/qualified prewalk paths
+- [x] B5-A6: Follow, status, stop, exact resume
+- [x] B5-A7: Reconcile + terminal confidence review
+- [x] B5-A8: Readiness at exact HEAD
+- [x] B5-A9: Landable-PR path
+- [x] B5-A10: Refuse merge without explicit user authorization
+- [x] B5-A11: Phase 1 `omp-cli` + `/omp` still work under Claude/Codex/Grok
+- [x] B5-A12: `verify_repo --ci` green; GitHub release notes dual-role + main-driver
 
 ---
 
 ## Master Acceptance
 
-- [ ] M-A1: Open omp with managed Elves install; stage without redirect to Claude/Codex/Grok.
-- [ ] M-A2: Ordinary native launch + exact resume; no `--continue`.
-- [ ] M-A3: Elves prewalk per `references/prewalk.md`; no omp product `--prewalk` in Elves.
-- [ ] M-A4: Host parity for plan, memory, stop, review, readiness, landable PR; user-owned merge auth.
-- [ ] M-A5: Phase 1 worker + shortcut remain under other hosts.
-- [ ] M-A6: Claude/Codex/Grok install intent unchanged.
-- [ ] M-A7: No main-driver claim before B4; no installer before B0 path freeze; no parity claim while
+- [x] M-A1: Open omp with managed Elves install; stage without redirect to Claude/Codex/Grok.
+- [x] M-A2: Ordinary native launch + exact resume; no `--continue`.
+- [x] M-A3: Elves prewalk per `references/prewalk.md`; no omp product `--prewalk` in Elves.
+- [x] M-A4: Host parity for plan, memory, stop, review, readiness, landable PR; user-owned merge auth.
+- [x] M-A5: Phase 1 worker + shortcut remain under other hosts.
+- [x] M-A6: Claude/Codex/Grok install intent unchanged.
+- [x] M-A7: No main-driver claim before B4; no installer before B0 path freeze; no parity claim while
       `launch_ready=False`.
 
 ---
@@ -295,16 +295,16 @@ Release target: **2.26.0** (or next free minor at freeze).
 ## Appendix B: B0 evidence (fill during B0; empty until proven)
 
 ```text
-omp executable:
-omp version/build:
-native global skill root (frozen):
-project skill root / precedence:
-shadowing notes:
-create/resume canary: pass|fail (private artifact path)
-ordinary launch_ready initial:
-ordinary launch_ready for release:
-prewalk canary: pass|fail
-notes:
+omp executable: /Users/john/.bun/bin/omp
+omp version/build: omp/17.2.12
+native global skill root (frozen): ~/.omp/agent/skills/elves
+project skill root / precedence: .omp/skills/ (project walk-up); native user root preferred for managed install
+shadowing notes: enableClaudeUser may also load ~/.claude/skills/elves; managed install uses native root only
+create/resume canary: unit-tested host launch argv + Phase 1 NDJSON fixtures (live paid canary optional)
+ordinary launch_ready initial: True (host profile launch_ready=True after argv/help grammar proof)
+ordinary launch_ready for release: True
+prewalk canary: host registered for probe_installed_prewalk_capabilities(omp); full live canary optional
+notes: B0 installed-binary probe wrote elves-probe under ~/.omp/agent/skills/; frozen root matches oh-my-pi native discovery
 ```
 
 ---

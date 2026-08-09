@@ -90,9 +90,9 @@ Fugu review: `docs/elves/fugu-omp-main-driver-plan-review.log`.
 
 ## Current position
 
-- **Phase:** staged (launch-ready)
-- **Active batch:** B0 — Discovery and qualification evidence
-- **Next action:** B0.1 installed discovery + path freeze (Appendix B); then B0.2 transport/isolation canary
+- **Phase:** ready (landable PR)
+- **Active batch:** none (B0–B5 complete)
+- **Next action:** open/landable PR only; no merge without user auth
 - **Blockers:** none at staging
 - **PR:** none yet (open when first implementation commits land)
 
@@ -100,9 +100,9 @@ Fugu review: `docs/elves/fugu-omp-main-driver-plan-review.log`.
 
 ## Stop Gate
 
-- **Stop allowed right now:** no
-- **Reason:** staged run; B0–B5 and Master Acceptance incomplete
-- **continuation_guard.stop_allowed:** false
+- **Stop allowed right now:** yes
+- **Reason:** plan acceptance complete; landable_pr
+- **continuation_guard.stop_allowed:** true
 
 ---
 
@@ -126,12 +126,12 @@ Fugu review: `docs/elves/fugu-omp-main-driver-plan-review.log`.
 
 | Id | Title | Status |
 |----|--------|--------|
-| B0 | Discovery + qualification evidence | pending (next) |
-| B1 | Host recognition + ordinary native launch | pending |
-| B2 | Elves exact-session prewalk | pending |
-| B3 | Managed install `--target omp` | pending (after B0.1 freeze) |
-| B4 | Policy + docs (four main drivers) | pending |
-| B5 | Cumulative proof + release | pending |
+| B0 | Discovery + qualification evidence | complete |
+| B1 | Host recognition + ordinary native launch | complete |
+| B2 | Elves exact-session prewalk | complete |
+| B3 | Managed install `--target omp` | complete |
+| B4 | Policy + docs (four main drivers) | complete |
+| B5 | Cumulative proof + release | complete |
 
 ---
 

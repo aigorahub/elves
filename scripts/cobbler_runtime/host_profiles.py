@@ -183,6 +183,68 @@ def _flagged_session_help_grammar(create_help: str, resume_help: str) -> tuple[b
     return exact, route
 
 
+def _omp_help_grammar(create_help: str, resume_help: str) -> tuple[bool, bool]:
+    """OMP advertises --resume and --model/--thinking; create captures stream UUID."""
+    help_blob = f"{create_help}\n{resume_help}"
+    exact = "--resume" in help_blob and "--mode" in help_blob
+    route = "--model" in help_blob and ("--thinking" in help_blob or "--effort" in help_blob)
+    return exact, route
+
+
+def _omp_launch_plan(request: HostLaunchRequest) -> HostLaunchPlan:
+    """Headless omp native-worker grammar (aligned with Phase 1 omp-cli transport).
+
+    Session identity is stream-captured (type=session id). Never --continue/-c.
+    Never product --prewalk (Elves owns prewalk trajectory). Packet via
+    --append-system-prompt (prompt_file_flag) plus a short trailing user message.
+    """
+    profile = (
+        "elves-omp-host-"
+        + hashlib.sha256(request.cwd.encode("utf-8")).hexdigest()[:12]
+    )
+    thinking = {"low": "low", "medium": "medium", "high": "high"}.get(
+        request.effort, "medium"
+    )
+    common = [
+        "omp",
+        "--mode",
+        "json",
+        "--cwd",
+        request.cwd,
+        "--profile",
+        profile,
+        "--model",
+        request.requested_model,
+        "--thinking",
+        thinking,
+        "--approval-mode",
+        "yolo",
+    ]
+    trailing = "Follow the system packet."
+    if request.session_id is None:
+        argv = tuple([*common, trailing])
+        resume = None
+        sid = None
+    else:
+        sid = exact_session_id(request.session_id)
+        argv = tuple([*common, "--resume", sid, trailing])
+        resume = argv
+    if "--prewalk" in argv or "-c" in argv or "--continue" in argv:
+        raise ValidationIssue(
+            "omp_prewalk_or_continue_forbidden",
+            "omp native host launch forbids --prewalk and ambiguous continue flags",
+        )
+    return HostLaunchPlan(
+        argv=argv,
+        resume_argv=resume,
+        session_id=sid,
+        session_id_source="stream.session.id",
+        stdin_packet=False,
+        prompt_file_flag="--append-system-prompt",
+    )
+
+
+
 @dataclass(frozen=True)
 class HostProfile:
     """One native-worker host row: launch grammar, identity, secrets, probes."""
@@ -332,6 +394,37 @@ HOST_PROFILES: tuple[HostProfile, ...] = (
         resume_help_argv=("--help",),
         help_grammar=_flagged_session_help_grammar,
         launch_ready=False,
+    ),
+    HostProfile(
+        host="omp",
+        aliases=("oh-my-pi",),
+        capability_host="omp",
+        transport="omp_build",
+        spec_profile="elves-native-worker",
+        commit_mode="permission_gated_worker_commit",
+        effort_flag="--thinking <level>",
+        worktree_binding="--cwd create and resume",
+        session_identity="stream type=session id UUID",
+        identity_event_keys=(("session", ("id",)),),
+        identity_from_stream_required=True,
+        # Allowlist of candidates; native_worker projects at most one for omp.
+        provider_secret_names=frozenset({
+            "ANTHROPIC_API_KEY",
+            "OPENAI_API_KEY",
+            "CODEX_API_KEY",
+            "XAI_API_KEY",
+            "GEMINI_API_KEY",
+            "GOOGLE_API_KEY",
+        }),
+        grants_git_write_roots=True,
+        reports_usage="unobserved",
+        launch_plan=_omp_launch_plan,
+        executable="omp",
+        version_argv=("--version",),
+        create_help_argv=("--help",),
+        resume_help_argv=("--help",),
+        help_grammar=_omp_help_grammar,
+        launch_ready=True,
     ),
 )
 

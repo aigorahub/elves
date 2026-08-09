@@ -1789,7 +1789,7 @@ IMPLEMENTATION_LANES_PHRASES = {
 SETUP_COBBLER_PHRASES = {
     "SKILL.md": [
         "### External-agent setup and model onboarding",
-        "Supported main drivers are Claude Code, Codex, and Grok Build",
+        "Supported main drivers are Claude Code, Codex, Grok Build, and Oh My Pi (omp)",
         "bounded live qualification canary",
         "/setup-cobbler",
         "/setup-council",
@@ -2130,7 +2130,7 @@ if isinstance(IMPLEMENTER_HANDOFF_PHRASES, dict) and 'SKILL.md' in IMPLEMENTER_H
     IMPLEMENTER_HANDOFF_PHRASES['SKILL.md'] = ['Build On', 'owned surfaces', 'forbidden surfaces', 'acceptance evidence', 'blocking coordinator defect', 'HEAD / run-doc paths / route-session identity / output format']
 if isinstance(INSTALLED_HELPER_PATH_PHRASES, dict) and 'SKILL.md' in INSTALLED_HELPER_PATH_PHRASES:
     INSTALLED_HELPER_PATH_PHRASES = dict(INSTALLED_HELPER_PATH_PHRASES)
-    INSTALLED_HELPER_PATH_PHRASES['SKILL.md'] = ['source-checkout shorthand', 'active Elves skill root', '~/.claude/skills/elves', '~/.codex/skills/elves', '~/.grok/skills/elves', '$ELVES_SKILL_ROOT/scripts/acceptance_contract.py', '$ELVES_SKILL_ROOT/scripts/elves_landing_check.py', 'installed Elves bundle never requires a repo-only helper']
+    INSTALLED_HELPER_PATH_PHRASES['SKILL.md'] = ['source-checkout shorthand', 'active Elves skill root', '~/.claude/skills/elves', '~/.codex/skills/elves', '~/.grok/skills/elves', '~/.omp/agent/skills/elves', '$ELVES_SKILL_ROOT/scripts/acceptance_contract.py', '$ELVES_SKILL_ROOT/scripts/elves_landing_check.py', 'installed Elves bundle never requires a repo-only helper']
 if isinstance(LANDING_CHECK_CONTRACT_PHRASES, dict) and 'SKILL.md' in LANDING_CHECK_CONTRACT_PHRASES:
     LANDING_CHECK_CONTRACT_PHRASES = dict(LANDING_CHECK_CONTRACT_PHRASES)
     LANDING_CHECK_CONTRACT_PHRASES['SKILL.md'] = ['$ELVES_SKILL_ROOT/scripts/elves_landing_check.py', '--session <session-path> --repo-root .', 'plan_path', 'equality assertion']
@@ -2157,7 +2157,7 @@ if isinstance(RISK_TIER_PHRASES, dict) and 'SKILL.md' in RISK_TIER_PHRASES:
     RISK_TIER_PHRASES['SKILL.md'] = ['Thin safety kernel', 'validate once, verify changes, attest final', 'low | standard | high', 'trusted | untrusted', 'touched surfaces', 'risk checkpoints', 'terminal readiness', 'exact HEAD', 'impact-selected']
 if isinstance(SETUP_COBBLER_PHRASES, dict) and 'SKILL.md' in SETUP_COBBLER_PHRASES:
     SETUP_COBBLER_PHRASES = dict(SETUP_COBBLER_PHRASES)
-    SETUP_COBBLER_PHRASES['SKILL.md'] = ['setup-cobbler', 'setup-council', 'model-onboarding.md', 'not a top-level', 'cobbler_agents.py setup', 'references/cobbler-setup-recipes.md', 'Supported main drivers are Claude Code, Codex, and Grok Build', 'bounded live qualification canary', '$elves setup-council']
+    SETUP_COBBLER_PHRASES['SKILL.md'] = ['setup-cobbler', 'setup-council', 'model-onboarding.md', 'not a top-level', 'cobbler_agents.py setup', 'references/cobbler-setup-recipes.md', 'Supported main drivers are Claude Code, Codex, Grok Build, and Oh My Pi (omp)', 'bounded live qualification canary', '$elves setup-council']
 if isinstance(SINGLE_KICKOFF_PHRASES, dict) and 'SKILL.md' in SINGLE_KICKOFF_PHRASES:
     SINGLE_KICKOFF_PHRASES = dict(SINGLE_KICKOFF_PHRASES)
     SINGLE_KICKOFF_PHRASES['SKILL.md'] = ['Default user path: one kickoff', 'Trusted full-run delegation keeps that path', 'chat-to-work', 'chat-to-land', 'Legacy two-call', 'full-run', 'parked']

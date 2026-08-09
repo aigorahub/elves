@@ -1117,18 +1117,39 @@ def _native_worker_child_env(
         "GCM_INTERACTIVE",
     }
     env: dict[str, str] = {}
+    omp_host = bool(
+        host_profile_or_none(host) and resolve_host_profile(host).capability_host == "omp"
+    )
     for name, value in parent.items():
         if name in forbidden_exact or name.startswith("GIT_"):
             continue
         if is_secret_env_name(name) and name not in provider_secret_names:
             continue
+        # OMP: strip allowlisted provider secrets here; re-add exactly one below.
+        if omp_host and name in provider_secret_names:
+            continue
         env[name] = value
     # Each host may need only its registry-allowlisted provider auth names
     # (subscription tokens for Codex/Claude; XAI_API_KEY/GROK_AUTH_PATH for
     # Grok). No other secret-valued environment entry crosses the boundary.
-    for name in provider_secret_names:
-        if parent.get(name):
-            env[name] = parent[name]
+    # OMP multi-provider allowlist: project exactly one selected credential
+    # (first present in stable preference order), never every ambient key.
+    if omp_host:
+        omp_order = (
+            "ANTHROPIC_API_KEY",
+            "OPENAI_API_KEY",
+            "CODEX_API_KEY",
+            "XAI_API_KEY",
+            "GEMINI_API_KEY",
+            "GOOGLE_API_KEY",
+        )
+        selected = next((n for n in omp_order if n in provider_secret_names and parent.get(n)), None)
+        if selected:
+            env[selected] = parent[selected]
+    else:
+        for name in provider_secret_names:
+            if parent.get(name):
+                env[name] = parent[name]
 
     empty_gh = runtime_dir / "empty-gh-config"
     empty_gh.mkdir(mode=0o700, parents=True, exist_ok=True)

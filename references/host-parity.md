@@ -1,18 +1,18 @@
-# Host parity: Claude Code, Codex, and Grok Build
+# Host parity: Claude Code, Codex, Grok Build, and Oh My Pi
 
-**Supported main drivers are Claude Code, Codex, and Grok Build.** All three share the workflow,
+**Supported main drivers are Claude Code, Codex, Grok Build, and Oh My Pi (omp).** All four share the workflow,
 safety kernel, automatic required-mode qualification, explicit experimental mode, and exact-session
 prewalk contract.
 
-| Concern | Claude Code | Codex | Grok Build (host) |
-|---------|-------------|-------|-------------------|
-| Skill load | Project/global Agent Skill (`~/.claude/skills/elves`) | Project/global Agent Skill (`~/.codex/skills/elves`) | Native skill (`~/.grok/skills/elves`) and/or Claude-compat discovery |
-| Primary invoke | `/elves`, natural language | `$elves`, natural language | natural language (no invented top-level slash map) |
-| Cobbler | `/cobbler`, `/cobbler-mode` | `$elves cobbler: …`, natural chat | natural language |
-| Setup | `/setup-cobbler` | `$elves setup-cobbler` | natural language / scripts |
-| Provider shortcuts | `/fugu`, `/manus`, `/grok`, `/devin`, `/omp` | `$elves fugu|manus|grok|devin|omp …`, natural chat | natural language; same runners from skill root |
-| Land PR | `/land-pr` or `\land-pr` | natural language or alias | natural language |
-| Continuation | optional | optional **Codex Goals** (seatbelt, not memory) | host session continuity; not Codex Goals |
+| Concern | Claude Code | Codex | Grok Build (host) | Oh My Pi (host) |
+|---------|-------------|-------|-------------------|----------------|
+| Skill load | `~/.claude/skills/elves` | `~/.codex/skills/elves` | `~/.grok/skills/elves` | `~/.omp/agent/skills/elves` |
+| Primary invoke | `/elves`, natural language | `$elves`, natural language | natural language | natural language / skill load |
+| Cobbler | `/cobbler`, `/cobbler-mode` | `$elves cobbler: …` | natural language | natural language |
+| Setup | `/setup-cobbler` | `$elves setup-cobbler` | scripts | `sync --target omp` |
+| Provider shortcuts | `/fugu` … `/omp` | `$elves fugu|…|omp` | same runners | N/A as host (omp is the host) |
+| Land PR | `/land-pr` | natural language | natural language | natural language |
+| Continuation | optional | optional Codex Goals | host continuity | host session continuity |
 | Native / host work | Separate custom/background session; supervised CLI uses safe mode and classifier-approved commits | Separate custom agent or sandboxed `codex exec`; narrow Git roots permit commits | Host-native Grok session or qualified/experimental two-phase worker |
 | Exact-session prewalk | cached proof, automatic required canary, or explicit experimental mode | same | same |
 | Visibility | Proven native agent view or exact private-log follow command | Proven native agent view or exact private-log follow command | Live session + run docs; same memory/landing ownership |
@@ -139,10 +139,10 @@ narrow auth projection, catalog-only model selection, and sanitized streaming fo
 
 Native-only overnight runs require no Grok, OpenRouter, or other external provider.
 
-## Optional omp worker
+## Oh My Pi dual role
 
-Optional Oh My Pi (`omp` / `omp-cli`) is a parked full-run worker and `/omp` / `$elves omp` shortcut
-available under Claude Code, Codex, and Grok Build drivers with the same authority boundaries as
-other optional workers (host owns PR/merge/protected-ref; worker never lands). Shortcut uses the
-shared isolation snapshot and a single provider-matched API key; it is not a main driver and does
-not implement Elves prewalk. See `references/omp-worker.md`.
+Oh My Pi is a **supported main driver** (`omp` host; skill root `~/.omp/agent/skills/elves`) and an
+optional parked full-run worker (`omp-cli`) plus `/omp` / `$elves omp` shortcut under Claude Code,
+Codex, and Grok Build. Host owns PR/merge/protected-ref; worker never lands. Shortcut uses the
+shared isolation snapshot and a single provider-matched API key. Elves prewalk is host-supervised;
+omp product `--prewalk` is never Elves prewalk. See `references/omp-worker.md`.

@@ -1,5 +1,5 @@
 ---
-version: "2.25.0"
+version: "2.26.0"
 ---
 
 # Elves: Codex repository adapter
@@ -97,8 +97,8 @@ assume `./scripts` belongs to the target repository and do not execute mappings 
   shared OAuth file)
 - Devin task → `run_devin.sh <instructions>` (remote session, bounded wait, no default stored
   secret or knowledge grants; creation and polling share one hard wall-clock bound)
-- Oh My Pi task → `run_omp.sh <instructions>` (optional headless `omp` worker shortcut;
-  never `opm`; not a main driver; run-scoped profile isolation)
+- Oh My Pi task → `run_omp.sh <instructions>` (optional headless worker shortcut under other hosts;
+  never `opm`; omp is also a supported main driver via `~/.omp/agent/skills/elves`; run-scoped profile isolation)
 
 Codex uses the `$elves` or natural-language forms above, not invented top-level `/fugu`, `/manus`,
 `/grok`, `/devin`, or `/omp` commands. Explicit invocation authorizes the provider call and any associated
@@ -122,7 +122,7 @@ provider usage, but not merge, protected-ref, secret, or approval-bypass authori
   observe/propose/promote/waive learning stays under `.elves/runtime/landing-profile/` with no
   auto-promotion (`references/project-landing-profiles.md`)
 - **Helper paths:** `python3 scripts/...` is **source-checkout shorthand**; installed skills
-  (`~/.claude/skills/elves`, `~/.codex/skills/elves`, or `~/.grok/skills/elves`) resolve helpers from the
+  (`~/.claude/skills/elves`, `~/.codex/skills/elves`, `~/.grok/skills/elves`, or `~/.omp/agent/skills/elves`) resolve helpers from the
   **active Elves skill root** while keeping the target repository as the working directory. An
   installed Elves bundle never requires a repo-only helper (`references/runtime-helper-paths.md`)
 - **Stop control:** honor the **Stop Gate** and `continuation_guard`; no final response while
@@ -162,7 +162,7 @@ provider usage, but not merge, protected-ref, secret, or approval-bypass authori
 
 ## Host check (Grok Build)
 
-Supported main drivers are Claude Code, Codex, and Grok Build. If this skill is loaded inside
+Supported main drivers are Claude Code, Codex, Grok Build, and Oh My Pi (omp). If this skill is loaded inside
 **Grok Build** as the orchestrator, **stage and run Elves** under the normal workflow. Required
 prewalk runs the bounded automatic qualification canary before task launch when matching proof is
 absent; experimental prewalk accepts qualification uncertainty without relaxing runtime checks.

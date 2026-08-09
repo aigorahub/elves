@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Grok Build, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.25.0"
+  version: "2.26.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -17,14 +17,18 @@ confidently, review intelligently, and ship.
 
 ## Supported main drivers (host check)
 
-**Supported main drivers are Claude Code, Codex, and Grok Build.** They load this skill, stage the
+**Supported main drivers are Claude Code, Codex, Grok Build, and Oh My Pi (omp).** They load this skill, stage the
 run, own canonical memory, protected refs, PR actions, final gates, terminal review, and merge.
 
 **Grok Build may drive Elves.** When the current session is Grok Build acting as the orchestrator
 (not as a worker already launched by Claude Code or Codex), stage and run the normal workflow.
 
-All three supported hosts may use exact-session prewalk when their installed transport proves the
-same continuity contract. `worker.prewalk=required` automatically runs one bounded live
+All four supported hosts may use exact-session prewalk when their installed transport proves the
+same continuity contract.
+
+**Oh My Pi may drive Elves.** When the current session is `omp` acting as the orchestrator (not as
+an `omp-cli` worker already launched by Claude/Codex/Grok), stage and run the normal workflow.
+Install with `sync_installed_skills.py --apply --target omp` into `~/.omp/agent/skills/elves`. `worker.prewalk=required` automatically runs one bounded live
 qualification canary when matching version-and-route-bound evidence is absent. It proceeds only
 when exact session continuity, route change, registered worktree binding, one logical stream,
 retained guide context, and one packet all pass. Failure stops before the task worker launches and
@@ -37,10 +41,10 @@ Grok Build also remains an **optional worker** under Claude Code or Codex when p
 (`grok-4.5` at `high` when the live catalog offers it). Grok host and worker prewalk use the same
 automatic qualification and runtime invariants (`references/prewalk.md`).
 
-Managed install targets are `~/.claude/skills/elves`, `~/.codex/skills/elves`, and
-`~/.grok/skills/elves` (`sync_installed_skills.py --target claude|codex|grok`). All three are
-first-class main drivers. Do not invent unsupported host surfaces for other products. If the
-session is an exotic non-supported host (not Claude, Codex, or Grok), refuse to stage and redirect
+Managed install targets are `~/.claude/skills/elves`, `~/.codex/skills/elves`,
+`~/.grok/skills/elves`, and `~/.omp/agent/skills/elves`
+(`sync_installed_skills.py --target claude|codex|grok|omp`). All four are first-class main drivers. Do not invent unsupported host surfaces for other products. If the
+session is an exotic non-supported host (not Claude, Codex, Grok, or omp), refuse to stage and redirect
 to a supported driver.
 
 **The user owns whether Elves may merge.** You never merge by default — the user merges when they
@@ -72,13 +76,13 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.25.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.26.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
 **Runtime helper paths:** every `python3 scripts/...` example is **source-checkout shorthand**.
 In an installed Claude Code, Codex, or Grok Build skill, resolve helpers from the **active Elves skill root**
-(`~/.claude/skills/elves`, `~/.codex/skills/elves`, or `~/.grok/skills/elves`) while keeping the **target repository as the working directory**, or pass `--repo-root`. An **installed Elves bundle never requires a repo-only helper**.
+(`~/.claude/skills/elves`, `~/.codex/skills/elves`, `~/.grok/skills/elves`, or `~/.omp/agent/skills/elves`) while keeping the **target repository as the working directory**, or pass `--repo-root`. An **installed Elves bundle never requires a repo-only helper**.
 See `references/runtime-helper-paths.md`.
 
 ## Reviewed PR Landing Command
@@ -205,8 +209,9 @@ falls back honestly to native. See `references/adaptive-worker-routing.md` and
 lifecycle and host-owned authority; Devin CLI, OpenCode, and other adapters when configured; or
 legacy bounded batches. Host owns packets, protected refs, final gates, PR, and merge. Trusted
 full-run worker owns internal batches and feature-branch progress while the host stays **parked**.
-Untrusted lease writers remain detached with host import only. omp is never a main driver and is
-never required for native runs (`references/omp-worker.md`).
+Untrusted lease writers remain detached with host import only. Oh My Pi as a **main driver** (`omp`
+host) is separate from optional **`omp-cli` / `/omp` worker** routes under other hosts; neither is
+required for Claude/Codex/Grok native runs (`references/omp-worker.md`).
 
 Launch recipe: `references/grok-implementer-launch-prompt.md`. Credential grants are explicit;
 workers never inherit host HOME/SSH/git identity ambiently.
@@ -301,9 +306,10 @@ required capability, then execute it without an extra confirmation prompt:
   allowlist surface authorizes them. Its creation and poll requests use bounded response bodies and
   share a hard wall-clock wait budget; zero wait retains create-and-return behavior.
 - `/omp <instructions>` → `scripts/run_omp.sh <instructions>` for a bounded headless Oh My Pi
-  (`omp`) task: optional worker/shortcut only (not a main driver), run-scoped `--profile` and
-  private HOME/XDG isolation, never spell the CLI `opm`, never pass omp `--prewalk` as Elves
-  prewalk. Prefer explicit model pin via `ELVES_OMP_MODEL`. See `references/omp-worker.md`.
+  worker/shortcut under Claude/Codex/Grok (not the interactive main-driver path), run-scoped
+  `--profile` and private HOME/XDG isolation, never spell the CLI `opm`, never pass omp product
+  `--prewalk` as Elves prewalk. Prefer explicit model pin via `ELVES_OMP_MODEL`. See
+  `references/omp-worker.md`.
 
 The slash spellings are Claude Code managed aliases. Codex uses `$elves fugu|manus|grok|devin|omp …`
 or natural language; **never invent top-level Codex slash commands**. These are optional paid
@@ -762,7 +768,7 @@ lanes remain useful but are not the default happy path.
 
 ## Host parity
 
-Claude Code, Codex, and Grok Build provide the same workflow and prewalk safety contract.
+Claude Code, Codex, Grok Build, and Oh My Pi (omp) provide the same workflow and prewalk safety contract.
 Exact-session prewalk preserves the same qualification, trajectory, checkpoint, visibility,
 fallback, and authority semantics on every host; supervised transport syntax may differ.
 The v2.24 run tools (`redrive`, `learnings`, `usage`, `salvage`, `continuity`) share one CLI
@@ -774,7 +780,7 @@ and `references/host-parity.md`.
 
 - Missing optional provider access never blocks a native run.
 - Record `implementation_lane: fast | untrusted` when using external work drivers.
-- Supported main drivers are Claude Code, Codex, and Grok Build. Required prewalk qualifies the
+- Supported main drivers are Claude Code, Codex, Grok Build, and Oh My Pi (omp). Required prewalk qualifies the
   installed transport automatically; experimental prewalk is explicit and still fail-closed during
   the real trajectory. Grok as an optional worker under Claude/Codex remains consent-gated.
 - Compatibility: `$elves setup-council` remains supported.

@@ -414,7 +414,7 @@ def record_terminal_calibration(
         repo_root,
         run_id=run_id,
         host=host,
-        provider="native" if host in {"claude", "codex", "grok"} else host,
+        provider="native" if host in {"claude", "codex", "grok", "omp"} else host,
         model=model or "unknown",
         effort=effort or "unknown",
         confidence=confidence,

@@ -916,7 +916,7 @@ def decide_worker_route(
 ) -> RouteDecision:
     """Return an inspectable route. Repository policy is the final safety veto."""
     host_token = host.strip().lower().replace("_", "-")
-    if host_token not in {"codex", "claude", "claude-code", "grok"}:
+    if host_token not in {"codex", "claude", "claude-code", "grok", "omp", "oh-my-pi"}:
         raise ValidationIssue("unsupported_host", f"Unsupported host `{host}`", path="host")
     execution = execution_reasoning.strip().lower()
     risk = review_risk.strip().lower()

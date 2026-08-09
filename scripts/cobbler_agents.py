@@ -920,7 +920,7 @@ def cmd_native_worker(args: argparse.Namespace) -> int:
         if not args.host or args.host == "fixture":
             issue = ValidationIssue(
                 "native_worker_arguments_required",
-                "prewalk-capabilities requires --host codex, claude, or grok",
+                "prewalk-capabilities requires --host codex, claude, grok, or omp",
             )
             return _emit_json({"ok": False, "issues": [issue.to_dict()]}, exit_code=1)
         try:
@@ -2822,7 +2822,7 @@ def build_parser() -> argparse.ArgumentParser:
         "route-worker",
         help="Inspect a deterministic native/optional-Grok worker recommendation",
     )
-    route_worker.add_argument("--host", choices=("codex", "claude", "grok"), required=True)
+    route_worker.add_argument("--host", choices=("codex", "claude", "grok", "omp"), required=True)
     route_worker.add_argument("--execution-reasoning", choices=("low", "medium", "high"), required=True)
     route_worker.add_argument("--review-risk", choices=("low", "standard", "high"), required=True)
     route_worker.add_argument("--driver-effort", choices=("low", "medium", "high"))
@@ -2887,7 +2887,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("spec", "launch", "follow", "status", "prewalk-capabilities", "_supervise"),
         default="spec",
     )
-    native_worker.add_argument("--host", choices=("codex", "claude", "fixture", "grok"))
+    native_worker.add_argument("--host", choices=("codex", "claude", "fixture", "grok", "omp"))
     native_worker.add_argument("--worktree")
     native_worker.add_argument("--effort", choices=("low", "medium", "high"))
     native_worker.add_argument("--model", help="Current driver model observed by the host, or an explicit routed model")

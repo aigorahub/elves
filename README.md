@@ -8,7 +8,7 @@ driver plans and reviews; a subscription-native (or optional external) worker im
 run files let the work survive context compaction. You write the plan and own the merge decision.
 The agent does the middle.
 
-**Current release: v2.25.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.26.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 **New to Elves?** Use the [practical user guide](https://aigorahub.github.io/elves/) — especially
@@ -18,11 +18,11 @@ available) and orients you. The guide also covers the first run, worker choice, 
 review, and landing. This README is the repository reference: shell install, safety model,
 operations, and an index into the detailed contracts under [`references/`](references/).
 
-**Supported main drivers:** Claude Code, Codex, and Grok Build. All three are first-class hosts:
+**Supported main drivers:** Claude Code, Codex, Grok Build, and Oh My Pi (omp). All four are first-class hosts:
 native skill install, doctor validation, automatic required-mode prewalk qualification, and
 explicit experimental prewalk. Grok Build is also an optional *worker* under Claude/Codex when
-permitted. Managed install targets: `claude` → `~/.claude/skills/elves`, `codex` →
-`~/.codex/skills/elves`, `grok` → `~/.grok/skills/elves`.
+permitted. Oh My Pi is also a main driver (`omp` → `~/.omp/agent/skills/elves`) and an optional
+worker under other hosts. Managed install targets: `claude`, `codex`, `grok`, `omp`.
 See the guide FAQ
 [I opened Grok Build and tried /elves](https://aigorahub.github.io/elves/#troubleshooting).
 
