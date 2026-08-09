@@ -12,10 +12,10 @@ The design is directionally correct: OMP becomes an additional main driver while
 
 ### Blockers
 
-1. **B0 permits insufficient install-path evidence.**  
+1. **B0 permits insufficient install-path evidence.**
    B0-A2 allows “live or fixture-backed” discovery to prove the skill root (`docs/plans/omp-main-driver.md:114-116`). A fixture can preserve an observed contract in CI, but cannot prove what the installed binary currently discovers. Path freeze must require an installed-binary load probe.
 
-2. **B0 does not prove the complete OMP transport.**  
+2. **B0 does not prove the complete OMP transport.**
    It covers help flags, UUID capture, resume, and worktree continuity, but not:
    - packet delivery;
    - `--thinking` route changes;
@@ -30,28 +30,28 @@ The design is directionally correct: OMP becomes an additional main driver while
    - `prewalk-capabilities` currently names only those three (`scripts/cobbler_agents.py:919-925`).
    - Therefore `worker_routing.py` is definitely required, not “if needed,” and `scripts/cobbler_agents.py` must be in B1’s owned surfaces.
 
-4. **The native launch abstraction cannot currently express OMP’s isolation contract.**  
+4. **The native launch abstraction cannot currently express OMP’s isolation contract.**
    `HostLaunchRequest` contains model, effort, cwd, Git roots, session ID, and fixture path, but no run-scoped OMP profile or approval policy (`scripts/cobbler_runtime/host_profiles.py:39-49`). Phase 1 requires a private profile retained across exact resume (`docs/plans/omp-first-class-harness.md:49-55`, `references/omp-worker.md:32-38`).
 
-5. **Credential handling is unsafe if modeled as one static allowlist.**  
+5. **Credential handling is unsafe if modeled as one static allowlist.**
    `HostProfile.provider_secret_names` is a host-wide set (`host_profiles.py:206`, `361-363`), whereas Phase 1 requires projecting exactly the credential for the selected OMP provider (`omp-first-class-harness.md:230-239`; `omp-worker.md:15-18`, `38`). B1-A3 must not authorize every ambient OMP-compatible key.
 
-6. **`launch_ready` has no coherent release rule.**  
+6. **`launch_ready` has no coherent release rule.**
    A false value blocks ordinary single-phase launch; qualification evidence only admits a two-phase prewalk path (`scripts/cobbler_runtime/native_worker.py:1567-1576`). Shipping OMP with `launch_ready=False` would break:
    - prewalk `off`;
    - unqualified `auto` fallback;
    - the plan’s promised separate native OMP implementer (`omp-main-driver.md:91-94`).
 
-7. **B5 is too weak to prove main-driver parity.**  
+7. **B5 is too weak to prove main-driver parity.**
    Its fixture/dry-run criterion covers staging identity and a non-native packet (`omp-main-driver.md:268-269`), but not actual skill loading, OMP host recognition, native launch, stop/follow, terminal review, readiness, or the landable-PR path.
 
-8. **Authority wording is incorrect.**  
+8. **Authority wording is incorrect.**
    Role A says OMP owns “merge auth” (`omp-main-driver.md:80-83`). The user owns merge authorization. The host may preserve, validate, and enforce it, but cannot originate it.
 
-9. **Batch references are stale.**  
+9. **Batch references are stale.**
    The context table assigns profile/prewalk/install to B2/B3/B4 (`omp-main-driver.md:32-34`), while the actual batches are B1/B2/B3. Lines 43-45 also assign the path re-probe to B1 although path discovery belongs in B0.
 
-10. **The Phase 1 OMP command contract needs reconciliation before reuse.**  
+10. **The Phase 1 OMP command contract needs reconciliation before reuse.**
     `references/omp-worker.md:24` describes `--approval-mode yolo @packet`, while the inspected adapter path uses `always-ask`, `--append-system-prompt`, and a positional prompt (`scripts/cobbler_runtime/adapters.py:876-925`). The main-host design must identify the authoritative launch path rather than copying inconsistent examples.
 
 ---
