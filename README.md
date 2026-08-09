@@ -405,6 +405,7 @@ exactly one file below; other docs link instead of restating.
   [`references/cobbler-setup-recipes.md`](references/cobbler-setup-recipes.md) — setup
 - [`references/provider-shortcuts.md`](references/provider-shortcuts.md) — focused Fugu,
   Manus, Grok Build, and Devin command routes
+- [`references/omp-worker.md`](references/omp-worker.md) — optional Oh My Pi (`omp` / `omp-cli`) worker and shortcut
 - [`references/host-parity.md`](references/host-parity.md) — Claude Code / Codex parity
 - [`references/project-landing-profiles.md`](references/project-landing-profiles.md) — tracked
   repository-specific exact-HEAD readiness checks
