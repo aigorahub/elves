@@ -23,8 +23,8 @@ Claude and Codex read safe worker preferences from the same XDG file and make th
 deterministic decision. Transport syntax differs; packet, authority, fallback, follow, and
 terminal-review semantics do not. See [`adaptive-worker-routing.md`](adaptive-worker-routing.md).
 When checking a route, pass `--host claude` from Claude Code, `--host codex` from Codex,
-`--host grok` from Grok Build, or `--host omp` from Oh My Pi so any native fallback uses the live
-driver's transport. Grok as **optional worker** under Claude/Codex is unchanged. Native installs:
+`--host grok` from Grok Build, or `--host omp` from Oh My Pi so any native fallback uses the live driver's transport.
+Grok as **optional worker** under Claude/Codex is unchanged. Native installs:
 `sync_installed_skills.py --apply --target claude|codex|grok|omp`.
 
 Provider shortcuts preserve the same route semantics and authority on both hosts; only Claude Code
