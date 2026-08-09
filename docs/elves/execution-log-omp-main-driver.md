@@ -28,4 +28,3 @@
 - B4: docs v2.26.0 four main drivers + dual-role omp-worker
 - B5: session acceptance met; consistency OK; tests.test_omp_main_driver OK
 - Landing: landable_pr; merge not authorized
-
