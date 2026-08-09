@@ -945,6 +945,7 @@ def prepare_implement(
         adapter_name = "opencode-cli"
     is_opencode = adapter_name == "opencode-cli"
     is_devin = adapter_name == "devin-cli"
+    is_omp = adapter_name == "omp-cli"
     if mode == FORBIDDEN_DEFAULT_PERMISSION and not is_opencode:
         # Explicit dontAsk is allowed only if the operator forces it; prepare still
         # warns by refusing to treat it as the lane default — block as product rule.
@@ -959,11 +960,13 @@ def prepare_implement(
     default_model = (
         "openrouter/qwen/qwen3-max" if is_opencode else
         "swe-1-7-lightning" if is_devin else
+        "google/gemini-2.5-flash" if is_omp else
         GROK_LIVE_DEFAULT
     )
     default_exe = (
         "opencode" if is_opencode else
         "devin" if is_devin else
+        "omp" if is_omp else
         DEFAULT_EXECUTABLE
     )
     raw_model = (model or "").strip() or default_model
@@ -975,10 +978,12 @@ def prepare_implement(
     default_note = {
         "opencode-cli": "OpenCode implement labor (Claude Code–like agent; OpenRouter/other models)",
         "devin-cli": "Devin CLI implement labor (SWE-1.7 Lightning; exact --resume only)",
+        "omp-cli": "Oh My Pi (omp) implement labor; exact --resume only; run-scoped --profile",
     }.get(adapter_name, "Lane A fast implementer (default for optional Grok Build)")
     session_note = {
         "opencode-cli": "OpenCode: exact --session preferred; never bare --continue; use --auto carefully",
         "devin-cli": "Devin: host captures provider session id; never bare --continue/-c; never --cwd",
+        "omp-cli": "OMP: host captures session from NDJSON; never --continue/-c; never omp --prewalk",
     }.get(adapter_name, "Never pass --no-subagents; never default permission to dontAsk")
     state = ImplementState(
         lane=(lane or DEFAULT_LANE).strip() or DEFAULT_LANE,
@@ -1084,6 +1089,8 @@ def resolve_implement_model(
     if not raw:
         if adapter_name == "devin-cli":
             return "swe-1-7-lightning", explicit_effort or DEFAULT_EFFORT, notes
+        if adapter_name == "omp-cli":
+            return "google/gemini-2.5-flash", explicit_effort or "high", notes
         if adapter_name in {"opencode-cli", "opencode-labor", "opencode"}:
             return "openrouter/qwen/qwen3-max", explicit_effort, notes
         return GROK_LIVE_DEFAULT, explicit_effort or GROK_DEFAULT_EFFORT, notes
@@ -1091,10 +1098,122 @@ def resolve_implement_model(
     if adapter_name == "devin-cli":
         return raw, explicit_effort or DEFAULT_EFFORT, notes
 
+    if adapter_name == "omp-cli":
+        return raw, explicit_effort or "high", notes
+
     if adapter_name in {"opencode-cli", "opencode-labor", "opencode"}:
         return raw, explicit_effort, notes
 
     return raw, explicit_effort or GROK_DEFAULT_EFFORT, notes
+
+
+
+def _map_omp_thinking(effort: str | None) -> str:
+    """Map Elves effort vocabulary onto omp --thinking levels."""
+    value = (effort or "high").strip().lower() or "high"
+    allowed = {
+        "off",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max",
+        "auto",
+    }
+    if value in allowed:
+        return value
+    # common elves effort aliases
+    aliases = {
+        "extra-high": "xhigh",
+        "extra_high": "xhigh",
+        "ultrathink": "max",
+        "ultra": "max",
+    }
+    return aliases.get(value, "high")
+
+
+def _build_omp_launch_argv(
+    *,
+    session_id: str,
+    packet_path: Path,
+    cwd_path: Path,
+    model: str | None,
+    executable: str,
+    create: bool,
+    effort: str | None,
+    yolo: bool,
+    profile: str | None = None,
+) -> list[str]:
+    """Build Oh My Pi (omp) implement argv for trusted full-run.
+
+    Create captures session id from NDJSON (no --session-id). Resume uses exact
+    ``--resume <uuid>`` only. Never ``--continue`` / ``-c`` / omp ``--prewalk``.
+    """
+    exe_hint = (executable or "omp").strip() or "omp"
+    exe = resolve_executable_for_launch(exe_hint) or exe_hint
+    model_name, effort_name, _notes = resolve_implement_model(
+        model, effort=effort, adapter="omp-cli"
+    )
+    thinking = _map_omp_thinking(effort_name)
+    run_profile = (profile or "").strip() or "elves-omp-full-run"
+    approval = "yolo" if yolo else "write"
+
+    argv: list[str] = [
+        exe,
+        "--mode",
+        "json",
+        "--cwd",
+        str(cwd_path),
+        "--profile",
+        run_profile,
+        "--model",
+        model_name,
+        "--thinking",
+        thinking,
+        "--approval-mode",
+        approval,
+    ]
+    if not create:
+        if not session_id:
+            raise ValidationIssue(
+                "missing_session_id",
+                "OMP resume requires an exact captured provider session uuid",
+            )
+        if session_id.strip().lower() in AMBIGUOUS_SESSION_TOKENS:
+            raise ValidationIssue(
+                "ambiguous_session_id",
+                f"Session id `{session_id}` is ambiguous and forbidden for OMP resume",
+            )
+        argv.extend(["--resume", session_id.strip()])
+    # Packet path must be a bare argv element so the full-run supervisor can
+    # rebind the staged packet snapshot (count(path)==1). omp loads file
+    # contents via --append-system-prompt <path>.
+    argv.extend(["--append-system-prompt", str(packet_path)])
+    argv.append(
+        "Implement the Elves worker packet appended to the system prompt. "
+        "Follow owned/forbidden surfaces; commit on the assigned feature branch only; "
+        "never merge or open PRs."
+    )
+
+    if "-c" in argv or "--continue" in argv:
+        raise ValidationIssue(
+            "ambiguous_session_flag",
+            "OMP implement launch must not use bare --continue/-c",
+        )
+    if "--prewalk" in argv:
+        raise ValidationIssue(
+            "omp_prewalk_forbidden",
+            "omp --prewalk is not Elves prewalk and is forbidden on this lane",
+        )
+    if "--resume" in argv:
+        idx = argv.index("--resume")
+        if idx + 1 >= len(argv) or argv[idx + 1].startswith("-"):
+            raise ValidationIssue(
+                "ambiguous_session_flag",
+                "OMP --resume requires an exact session id",
+            )
+    return argv
 
 
 def _build_devin_launch_argv(
@@ -1461,6 +1580,18 @@ def build_launch_argv(
             create=create,
             effort=effort,
             export_path=export_path,
+        )
+
+    if adapter_name == "omp-cli":
+        return _build_omp_launch_argv(
+            session_id=sid,
+            packet_path=packet_path,
+            cwd_path=cwd_path,
+            model=model,
+            executable=executable or "omp",
+            create=create,
+            effort=effort,
+            yolo=yolo,
         )
 
     if adapter_name in {"opencode-cli", "opencode-labor", "opencode"}:
@@ -1889,7 +2020,7 @@ def launch_payload(
     adapter_name = (state.adapter if state else "grok-build") or "grok-build"
     # OpenCode and Devin may start without a pre-allocated session id (host captures after first run).
     if not sid and adapter_name not in {
-        "opencode-cli", "opencode-labor", "opencode", "devin-cli"
+        "opencode-cli", "opencode-labor", "opencode", "devin-cli", "omp-cli"
     }:
         raise ValidationIssue(
             "missing_session_id",

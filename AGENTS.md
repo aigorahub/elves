@@ -1,5 +1,5 @@
 ---
-version: "2.24.2"
+version: "2.25.0"
 ---
 
 # Elves: Codex repository adapter
@@ -45,7 +45,7 @@ Skill Memory) apply to all three hosts unchanged. See the guide's "v2.24 run too
 | Cobbler | `$elves cobbler: <task>` or "Ask the Cobbler…" |
 | Cobbler Mode | `$elves cobbler-mode` or natural "Cobbler Mode: on/off" |
 | Setup | `$elves setup-cobbler` / `$elves setup-council` |
-| Provider shortcut | `$elves fugu [--deep\|--ultra\|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] <task>` / `$elves fugu [--deep\|--ultra\|--max] [--max-wait SECONDS] [--preflight] review <scope>`, `$elves manus [--wide\|--fanout] …`, `$elves grok <instructions>`, or `$elves devin <instructions>` |
+| Provider shortcut | `$elves fugu [--deep\|--ultra\|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] <task>` / `$elves fugu [--deep\|--ultra\|--max] [--max-wait SECONDS] [--preflight] review <scope>`, `$elves manus [--wide\|--fanout] …`, `$elves grok <instructions>`, `$elves devin <instructions>`, or `$elves omp <instructions>` |
 | Land PR | natural language; `\land-pr` / `/land-pr` when the host maps them |
 
 ### Provider subprocess capabilities map
@@ -97,9 +97,11 @@ assume `./scripts` belongs to the target repository and do not execute mappings 
   shared OAuth file)
 - Devin task → `run_devin.sh <instructions>` (remote session, bounded wait, no default stored
   secret or knowledge grants; creation and polling share one hard wall-clock bound)
+- Oh My Pi task → `run_omp.sh <instructions>` (optional headless `omp` worker shortcut;
+  never `opm`; not a main driver; run-scoped profile isolation)
 
 Codex uses the `$elves` or natural-language forms above, not invented top-level `/fugu`, `/manus`,
-`/grok`, or `/devin` commands. Explicit invocation authorizes the provider call and any associated
+`/grok`, `/devin`, or `/omp` commands. Explicit invocation authorizes the provider call and any associated
 provider usage, but not merge, protected-ref, secret, or approval-bypass authority.
 
 ## Workflow pointers (SKILL.md owns every contract)

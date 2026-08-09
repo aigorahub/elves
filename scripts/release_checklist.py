@@ -70,6 +70,7 @@ EXPECTED_CLAUDE_ALIASES = frozenset(
         "manus",
         "grok",
         "devin",
+        "omp",
         "setup-cobbler",
         "setup-council",
     }
@@ -248,7 +249,7 @@ def build_release_checklist(
         found = {p.name for p in alias_root.iterdir() if p.is_dir()}
         if found != EXPECTED_CLAUDE_ALIASES:
             result.failures.append(
-                "aliases/claude: expected exactly eleven managed aliases "
+                "aliases/claude: expected exactly twelve managed aliases "
                 f"{sorted(EXPECTED_CLAUDE_ALIASES)}; found {sorted(found)}"
             )
         for name in sorted(EXPECTED_CLAUDE_ALIASES):

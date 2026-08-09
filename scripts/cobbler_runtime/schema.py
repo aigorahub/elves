@@ -109,6 +109,7 @@ BUILTIN_ADAPTER_NAMES: tuple[str, ...] = (
     "antigravity-cli",
     "opencode-cli",
     "devin-cli",
+    "omp-cli",
     "custom-cli",
     "host-native",
 )

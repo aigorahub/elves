@@ -264,7 +264,7 @@ def _parse_profiles(
         # Validate adapter exists (custom-cli and built-ins).
         try:
             get_adapter(adapter_name if adapter_name in {
-                "claude-code", "grok-build", "codex-fugu", "custom-cli", "host-native", "devin-cli"
+                "claude-code", "grok-build", "codex-fugu", "custom-cli", "host-native", "devin-cli", "omp-cli"
             } else "custom-cli")
         except ValidationIssue:
             raise
@@ -275,7 +275,7 @@ def _parse_profiles(
             "codex-fugu",
             "custom-cli",
             "host-native",
-            "devin-cli",
+            "devin-cli", "omp-cli",
         }:
             # Named custom profiles still use the custom-cli adapter contract.
             resolved_adapter = "custom-cli"

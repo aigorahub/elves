@@ -1,11 +1,11 @@
 ---
 name: elves
-description: Autonomous multi-batch development agent for long unattended runs, reviewed-PR landing, Cobbler-first orchestration, and optional Fugu, Manus, Grok, or Devin provider shortcuts. Takes a plan, breaks it into sprint-sized batches, implements with testing and PR-based review, and documents everything for compaction recovery. Use when user says "run overnight", "I'm going offline", "implement this plan", "keep going without me", "do not stop", "I'll be back in the morning", "run this end-to-end", asks to get a subagent to review the diff from main, read PR comments, test, fix, and merge commit once green, types \land-pr or /land-pr, asks for `/cobbler`, `/council`, `/ec`, `/elves-council`, `/fugu`, `/manus`, `/grok`, or `/devin`, or says `$elves cobbler`.
+description: Autonomous multi-batch development agent for long unattended runs, reviewed-PR landing, Cobbler-first orchestration, and optional Fugu, Manus, Grok, Devin, or Oh My Pi (omp) provider shortcuts. Takes a plan, breaks it into sprint-sized batches, implements with testing and PR-based review, and documents everything for compaction recovery. Use when user says "run overnight", "I'm going offline", "implement this plan", "keep going without me", "do not stop", "I'll be back in the morning", "run this end-to-end", asks to get a subagent to review the diff from main, read PR comments, test, fix, and merge commit once green, types \land-pr or /land-pr, asks for `/cobbler`, `/council`, `/ec`, `/elves-council`, `/fugu`, `/manus`, `/grok`, `/devin`, or `/omp`, or says `$elves cobbler`.
 license: MIT
 compatibility: Works with Claude Code, Codex, Grok Build, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.24.2"
+  version: "2.25.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -72,7 +72,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.24.2):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.25.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
@@ -201,10 +201,12 @@ falls back honestly to native. See `references/adaptive-worker-routing.md` and
 
 **Optional work drivers:** trusted Grok Build full-run
 (`implement full-run-prepare|full-run-launch|full-run-monitor|full-run-await|full-run-reconcile|full-run-logs`;
-`full-run-stop` for cancellation only) or legacy bounded batches; OpenCode/other adapters when
-configured. Host owns packets, protected refs, final gates, PR, and merge. Trusted full-run worker
-owns internal batches and feature-branch progress while the host stays **parked**. Untrusted lease
-writers remain detached with host import only.
+`full-run-stop` for cancellation only); **Oh My Pi (`omp-cli`)** parked full-run with the same
+lifecycle and host-owned authority; Devin CLI, OpenCode, and other adapters when configured; or
+legacy bounded batches. Host owns packets, protected refs, final gates, PR, and merge. Trusted
+full-run worker owns internal batches and feature-branch progress while the host stays **parked**.
+Untrusted lease writers remain detached with host import only. omp is never a main driver and is
+never required for native runs (`references/omp-worker.md`).
 
 Launch recipe: `references/grok-implementer-launch-prompt.md`. Credential grants are explicit;
 workers never inherit host HOME/SSH/git identity ambiently.
@@ -298,8 +300,12 @@ required capability, then execute it without an extra confirmation prompt:
   development session with no stored secret or knowledge grants unless a future explicit
   allowlist surface authorizes them. Its creation and poll requests use bounded response bodies and
   share a hard wall-clock wait budget; zero wait retains create-and-return behavior.
+- `/omp <instructions>` → `scripts/run_omp.sh <instructions>` for a bounded headless Oh My Pi
+  (`omp`) task: optional worker/shortcut only (not a main driver), run-scoped `--profile` and
+  private HOME/XDG isolation, never spell the CLI `opm`, never pass omp `--prewalk` as Elves
+  prewalk. Prefer explicit model pin via `ELVES_OMP_MODEL`. See `references/omp-worker.md`.
 
-The slash spellings are Claude Code managed aliases. Codex uses `$elves fugu|manus|grok|devin …`
+The slash spellings are Claude Code managed aliases. Codex uses `$elves fugu|manus|grok|devin|omp …`
 or natural language; **never invent top-level Codex slash commands**. These are optional paid
 provider routes, not the native default, and never grant merge, protected-ref, secret, or
 approval-bypass authority. Full transport, timeout, auth-name, and follow-link contracts:

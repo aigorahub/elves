@@ -35,6 +35,7 @@ EXPECTED_CLAUDE_ALIASES = (
     "manus",
     "grok",
     "devin",
+    "omp",
     "setup-cobbler",
     "setup-council",
 )
@@ -62,6 +63,7 @@ REQUIRED_TOP_LEVEL_RUNTIME_PATHS = (
     "scripts/run_manus.sh",
     "scripts/run_grok.sh",
     "scripts/run_devin.sh",
+    "scripts/run_omp.sh",
 )
 
 # Must never appear under an installed skill root (source-checkout archives).
@@ -206,7 +208,7 @@ def _validate_alias_installation(
         expected = set(EXPECTED_CLAUDE_ALIASES)
         if found != expected:
             failures.append(
-                "Claude install expected exactly eleven managed aliases "
+                "Claude install expected exactly twelve managed aliases "
                 f"{sorted(expected)}; found {sorted(found)}"
             )
         for name in EXPECTED_CLAUDE_ALIASES:

@@ -3290,7 +3290,7 @@ def build_parser() -> argparse.ArgumentParser:
     i_fr_prepare.add_argument(
         "--adapter",
         default="grok-build",
-        help="grok-build (default), devin-cli, or fixture (explicit test mode only)",
+        help="grok-build (default), devin-cli, omp-cli, or fixture (explicit test mode only)",
     )
     i_fr_prepare.add_argument(
         "--model",

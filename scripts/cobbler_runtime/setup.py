@@ -159,6 +159,16 @@ PROFILE_RECIPES: dict[str, dict[str, Any]] = {
             "Permission mode auto maps to dangerous for unattended labor."
         ),
     },
+    "omp-cli": {
+        "adapter": "omp-cli",
+        "executable": "omp",
+        "notes": (
+            "Oh My Pi (omp) — optional implement worker. Headless --mode json; "
+            "host captures session UUID from NDJSON; resume uses --resume <uuid> only. "
+            "Run-scoped --profile isolation; never --continue or omp --prewalk. "
+            "Pin model via requested_model (e.g. google/gemini-2.5-flash)."
+        ),
+    },
     "codex-fugu": {"adapter": "codex-fugu"},
     "codex-fugu-planning": {
         "adapter": "codex-fugu",

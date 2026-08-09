@@ -361,8 +361,8 @@ class SyncInstalledSkillsTests(unittest.TestCase):
             self.assertFalse((installed / "docs" / "plans").exists())
             self.assertFalse((installed / "docs" / "elves").exists())
 
-    def test_exactly_eleven_claude_aliases(self) -> None:
-        self.assertEqual(len(self.sync.CLAUDE_ALIAS_NAMES), 11)
+    def test_exactly_twelve_claude_aliases(self) -> None:
+        self.assertEqual(len(self.sync.CLAUDE_ALIAS_NAMES), 12)
         self.assertEqual(
             self.sync.CLAUDE_ALIAS_NAMES,
             [
@@ -375,6 +375,7 @@ class SyncInstalledSkillsTests(unittest.TestCase):
                 "manus",
                 "grok",
                 "devin",
+                "omp",
                 "setup-cobbler",
                 "setup-council",
             ],

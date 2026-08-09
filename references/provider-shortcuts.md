@@ -10,6 +10,7 @@ not change the native-first worker default, the supported-host policy, or landin
 | Manus web research | `/manus [--wide\|--fanout] …` | `$elves manus [--wide\|--fanout] …` | `run_manus.sh` |
 | Grok Build headless task | `/grok <instructions>` | `$elves grok <instructions>` | `run_grok.sh` |
 | Devin remote task | `/devin <instructions>` | `$elves devin <instructions>` | `run_devin.sh` |
+| Oh My Pi headless task | `/omp <instructions>` | `$elves omp <instructions>` | `run_omp.sh` |
 
 Resolve each runner from the **active Elves skill root**, keep the target repository as the working
 directory, validate arguments, and execute only after the user explicitly invokes the matching
@@ -423,3 +424,12 @@ controlled proxies.
 These routes can consume paid provider capacity. They never grant merge, protected-ref, secret,
 or approval-bypass authority, and their output remains evidence for the supported Claude Code or
 Codex driver to review.
+
+
+## Oh My Pi (`omp`)
+
+- Runner: `scripts/run_omp.sh` (Claude `/omp`, Codex/Grok `$elves omp` or natural language).
+- CLI binary is **`omp`** only (never `opm`). Not a main driver.
+- Isolation: shared `isolated_lane` snapshot + single provider-matched API key via `ELVES_OMP_MODEL`.
+- Read-only shortcut; `ELVES_OMP_WRITE` is rejected. Implementation labor uses full-run `omp-cli`.
+- Full reference: [`omp-worker.md`](omp-worker.md).
