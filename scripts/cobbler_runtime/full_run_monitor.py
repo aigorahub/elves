@@ -13,6 +13,7 @@ from typing import Any
 # loaded only after full_run has finished initializing (via full_run.__getattr__
 # or an explicit import by the CLI after full_run is already loaded).
 from . import full_run as _fr
+import json
 
 
 _KEEP = frozenset(
@@ -111,6 +112,18 @@ def monitor_full_run(
     # Devin CLI does not preallocate a session id; capture the exact provider
     # UUID using the isolated worker env. Capture is attempted even if a fast
     # worker has already exited, so long as an identity has not been retired.
+    if (
+        state.adapter == "omp-cli"
+        and not state.provider_session_id
+        and not identity_retired
+    ):
+        captured = _capture_omp_session_id(state, root, Path(repo_root))
+        if captured:
+            state.provider_session_id = captured
+            cache["omp_capture_succeeded_at"] = time.monotonic()
+            state.monitor_cache = cache
+            save_state(repo_root, state)
+
     if (
         state.adapter == "devin-cli"
         and not state.provider_session_id
@@ -621,12 +634,12 @@ def monitor_full_run(
             and report.get("status") == "complete"
         )
         if clean_exit and complete_report and not protected_errors:
-            if state.adapter == "devin-cli" and not (
+            if state.adapter in {"devin-cli", "omp-cli"} and not (
                 state.provider_session_id or ""
             ).strip():
                 state.status = "blocked"
                 state.blocker = (
-                    "Devin full-run cannot complete without a captured "
+                    f"{state.adapter} full-run cannot complete without a captured "
                     "provider session id"
                 )
                 state.next_action = "driver_wake_reconcile"
@@ -1081,3 +1094,36 @@ def await_full_run(
         if timeout_seconds is not None:
             delay = min(delay, max(0.0, float(timeout_seconds) - elapsed))
         sleep(delay)
+
+
+def _capture_omp_session_id(state, root, repo_root):
+    """Parse provider_session_id from OMP NDJSON event logs if present."""
+    candidates = [
+        root / "events.jsonl",
+        root / "stdout.log",
+        root / "provider.stdout",
+        root / "child.stdout",
+    ]
+    for path in candidates:
+        try:
+            if not path.is_file() or path.is_symlink():
+                continue
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        for line in text.splitlines():
+            line = line.strip()
+            if not line.startswith("{"):
+                continue
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(event, dict) or event.get("type") != "session":
+                continue
+            sid = event.get("id")
+            if isinstance(sid, str) and sid.strip():
+                return sid.strip()
+    return None
+
+

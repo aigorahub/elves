@@ -21,3 +21,12 @@
 - Session sync-session --write: **OK**.
 - Batches: B0 optional shortcut; B1 adapter; B2 full-run; B3 auth/isolation; B4 docs; B5/B6 deferred.
 - Ready for implementation after staging commit/push.
+
+## 2026-08-09 — Implementation complete (B0–B4)
+
+- Implemented `omp-cli` adapter, `decode_omp_jsonl`, `_build_omp_launch_argv`, full_run session capture.
+- Shipped `scripts/run_omp.sh`, Claude `/omp` alias, sync ship list, docs (`references/omp-worker.md`), CHANGELOG Unreleased, SKILL pointers.
+- Isolation via run-scoped `--profile`; forbid `--continue` and omp `--prewalk`.
+- Impact tests: `test_omp_cli_adapter`, implement, setup, sync, provider_shortcuts, installed_bundle_smoke — **190 OK (4 skipped)**.
+- B5/B6 remain deferred (host-profile prewalk; main-driver install).
+- Merge policy: user-merges; no merge performed.

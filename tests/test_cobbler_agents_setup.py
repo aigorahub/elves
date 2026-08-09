@@ -45,6 +45,7 @@ class InventoryTests(unittest.TestCase):
                 "antigravity-cli": False,
                 "opencode-cli": False,
                 "devin-cli": False,
+                "omp-cli": False,
             }
         )
         by_name = {i.adapter: i for i in items}
@@ -385,7 +386,7 @@ class AliasDelegationTests(unittest.TestCase):
         # Package is shipped recursively; individual modules need no allowlist entry.
         self.assertIn("scripts/cobbler_runtime", mod.RUNTIME_SCRIPT_PATHS)
         self.assertIn("scripts/openrouter_lens.py", mod.RUNTIME_SCRIPT_PATHS)
-        self.assertEqual(len(mod.CLAUDE_ALIAS_NAMES), 11)
+        self.assertEqual(len(mod.CLAUDE_ALIAS_NAMES), 12)
 
 
 if __name__ == "__main__":

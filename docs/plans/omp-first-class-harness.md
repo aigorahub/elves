@@ -83,13 +83,13 @@ Ship **Phase 1—an optional trusted parked full-run `omp-cli` worker—as the p
 
 **Acceptance criteria:**
 
-- [ ] B0-A1: `/omp <instructions>` on Claude Code and `$elves omp <instructions>` or equivalent natural language on Codex/Grok resolve `run_omp.sh` from the active installed Elves skill root.
-- [ ] B0-A2: The command is always `omp`; `opm` is neither accepted nor documented.
-- [ ] B0-A3: The shortcut uses a policy-admitted disposable snapshot, a finite hard wall limit, closed stdin, and a run-scoped profile.
-- [ ] B0-A4: Read-only behavior is the default. Any write form requires independent user implementation authority and the existing qualified writable-snapshot boundary.
-- [ ] B0-A5: No host `HOME`, agent configuration, Git credentials, PR authority, or merge authority is inherited.
-- [ ] B0-A6: Missing executable or auth, malformed NDJSON, timeout, incomplete terminal output, and cleanup failure return clear nonzero failures without affecting native routes.
-- [ ] B0-A7: An unmarked user-owned Claude alias is reported as a conflict before any installed skill files are changed.
+- [x] B0-A1: `/omp <instructions>` on Claude Code and `$elves omp <instructions>` or equivalent natural language on Codex/Grok resolve `run_omp.sh` from the active installed Elves skill root.
+- [x] B0-A2: The command is always `omp`; `opm` is neither accepted nor documented.
+- [x] B0-A3: The shortcut uses a policy-admitted disposable snapshot, a finite hard wall limit, closed stdin, and a run-scoped profile.
+- [x] B0-A4: Read-only behavior is the default. Any write form requires independent user implementation authority and the existing qualified writable-snapshot boundary.
+- [x] B0-A5: No host `HOME`, agent configuration, Git credentials, PR authority, or merge authority is inherited.
+- [x] B0-A6: Missing executable or auth, malformed NDJSON, timeout, incomplete terminal output, and cleanup failure return clear nonzero failures without affecting native routes.
+- [x] B0-A7: An unmarked user-owned Claude alias is reported as a conflict before any installed skill files are changed.
 
 **Risk:** Standard—shortcut intent could otherwise be confused with trusted implementation authority.
 
@@ -128,15 +128,15 @@ Ship **Phase 1—an optional trusted parked full-run `omp-cli` worker—as the p
 
 **Acceptance criteria:**
 
-- [ ] B1-A1: `omp-cli` is a canonical built-in adapter with persistent-session and isolated-write capabilities; it never silently degrades to `custom-cli`.
-- [ ] B1-A2: Its canonical contract pair is `("none", "omp-jsonl")`: the complete packet is passed as a positional argv token after `--print`, not misrepresented as a prompt file or stdin transport.
-- [ ] B1-A3: `omp-jsonl` is a supported output contract with one strict decoder selected by `default_decoder_for_adapter`.
-- [ ] B1-A4: Create argv contains `--mode json`, exact worktree `--cwd`, requested model, thinking level, approval mode, isolated `--profile`, `--print`, and the complete redacted packet.
-- [ ] B1-A5: Resume argv contains `--resume <exact-uuid>` and never contains `--continue`, `-c`, bare `--resume`, latest/current selectors, or OMP `--prewalk`.
-- [ ] B1-A6: Profile `extra_args` cannot override `--mode`, `--cwd`, `--model`, `--thinking`, `--approval-mode`, `--profile`, `--print`, `--resume`, or session-selection controls.
-- [ ] B1-A7: The decoder binds session identity, model, usage, messages, and terminal state only from documented typed events.
-- [ ] B1-A8: Empty output, malformed rows, malformed or conflicting UUIDs, conflicting model evidence, invalid usage, missing output, missing terminal state, and size-limit violations fail with stable validation codes.
-- [ ] B1-A9: Existing Claude, Grok, Codex, Gemini, Antigravity, OpenCode, Devin, custom, and host-native registry and argv tests remain unchanged.
+- [x] B1-A1: `omp-cli` is a canonical built-in adapter with persistent-session and isolated-write capabilities; it never silently degrades to `custom-cli`.
+- [x] B1-A2: Its canonical contract pair is `("none", "omp-jsonl")`: the complete packet is passed as a positional argv token after `--print`, not misrepresented as a prompt file or stdin transport.
+- [x] B1-A3: `omp-jsonl` is a supported output contract with one strict decoder selected by `default_decoder_for_adapter`.
+- [x] B1-A4: Create argv contains `--mode json`, exact worktree `--cwd`, requested model, thinking level, approval mode, isolated `--profile`, `--print`, and the complete redacted packet.
+- [x] B1-A5: Resume argv contains `--resume <exact-uuid>` and never contains `--continue`, `-c`, bare `--resume`, latest/current selectors, or OMP `--prewalk`.
+- [x] B1-A6: Profile `extra_args` cannot override `--mode`, `--cwd`, `--model`, `--thinking`, `--approval-mode`, `--profile`, `--print`, `--resume`, or session-selection controls.
+- [x] B1-A7: The decoder binds session identity, model, usage, messages, and terminal state only from documented typed events.
+- [x] B1-A8: Empty output, malformed rows, malformed or conflicting UUIDs, conflicting model evidence, invalid usage, missing output, missing terminal state, and size-limit violations fail with stable validation codes.
+- [x] B1-A9: Existing Claude, Grok, Codex, Gemini, Antigravity, OpenCode, Devin, custom, and host-native registry and argv tests remain unchanged.
 
 **Risk:** High—a permissive parser could allow model-authored text to forge transport identity or resume the wrong session.
 
@@ -176,18 +176,18 @@ Ship **Phase 1—an optional trusted parked full-run `omp-cli` worker—as the p
 
 **Acceptance criteria:**
 
-- [ ] B2-A1: `full-run-prepare --adapter omp-cli` validates the staged packet, acceptance mapping, worktree, branch, protected refs, executable, requested model, thinking level, approval mode, and run profile before launch.
-- [ ] B2-A2: `full-run-launch`, `monitor`, `await`, `logs`, `stop`, and `reconcile` return the existing provider-neutral result shapes.
-- [ ] B2-A3: Create starts without a provider session ID. The first authoritative `session` event supplies the canonical UUID, which is persisted as `provider_session_id` before resume is permitted.
-- [ ] B2-A4: No listing, “current,” latest-session, or report-text fallback is used when the session event is missing.
-- [ ] B2-A5: Repeated identical session events are idempotent; zero session identities or conflicting identities block the run.
-- [ ] B2-A6: Resume requires the captured UUID, same worktree, same run profile, an authenticated prior host interruption, a closed prior process identity, unchanged packet/acceptance bindings, and a nonterminal event log.
-- [ ] B2-A7: Resume argv is inspected before spawn and must contain the exact `--resume <provider_session_id>` pair.
-- [ ] B2-A8: EOF or process exit zero without `agent_end` is incomplete rather than successful.
-- [ ] B2-A9: Nonzero exit, malformed terminal data, session/model conflict, unsafe branch movement, protected-ref movement, or missing identity produces a bounded blocked/interrupted result.
-- [ ] B2-A10: A healthy run may make meaningful commits on the assigned feature branch and wakes the parked driver only on terminal, safety, checkpoint, blocker, or explicit-stop conditions.
-- [ ] B2-A11: Reconciliation derives transport/session/model/usage evidence from the host decoder rather than worker report prose; worker `merge_authority` remains false.
-- [ ] B2-A12: Existing Grok and Devin full-run fixtures remain green without semantic changes.
+- [x] B2-A1: `full-run-prepare --adapter omp-cli` validates the staged packet, acceptance mapping, worktree, branch, protected refs, executable, requested model, thinking level, approval mode, and run profile before launch.
+- [x] B2-A2: `full-run-launch`, `monitor`, `await`, `logs`, `stop`, and `reconcile` return the existing provider-neutral result shapes.
+- [x] B2-A3: Create starts without a provider session ID. The first authoritative `session` event supplies the canonical UUID, which is persisted as `provider_session_id` before resume is permitted.
+- [x] B2-A4: No listing, “current,” latest-session, or report-text fallback is used when the session event is missing.
+- [x] B2-A5: Repeated identical session events are idempotent; zero session identities or conflicting identities block the run.
+- [x] B2-A6: Resume requires the captured UUID, same worktree, same run profile, an authenticated prior host interruption, a closed prior process identity, unchanged packet/acceptance bindings, and a nonterminal event log.
+- [x] B2-A7: Resume argv is inspected before spawn and must contain the exact `--resume <provider_session_id>` pair.
+- [x] B2-A8: EOF or process exit zero without `agent_end` is incomplete rather than successful.
+- [x] B2-A9: Nonzero exit, malformed terminal data, session/model conflict, unsafe branch movement, protected-ref movement, or missing identity produces a bounded blocked/interrupted result.
+- [x] B2-A10: A healthy run may make meaningful commits on the assigned feature branch and wakes the parked driver only on terminal, safety, checkpoint, blocker, or explicit-stop conditions.
+- [x] B2-A11: Reconciliation derives transport/session/model/usage evidence from the host decoder rather than worker report prose; worker `merge_authority` remains false.
+- [x] B2-A12: Existing Grok and Devin full-run fixtures remain green without semantic changes.
 
 **Risk:** High—session capture, process settlement, terminal recognition, and authenticated recovery directly affect readiness.
 
@@ -229,16 +229,16 @@ Ship **Phase 1—an optional trusted parked full-run `omp-cli` worker—as the p
 
 **Acceptance criteria:**
 
-- [ ] B3-A1: Doctor/setup/onboard separately report executable presence, version, authentication, exact-resume support, NDJSON support, isolated-write support, usage reporting, and qualification.
-- [ ] B3-A2: Inventory never invents remaining quota, authentication success, model availability, or qualification.
-- [ ] B3-A3: Provider authentication is granted only through the exact selected and allowlisted environment variable or a separately qualified exact source projection.
-- [ ] B3-A4: Credentials for unselected providers are absent even if present in the host environment.
-- [ ] B3-A5: Every launch receives a private run HOME/XDG tree and a run-scoped `--profile`; the same profile identity is retained across exact resume.
-- [ ] B3-A6: Host `~/.claude/tools` is never copied, mounted wholesale, or exposed writable. A tool-name collision fails before launch or is handled using a run-owned exact tool installation.
-- [ ] B3-A7: Other agent configuration roots, SSH material, private keys, global Git configuration, and credential stores remain unavailable.
-- [ ] B3-A8: OMP provider auth does not imply GitHub push auth. Push remains a separate explicit host grant.
-- [ ] B3-A9: Explicit `omp-cli` selection may proceed only when capability and authority checks pass; otherwise routing records an honest native fallback.
-- [ ] B3-A10: Existing Grok consent, Devin behavior, and host-native route selection remain unchanged.
+- [x] B3-A1: Doctor/setup/onboard separately report executable presence, version, authentication, exact-resume support, NDJSON support, isolated-write support, usage reporting, and qualification.
+- [x] B3-A2: Inventory never invents remaining quota, authentication success, model availability, or qualification.
+- [x] B3-A3: Provider authentication is granted only through the exact selected and allowlisted environment variable or a separately qualified exact source projection.
+- [x] B3-A4: Credentials for unselected providers are absent even if present in the host environment.
+- [x] B3-A5: Every launch receives a private run HOME/XDG tree and a run-scoped `--profile`; the same profile identity is retained across exact resume.
+- [x] B3-A6: Host `~/.claude/tools` is never copied, mounted wholesale, or exposed writable. A tool-name collision fails before launch or is handled using a run-owned exact tool installation.
+- [x] B3-A7: Other agent configuration roots, SSH material, private keys, global Git configuration, and credential stores remain unavailable.
+- [x] B3-A8: OMP provider auth does not imply GitHub push auth. Push remains a separate explicit host grant.
+- [x] B3-A9: Explicit `omp-cli` selection may proceed only when capability and authority checks pass; otherwise routing records an honest native fallback.
+- [x] B3-A10: Existing Grok consent, Devin behavior, and host-native route selection remain unchanged.
 
 **Risk:** High—multi-provider auth and shared configuration paths can silently broaden authority.
 
@@ -278,15 +278,15 @@ Ship **Phase 1—an optional trusted parked full-run `omp-cli` worker—as the p
 
 **Acceptance criteria:**
 
-- [ ] B4-A1: Documentation presents OMP as an optional trusted worker and retains Claude Code, Codex, and Grok Build as the supported main drivers.
-- [ ] B4-A2: Documentation explicitly distinguishes OMP `--prewalk` from Elves exact-session prewalk.
-- [ ] B4-A3: Create, session capture, follow, interruption, exact resume, profile isolation, auth grants, and host reconciliation have copy-paste examples.
-- [ ] B4-A4: The existing recursive `cobbler_runtime` shipment includes all new runtime code without introducing a new per-module copy list.
-- [ ] B4-A5: Existing Claude, Codex, and Grok skill roots receive the OMP worker runtime and reference; Phase 1 does not invent an OMP main-driver install root.
-- [ ] B4-A6: Installed-bundle smoke proves `omp-cli` retains its registry identity and that native operation does not require an installed `omp`.
-- [ ] B4-A7: If B0 is included, Claude’s managed alias inventory changes atomically from eleven to twelve while Codex and Grok continue to receive no Claude aliases.
-- [ ] B4-A8: Repository consistency checks reject `opm` when used as an Oh My Pi executable, adapter, profile, alias, or command.
-- [ ] B4-A9: Focused tests and the applicable repository verifier pass without weakening or skipping tests.
+- [x] B4-A1: Documentation presents OMP as an optional trusted worker and retains Claude Code, Codex, and Grok Build as the supported main drivers.
+- [x] B4-A2: Documentation explicitly distinguishes OMP `--prewalk` from Elves exact-session prewalk.
+- [x] B4-A3: Create, session capture, follow, interruption, exact resume, profile isolation, auth grants, and host reconciliation have copy-paste examples.
+- [x] B4-A4: The existing recursive `cobbler_runtime` shipment includes all new runtime code without introducing a new per-module copy list.
+- [x] B4-A5: Existing Claude, Codex, and Grok skill roots receive the OMP worker runtime and reference; Phase 1 does not invent an OMP main-driver install root.
+- [x] B4-A6: Installed-bundle smoke proves `omp-cli` retains its registry identity and that native operation does not require an installed `omp`.
+- [x] B4-A7: If B0 is included, Claude’s managed alias inventory changes atomically from eleven to twelve while Codex and Grok continue to receive no Claude aliases.
+- [x] B4-A8: Repository consistency checks reject `opm` when used as an Oh My Pi executable, adapter, profile, alias, or command.
+- [x] B4-A9: Focused tests and the applicable repository verifier pass without weakening or skipping tests.
 
 **Risk:** Standard—documentation or installation drift could overstate support or authority.
 
@@ -387,13 +387,13 @@ Ship **Phase 1—an optional trusted parked full-run `omp-cli` worker—as the p
 
 ## Master Acceptance
 
-- [ ] M-A1: A supported Elves host can stage one acceptance-bound packet and run OMP as an optional trusted parked implementation worker.
-- [ ] M-A2: The host captures one exact OMP UUID from typed NDJSON and uses only `--resume <uuid>` for recovery.
-- [ ] M-A3: Successful completion requires `agent_end`, process exit zero, valid identity/model evidence, and clean host safety checks.
-- [ ] M-A4: Provider credentials, OMP profile state, worktree authority, GitHub push authority, and merge authority remain separate.
-- [ ] M-A5: Missing OMP capability falls back honestly to native work and never makes OMP mandatory.
-- [ ] M-A6: Existing Grok, Devin, and host-native behavior remains green.
-- [ ] M-A7: User-facing documentation and installed bundles describe the supported Phase 1 route without implying Phase 2 or Phase 3 support.
+- [x] M-A1: A supported Elves host can stage one acceptance-bound packet and run OMP as an optional trusted parked implementation worker.
+- [x] M-A2: The host captures one exact OMP UUID from typed NDJSON and uses only `--resume <uuid>` for recovery.
+- [x] M-A3: Successful completion requires `agent_end`, process exit zero, valid identity/model evidence, and clean host safety checks.
+- [x] M-A4: Provider credentials, OMP profile state, worktree authority, GitHub push authority, and merge authority remain separate.
+- [x] M-A5: Missing OMP capability falls back honestly to native work and never makes OMP mandatory.
+- [x] M-A6: Existing Grok, Devin, and host-native behavior remains green.
+- [x] M-A7: User-facing documentation and installed bundles describe the supported Phase 1 route without implying Phase 2 or Phase 3 support.
 
 ---
 

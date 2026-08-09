@@ -59,6 +59,7 @@ TOP_LEVEL_RUNTIME_SCRIPT_PATHS = [
     "scripts/run_manus.sh",
     "scripts/run_grok.sh",
     "scripts/run_devin.sh",
+    "scripts/run_omp.sh",
 ]
 
 # Source-checkout archives that must never appear in an installed skill bundle.
@@ -106,6 +107,7 @@ CLAUDE_ALIAS_NAMES = [
     "manus",
     "grok",
     "devin",
+    "omp",
     "setup-cobbler",
     "setup-council",
 ]

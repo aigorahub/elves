@@ -4,6 +4,13 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+### Added
+- Optional **Oh My Pi (`omp`)** parked full-run worker adapter `omp-cli` with headless
+  `--mode json`, stream-captured session UUIDs, exact `--resume` only, run-scoped
+  `--profile` isolation, and provider shortcut `run_omp.sh` / `/omp` (never `opm`;
+  not a main driver).
+
+
 ## [2.24.2] - 2026-08-07
 
 Maintainer land polish after dual Fugu + host review of the v2.24.1 harvest PR.

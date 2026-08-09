@@ -70,6 +70,7 @@ PURPOSE_CATALOG: tuple[dict[str, Any], ...] = (
             "codex-fugu-labor",
             "grok-build",
             "devin-cli",
+            "omp-cli",
             "claude-code",
             "codex-fugu",
             "antigravity-labor",
@@ -189,6 +190,11 @@ ROUTE_HELP: dict[str, str] = {
     "devin-cli": (
         "Devin CLI (Cognition) — optional implement worker pinned to SWE-1.7 Lightning; "
         "host captures exact session id; exact --resume <id> only"
+    ),
+    "omp-cli": (
+        "Oh My Pi (omp) — optional implement worker; headless --mode json; "
+        "host captures session UUID from NDJSON; exact --resume only; "
+        "run-scoped --profile isolation"
     ),
     "codex-fugu": "Codex/Fugu CLI (default model for the install)",
     "codex-fugu-planning": "Codex high-quality tier for plan/review (pin requested_model in TOML)",

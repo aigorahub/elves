@@ -138,3 +138,7 @@ narrow auth projection, catalog-only model selection, and sanitized streaming fo
 | `references/*` | Runtime, authority, follow, proof, schema details |
 
 Native-only overnight runs require no Grok, OpenRouter, or other external provider.
+
+## Optional omp worker
+
+Optional Oh My Pi (`omp` / `omp-cli`) is a parked full-run worker available under Claude, Codex, and Grok drivers with identical authority boundaries. See `references/omp-worker.md`.

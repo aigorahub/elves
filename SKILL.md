@@ -295,11 +295,13 @@ required capability, then execute it without an extra confirmation prompt:
   inspection. Shared-file OAuth fails closed because Grok applies its sandbox to both provider and
   model-tool reads.
 - `/devin <instructions>` → `scripts/run_devin.sh <instructions>` for a bounded remote Devin
-  development session with no stored secret or knowledge grants unless a future explicit
+  development session
+- `/omp <instructions>` → `scripts/run_omp.sh <instructions>` for a bounded headless Oh My Pi
+  (`omp`) task (optional worker; not a main driver; exact profile isolation; never `opm`) with no stored secret or knowledge grants unless a future explicit
   allowlist surface authorizes them. Its creation and poll requests use bounded response bodies and
   share a hard wall-clock wait budget; zero wait retains create-and-return behavior.
 
-The slash spellings are Claude Code managed aliases. Codex uses `$elves fugu|manus|grok|devin …`
+The slash spellings are Claude Code managed aliases. Codex uses `$elves fugu|manus|grok|devin|omp …`
 or natural language; **never invent top-level Codex slash commands**. These are optional paid
 provider routes, not the native default, and never grant merge, protected-ref, secret, or
 approval-bypass authority. Full transport, timeout, auth-name, and follow-link contracts:

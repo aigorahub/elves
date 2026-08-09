@@ -56,16 +56,14 @@ without making omp a main driver and without weakening Grok/Devin/host-native pa
 
 ## Stop Gate
 
-- **Stop allowed right now:** no (implementation incomplete; staging docs committed)
-- **continuation_guard.stop_allowed:** false until Master Acceptance or user stop
+- **Stop allowed right now:** yes (B0–B4 complete; B5/B6 deferred; landable PR only; user-merges)
+- **continuation_guard.stop_allowed:** true
 
 ## Next action
 
-1. Staging is complete (plan Fugu-aligned, acceptance_contract OK).
-2. Push staging commit on `feat/omp-first-class-harness` if not yet remote.
-3. On user go: implement B1 (adapter) → B2 (full-run) → B3 (auth/isolation) → B4 (docs);
-   optional B0 shortcut if included; never start deferred B5/B6.
-4. Keep work driver host-native while building the omp adapter.
+1. Implementation B0–B4 complete and pushed.
+2. Open/update landable PR when desired; do not merge without explicit user authorization.
+3. Do not start B5/B6 unless newly planned.
 
 ## Decisions made
 

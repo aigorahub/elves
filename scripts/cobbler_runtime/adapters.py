@@ -174,6 +174,14 @@ _BUILTIN: dict[str, StubAdapter] = {
         # Full-run capable isolated write implementer; host captures provider session id.
         supports_isolated_write=True,
     ),
+    "omp-cli": StubAdapter(
+        name="omp-cli",
+        executable_hint="omp",
+        # Exact --resume <uuid> only (never --continue / -c / latest).
+        supports_persistent_sessions=True,
+        # Full-run capable isolated write implementer; host captures session from NDJSON.
+        supports_isolated_write=True,
+    ),
     "custom-cli": StubAdapter(
         name="custom-cli",
         executable_hint="(user-defined)",
@@ -326,6 +334,26 @@ _RESERVED_CONTROL_FLAGS: dict[str, frozenset[str]] = {
             "--respect-workspace-trust",
         }
     ),
+    "omp-cli": frozenset(
+        {
+            "--mode",
+            "--model",
+            "--thinking",
+            "--approval-mode",
+            "--auto-approve",
+            "--cwd",
+            "--profile",
+            "--session-dir",
+            "--resume",
+            "-r",
+            "--continue",
+            "-c",
+            "--print",
+            "-p",
+            "--prewalk",
+            "--no-session",
+        }
+    ),
     "custom-cli": frozenset(),
 }
 
@@ -343,6 +371,7 @@ ALLOWED_OUTPUT_CONTRACTS: frozenset[str] = frozenset(
         "claude-json",
         "grok-json",
         "codex-jsonl",
+        "omp-jsonl",
         "custom-json-envelope",
         "host-injected",
         "json-role-report",  # legacy alias -> custom envelope for wrappers
@@ -431,6 +460,8 @@ def default_profiles() -> dict[str, HarnessProfile]:
             input_c, output_c = "none", "custom-json-envelope"
         elif name == "devin-cli":
             input_c, output_c = "prompt-file", "custom-json-envelope"
+        elif name == "omp-cli":
+            input_c, output_c = "none", "omp-jsonl"
         elif name == "custom-cli":
             input_c, output_c = "json-stdio", "custom-json-envelope"
         else:
@@ -457,6 +488,7 @@ def default_decoder_for_adapter(adapter: str) -> str:
         "grok-build": "grok-json",
         "codex-fugu": "codex-jsonl",
         "devin-cli": "custom-json-envelope",
+        "omp-cli": "omp-jsonl",
         "custom-cli": "custom-json-envelope",
         "host-native": "host-injected",
     }.get(name, "custom-json-envelope")
@@ -521,6 +553,7 @@ ADAPTER_CONTRACT_PAIRS: dict[str, tuple[str, str]] = {
     "antigravity-cli": ("none", "custom-json-envelope"),
     "opencode-cli": ("none", "custom-json-envelope"),
     "devin-cli": ("prompt-file", "custom-json-envelope"),
+    "omp-cli": ("none", "omp-jsonl"),
     "custom-cli": ("json-stdio", "custom-json-envelope"),
     "host-native": ("host-injected", "host-injected"),
 }
@@ -839,6 +872,57 @@ def build_readonly_invocation(
             prompt_file_body=full_prompt,
             session_id=exact_session,
         )
+
+    if name == "omp-cli":
+        if not exe:
+            exe = "omp"
+        profile_name = f"elves-omp-ro-{Path(work_cwd or '.').name}"[:48]
+        argv_list = [
+            exe,
+            "--mode",
+            "json",
+            "--approval-mode",
+            "always-ask",
+            "--profile",
+            profile_name,
+            "--thinking",
+            "medium",
+        ]
+        if work_cwd:
+            argv_list.extend(["--cwd", str(work_cwd)])
+        if exact_session:
+            argv_list.extend(["--resume", exact_session])
+        if requested_model:
+            argv_list.extend(["--model", str(requested_model)])
+        # Packet as @file then short task; never --continue
+        argv_list.append(f"@{prompt_path}")
+        argv_list.append(full_prompt if full_prompt.strip() else "Follow the attached packet.")
+        argv_list.extend(extras)
+        inv = AdapterInvocation(
+            adapter=name,
+            executable=exe,
+            argv=tuple(argv_list),
+            read_only=True,
+            tool_scope="read-only",
+            sandbox_scope="ephemeral",
+            notes=(
+                "Oh My Pi (omp) headless --mode json; exact --resume <uuid> only; "
+                "never --continue/-c; never omp --prewalk. Host captures session id "
+                "from typed NDJSON session events."
+            ),
+            stdin_text=None,
+            input_mode="none",
+            decoder="omp-jsonl",
+            cwd=work_cwd,
+            session_id=exact_session,
+        )
+        assert_no_ambiguous_session_flags(inv.argv)
+        if "--prewalk" in inv.argv:
+            raise ValidationIssue(
+                "omp_prewalk_forbidden",
+                "omp --prewalk is not Elves exact-session prewalk and is forbidden",
+            )
+        return inv
 
     if name in {"gemini-cli", "antigravity-cli"}:
         # Dogfood (2026-07): Gemini CLI 0.50 + Antigravity CLI (agy) 1.1.
@@ -1390,6 +1474,143 @@ def decode_custom_json_envelope(
     )
 
 
+
+def decode_omp_jsonl(
+    stdout: str,
+    *,
+    expected_role: str | None = None,
+) -> TransportDecodeResult:
+    """Oh My Pi ``omp --mode json`` NDJSON stream decoder.
+
+    Transport authority fields only:
+    - session id from ``{"type":"session","id":...}``
+    - model/provider from assistant message metadata (not free text)
+    - terminal from ``agent_end`` (required for success)
+    """
+    lines = [ln.strip() for ln in stdout.splitlines() if ln.strip()]
+    if not lines:
+        raise ValidationIssue("empty_output", "OMP JSONL stdout is empty")
+
+    session_id: str | None = None
+    actual: str | None = None
+    source: str | None = None
+    texts: list[str] = []
+    saw_agent_end = False
+    usage_note = ""
+
+    for line in lines:
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise ValidationIssue(
+                "malformed_json",
+                f"OMP JSONL line is not valid JSON: {exc.msg}",
+            ) from exc
+        if not isinstance(event, dict):
+            continue
+        et = event.get("type")
+        if et == "session":
+            raw_id = event.get("id")
+            if not isinstance(raw_id, str) or not raw_id.strip():
+                raise ValidationIssue(
+                    "malformed_output",
+                    "OMP session event missing string id",
+                )
+            sid = raw_id.strip()
+            if session_id is None:
+                session_id = sid
+            elif session_id != sid:
+                raise ValidationIssue(
+                    "session_id_conflict",
+                    f"OMP stream emitted conflicting session ids ({session_id} vs {sid})",
+                )
+        elif et in {"message_end", "message_start"}:
+            msg = event.get("message")
+            if isinstance(msg, dict) and msg.get("role") == "assistant":
+                model = msg.get("model")
+                provider = msg.get("provider")
+                if isinstance(model, str) and model.strip():
+                    if isinstance(provider, str) and provider.strip():
+                        actual = f"{provider.strip()}/{model.strip()}"
+                    else:
+                        actual = model.strip()
+                    source = "omp.message.model"
+                content = msg.get("content")
+                if isinstance(content, list):
+                    for part in content:
+                        if isinstance(part, dict) and part.get("type") == "text":
+                            text = part.get("text")
+                            if isinstance(text, str) and text.strip():
+                                texts.append(text)
+                usage = msg.get("usage")
+                if isinstance(usage, dict):
+                    usage_note = f"usage_tokens={usage.get('totalTokens')}"
+        elif et == "agent_end":
+            saw_agent_end = True
+            msgs = event.get("messages")
+            if isinstance(msgs, list):
+                for msg in msgs:
+                    if not isinstance(msg, dict) or msg.get("role") != "assistant":
+                        continue
+                    model = msg.get("model")
+                    provider = msg.get("provider")
+                    if isinstance(model, str) and model.strip():
+                        if isinstance(provider, str) and provider.strip():
+                            actual = f"{provider.strip()}/{model.strip()}"
+                        else:
+                            actual = model.strip()
+                        source = "omp.agent_end.model"
+                    content = msg.get("content")
+                    if isinstance(content, list):
+                        for part in content:
+                            if isinstance(part, dict) and part.get("type") == "text":
+                                text = part.get("text")
+                                if isinstance(text, str) and text.strip():
+                                    texts.append(text)
+
+    if session_id is None:
+        raise ValidationIssue(
+            "malformed_output",
+            "OMP JSONL stream contained no session id",
+        )
+    if not saw_agent_end:
+        raise ValidationIssue(
+            "malformed_output",
+            "OMP JSONL stream missing agent_end terminal event",
+        )
+    if not texts:
+        raise ValidationIssue(
+            "malformed_output",
+            "OMP JSONL stream contained no assistant text",
+        )
+    # Free-text assistant bodies are not role-report JSON; wrap as host transport summary.
+    summary = texts[-1].strip()
+    role = (expected_role or "implement").strip() or "implement"
+    report = validate_role_report(
+        {
+            "role": role,
+            "verdict": "info",
+            "confidence": 0.5,
+            "key_findings": [summary[:500]],
+            "evidence": ["omp.assistant_text"],
+            "risks": [],
+            "recommended_actions": [],
+            "open_questions": [],
+        },
+        expected_role=expected_role,
+    )
+    notes = ["omp-jsonl"]
+    if usage_note:
+        notes.append(usage_note)
+    return TransportDecodeResult(
+        role_report=report,
+        actual_model=actual,
+        model_evidence_source=source,
+        session_id=session_id,
+        transport_notes=tuple(notes),
+    )
+
+
 def decode_adapter_output(
     stdout: str,
     *,
@@ -1406,6 +1627,8 @@ def decode_adapter_output(
         result = decode_grok_json(stdout, expected_role=expected_role)
     elif name in {"codex-jsonl"}:
         result = decode_codex_jsonl(stdout, expected_role=expected_role)
+    elif name in {"omp-jsonl"}:
+        result = decode_omp_jsonl(stdout, expected_role=expected_role)
     elif name in {"custom-json-envelope", "json-role-report", "json-transport-envelope"}:
         result = decode_custom_json_envelope(stdout, expected_role=expected_role)
     else:
@@ -1647,6 +1870,35 @@ def build_session_create_invocation(
         )
         assert_no_ambiguous_session_flags(inv.argv)
         return inv
+    if name == "omp-cli":
+        # OMP does not accept a preallocated session id. Headless create emits a typed
+        # session event; host captures id before resume.
+        argv = [
+            exe or "omp",
+            "--mode",
+            "json",
+            "--approval-mode",
+            "always-ask",
+            "--profile",
+            "elves-omp-create",
+            "Reply with exactly: session-created",
+        ]
+        if requested_model:
+            argv.extend(["--model", str(requested_model)])
+        argv.extend(extras)
+        inv = AdapterInvocation(
+            adapter="omp-cli",
+            executable=argv[0],
+            argv=tuple(argv),
+            read_only=True,
+            notes=(
+                "OMP session create: capture exact UUID from NDJSON type=session id; "
+                "resume with --resume <uuid> only (never --continue/-c)."
+            ),
+            session_id=None,
+        )
+        assert_no_ambiguous_session_flags(inv.argv)
+        return inv
     if name == "gemini-cli":
         # Host supplies exact UUID; Gemini creates under --session-id.
         import uuid as _uuid  # noqa: PLC0415
@@ -1818,6 +2070,54 @@ def build_session_resume_invocation(
                 "resume the same conversation that did planning when reviewing"
             ),
             session_id=sid,
+        )
+        assert_no_ambiguous_session_flags(inv.argv)
+        return inv
+    if name == "omp-cli":
+        argv = [
+            exe or "omp",
+            "--mode",
+            "json",
+            "--resume",
+            sid,
+            "--approval-mode",
+            "always-ask",
+            "--profile",
+            "elves-omp-resume",
+            "Continue the prior session.",
+        ]
+        if requested_model:
+            argv.extend(["--model", str(requested_model)])
+        if cwd:
+            # keep cwd after mode for resume when provided
+            argv = [
+                exe or "omp",
+                "--mode",
+                "json",
+                "--cwd",
+                str(cwd),
+                "--resume",
+                sid,
+                "--approval-mode",
+                "always-ask",
+                "--profile",
+                "elves-omp-resume",
+            ]
+            if requested_model:
+                argv.extend(["--model", str(requested_model)])
+            argv.append("Continue the prior session.")
+        argv.extend(extras)
+        inv = AdapterInvocation(
+            adapter="omp-cli",
+            executable=argv[0],
+            argv=tuple(argv),
+            read_only=True,
+            notes=(
+                "exact OMP --resume <uuid> only — never --continue/-c or latest; "
+                "session id must match the captured create stream id"
+            ),
+            session_id=sid,
+            cwd=cwd,
         )
         assert_no_ambiguous_session_flags(inv.argv)
         return inv
