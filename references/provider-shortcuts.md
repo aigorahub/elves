@@ -426,10 +426,12 @@ or approval-bypass authority, and their output remains evidence for the supporte
 Codex driver to review.
 
 
-## Oh My Pi (`omp`)
+## Oh My Pi (`omp` shortcut / worker route)
 
 - Runner: `scripts/run_omp.sh` (Claude `/omp`, Codex/Grok `$elves omp` or natural language).
-- CLI binary is **`omp`** only (never `opm`). Not a main driver.
+- CLI binary is **`omp`** only (never `opm`). This shortcut is the **optional worker** path under
+  Claude/Codex/Grok (adapter `omp-cli` for parked full-run labor). The host token **`omp`** is a
+  supported main driver when the user opens omp with the managed skill root; do not confuse the
+  two roles. See [`omp-worker.md`](omp-worker.md).
 - Isolation: shared `isolated_lane` snapshot + single provider-matched API key via `ELVES_OMP_MODEL`.
 - Read-only shortcut; `ELVES_OMP_WRITE` is rejected. Implementation labor uses full-run `omp-cli`.
-- Full reference: [`omp-worker.md`](omp-worker.md).

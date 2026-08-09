@@ -756,12 +756,13 @@ python3 ~/.grok/skills/elves/scripts/install_doctor.py --startup</code></pre>
             needs <code>DEVIN_API_KEY</code>. Stored Devin secrets and knowledge are not granted by
             default, and bounded session creation and polling responses share a hard wall-clock
             wait budget.</li>
-          <li><strong>Oh My Pi</strong> (<code>/omp</code> / <code>$elves omp</code>) runs the
-            installed <code>omp</code> CLI headlessly over Elves' isolation snapshot with one
-            provider-matched API key (set <code>ELVES_OMP_MODEL</code>). Optional parked full-run
-            worker is <code>omp-cli</code> — not a main driver; never spell the CLI
-            <code>opm</code>. Shortcut writes are not supported; use full-run for implementation
-            labor. See <code>references/omp-worker.md</code>.</li>
+          <li><strong>Oh My Pi</strong> (<code>/omp</code> / <code>$elves omp</code>) is the
+            optional worker/shortcut under Claude/Codex/Grok: headless <code>omp</code> over Elves'
+            isolation snapshot with one provider-matched API key (set <code>ELVES_OMP_MODEL</code>).
+            Parked full-run labor uses adapter <code>omp-cli</code>. Opening <code>omp</code> as
+            the host with the managed skill root is a supported main driver; that is a different
+            role. Never spell the CLI <code>opm</code>. Shortcut writes are not supported; use
+            full-run for implementation labor. See <code>references/omp-worker.md</code>.</li>
         </ul>
         <p>Manus chooses whether its internal Wide mode activates; the public API has no documented
           force-Wide or create-child endpoint. Cobbler's coverage check and deterministic fallback
