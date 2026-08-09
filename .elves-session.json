@@ -5,7 +5,7 @@
   "status": "staged",
   "branch": "feat/omp-main-driver",
   "base_ref": "origin/main",
-  "start_head": "74a1267d929a9e06faaafbf41326f66674396d22",
+  "start_head": "b42ea5dff2a0d2cdbe8515cee6175e0f51641bef",
   "worktree_path": "/Users/john/aigora/dev/elves-omp-main-driver",
   "plan_path": "docs/plans/omp-main-driver.md",
   "survival_guide_path": "docs/elves/survival-guide-omp-main-driver.md",
