@@ -29,7 +29,7 @@ Fugu review: `docs/elves/fugu-omp-main-driver-plan-review.log`.
 - **Actual stop conditions:** Master Acceptance met with proof, or true Hard Stop / user stop
 - **Workspace ownership:** dedicated worktree
   `/Users/john/aigora/dev/elves-omp-main-driver` on branch `feat/omp-main-driver`
-- **Branch tip at start (collision tripwire):** `4e81f6b5c0d8183a1a9f49df416e995bcd09cb1c`
+- **Branch tip at start (collision tripwire):** `74a1267d929a9e06faaafbf41326f66674396d22`
 - **Merge policy:** user-merges (default — never merge unless user authorizes later)
 - **Final-response policy:** disallowed until stop
 - **Coordination mode:** Cobbler-first

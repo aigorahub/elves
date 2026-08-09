@@ -5,7 +5,7 @@
   "status": "staged",
   "branch": "feat/omp-main-driver",
   "base_ref": "origin/main",
-  "start_head": "4e81f6b5c0d8183a1a9f49df416e995bcd09cb1c",
+  "start_head": "74a1267d929a9e06faaafbf41326f66674396d22",
   "worktree_path": "/Users/john/aigora/dev/elves-omp-main-driver",
   "plan_path": "docs/plans/omp-main-driver.md",
   "survival_guide_path": "docs/elves/survival-guide-omp-main-driver.md",
@@ -367,6 +367,7 @@
     "fugu_review": "docs/elves/fugu-omp-main-driver-plan-review.log",
     "phase1_plan": "docs/plans/omp-first-class-harness.md",
     "version_target": "2.26.0",
-    "next_batch": "B0"
+    "next_batch": "B0",
+    "staged_commit": "74a1267d929a9e06faaafbf41326f66674396d22"
   }
 }
