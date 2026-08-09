@@ -1,8 +1,8 @@
 # Plan: Oh My Pi (omp) as a supported main driver
 
-> **Status:** plan revised after Fugu Ultra design review (2026-08-09).  
-> Fugu log: `docs/elves/fugu-omp-main-driver-plan-review.log`  
-> Fugu verdict: **needs changes incorporated before B1–B5** (done below); **B0 may start now**.  
+> **Status:** plan revised after Fugu Ultra design review (2026-08-09).
+> Fugu log: `docs/elves/fugu-omp-main-driver-plan-review.log`
+> Fugu verdict: **needs changes incorporated before B1–B5** (done below); **B0 may start now**.
 > Do not write installer code, claim public main-driver support, or cut 2.26.0 until B0 freezes paths
 > and ordinary launch is proven.
 
@@ -141,8 +141,8 @@ Split:
 - [x] B0-A4: Prewalk canary items 21–26 proven or honest gaps; no help-text-only “ready.”
 - [x] B0-A5: Appendix B filled; private raw evidence stays uncommitted.
 
-**Risk:** Critical if skipped.  
-**Forbidden:** installer code; SKILL main-driver list change.  
+**Risk:** Critical if skipped.
+**Forbidden:** installer code; SKILL main-driver list change.
 **Depends on:** main ≥ v2.25.0.
 
 ---
@@ -172,7 +172,7 @@ unqualified auto fallback), not only a profile row.
 - [x] B1-A6: Successful prewalk-off launch and unqualified-auto fallback path.
 - [x] B1-A7: `launch_ready=True` only after ordinary launch proof (dev may land False temporarily; release/B4 forbids claiming main-driver parity while False).
 
-**Risk:** High.  
+**Risk:** High.
 **Depends on:** B0.
 
 ---
@@ -190,7 +190,7 @@ unqualified auto fallback), not only a profile row.
 - [x] B2-A4: No omp product `--prewalk` in any Elves argv/docs/examples (negative tests).
 - [x] B2-A5: Compaction de-qualification + post-edit cold-fallback rules match other hosts; pre-edit abandonment vs forbidden post-edit cold fallback distinguished.
 
-**Risk:** Critical.  
+**Risk:** Critical.
 **Depends on:** B1.
 
 ---
@@ -311,8 +311,8 @@ notes: B0 installed-binary probe wrote elves-probe under ~/.omp/agent/skills/; f
 
 ## Fugu review summary (incorporated)
 
-**Route:** general `--ultra`, read-only, 2026-08-09.  
-**Verdict:** revise plan (done); B0 may start; no installer/public claim until blockers cleared.  
+**Route:** general `--ultra`, read-only, 2026-08-09.
+**Verdict:** revise plan (done); B0 may start; no installer/public claim until blockers cleared.
 **Key blockers incorporated:** installed-only path freeze; full transport B0; worker_routing +
 cobbler_agents in B1; HostLaunchRequest isolation fields; single-credential projection;
 `launch_ready` release rule; strong B5 proof list; user-owned merge wording; dual-role token

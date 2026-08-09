@@ -13,7 +13,7 @@ native launch, exact-session prewalk when qualified, separate native worker, rev
 Retain Phase 1 `omp-cli` worker and `/omp` shortcut under other hosts. User owns merge
 authorization. Target release: **2.26.0** (or next free minor).
 
-Plan: `docs/plans/omp-main-driver.md` (Fugu-revised).  
+Plan: `docs/plans/omp-main-driver.md` (Fugu-revised).
 Fugu review: `docs/elves/fugu-omp-main-driver-plan-review.log`.
 
 ---
