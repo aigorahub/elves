@@ -13,19 +13,19 @@ prewalk contract.
 | Provider shortcuts | `/fugu` … `/omp` | `$elves fugu|…|omp` | same runners | N/A as host (omp is the host) |
 | Land PR | `/land-pr` | natural language | natural language | natural language |
 | Continuation | optional | optional Codex Goals | host continuity | host session continuity |
-| Native / host work | Separate custom/background session; supervised CLI uses safe mode and classifier-approved commits | Separate custom agent or sandboxed `codex exec`; narrow Git roots permit commits | Host-native Grok session or qualified/experimental two-phase worker |
-| Exact-session prewalk | cached proof, automatic required canary, or explicit experimental mode | same | same |
-| Visibility | Proven native agent view or exact private-log follow command | Proven native agent view or exact private-log follow command | Live session + run docs; same memory/landing ownership |
-| Grok Build goal | proven enhancement or one-packet fallback (worker) | same (worker) | host-native path; goal mode is not a substitute for prewalk |
-| Confidence-guided review | Attach terminal `review_context.review_prompt_block`, or derive the same table from native `Confidence:` trailers | Same machine-produced block/table and Final Readiness output section | Same contract when workers emit trailers/blocks |
+| Native / host work | Separate custom/background session; supervised CLI uses safe mode and classifier-approved commits | Separate custom agent or sandboxed `codex exec`; narrow Git roots permit commits | Host-native Grok session or qualified/experimental two-phase worker | Host-native omp session; separate native worker uses run-scoped `--profile` |
+| Exact-session prewalk | cached proof, automatic required canary, or explicit experimental mode | same | same | same (omp product `--prewalk` is never Elves prewalk) |
+| Visibility | Proven native agent view or exact private-log follow command | Proven native agent view or exact private-log follow command | Live session + run docs; same memory/landing ownership | Live session + run docs; same memory/landing ownership |
+| Grok Build goal | proven enhancement or one-packet fallback (worker) | same (worker) | host-native path; goal mode is not a substitute for prewalk | n/a (not Grok) |
+| Confidence-guided review | Attach terminal `review_context.review_prompt_block`, or derive the same table from native `Confidence:` trailers | Same machine-produced block/table and Final Readiness output section | Same contract when workers emit trailers/blocks | Same contract when workers emit trailers/blocks |
 
 Claude and Codex read safe worker preferences from the same XDG file and make the same
 deterministic decision. Transport syntax differs; packet, authority, fallback, follow, and
 terminal-review semantics do not. See [`adaptive-worker-routing.md`](adaptive-worker-routing.md).
-When checking a route, pass `--host claude` from Claude Code, `--host codex` from Codex, or
-`--host grok` from Grok Build so any native fallback uses the live driver's transport. Grok as
-**optional worker** under Claude/Codex is unchanged. Native install:
-`sync_installed_skills.py --apply --target grok`.
+When checking a route, pass `--host claude` from Claude Code, `--host codex` from Codex,
+`--host grok` from Grok Build, or `--host omp` from Oh My Pi so any native fallback uses the live
+driver's transport. Grok as **optional worker** under Claude/Codex is unchanged. Native installs:
+`sync_installed_skills.py --apply --target claude|codex|grok|omp`.
 
 Provider shortcuts preserve the same route semantics and authority on both hosts; only Claude Code
 installs the four slash aliases. Codex must use the main skill surface. See

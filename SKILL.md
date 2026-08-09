@@ -2,7 +2,7 @@
 name: elves
 description: Autonomous multi-batch development agent for long unattended runs, reviewed-PR landing, Cobbler-first orchestration, and optional Fugu, Manus, Grok, Devin, or Oh My Pi (omp) provider shortcuts. Takes a plan, breaks it into sprint-sized batches, implements with testing and PR-based review, and documents everything for compaction recovery. Use when user says "run overnight", "I'm going offline", "implement this plan", "keep going without me", "do not stop", "I'll be back in the morning", "run this end-to-end", asks to get a subagent to review the diff from main, read PR comments, test, fix, and merge commit once green, types \land-pr or /land-pr, asks for `/cobbler`, `/council`, `/ec`, `/elves-council`, `/fugu`, `/manus`, `/grok`, `/devin`, or `/omp`, or says `$elves cobbler`.
 license: MIT
-compatibility: Works with Claude Code, Codex, Grok Build, Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
+compatibility: Works with Claude Code, Codex, Grok Build, Oh My Pi (omp), Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
   version: "2.26.0"

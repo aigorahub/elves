@@ -559,7 +559,7 @@
 2. Install from a temporary clone of https://github.com/aigorahub/elves.git:
    ELVES_TMP="$(mktemp -d)"
    git clone --depth 1 https://github.com/aigorahub/elves.git "$ELVES_TMP/elves"
-   python3 "$ELVES_TMP/elves/scripts/sync_installed_skills.py" --apply --target &lt;claude|codex|grok&gt;
+   python3 "$ELVES_TMP/elves/scripts/sync_installed_skills.py" --apply --target &lt;claude|codex|grok|omp&gt;
    rm -rf "$ELVES_TMP"
    Use target `claude`, `codex`, or `grok` to match what you detected. Requires Python 3.10 or newer.
 
