@@ -133,7 +133,7 @@ Split:
 - Stale/version/route mismatch fail-closed
 - Explicit **initial** vs **release** `launch_ready` decisions
 
-**Acceptance:**
+**Acceptance criteria:**
 
 - [ ] B0-A1: Installed version/build + create/resume help recorded (bounded).
 - [ ] B0-A2: **Installed-binary** load probe freezes skill root in Appendix B (not fixtures-only).
@@ -162,18 +162,15 @@ unqualified auto fallback), not only a profile row.
 - Reuse: `adapters.py` omp transport, isolation/auth surfaces from Phase 1
 - Tests: `test_host_profiles.py`, `test_adaptive_worker_routing.py`, extend omp adapter tests
 
-**Acceptance:**
+**Acceptance criteria:**
 
-- [ ] B1-A1: Canonical host token `omp`; optional alias `oh-my-pi` only if B0 needs it;
-      **`omp-cli` rejected as host**.
+- [ ] B1-A1: Canonical host token `omp`; optional alias `oh-my-pi` only if B0 needs it; `omp-cli` rejected as host.
 - [ ] B1-A2: Identity is stream-derived UUID (not caller-only session-id unless B0 proves otherwise).
-- [ ] B1-A3: Launch argv: `--mode json`, model, thinking, cwd, **run-scoped profile**, approval
-      policy, packet transport per authoritative Phase 1 adapter; never `--continue` / `-c`.
+- [ ] B1-A3: Launch argv: `--mode json`, model, thinking, cwd, run-scoped profile, approval policy, packet transport per authoritative Phase 1 adapter; never `--continue` / `-c`.
 - [ ] B1-A4: Exactly one selected provider credential; not a static full-key allowlist dump.
 - [ ] B1-A5: Routing and capability probes accept omp; other exotic hosts still rejected.
-- [ ] B1-A6: Successful **prewalk-off** launch and unqualified-auto fallback path.
-- [ ] B1-A7: `launch_ready=True` only after ordinary launch proof (dev may land False temporarily;
-      **release/B4 forbids claiming main-driver parity while False**).
+- [ ] B1-A6: Successful prewalk-off launch and unqualified-auto fallback path.
+- [ ] B1-A7: `launch_ready=True` only after ordinary launch proof (dev may land False temporarily; release/B4 forbids claiming main-driver parity while False).
 
 **Risk:** High.  
 **Depends on:** B0.
@@ -185,16 +182,13 @@ unqualified auto fallback), not only a profile row.
 **Owned surfaces:** `prewalk.py`, native_worker prewalk paths, `references/prewalk.md`,
 `tests/test_native_worker_prewalk.py`, `tests/test_native_worker_hardening.py`.
 
-**Acceptance:**
+**Acceptance criteria:**
 
-- [ ] B2-A1: Canary: create, stream UUID, exact resume, same worktree, same run-scoped profile,
-      one logical stream, **`retained_safe`**, route change, packet once, resume input **`Continue.`**
-      only, no packet replay.
+- [ ] B2-A1: Canary: create, stream UUID, exact resume, same worktree, same run-scoped profile, one logical stream, retained_safe, route change, packet once, resume input Continue. only, no packet replay.
 - [ ] B2-A2: `required` fails closed on missing/malformed/stale/version-mismatched evidence.
 - [ ] B2-A3: `experimental` keeps exact-session, worktree, packet, process, authority checks.
 - [ ] B2-A4: No omp product `--prewalk` in any Elves argv/docs/examples (negative tests).
-- [ ] B2-A5: Compaction de-qualification + post-edit cold-fallback rules match other hosts;
-      pre-edit abandonment vs forbidden post-edit cold fallback distinguished.
+- [ ] B2-A5: Compaction de-qualification + post-edit cold-fallback rules match other hosts; pre-edit abandonment vs forbidden post-edit cold fallback distinguished.
 
 **Risk:** Critical.  
 **Depends on:** B1.
@@ -208,14 +202,12 @@ unqualified auto fallback), not only a profile row.
 **Owned surfaces:** `sync_installed_skills.py`, `installed_bundle_smoke.py`, `install_doctor.py`,
 `references/runtime-helper-paths.md`, sync/smoke tests.
 
-**Acceptance:**
+**Acceptance criteria:**
 
-- [ ] B3-A1: `--target omp` installs to **Appendix B frozen root** (candidate until freeze:
-      `~/.omp/agent/skills/elves`).
+- [ ] B3-A1: `--target omp` installs to Appendix B frozen root (candidate until freeze: `~/.omp/agent/skills/elves`).
 - [ ] B3-A2: First install requires explicit target; `--target all` update-only.
-- [ ] B3-A3: Install/update/idempotent check/cleanup; symlink and source-archive protections;
-      conflict policy for existing `elves` root; shadowing warnings/refusal.
-- [ ] B3-A4: Post-install **fresh-process** load probe (same class as B0).
+- [ ] B3-A3: Install/update/idempotent check/cleanup; symlink and source-archive protections; conflict policy for existing `elves` root; shadowing warnings/refusal.
+- [ ] B3-A4: Post-install fresh-process load probe (same class as B0).
 - [ ] B3-A5: No Claude alias tree under omp unless separately proven; Claude/Codex/Grok unchanged.
 - [ ] B3-A6: CLI choices, descriptions, recovery messages name omp.
 
@@ -230,12 +222,11 @@ unqualified auto fallback), not only a profile row.
 **Owned surfaces:** SKILL, AGENTS, README, PRODUCT, guide, host-parity, prewalk, omp-worker,
 CHANGELOG (**2.26.0** or next free minor), consistency/architecture wording tests.
 
-**Acceptance:**
+**Acceptance criteria:**
 
 - [ ] B4-A1: Supported main drivers: Claude Code, Codex, Grok Build, **Oh My Pi (omp)**.
 - [ ] B4-A2: Host parity table includes omp; dual-role documented; never “omp-cli main driver.”
-- [ ] B4-A3: Guide detects **executable and discovery**, not mere `~/.omp` directory; documents
-      `sync_installed_skills.py --apply --target omp`.
+- [ ] B4-A3: Guide detects executable and discovery, not mere `~/.omp` directory; documents `sync_installed_skills.py --apply --target omp`.
 - [ ] B4-A4: Host-check no longer treats omp as exotic.
 - [ ] B4-A5: Authority wording: user owns merge authorization; host enforces.
 - [ ] B4-A6: No main-driver claim if `launch_ready` still False.
@@ -246,7 +237,7 @@ CHANGELOG (**2.26.0** or next free minor), consistency/architecture wording test
 
 **Depends on:** B1–B4.
 
-**Acceptance (installed-host / honest automated equivalent):**
+**Acceptance criteria:**
 
 - [ ] B5-A1: Managed install + skill discovery
 - [ ] B5-A2: Host check accepts omp
