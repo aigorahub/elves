@@ -1,0 +1,407 @@
+Fugu context bundle: 287 tracked, 1 non-ignored untracked, 10557640 bytes; manifest=_elves_context/manifest.json.
+Fugu context excluded '.elves-session.json': policy.
+Fugu context excluded '.elves/landing-profile.json': policy.
+Fugu Ultra exploration phase: up to 1200s; the remaining wall budget is reserved for exact-session synthesis.
+# Design review: `docs/plans/omp-main-driver.md`
+
+## 1. Verdict
+
+**Needs changes before B1–B5 are staged.** A revised, discovery-only B0 can start now.
+
+The design is directionally correct: OMP becomes an additional main driver while retaining the existing `omp-cli` worker, Elves prewalk remains distinct from OMP’s `--prewalk`, installation is evidence-gated, and merge permission remains user-owned. The following issues block implementation and the 2.26.0 support claim.
+
+### Blockers
+
+1. **B0 permits insufficient install-path evidence.**  
+   B0-A2 allows “live or fixture-backed” discovery to prove the skill root (`docs/plans/omp-main-driver.md:114-116`). A fixture can preserve an observed contract in CI, but cannot prove what the installed binary currently discovers. Path freeze must require an installed-binary load probe.
+
+2. **B0 does not prove the complete OMP transport.**  
+   It covers help flags, UUID capture, resume, and worktree continuity, but not:
+   - packet delivery;
+   - `--thinking` route changes;
+   - approval-mode safety;
+   - run-scoped profile continuity;
+   - terminal `agent_end` behavior;
+   - selected-provider-only credentials;
+   - one-packet/`Continue.`-only prewalk semantics.
+
+3. **A `HOST_PROFILES` row alone will not enable an OMP main host.**
+   - Worker routing currently rejects every host except Claude, Codex, and Grok (`scripts/cobbler_runtime/worker_routing.py:918-920`).
+   - `prewalk-capabilities` currently names only those three (`scripts/cobbler_agents.py:919-925`).
+   - Therefore `worker_routing.py` is definitely required, not “if needed,” and `scripts/cobbler_agents.py` must be in B1’s owned surfaces.
+
+4. **The native launch abstraction cannot currently express OMP’s isolation contract.**  
+   `HostLaunchRequest` contains model, effort, cwd, Git roots, session ID, and fixture path, but no run-scoped OMP profile or approval policy (`scripts/cobbler_runtime/host_profiles.py:39-49`). Phase 1 requires a private profile retained across exact resume (`docs/plans/omp-first-class-harness.md:49-55`, `references/omp-worker.md:32-38`).
+
+5. **Credential handling is unsafe if modeled as one static allowlist.**  
+   `HostProfile.provider_secret_names` is a host-wide set (`host_profiles.py:206`, `361-363`), whereas Phase 1 requires projecting exactly the credential for the selected OMP provider (`omp-first-class-harness.md:230-239`; `omp-worker.md:15-18`, `38`). B1-A3 must not authorize every ambient OMP-compatible key.
+
+6. **`launch_ready` has no coherent release rule.**  
+   A false value blocks ordinary single-phase launch; qualification evidence only admits a two-phase prewalk path (`scripts/cobbler_runtime/native_worker.py:1567-1576`). Shipping OMP with `launch_ready=False` would break:
+   - prewalk `off`;
+   - unqualified `auto` fallback;
+   - the plan’s promised separate native OMP implementer (`omp-main-driver.md:91-94`).
+
+7. **B5 is too weak to prove main-driver parity.**  
+   Its fixture/dry-run criterion covers staging identity and a non-native packet (`omp-main-driver.md:268-269`), but not actual skill loading, OMP host recognition, native launch, stop/follow, terminal review, readiness, or the landable-PR path.
+
+8. **Authority wording is incorrect.**  
+   Role A says OMP owns “merge auth” (`omp-main-driver.md:80-83`). The user owns merge authorization. The host may preserve, validate, and enforce it, but cannot originate it.
+
+9. **Batch references are stale.**  
+   The context table assigns profile/prewalk/install to B2/B3/B4 (`omp-main-driver.md:32-34`), while the actual batches are B1/B2/B3. Lines 43-45 also assign the path re-probe to B1 although path discovery belongs in B0.
+
+10. **The Phase 1 OMP command contract needs reconciliation before reuse.**  
+    `references/omp-worker.md:24` describes `--approval-mode yolo @packet`, while the inspected adapter path uses `always-ask`, `--append-system-prompt`, and a positional prompt (`scripts/cobbler_runtime/adapters.py:876-925`). The main-host design must identify the authoritative launch path rather than copying inconsistent examples.
+
+---
+
+## 2. Gaps versus real host parity
+
+### Skill load path
+
+The plan gives the only currently supported candidates:
+
+- native global: `~/.omp/agent/skills/<name>/SKILL.md`;
+- project: `.omp/skills/`;
+- optional Claude, Codex, Pi, and `.agents` compatibility sources when enabled.
+
+These appear at `omp-main-driver.md:38-45`. Therefore, `~/.omp/agent/skills/elves` is a justified **candidate**, but it is not yet a frozen installer contract because Appendix B remains empty (`omp-main-driver.md:363-370`).
+
+B0 must determine:
+
+- the exact installed OMP version/build;
+- whether a fresh process loads from the native global root;
+- whether discovery toggles are required;
+- project-versus-global precedence;
+- precedence against compatibility sources;
+- duplicate `elves` skill behavior;
+- whether a stale compatibility copy can shadow the managed native copy;
+- whether helpers resolve from the actively loaded OMP skill root;
+- whether loading works without an existing Claude or Codex installation.
+
+B4-A4 should not treat the mere existence of `~/.omp` as sufficient host detection (`omp-main-driver.md:248-249`). A stale directory does not prove an executable or a working skill host.
+
+### Exact-session prewalk
+
+The plan correctly forbids using OMP’s product `--prewalk` flag as Elves prewalk. Preserve that as a repository-wide negative test covering create, resume, help output, examples, and generated commands.
+
+Real parity requires the full contract from `references/prewalk.md`, including:
+
+- packet sent exactly once on the guide turn;
+- execution input exactly `Continue.`;
+- UUID captured only from authoritative structured transport;
+- exact resume of that UUID;
+- same worktree, branch, origin, and isolated OMP profile;
+- explicitly different guide and execution routes;
+- one logical redacted follow stream;
+- `retained_safe` instruction-fidelity evidence;
+- no packet replay;
+- meaningful-edit checkpoint;
+- no post-edit cold fallback;
+- compaction de-qualification;
+- evidence bound to the exact installed version/build and route pair.
+
+B2-A1 should replace the vague “retained guide context” with the precise `retained_safe` requirement and explicitly add one-packet/no-replay and `Continue.`-only checks.
+
+### Managed installation
+
+B3 has the right baseline behavior:
+
+- first install requires explicit `--target omp`;
+- `--target all` remains update-only;
+- no Claude aliases under the OMP root;
+- bundle smoke, doctor, and helper-root documentation are updated.
+
+It also needs acceptance for:
+
+- first install, update, idempotent check, and managed cleanup;
+- unsafe symlink and unsafe ancestor refusal;
+- absence of source-only archives;
+- ownership/conflict behavior for an existing `elves` root;
+- duplicate or shadowing OMP skill roots;
+- fresh-process skill loading after installation;
+- all parser choices, descriptions, and recovery messages naming OMP.
+
+The current sync implementation hard-codes three targets in its target map, CLI choices, descriptions, and no-install recovery text (`scripts/sync_installed_skills.py:163-219`, `532-536`).
+
+### Authority parity
+
+OMP main-driver recognition must not increase model authority:
+
+- The host may stage, supervise, review, prepare PR state, and enforce readiness.
+- The worker may edit and commit only within assigned authority.
+- Provider authentication does not imply push authentication.
+- Qualification, `launch_ready`, skill discovery, or worker output cannot grant merge permission.
+- Merge remains contingent on explicit user authorization at the reviewed HEAD.
+
+Replace “owns merge auth” with:
+
+> Preserves and enforces explicit user-owned merge authorization.
+
+---
+
+## 3. Risks and edge cases
+
+### Dual role: `omp` host versus `omp-cli` worker
+
+Keep the identities disjoint:
+
+- **Main host token:** `omp`
+- **Possible descriptive alias:** `oh-my-pi`, only if B0 proves it is needed
+- **Optional worker adapter:** `omp-cli`
+
+`omp-cli` should be explicitly rejected as a host token. B1-A1 currently leaves that possibility open. Otherwise Phase 1 worker capability could be confused with main-driver qualification.
+
+The interactive OMP host and the separate native OMP worker must not share:
+
+- session identity;
+- default profile;
+- HOME/XDG configuration;
+- conversation state;
+- unrelated credentials.
+
+### Path guessing and shadowing
+
+Do not implement `~/.omp/skills`; the plan explicitly warns against it (`omp-main-driver.md:43-45`). Also test the inverse problem: installing into the correct native root is insufficient if a project or compatibility root silently shadows it.
+
+### OMP `--prewalk` confusion
+
+This is a high-likelihood regression because the product exposes a same-named but semantically different flag. Add explicit assertions that no Elves OMP create/resume/prewalk argv contains it.
+
+### `launch_ready` gating
+
+Define two different gates:
+
+1. **Development gate:** an OMP profile may initially land with `launch_ready=False`.
+2. **Release gate:** before B4 claims main-driver parity, ordinary single-phase OMP native launch must be qualified and enabled.
+
+If OMP remains gated off, it cannot support prewalk-off or normal auto fallback and therefore is not a fully supported main driver under the plan’s own mission.
+
+### Credential breadth
+
+Do not populate the OMP profile with every possible provider secret. Select the provider from the pinned model and project exactly one credential, or use a separately qualified OAuth source.
+
+### Evidence handling
+
+Separate:
+
+- private raw evidence in run-local/cache storage; and
+- a bounded, redacted committed summary in the plan appendix.
+
+Never commit credentials, full environment output, raw provider transcripts, or random canary facts.
+
+---
+
+## 4. Concrete plan edits
+
+### B0.1: Installed discovery and path freeze
+
+Require:
+
+- executable and exact version/build;
+- native global and project discovery;
+- toggles, precedence, duplicates, and shadowing;
+- fresh-process load of an isolated probe skill;
+- active helper-root resolution;
+- frozen root recorded in Appendix B.
+
+Fixtures may be created only after live discovery and should encode the observed contract for CI.
+
+### B0.2: Transport, isolation, and qualification evidence
+
+Require:
+
+- exact create and resume grammar;
+- packet/prompt delivery;
+- authoritative UUID and conflict behavior;
+- terminal event and incomplete EOF behavior;
+- same worktree and same run-scoped profile;
+- model and thinking override on resume;
+- safe noninteractive approval behavior;
+- selected-provider-only authentication;
+- exact-session two-turn canary;
+- stale/version/route mismatch behavior.
+
+### B1.1: Host registration and recognition
+
+Definite owned surfaces:
+
+- `scripts/cobbler_runtime/host_profiles.py`
+- `scripts/cobbler_runtime/native_worker.py`
+- `scripts/cobbler_runtime/worker_routing.py`
+- `scripts/cobbler_agents.py`
+- `tests/test_host_profiles.py`
+- `tests/test_adaptive_worker_routing.py`
+
+Acceptance additions:
+
+- canonical host token is `omp`;
+- `omp-cli` is rejected as a host token;
+- OMP help grammar accounts for stream-derived identity rather than requiring caller-created `--session-id`;
+- routing and capability probing accept OMP;
+- unsupported hosts remain rejected.
+
+### B1.2: Ordinary native OMP launch, authentication, and isolation
+
+Add acceptance for:
+
+- `--mode json`, model, `--thinking`, cwd, profile, approval policy, and packet transport;
+- stream-derived UUID;
+- same profile and worktree on resume;
+- exactly one selected provider credential;
+- no host HOME, SSH, global Git credentials, or other agent configuration;
+- successful prewalk-off launch;
+- successful unqualified-auto fallback;
+- `launch_ready=True` only after ordinary launch proof.
+
+Explicitly review and reuse the existing OMP transport implementation where appropriate:
+
+- `scripts/cobbler_runtime/adapters.py`
+- `tests/test_omp_cli_adapter.py`
+- isolation/authentication surfaces listed in `omp-first-class-harness.md:406-416`
+
+Avoid a weaker second OMP decoder or divergent session grammar.
+
+### B2: Exact-session prewalk
+
+Add explicit acceptance for:
+
+- packet delivered once;
+- continuation exactly `Continue.`;
+- no packet replay;
+- `retained_safe` evidence;
+- same run-scoped profile;
+- stable failure codes;
+- no OMP `--prewalk` in any argv;
+- exact behavior for pre-edit abandonment versus forbidden post-edit cold fallback.
+
+### B3: Managed installation
+
+Add:
+
+- ownership/conflict policy for an existing OMP `elves` root;
+- duplicate/shadowed-root warning or refusal;
+- symlink and source-archive protections;
+- install/update/check/cleanup tests;
+- exact B0-established post-install load probe;
+- no OMP alias tree unless separately proven necessary.
+
+### B4: Policy and documentation
+
+Change its dependency from “functional enough” to **B1–B3 acceptance passed**.
+
+Use executable and discovery probes for onboarding detection, not `~/.omp` alone. Document the exact installer command:
+
+```text
+sync_installed_skills.py --apply --target omp
+```
+
+Update every main-driver, prewalk, invocation, helper-path, authority, and optional-worker statement atomically.
+
+### B5: Cumulative host-parity proof
+
+Replace B5-A1 with a faithful installed-host proof covering:
+
+1. managed installation and skill discovery;
+2. host check accepting OMP;
+3. staging and canonical memory;
+4. default separate native OMP worker;
+5. prewalk-off and required/qualified prewalk paths;
+6. follow, status, stop, and exact resume;
+7. reconciliation and terminal confidence review;
+8. readiness at exact HEAD;
+9. landable-PR path;
+10. refusal to merge without explicit user authorization;
+11. continued Phase 1 `omp-cli` and `/omp` behavior under Claude/Codex/Grok.
+
+### Additional forbidden surfaces
+
+Add explicit prohibitions against:
+
+- resolving `omp-cli` as a main host;
+- forwarding all ambient OMP provider keys;
+- sharing the interactive host’s OMP profile with its worker;
+- claiming main-driver parity while `launch_ready=False`;
+- claiming installed discovery from fixtures alone;
+- replaying the task packet during execution resume;
+- treating assistant prose as transport identity;
+- storing raw canary output in committed evidence;
+- allowing qualification evidence to grant Git, PR, or merge authority.
+
+---
+
+## 5. What B0 must prove before any install code
+
+Before adding `--target omp`, B0 must establish:
+
+### Installed discovery
+
+1. Installed executable path and exact OMP version/build.
+2. Relevant help/version output recorded in bounded form.
+3. Exact native global skill root.
+4. Project skill root and its precedence.
+5. Compatibility-source and discovery-toggle behavior.
+6. Duplicate-name and stale-copy behavior.
+7. A fresh OMP process actually loads a probe from the selected root.
+8. The loaded skill resolves its own runtime helpers.
+
+### Transport
+
+9. Exact create prompt/packet transport.
+10. Authoritative `session` event and canonical UUID validation.
+11. Repeated-identical and conflicting identity behavior.
+12. Required terminal event and incomplete EOF behavior.
+13. Exact `--resume <uuid>`, with no latest/continue fallback.
+14. Same registered worktree across create and resume.
+15. Same isolated run profile across create and resume.
+16. Explicit model and thinking route override on resume.
+
+### Isolation and authority
+
+17. Safe noninteractive approval behavior.
+18. Exactly one selected provider-authentication grant.
+19. No ambient HOME, SSH, Git credentials, or other agent configuration.
+20. Provider authentication does not imply push or merge authority.
+
+### Prewalk qualification
+
+21. Packet sent once and continuation input exactly `Continue.`.
+22. Same session, worktree, profile, and logical stream.
+23. `retained_safe` instruction fidelity.
+24. Evidence bound to exact version/build and both routes.
+25. Correct failure for missing auth, malformed stream, stale evidence, and version/route mismatch.
+26. Explicit initial and release-time `launch_ready` decisions.
+
+Until the discovery items pass, `~/.omp/agent/skills/elves` remains a candidate from `omp-main-driver.md:38-45`, and installer code should not be written.
+
+---
+
+## 6. Version and batch-order assessment
+
+### Version
+
+**2.26.0 is appropriate**, provided no intervening minor release consumes that number.
+
+The repository identifies v2.25.0 as current on August 9, 2026 (`README.md:11`; `CHANGELOG.md`, 2.25.0 entry). A fourth main driver, new managed install target, host profile, and prewalk transport are additive minor-version features, not a patch.
+
+Keep the plan wording as “2.26.0 or the next available minor” until release freeze.
+
+### Batch order
+
+The conceptual sequence is sound after revision:
+
+```text
+B0 evidence
+→ B1 host recognition and ordinary launch
+→ B2 exact-session prewalk
+→ B3 managed install
+→ B4 policy/docs
+→ B5 cumulative proof and release
+```
+
+B3 may be developed in parallel with B1/B2 only after B0.1 freezes the install root. B4 and B5 must remain hard cumulative gates.
+
+As currently written, the sequence is not implementation-ready because of the stale batch references, incomplete B1 file scope, unresolved ordinary-launch/`launch_ready` behavior, and insufficient B5 proof.
+
+**Recommendation:** approve a revised B0 now. Do not authorize installer work, public main-driver claims, or the 2.26.0 release until the blockers above are incorporated.
