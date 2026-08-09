@@ -8,7 +8,7 @@ driver plans and reviews; a subscription-native (or optional external) worker im
 run files let the work survive context compaction. You write the plan and own the merge decision.
 The agent does the middle.
 
-**Current release: v2.24.2**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.25.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 **New to Elves?** Use the [practical user guide](https://aigorahub.github.io/elves/) — especially
@@ -42,7 +42,7 @@ ELVES_TMP="$(mktemp -d)" && git clone --depth 1 https://github.com/aigorahub/elv
 
 This installs `~/.claude/skills/elves/` plus eleven managed alias skills (`/cobbler`,
 `/cobbler-mode`, `/council`, `/ec`, `/elves-council`, `/setup-cobbler`, `/setup-council`, `/fugu`,
-`/manus`, `/grok`, `/devin`). The sync
+`/manus`, `/grok`, `/devin`, `/omp`). The sync
 helper creates missing aliases and updates only aliases carrying the Elves-managed marker. If it
 finds a user-owned alias, it reports the conflict before changing the install and never
 overwrites that alias.
@@ -72,8 +72,8 @@ skill discovery or natural language.
 Focused provider tasks do not require a full Elves run. Claude Code gets
 `/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] <task>` and
 `/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] review <scope>`,
-`/manus <topic>`, `/grok <instructions>`, and `/devin <instructions>`; Codex uses the equivalent
-`$elves fugu|manus|grok|devin …` forms or natural language. Plain Fugu follows the requested
+`/manus <topic>`, `/grok <instructions>`, `/devin <instructions>`, and `/omp <instructions>`;
+Codex uses the equivalent `$elves fugu|manus|grok|devin|omp …` forms or natural language. Plain Fugu follows the requested
 analysis, design, investigation, or other task; `fugu review` keeps the read-only P0-P3 review
 contract. Both receive a bounded snapshot of policy-admitted tracked and non-ignored untracked
 files. `--include` records an exact host-selected path but cannot override exclusions for ignored
@@ -109,7 +109,9 @@ attachments, and duplicate-safe `--resume` that retries only known-failed steps;
 are validated and exclusively reserved before any upload. A durable pre-create marker prevents
 resume from duplicating a paid Manus task when task-ID persistence was interrupted. Devin creates
 a bounded remote task, including its creation request, without granting stored secrets or knowledge
-by default. Grok uses
+by default. Oh My Pi (`/omp` / `$elves omp`) runs headless `omp` over the shared isolation
+snapshot with a single provider-matched API key and never modifies the live checkout from the
+shortcut (use parked `omp-cli` full-run for implementation labor). Grok uses
 headless high-reasoning mode without approval bypass over a disposable tracked-source snapshot in
 Elves' required outer kernel sandbox, plus Grok's built-in inner `strict` profile, provider-documented
 isolated `dontAsk` settings, and bypass mode locked off. The shortcut requires an explicit
@@ -192,7 +194,8 @@ veto. The host owns packets, protected refs, final gates, PR, and merge — alwa
 [`references/adaptive-worker-routing.md`](references/adaptive-worker-routing.md),
 [`references/prewalk.md`](references/prewalk.md),
 [`references/grok-open-source-worker.md`](references/grok-open-source-worker.md),
-[`references/grok-implementer-launch-prompt.md`](references/grok-implementer-launch-prompt.md).
+[`references/grok-implementer-launch-prompt.md`](references/grok-implementer-launch-prompt.md),
+[`references/omp-worker.md`](references/omp-worker.md) (optional Oh My Pi `omp-cli` parked worker / shortcut).
 Parallel implementation lanes are optional and never the default: serial stays the default, and
 `worker.parallel=auto` only recommends lanes when the deterministic width test passes; see
 [`references/parallelves.md`](references/parallelves.md).

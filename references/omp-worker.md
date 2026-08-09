@@ -34,20 +34,28 @@ Host retains planning, run memory, PR, readiness, and merge.
 
 ## Isolation
 
-- Always pass a run-scoped `--profile` so host agent roots are not ambiently reused.
-- Do not wholesale mount host `HOME` or `~/.claude/tools` (Claude may store binaries there;
-  omp would try to load them as custom tools).
-- Grant only the provider env keys required for the pinned model.
+- Full-run and shortcut always use a run-scoped `--profile`.
+- Shortcut: private HOME/XDG via `isolated_lane`; empty `~/.claude/tools` under that home.
+- Full-run session capture reads supervisor-owned transport files only (never worker
+  `events.jsonl` for provider identity); session id must be a UUID.
+- Grant only the single provider key matching the pinned model.
 
 ## Shortcut
 
 ```bash
+export ELVES_OMP_MODEL=google/gemini-2.5-flash   # required when multiple keys present
+export GEMINI_API_KEY=…                          # single matching provider key
 "$ELVES_SKILL_ROOT/scripts/run_omp.sh" "<task>"
 ```
 
-Claude: `/omp …`. Codex/Grok: `$elves omp …` or natural language. Read-only by default;
-`ELVES_OMP_WRITE=1` only when the host independently authorizes writes.
-`ELVES_OMP_MODEL` pins a model. Finite wall: `ELVES_OMP_MAX_WAIT_SECONDS` (default 600).
+Claude: `/omp …`. Codex/Grok: `$elves omp …` or natural language.
+
+- Uses Elves `isolated_lane` snapshot (cwd is the disposable snapshot, not the live checkout).
+- Projects **one** provider-matched API key only (from `ELVES_OMP_MODEL` family).
+- Read-only: `ELVES_OMP_WRITE` is rejected; use parked `omp-cli` full-run for implementation.
+- Validates `--mode json` stdout with `decode_omp_jsonl` when nonempty.
+- Finite wall: `ELVES_OMP_MAX_WAIT_SECONDS` (default 600).
+
 
 ## Non-goals
 

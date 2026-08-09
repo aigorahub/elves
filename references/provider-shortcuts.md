@@ -424,3 +424,13 @@ controlled proxies.
 These routes can consume paid provider capacity. They never grant merge, protected-ref, secret,
 or approval-bypass authority, and their output remains evidence for the supported Claude Code or
 Codex driver to review.
+
+
+## Oh My Pi (`omp`)
+
+- Runner: `scripts/run_omp.sh` (Claude `/omp`, Codex/Grok `$elves omp` or natural language).
+- CLI binary is **`omp`** only (never `opm`). Not a main driver.
+- Isolation: shared `isolated_lane` snapshot + single provider-matched API key via `ELVES_OMP_MODEL`.
+- Read-only shortcut; `ELVES_OMP_WRITE` is rejected. Implementation labor uses full-run `omp-cli`.
+- Full reference: [`omp-worker.md`](omp-worker.md).
+

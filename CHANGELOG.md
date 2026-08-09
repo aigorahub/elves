@@ -4,12 +4,19 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
-### Added
-- Optional **Oh My Pi (`omp`)** parked full-run worker adapter `omp-cli` with headless
-  `--mode json`, stream-captured session UUIDs, exact `--resume` only, run-scoped
-  `--profile` isolation, and provider shortcut `run_omp.sh` / `/omp` (never `opm`;
-  not a main driver).
+## [2.25.0] - 2026-08-09
 
+### Added
+- Optional **Oh My Pi (`omp`)** first-class harness surfaces:
+  - Parked full-run worker adapter **`omp-cli`**: headless `--mode json`, session UUID capture
+    from supervisor-owned transport files only, exact `--resume <uuid>` (never `--continue`),
+    bare staged-packet path via `--append-system-prompt` for rebinding, default model
+    `google/gemini-2.5-flash` when auto, host-owned PR/merge/protected-ref authority.
+  - Provider shortcut **`run_omp.sh`** / Claude `/omp` / Codex `$elves omp`: isolation snapshot
+    (same machinery as Grok shortcut), single provider-matched API key, private HOME/XDG,
+    read-only (write labor uses full-run). CLI spelling is **`omp`**, never `opm`.
+  - Docs parity: `references/omp-worker.md`, SKILL/AGENTS/README/guide/host-parity/provider-shortcuts.
+  - Tests: `tests/test_omp_cli_adapter.py` plus full-run fixture lifecycle coverage.
 
 ## [2.24.2] - 2026-08-07
 

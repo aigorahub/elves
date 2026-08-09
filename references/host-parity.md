@@ -10,7 +10,7 @@ prewalk contract.
 | Primary invoke | `/elves`, natural language | `$elves`, natural language | natural language (no invented top-level slash map) |
 | Cobbler | `/cobbler`, `/cobbler-mode` | `$elves cobbler: …`, natural chat | natural language |
 | Setup | `/setup-cobbler` | `$elves setup-cobbler` | natural language / scripts |
-| Provider shortcuts | `/fugu`, `/manus`, `/grok`, `/devin` | `$elves fugu|manus|grok|devin …`, natural chat | natural language; same runners from skill root |
+| Provider shortcuts | `/fugu`, `/manus`, `/grok`, `/devin`, `/omp` | `$elves fugu|manus|grok|devin|omp …`, natural chat | natural language; same runners from skill root |
 | Land PR | `/land-pr` or `\land-pr` | natural language or alias | natural language |
 | Continuation | optional | optional **Codex Goals** (seatbelt, not memory) | host session continuity; not Codex Goals |
 | Native / host work | Separate custom/background session; supervised CLI uses safe mode and classifier-approved commits | Separate custom agent or sandboxed `codex exec`; narrow Git roots permit commits | Host-native Grok session or qualified/experimental two-phase worker |
@@ -141,4 +141,8 @@ Native-only overnight runs require no Grok, OpenRouter, or other external provid
 
 ## Optional omp worker
 
-Optional Oh My Pi (`omp` / `omp-cli`) is a parked full-run worker available under Claude, Codex, and Grok drivers with identical authority boundaries. See `references/omp-worker.md`.
+Optional Oh My Pi (`omp` / `omp-cli`) is a parked full-run worker and `/omp` / `$elves omp` shortcut
+available under Claude Code, Codex, and Grok Build drivers with the same authority boundaries as
+other optional workers (host owns PR/merge/protected-ref; worker never lands). Shortcut uses the
+shared isolation snapshot and a single provider-matched API key; it is not a main driver and does
+not implement Elves prewalk. See `references/omp-worker.md`.

@@ -1097,14 +1097,20 @@ def await_full_run(
 
 
 def _capture_omp_session_id(state, root, repo_root):
-    """Parse provider_session_id from OMP NDJSON event logs if present."""
+    """Parse provider_session_id from supervisor-owned OMP NDJSON only.
+
+    Never trust worker-writable ``events.jsonl`` for provider identity. Prefer
+    host/supervisor-owned transport files and require a concrete UUID.
+    """
+    import re
+    from uuid import UUID
+
     candidates = [
-        root / "events.jsonl",
-        root / "stdout.log",
+        root / "omp.ndjson",
         root / "provider.stdout",
         root / "child.stdout",
+        root / "stdout.log",
         root / "transcript.log",
-        root / "omp.ndjson",
     ]
     for path in candidates:
         try:
@@ -1113,6 +1119,7 @@ def _capture_omp_session_id(state, root, repo_root):
             text = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
+        session_id = None
         for line in text.splitlines():
             line = line.strip()
             if not line.startswith("{"):
@@ -1124,8 +1131,20 @@ def _capture_omp_session_id(state, root, repo_root):
             if not isinstance(event, dict) or event.get("type") != "session":
                 continue
             sid = event.get("id")
-            if isinstance(sid, str) and sid.strip():
-                return sid.strip()
+            if not isinstance(sid, str) or not sid.strip():
+                continue
+            sid = sid.strip()
+            try:
+                UUID(sid)
+            except (ValueError, TypeError, AttributeError):
+                continue
+            if session_id is None:
+                session_id = sid
+            elif session_id != sid:
+                # Conflicting transport identities: refuse to bind either.
+                return None
+        if session_id:
+            return session_id
     return None
 
 

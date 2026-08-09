@@ -70,6 +70,7 @@ EXPECTED_CLAUDE_ALIASES = frozenset(
         "manus",
         "grok",
         "devin",
+        "omp",
         "setup-cobbler",
         "setup-council",
     }

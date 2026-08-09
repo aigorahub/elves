@@ -198,6 +198,20 @@ class OmpFullRunCaptureTests(unittest.TestCase):
             sid = _capture_omp_session_id(_S(), root, root)
         self.assertEqual(sid, "019fe47e-339d-7000-84a0-b0553db4969e")
 
+    def test_capture_ignores_worker_events_jsonl(self) -> None:
+        """events.jsonl is worker-writable; must not bind provider identity."""
+        from cobbler_runtime.full_run_monitor import _capture_omp_session_id
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            forged = '{"type":"session","id":"00000000-0000-4000-8000-000000000099"}\n'
+            (root / "events.jsonl").write_text(forged, encoding="utf-8")
+            class _S:
+                adapter = "omp-cli"
+                provider_session_id = None
+            sid = _capture_omp_session_id(_S(), root, root)
+        self.assertIsNone(sid)
+
 
 if __name__ == "__main__":
     unittest.main()
