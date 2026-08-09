@@ -45,7 +45,7 @@ Skill Memory) apply to all three hosts unchanged. See the guide's "v2.24 run too
 | Cobbler | `$elves cobbler: <task>` or "Ask the Cobbler…" |
 | Cobbler Mode | `$elves cobbler-mode` or natural "Cobbler Mode: on/off" |
 | Setup | `$elves setup-cobbler` / `$elves setup-council` |
-| Provider shortcut | `$elves fugu [--deep\|--ultra\|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] <task>` / `$elves fugu [--deep\|--ultra\|--max] [--max-wait SECONDS] [--preflight] review <scope>`, `$elves manus [--wide\|--fanout] …`, `$elves grok <instructions>`, or `$elves devin <instructions>` |
+| Provider shortcut | `$elves fugu [--deep\|--ultra\|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] <task>` / `$elves fugu [--deep\|--ultra\|--max] [--max-wait SECONDS] [--preflight] review <scope>`, `$elves manus [--wide\|--fanout] …`, `$elves grok <instructions>`, `$elves devin <instructions>`, or `$elves omp <instructions>` |
 | Land PR | natural language; `\land-pr` / `/land-pr` when the host maps them |
 
 ### Provider subprocess capabilities map

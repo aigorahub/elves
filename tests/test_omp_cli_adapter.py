@@ -181,5 +181,22 @@ class OmpIsolationStaticTests(unittest.TestCase):
         self.assertTrue(profile.startswith("elves-omp"))
 
 
+class OmpFullRunCaptureTests(unittest.TestCase):
+    def test_capture_session_from_stdout_log(self) -> None:
+        from cobbler_runtime.full_run_monitor import _capture_omp_session_id
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "stdout.log").write_text(
+                SAMPLE_OMP_STREAM + "\n",
+                encoding="utf-8",
+            )
+            class _S:
+                adapter = "omp-cli"
+                provider_session_id = None
+            sid = _capture_omp_session_id(_S(), root, root)
+        self.assertEqual(sid, "019fe47e-339d-7000-84a0-b0553db4969e")
+
+
 if __name__ == "__main__":
     unittest.main()
