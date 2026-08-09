@@ -13,12 +13,9 @@ the default main driver. omp never receives protected-ref, PR, merge, or final-a
 ## Install and authenticate
 
 Install omp from the official Oh My Pi distribution, then authenticate a provider (API key or
-OAuth). Example API key:
-
-```bash
-export GEMINI_API_KEY=…
-# or ANTHROPIC_API_KEY / OPENAI_API_KEY / XAI_API_KEY for other models
-```
+OAuth). Set exactly one provider credential in the environment before a launch (for example
+`GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `XAI_API_KEY`), or complete the
+provider OAuth flow omp documents for that model.
 
 ## Trusted full-run (parked worker)
 
@@ -43,8 +40,9 @@ Host retains planning, run memory, PR, readiness, and merge.
 ## Shortcut
 
 ```bash
-export ELVES_OMP_MODEL=google/gemini-2.5-flash   # required when multiple keys present
-export GEMINI_API_KEY=…                          # single matching provider key
+# Require ELVES_OMP_MODEL when more than one provider key is present.
+# Grant only the single matching provider key name (for example GEMINI_API_KEY).
+export ELVES_OMP_MODEL=google/gemini-2.5-flash
 "$ELVES_SKILL_ROOT/scripts/run_omp.sh" "<task>"
 ```
 
