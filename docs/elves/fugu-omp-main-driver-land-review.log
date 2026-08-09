@@ -1,0 +1,145 @@
+Fugu context bundle: 293 tracked, 1 non-ignored untracked, 10595050 bytes; manifest=_elves_context/manifest.json.
+Fugu context excluded '.elves-session.json': policy.
+Fugu context excluded '.elves/landing-profile.json': policy.
+Fugu Ultra exploration phase: up to 1200s; the remaining wall budget is reserved for exact-session synthesis.
+## Actionable findings
+
+**No P0 findings.**
+
+### P1 — OMP launches in `yolo` mode without filesystem isolation
+
+**Locations:**
+- `scripts/cobbler_runtime/host_profiles.py:208-222`
+- `scripts/cobbler_runtime/host_profiles.py:427`
+- `scripts/cobbler_runtime/native_worker.py:1103-1187`
+- `scripts/cobbler_runtime/native_worker.py:1382-1392`
+
+The new host profile hard-codes `--approval-mode yolo` and marks OMP launch-ready. The worker is then started directly with `subprocess.Popen`; its environment retains the real `HOME` and XDG paths, and no filesystem sandbox restricts it to the registered worktree.
+
+**Failure scenario:** Untrusted repository content instructs OMP to read or modify `~/.ssh`, other repositories, or agent configuration. The Git environment restrictions block normal pushes but do not prevent arbitrary local reads, writes, deletion, or network exfiltration.
+
+**Smallest safe repair:** Run OMP through the existing filesystem-isolation machinery with only the worktree and runtime directories exposed, plus a private HOME/XDG tree. Until that is implemented, set `launch_ready=False` so ordinary OMP launch fails closed.
+
+---
+
+### P1 — Prewalk resume does not send `Continue.` as the sole user input
+
+**Locations:**
+- `scripts/cobbler_runtime/host_profiles.py:223-243`
+- `scripts/cobbler_runtime/native_worker.py:1352-1386`
+- `scripts/cobbler_runtime/native_worker.py:1913-1926`
+
+Every OMP create/resume argv contains the positional user message `Follow the system packet.` and declares `--append-system-prompt` as its prompt-file mechanism. During execution resume, `_run_worker_phase` writes `Continue.` into that system-prompt file and closes stdin.
+
+The resulting resume turn therefore has:
+
+- Appended system prompt: `Continue.`
+- User message: `Follow the system packet.`
+
+This contradicts the documented requirement that execution receive only `Continue.`.
+
+**Failure scenario:** Qualification succeeds or fails against a different conversation stimulus from the promised guide→`Continue.` trajectory. Retained-context evidence is consequently invalid, and real execution may repeat packet-following behavior rather than continue the guide session.
+
+**Smallest safe repair:** Model OMP create and resume input separately. Create may attach the packet through `--append-system-prompt`; resume must omit that flag and pass exactly `Continue.` as the positional user message. Add assertions against the final effective subprocess argv.
+
+---
+
+### P1 — OMP credential projection ignores the requested provider
+
+**Locations:**
+- `scripts/cobbler_runtime/host_profiles.py:410-418`
+- `scripts/cobbler_runtime/native_worker.py:1135-1148`
+- `scripts/cobbler_runtime/native_worker.py:2188-2201`
+
+The environment code forwards the first available credential in a fixed order. It receives neither the requested model nor its provider. A single resulting environment is reused for both prewalk phases.
+
+**Failure scenarios:**
+
+- A requested xAI model is launched while Anthropic and xAI keys are present. The Anthropic key wins; the required xAI key is removed.
+- An Anthropic guide followed by an xAI execution route reuses one credential, leaving one phase unauthenticated.
+- The new test encodes “Anthropic wins” rather than checking that the selected key matches the requested model.
+
+**Smallest safe repair:** Resolve the provider credential from each phase’s pinned model, fail closed if it cannot be mapped, and build the child environment per phase. Persist only the provider or credential name, never its value.
+
+---
+
+### P1 — OMP can complete successfully without its required `agent_end` event
+
+**Locations:**
+- `scripts/cobbler_runtime/native_worker.py:1438-1463`
+- `scripts/cobbler_runtime/native_worker.py:1498-1506`
+- `scripts/cobbler_runtime/native_worker.py:1567-1574`
+- Existing correct behavior: `scripts/cobbler_runtime/adapters.py:1478-1489,1548-1579`
+
+The generic native-worker path counts any structured event but does not track OMP’s terminal `agent_end`. A zero process exit is treated as successful even if the stream was incomplete. This disagrees with the existing OMP decoder, which explicitly requires `agent_end`.
+
+**Failure scenario:** OMP emits a valid `session` event, truncates its remaining output, and exits zero. Session readiness succeeds and the run is marked `complete`, despite having no authoritative completion event or dependable result.
+
+**Smallest safe repair:** Add host-specific terminal-event tracking to `_PhaseResult` and require `agent_end` for successful OMP phases, including qualification. Clean EOF without it should return a stable incomplete-stream failure.
+
+---
+
+### P2 — The OMP profile is scoped to the worktree, not the run
+
+**Location:** `scripts/cobbler_runtime/host_profiles.py:201-204`
+
+The profile name is derived solely from `sha256(cwd)`. Multiple runs using the same worktree therefore share OMP profile state despite documentation promising a run-scoped profile.
+
+**Failure scenario:** A restarted or concurrent run inherits another run’s profile configuration, tools, caches, or mutable state, creating cross-run interference.
+
+**Smallest safe repair:** Generate a random or run-ID-derived profile when staging the run, persist it in private run state, pass it through `HostLaunchRequest`, and reuse it only for that run’s exact resumes.
+
+---
+
+### P2 — OMP install checks permit a stale Claude alias tree
+
+**Locations:**
+- `scripts/sync_installed_skills.py:378-383`
+- `scripts/sync_installed_skills.py:480-518`
+
+The alias-under-skill validation applies only to Codex. OMP neither manages nor removes aliases, but `--check` does not report an existing `aliases/claude/` tree under its skill root.
+
+**Failure scenario:** A copied or stale Claude bundle under `~/.omp/agent/skills/elves` retains slash-alias skills. `--apply --target omp` leaves them behind, and the following check reports success despite the intended OMP bundle shape.
+
+**Smallest safe repair:** Apply the no-Claude-alias rule to every non-Claude target, including `codex`, `grok`, and `omp`. Remove only clearly Elves-managed stale aliases; otherwise report a conflict.
+
+---
+
+### P3 — OMP help probing uses `--mode` as evidence of exact resume
+
+**Location:** `scripts/cobbler_runtime/host_profiles.py:186-191`
+
+`_omp_help_grammar` considers exact resume advertised when the combined help contains `--resume` and `--mode`. `--mode` describes output behavior, not session identity or exact-resume semantics.
+
+**Failure scenario:** An OMP version exposing generic `--resume` and JSON `--mode`, but lacking an exact session-ID contract, becomes eligible for experimental prewalk based on insufficient evidence.
+
+**Smallest safe repair:** Require explicit session-ID/UUID grammar associated with `--resume`, rather than using `--mode` as the second condition.
+
+---
+
+### P3 — Four-host parity documentation remains internally incomplete
+
+**Locations:**
+- `references/host-parity.md:51-63`
+- `references/host-parity.md:144-147`
+- `README.md:5-17`
+- `README.md:408-409`
+- `scripts/sync_installed_skills.py:2-9`
+
+Issues:
+
+- The detailed prewalk table still covers only Claude, Codex, and Grok.
+- “Host owns PR/merge/protected-ref” conflicts with `PRODUCT.md:16`, which correctly says the user owns merge authorization.
+- The README introduction and onboarding text still list only the previous three drivers.
+- The README index still describes `omp-worker.md` as optional-worker-only and `host-parity.md` as Claude/Codex parity.
+- The installer docstring omits the OMP target and example.
+
+**Failure scenario:** Operators receive contradictory guidance about OMP support, its prewalk grammar, and who may authorize a merge.
+
+**Smallest safe repair:** Add an OMP prewalk column covering stream UUID, exact resume, route and profile continuity, and `agent_end`; replace the authority sentence with explicit user-owned merge authorization; update the README and installer introductions/examples.
+
+## Residual verification risks
+
+- Direct `git diff` and focused unit tests could not execute because this snapshot’s Git/Python launcher attempted to load sandbox-blocked Xcode components. Findings were verified from the host-generated bounded diff and direct line-numbered source inspection.
+- `SKILL.md` and `AGENTS.md` were available only as quoted instruction evidence under `_instruction_evidence`, not as live files. Their four-driver wording appears updated, but the committed files could not be independently opened.
+- No live OMP binary probe was performed. CLI semantics were evaluated against the repository’s own documented and implemented transport contract.

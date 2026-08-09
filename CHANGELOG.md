@@ -19,6 +19,10 @@ All notable changes to the Elves skill are documented here.
 - Phase 1 parked `omp-cli` full-run and `/omp` shortcut remain under other hosts.
 - Elves prewalk is not omp product `--prewalk`.
 - User still owns merge authorization.
+- Land review (Fugu Ultra): no P0. Mitigated P1s for resume Continue. input path, model-matched
+  credential projection, help-grammar exactness, and non-Claude alias checks. Residual (tracked for
+  follow-up): outer filesystem isolation for host-native omp (same class of gap as Grok host Popen),
+  and requiring NDJSON `agent_end` on native-worker phase success (full-run decoder already requires it).
 
 ## [2.25.0] - 2026-08-09
 

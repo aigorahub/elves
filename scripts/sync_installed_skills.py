@@ -6,6 +6,7 @@ Usage:
   python3 scripts/sync_installed_skills.py --apply
   python3 scripts/sync_installed_skills.py --apply --target codex
   python3 scripts/sync_installed_skills.py --apply --target grok
+  python3 scripts/sync_installed_skills.py --apply --target omp
 
 `--check` reports drift between this repo checkout and the local installed copies.
 `--apply` overwrites the managed files/directories in the installed copies so they match
@@ -375,12 +376,14 @@ def check_target(name: str) -> tuple[bool, list[str]]:
     for alias_name in TARGETS[name].get("managed_aliases", []):
         problems.extend(compare_alias(alias_name, alias_root / alias_name))
 
-    # Codex must never receive the Claude alias tree under the skill install.
-    if name == "codex":
+    # Non-Claude installs must never carry a Claude alias tree under the skill root.
+    if name in {"codex", "grok", "omp"}:
         for alias_name in CLAUDE_ALIAS_NAMES:
             alias_under_skill = root / "aliases" / "claude" / alias_name
             if alias_under_skill.exists():
-                problems.append(f"unexpected Claude alias under Codex install: {alias_under_skill}")
+                problems.append(
+                    f"unexpected Claude alias under {name} install: {alias_under_skill}"
+                )
 
     return not problems, problems
 

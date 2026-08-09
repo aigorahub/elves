@@ -770,6 +770,7 @@ def qualify_installed_prewalk_transport(
                 host=resolve_host_profile(host).host,
                 worktree=worktree,
                 runtime_dir=runtime_dir,
+                requested_model=guide_model,
             )
             child_env["ELVES_PREWALK_QUALIFICATION"] = "1"
             guide_spec = build_native_worker_spec(
@@ -1100,8 +1101,30 @@ def _native_git_contract(worktree: Path) -> dict[str, Any]:
     }
 
 
+def _omp_provider_secret_for_model(requested_model: str | None) -> tuple[str, ...]:
+    """Map a pinned omp model selector to preferred provider secret names."""
+    model = (requested_model or "").strip().lower()
+    if any(token in model for token in ("anthropic", "claude")):
+        return ("ANTHROPIC_API_KEY",)
+    if any(token in model for token in ("xai", "grok")):
+        return ("XAI_API_KEY",)
+    if any(token in model for token in ("gemini", "google/")):
+        return ("GEMINI_API_KEY", "GOOGLE_API_KEY")
+    if any(token in model for token in ("openai", "gpt-", "codex", "o1", "o3", "o4")):
+        return ("OPENAI_API_KEY", "CODEX_API_KEY")
+    # Unknown model: stable fallback order (still one secret only).
+    return (
+        "ANTHROPIC_API_KEY",
+        "OPENAI_API_KEY",
+        "CODEX_API_KEY",
+        "XAI_API_KEY",
+        "GEMINI_API_KEY",
+        "GOOGLE_API_KEY",
+    )
+
+
 def _native_worker_child_env(
-    *, host: str, worktree: Path, runtime_dir: Path
+    *, host: str, worktree: Path, runtime_dir: Path, requested_model: str | None = None
 ) -> dict[str, str]:
     """Project provider auth while removing ambient Git/network credentials."""
     parent = dict(os.environ)
@@ -1132,17 +1155,10 @@ def _native_worker_child_env(
     # Each host may need only its registry-allowlisted provider auth names
     # (subscription tokens for Codex/Claude; XAI_API_KEY/GROK_AUTH_PATH for
     # Grok). No other secret-valued environment entry crosses the boundary.
-    # OMP multi-provider allowlist: project exactly one selected credential
-    # (first present in stable preference order), never every ambient key.
+    # OMP multi-provider allowlist: project exactly one credential, preferred
+    # by the pinned model provider when known.
     if omp_host:
-        omp_order = (
-            "ANTHROPIC_API_KEY",
-            "OPENAI_API_KEY",
-            "CODEX_API_KEY",
-            "XAI_API_KEY",
-            "GEMINI_API_KEY",
-            "GOOGLE_API_KEY",
-        )
+        omp_order = _omp_provider_secret_for_model(requested_model)
         selected = next((n for n in omp_order if n in provider_secret_names and parent.get(n)), None)
         if selected:
             env[selected] = parent[selected]
@@ -2185,10 +2201,16 @@ def supervise_native_worker(*, repo_root: Path, run_id: str, packet: Path) -> in
             break
         time.sleep(0.02)
     worktree = Path(str(state["worktree"])).resolve()
+    phase_model = None
+    if isinstance(state.get("execution"), dict):
+        phase_model = state["execution"].get("model")
+    if phase_model is None and isinstance(state.get("prewalk"), dict):
+        phase_model = state["prewalk"].get("model")
     child_env = _native_worker_child_env(
         host=str(state.get("host") or ""),
         worktree=worktree,
         runtime_dir=state_path.parent,
+        requested_model=str(phase_model) if phase_model else None,
     )
     try:
         if state.get("version") == PREWALK_STATE_VERSION and state.get("mode") == "prewalk":

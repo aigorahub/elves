@@ -143,6 +143,7 @@ Native-only overnight runs require no Grok, OpenRouter, or other external provid
 
 Oh My Pi is a **supported main driver** (`omp` host; skill root `~/.omp/agent/skills/elves`) and an
 optional parked full-run worker (`omp-cli`) plus `/omp` / `$elves omp` shortcut under Claude Code,
-Codex, and Grok Build. Host owns PR/merge/protected-ref; worker never lands. Shortcut uses the
+Codex, and Grok Build. The host prepares PR state and enforces readiness; the user owns merge
+authorization; workers never land. Shortcut uses the
 shared isolation snapshot and a single provider-matched API key. Elves prewalk is host-supervised;
 omp product `--prewalk` is never Elves prewalk. See `references/omp-worker.md`.

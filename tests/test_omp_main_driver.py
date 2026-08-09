@@ -46,7 +46,8 @@ class OmpHostProfileTests(unittest.TestCase):
         self.assertIn("json", create.argv)
         self.assertIn("--cwd", create.argv)
         self.assertIn("--profile", create.argv)
-        self.assertIn("--append-system-prompt", (create.prompt_file_flag,))
+        self.assertEqual(create.prompt_file_flag, "--append-system-prompt")
+        self.assertIn("Follow the system packet.", create.argv)
         self.assertNotIn("--prewalk", create.argv)
         self.assertNotIn("--continue", create.argv)
         self.assertNotIn("-c", create.argv)
@@ -64,6 +65,8 @@ class OmpHostProfileTests(unittest.TestCase):
         )
         self.assertIn("--resume", resume.argv)
         self.assertIn(sid, resume.argv)
+        self.assertIsNone(resume.prompt_file_flag)
+        self.assertNotIn("Follow the system packet.", resume.argv)
         self.assertNotIn("--prewalk", resume.argv)
         self.assertNotIn("--continue", resume.argv)
 
@@ -115,12 +118,18 @@ class OmpHostProfileTests(unittest.TestCase):
             try:
                 os.environ.clear()
                 os.environ.update(env)
-                child = _native_worker_child_env(host="omp", worktree=worktree, runtime_dir=runtime)
+                child = _native_worker_child_env(
+                    host="omp",
+                    worktree=worktree,
+                    runtime_dir=runtime,
+                    requested_model="xai-oauth/grok-4.5",
+                )
             finally:
                 os.environ.clear()
                 os.environ.update(old)
-            self.assertIn("ANTHROPIC_API_KEY", child)
-            self.assertNotIn("XAI_API_KEY", child)
+            # Model-matched: xAI wins over ambient Anthropic/OpenAI keys.
+            self.assertIn("XAI_API_KEY", child)
+            self.assertNotIn("ANTHROPIC_API_KEY", child)
             self.assertNotIn("OPENAI_API_KEY", child)
             self.assertNotIn("GH_TOKEN", child)
 
