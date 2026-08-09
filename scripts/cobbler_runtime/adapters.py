@@ -894,8 +894,8 @@ def build_readonly_invocation(
             argv_list.extend(["--resume", exact_session])
         if requested_model:
             argv_list.extend(["--model", str(requested_model)])
-        # Packet as @file then short task; never --continue
-        argv_list.append(f"@{prompt_path}")
+        # Bare prompt path for supervisors; omp loads via append-system-prompt
+        argv_list.extend(["--append-system-prompt", str(prompt_path)])
         argv_list.append(full_prompt if full_prompt.strip() else "Follow the attached packet.")
         argv_list.extend(extras)
         inv = AdapterInvocation(

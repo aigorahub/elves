@@ -1103,6 +1103,8 @@ def _capture_omp_session_id(state, root, repo_root):
         root / "stdout.log",
         root / "provider.stdout",
         root / "child.stdout",
+        root / "transcript.log",
+        root / "omp.ndjson",
     ]
     for path in candidates:
         try:

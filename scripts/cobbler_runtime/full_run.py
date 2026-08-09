@@ -3828,6 +3828,10 @@ def prepare_full_run(
         not model or model in {DEFAULT_MODEL, "auto"}
     ):
         model = "swe-1-7-lightning"
+    elif adapter_name == "omp-cli" and (
+        not model or model in {DEFAULT_MODEL, "auto"}
+    ):
+        model = "google/gemini-2.5-flash"
     elif not model:
         model = "auto" if adapter_name == "grok-build" else DEFAULT_MODEL
 
@@ -3990,12 +3994,17 @@ def prepare_full_run(
     if adapter_name == "fixture":
         exe = sys.executable
     else:
-        default_exe = (
-            "devin" if adapter_name == "devin-cli" else DEFAULT_EXECUTABLE
-        )
+        if adapter_name == "devin-cli":
+            default_exe = "devin"
+        elif adapter_name == "omp-cli":
+            default_exe = "omp"
+        else:
+            default_exe = DEFAULT_EXECUTABLE
         exe = (executable or "").strip() or default_exe
     if adapter_name == "devin-cli" and model == DEFAULT_MODEL:
         model = "swe-1-7-lightning"
+    if adapter_name == "omp-cli" and model in {DEFAULT_MODEL, "auto", ""}:
+        model = "google/gemini-2.5-flash"
     qualified_supervisor = _qualified_process_supervisor()
     supervisor_executable: str | None = str(qualified_supervisor)
     supervision_token: str | None = secrets.token_hex(24)
@@ -4244,6 +4253,23 @@ def build_full_run_argv(state: FullRunState) -> list[str]:
             adapter="devin-cli",
             check=False,
             export_path=export_path,
+        )
+    if state.adapter == "omp-cli":
+        state.goal_launch_mode = "omp_json_stream"
+        return build_launch_argv(
+            session_id=state.provider_session_id or None,
+            packet=launch_packet,
+            cwd=state.worktree,
+            model=state.model,
+            permission_mode=state.permission_mode,
+            executable=state.executable,
+            create=bool(state.create_session),
+            effort=state.effort,
+            yolo=bool(state.yolo),
+            max_turns=state.max_turns,
+            output_format=None,
+            adapter="omp-cli",
+            check=False,
         )
     detection = detect_native_grok_goal(state.executable)
     # Record actual capability; do not invent flags. Headless packet launch is
@@ -4515,7 +4541,7 @@ def _capture_devin_session_id(
 
 
 def _prepare_resume_attempt(repo_root: Path, state: FullRunState) -> str:
-    supported_adapters = {"fixture", "grok-build", "devin-cli"}
+    supported_adapters = {"fixture", "grok-build", "devin-cli", "omp-cli"}
     if state.adapter not in supported_adapters:
         raise ValidationIssue(
             "full_run_resume_adapter_unsupported",
@@ -4530,6 +4556,11 @@ def _prepare_resume_attempt(repo_root: Path, state: FullRunState) -> str:
         raise ValidationIssue(
             "full_run_devin_resume_missing_provider_session",
             "Devin full-run resume requires a captured provider session id",
+        )
+    if state.adapter == "omp-cli" and not state.provider_session_id:
+        raise ValidationIssue(
+            "full_run_omp_resume_missing_provider_session",
+            "OMP full-run resume requires a captured provider session id",
         )
     if state.launch_start_head != state.start_head:
         raise ValidationIssue(
@@ -4893,7 +4924,7 @@ def launch_full_run(
                 ) from exc
             expected_resume_id = (
                 state.provider_session_id
-                if state.adapter == "devin-cli"
+                if state.adapter in {"devin-cli", "omp-cli"}
                 else state.session_id
             )
             if (

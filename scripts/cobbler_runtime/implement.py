@@ -1186,11 +1186,14 @@ def _build_omp_launch_argv(
                 f"Session id `{session_id}` is ambiguous and forbidden for OMP resume",
             )
         argv.extend(["--resume", session_id.strip()])
-    # packet via @path then short instruction (avoids inventing --prompt-file)
-    argv.append(f"@{packet_path}")
+    # Packet path must be a bare argv element so the full-run supervisor can
+    # rebind the staged packet snapshot (count(path)==1). omp loads file
+    # contents via --append-system-prompt <path>.
+    argv.extend(["--append-system-prompt", str(packet_path)])
     argv.append(
-        "Implement the attached Elves worker packet. Follow owned/forbidden surfaces; "
-        "commit on the assigned feature branch only; never merge or open PRs."
+        "Implement the Elves worker packet appended to the system prompt. "
+        "Follow owned/forbidden surfaces; commit on the assigned feature branch only; "
+        "never merge or open PRs."
     )
 
     if "-c" in argv or "--continue" in argv:

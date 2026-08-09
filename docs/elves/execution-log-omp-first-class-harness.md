@@ -30,3 +30,11 @@
 - Impact tests: `test_omp_cli_adapter`, implement, setup, sync, provider_shortcuts, installed_bundle_smoke — **190 OK (4 skipped)**.
 - B5/B6 remain deferred (host-profile prewalk; main-driver install).
 - Merge policy: user-merges; no merge performed.
+
+## 2026-08-09 — Skeptic gap fixes
+
+- full_run: omp-cli argv uses provider_session_id; resume supported; default executable `omp`.
+- Packet path bare via `--append-system-prompt` for supervisor staged-packet rebinding.
+- run_omp.sh: private HOME/XDG allowlisted env (no ambient host HOME).
+- Fixture: FAKE_OMP + test_omp_fixture_create_capture_and_resume (create, capture, resume UUID).
+- cobbler_agents full-run-prepare --adapter help includes omp-cli.

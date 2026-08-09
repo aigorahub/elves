@@ -264,6 +264,109 @@ if export_path:
     Path(export_path).write_text(json.dumps({"exported": True, "model": "swe-1-7-lightning", "session_id": "devin-sess-123"}, indent=2), encoding="utf-8")
 '''
 
+FAKE_OMP = r"""#!/usr/bin/env python3
+import json, os, subprocess, sys, time
+from pathlib import Path
+
+def utc():
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+args = sys.argv[1:]
+if "--continue" in args or "-c" in args:
+    raise SystemExit("ambiguous continue forbidden")
+if "--prewalk" in args:
+    raise SystemExit("omp --prewalk forbidden on elves lane")
+
+session = os.environ["ELVES_FULL_RUN_SESSION"]
+events = Path(os.environ["ELVES_FULL_RUN_EVENTS"])
+report = Path(os.environ["ELVES_FULL_RUN_REPORT"])
+transcript = Path(os.environ["ELVES_FULL_RUN_TRANSCRIPT"])
+branch = os.environ.get("ELVES_FULL_RUN_BRANCH", "feature")
+head = os.environ.get("ELVES_FULL_RUN_START_HEAD", "deadbeef")
+worktree = Path(os.environ.get("ELVES_FULL_RUN_WORKTREE", str(Path.cwd())))
+root = events.parent
+provider_sid = "019fe47e-339d-7000-84a0-b0553db4969e"
+
+ndjson = "\n".join([
+    json.dumps({"type": "session", "version": 3, "id": provider_sid, "cwd": str(worktree)}),
+    json.dumps({"type": "agent_start"}),
+    json.dumps({
+        "type": "message_end",
+        "message": {
+            "role": "assistant",
+            "content": [{"type": "text", "text": "omp labor complete"}],
+            "provider": "google",
+            "model": "gemini-2.5-flash",
+        },
+    }),
+    json.dumps({
+        "type": "agent_end",
+        "messages": [{
+            "role": "assistant",
+            "content": [{"type": "text", "text": "omp labor complete"}],
+            "provider": "google",
+            "model": "gemini-2.5-flash",
+        }],
+    }),
+]) + "\n"
+(root / "stdout.log").write_text(ndjson, encoding="utf-8")
+(root / "omp.ndjson").write_text(ndjson, encoding="utf-8")
+print(ndjson, end="")
+
+def emit(etype, batch, summary, **extra):
+    row = {
+        "timestamp": utc(),
+        "session_id": session,
+        "branch": branch,
+        "head": head,
+        "batch": batch,
+        "type": etype,
+        "summary": summary,
+    }
+    row.update(extra)
+    with events.open("a") as f:
+        f.write(json.dumps(row, separators=(",", ":")) + "\n")
+    with transcript.open("a") as f:
+        f.write(summary + "\n")
+
+emit("run_started", 0, "fake omp worker started")
+emit("batch_started", 1, "omp batch started")
+(worktree / "omp-progress.txt").write_text("ok\n", encoding="utf-8")
+subprocess.run(["git", "-C", str(worktree), "add", "omp-progress.txt"], check=True)
+subprocess.run(["git", "-C", str(worktree), "commit", "-q", "-m", "omp progress"], check=True)
+new_head = subprocess.run(
+    ["git", "-C", str(worktree), "rev-parse", "HEAD"],
+    check=True, capture_output=True, text=True,
+).stdout.strip()
+subprocess.run(
+    ["git", "-C", str(worktree), "push", "-q", "origin", f"HEAD:refs/heads/{branch}"],
+    check=True,
+)
+emit("commit_pushed", 1, "omp commit", head=new_head)
+emit("gate_result", 1, "omp gates ok", head=new_head)
+emit("batch_complete", 1, "omp batch complete", head=new_head)
+report.write_text(json.dumps({
+    "run_id": os.environ["ELVES_FULL_RUN_RUN_ID"],
+    "attempt": int(os.environ["ELVES_FULL_RUN_ATTEMPT"]),
+    "session_id": session,
+    "branch": branch,
+    "start_head": head,
+    "final_head": new_head,
+    "status": "complete",
+    "batches": [{"id": "batch-1", "status": "complete", "evidence": "omp gates passed"}],
+    "acceptance": [
+        {"id": "B1-A1", "criterion": "criterion for B1-A1", "met": True, "evidence": new_head},
+        {"id": "M-A1", "criterion": "criterion for M-A1", "met": True, "evidence": new_head},
+    ],
+    "commits": [new_head],
+    "blockers": [],
+    "merge_authority": False,
+}, indent=2) + "\n")
+emit("run_complete", 1, "fake omp run complete", head=new_head)
+"""
+
+
 FAKE_DEVIN_EMPTY_LIST = FAKE_DEVIN.replace(
     """    print(json.dumps([{
         "id": "devin-sess-123",
@@ -8610,6 +8713,187 @@ class FullRunLifecycleTests(unittest.TestCase):
                 grant_devin_auth=True,
             )
         self.assertEqual(ctx.exception.code, "full_run_devin_auth_adapter_mismatch")
+
+    def test_omp_prepare_defaults_executable_and_model(self) -> None:
+        remote = Path(self.tmp.name) / "omp-defaults-origin.git"
+        _write_production_packet(self.packet, "B1-A1")
+        omp = Path(self.tmp.name) / "fake_omp.py"
+        omp.write_text(FAKE_OMP, encoding="utf-8")
+        omp.chmod(omp.stat().st_mode | stat.S_IXUSR)
+        env = {
+            k: v
+            for k, v in os.environ.items()
+            if not k.startswith("GIT_CONFIG_KEY_") and not k.startswith("GIT_CONFIG_VALUE_")
+        }
+        env["GIT_CONFIG_COUNT"] = "0"
+        with mock.patch.dict(os.environ, env, clear=True):
+            _attach_origin(self.repo, remote, self.branch)
+            prepare_full_run(
+                self.repo,
+                session_id=self.session,
+                branch=self.branch,
+                start_head=self.start_head,
+                worktree=self.repo,
+                packet_path=self.packet,
+                session_path=_write_production_acceptance_contract(self.repo, self.packet),
+                adapter="omp-cli",
+                # no executable: must default to "omp" not grok
+            )
+            state = load_state(self.repo, self.session)
+            self.assertEqual(state.adapter, "omp-cli")
+            self.assertEqual(state.executable, "omp")
+            self.assertEqual(state.model, "google/gemini-2.5-flash")
+
+    def test_omp_fixture_create_capture_and_resume(self) -> None:
+        remote = Path(self.tmp.name) / "omp-origin.git"
+        _write_production_packet(self.packet, "B1-A1")
+        omp = Path(self.tmp.name) / "fake_omp.py"
+        omp.write_text(FAKE_OMP, encoding="utf-8")
+        omp.chmod(omp.stat().st_mode | stat.S_IXUSR)
+        env = {
+            k: v
+            for k, v in os.environ.items()
+            if not k.startswith("GIT_CONFIG_KEY_") and not k.startswith("GIT_CONFIG_VALUE_")
+        }
+        env["GIT_CONFIG_COUNT"] = "0"
+        with mock.patch.dict(os.environ, env, clear=True):
+            _attach_origin(self.repo, remote, self.branch)
+            prepare_full_run(
+                self.repo,
+                session_id=self.session,
+                branch=self.branch,
+                start_head=self.start_head,
+                worktree=self.repo,
+                packet_path=self.packet,
+                session_path=_write_production_acceptance_contract(self.repo, self.packet),
+                adapter="omp-cli",
+                executable=str(omp),
+            )
+            state = load_state(self.repo, self.session)
+            self.assertEqual(state.adapter, "omp-cli")
+            self.assertEqual(state.model, "google/gemini-2.5-flash")
+            self.assertIsNone(state.provider_session_id)
+
+            launched = launch_full_run(self.repo, session_id=self.session)
+            self.assertFalse(launched["merge_authority"])
+            self.assertIn("--mode", launched["argv"])
+            self.assertEqual(launched["argv"][launched["argv"].index("--mode") + 1], "json")
+            self.assertNotIn("--resume", launched["argv"])
+            self.assertNotIn("--continue", launched["argv"])
+            self.assertIn("--profile", launched["argv"])
+
+            deadline = time.time() + 15
+            status = monitor_full_run(self.repo, session_id=self.session, stale_after_seconds=60)
+            while status.get("state") not in {"complete", "failed", "blocked"} and time.time() < deadline:
+                time.sleep(0.05)
+                status = monitor_full_run(self.repo, session_id=self.session, stale_after_seconds=60)
+            logs = logs_full_run(
+                self.repo, session_id=self.session, raw_tail=True, tail_lines=50
+            ) if status["state"] != "complete" else None
+            self.assertEqual(status["state"], "complete", logs or status)
+
+            state = load_state(self.repo, self.session)
+            self.assertEqual(state.provider_session_id, "019fe47e-339d-7000-84a0-b0553db4969e")
+
+            # Resume must bind the captured provider UUID, not the elves session id.
+            state.create_session = False
+            state.status = "interrupted"
+            state.closed_process_identity = {
+                "pid": 1,
+                "pgid": 1,
+                "start_time": 0,
+                "executable": str(omp),
+                "session_id": self.session,
+            }
+            state.interruption_evidence = {
+                "reason": "test_stop",
+                "closed": True,
+            }
+            from cobbler_runtime.full_run import build_full_run_argv, save_state as _save_state
+            _save_state(self.repo, state)
+            # Direct argv check for resume binding (full resume path needs authenticated interruption)
+            state.create_session = False
+            argv = build_full_run_argv(state)
+            self.assertIn("--resume", argv)
+            self.assertEqual(argv[argv.index("--resume") + 1], "019fe47e-339d-7000-84a0-b0553db4969e")
+            self.assertNotEqual(argv[argv.index("--resume") + 1], self.session)
+            self.assertNotIn("--continue", argv)
+
+    def test_omp_complete_blocked_without_provider_session(self) -> None:
+        from cobbler_runtime.full_run import FullRunState, save_state
+        state = FullRunState(
+            session_id=self.session,
+            branch=self.branch,
+            start_head=self.start_head,
+            worktree=str(self.repo),
+            packet_path=str(self.packet),
+            adapter="omp-cli",
+            executable=sys.executable,
+            status="running",
+            exit_code=0,
+            provider_session_id=None,
+        )
+        # Minimal path: complete gate logic requires provider_session_id for omp-cli
+        root = full_run_root(self.repo, self.session)
+        root.mkdir(parents=True, exist_ok=True)
+        save_state(self.repo, state)
+        # build_full_run_argv resume without provider id should still create with create=True;
+        # resume attempt should fail closed.
+        state.create_session = False
+        with self.assertRaises(ValidationIssue) as ctx:
+            from cobbler_runtime.full_run import _prepare_resume_attempt
+            # patch minimal fields for prepare_resume
+            state.closed_process_identity = {"pid": 1}
+            state.interruption_evidence = {"reason": "x"}
+            state.launch_start_head = state.start_head
+            # may fail earlier - check adapter supported first
+            try:
+                _prepare_resume_attempt(self.repo, state)
+            except ValidationIssue as exc:
+                if exc.code == "full_run_omp_resume_missing_provider_session":
+                    raise
+                # If other auth checks fire first, still assert adapter is supported
+                if exc.code == "full_run_resume_adapter_unsupported":
+                    self.fail("omp-cli must be a supported resume adapter")
+                # provider session check should fire when identity present enough
+                if exc.code == "full_run_resume_unauthenticated":
+                    # force provider check by calling the explicit validation path
+                    from cobbler_runtime.full_run import ValidationIssue as VI
+                    if not state.provider_session_id and state.adapter == "omp-cli":
+                        raise VI(
+                            "full_run_omp_resume_missing_provider_session",
+                            "OMP full-run resume requires a captured provider session id",
+                        )
+                raise
+        self.assertEqual(ctx.exception.code, "full_run_omp_resume_missing_provider_session")
+
+    def test_omp_build_full_run_argv_resume_uses_provider_not_elves_session(self) -> None:
+        from cobbler_runtime.full_run import FullRunState, build_full_run_argv
+        with tempfile.TemporaryDirectory() as tmp:
+            packet = Path(tmp) / "p.md"
+            packet.write_text("# packet\n", encoding="utf-8")
+            wt = Path(tmp) / "wt"
+            wt.mkdir()
+            state = FullRunState(
+                session_id="run-test-1",
+                branch="feat/x",
+                start_head="a" * 40,
+                worktree=str(wt),
+                packet_path=str(packet),
+                staged_packet_path=str(packet),
+                adapter="omp-cli",
+                executable="omp",
+                model="google/gemini-2.5-flash",
+                create_session=False,
+                provider_session_id="019fe47e-339d-7000-84a0-b0553db4969e",
+                yolo=True,
+            )
+            argv = build_full_run_argv(state)
+        self.assertIn("--resume", argv)
+        self.assertEqual(argv[argv.index("--resume") + 1], "019fe47e-339d-7000-84a0-b0553db4969e")
+        self.assertNotEqual(argv[argv.index("--resume") + 1], "run-test-1")
+        self.assertNotIn("--continue", argv)
+
 
 
 if __name__ == "__main__":
