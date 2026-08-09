@@ -74,6 +74,7 @@ class SyncInstalledSkillsTests(unittest.TestCase):
         self.sync.TARGETS["claude"]["alias_root"] = home / ".claude" / "skills"
         self.sync.TARGETS["codex"]["root"] = home / ".codex" / "skills" / "elves"
         self.sync.TARGETS["grok"]["root"] = home / ".grok" / "skills" / "elves"
+        self.sync.TARGETS["omp"]["root"] = home / ".omp" / "agent" / "skills" / "elves"
         return repo, home
 
     def test_apply_creates_missing_claude_aliases(self) -> None:

@@ -3,26 +3,26 @@
 ![Elves - they work while you sleep](assets/elves-banner.jpeg)
 
 Elves is an open-source Agent Skill for handing planned development or research work to a separate
-worker without locking the run to one model provider. The capable Claude Code, Codex, or Grok Build
-driver plans and reviews; a subscription-native (or optional external) worker implements; durable
-run files let the work survive context compaction. You write the plan and own the merge decision.
-The agent does the middle.
+worker without locking the run to one model provider. The capable Claude Code, Codex, Grok Build, or
+Oh My Pi (omp) driver plans and reviews; a subscription-native (or optional external) worker
+implements; durable run files let the work survive context compaction. You write the plan and own
+the merge decision. The agent does the middle.
 
-**Current release: v2.25.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.26.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 **New to Elves?** Use the [practical user guide](https://aigorahub.github.io/elves/) — especially
 **[Paste this to your agent](https://aigorahub.github.io/elves/#agent-onboarding)** at the top.
-That copy-ready block installs Elves for Claude Code, Codex, and/or Grok Build (whichever is
-available) and orients you. The guide also covers the first run, worker choice, live progress,
-review, and landing. This README is the repository reference: shell install, safety model,
-operations, and an index into the detailed contracts under [`references/`](references/).
+That copy-ready block installs Elves for Claude Code, Codex, Grok Build, and/or Oh My Pi (omp)
+(whichever is available) and orients you. The guide also covers the first run, worker choice, live
+progress, review, and landing. This README is the repository reference: shell install, safety
+model, operations, and an index into the detailed contracts under [`references/`](references/).
 
-**Supported main drivers:** Claude Code, Codex, and Grok Build. All three are first-class hosts:
+**Supported main drivers:** Claude Code, Codex, Grok Build, and Oh My Pi (omp). All four are first-class hosts:
 native skill install, doctor validation, automatic required-mode prewalk qualification, and
 explicit experimental prewalk. Grok Build is also an optional *worker* under Claude/Codex when
-permitted. Managed install targets: `claude` → `~/.claude/skills/elves`, `codex` →
-`~/.codex/skills/elves`, `grok` → `~/.grok/skills/elves`.
+permitted. Oh My Pi is also a main driver (`omp` → `~/.omp/agent/skills/elves`) and an optional
+worker under other hosts. Managed install targets: `claude`, `codex`, `grok`, `omp`.
 See the guide FAQ
 [I opened Grok Build and tried /elves](https://aigorahub.github.io/elves/#troubleshooting).
 
@@ -195,7 +195,7 @@ veto. The host owns packets, protected refs, final gates, PR, and merge — alwa
 [`references/prewalk.md`](references/prewalk.md),
 [`references/grok-open-source-worker.md`](references/grok-open-source-worker.md),
 [`references/grok-implementer-launch-prompt.md`](references/grok-implementer-launch-prompt.md),
-[`references/omp-worker.md`](references/omp-worker.md) (optional Oh My Pi `omp-cli` parked worker / shortcut).
+[`references/omp-worker.md`](references/omp-worker.md) (Oh My Pi main driver + optional `omp-cli` / `/omp` worker).
 Parallel implementation lanes are optional and never the default: serial stays the default, and
 `worker.parallel=auto` only recommends lanes when the deterministic width test passes; see
 [`references/parallelves.md`](references/parallelves.md).
@@ -405,7 +405,7 @@ exactly one file below; other docs link instead of restating.
   [`references/cobbler-setup-recipes.md`](references/cobbler-setup-recipes.md) — setup
 - [`references/provider-shortcuts.md`](references/provider-shortcuts.md) — focused Fugu,
   Manus, Grok Build, and Devin command routes
-- [`references/omp-worker.md`](references/omp-worker.md) — optional Oh My Pi (`omp` / `omp-cli`) worker and shortcut
+- [`references/omp-worker.md`](references/omp-worker.md) — Oh My Pi main driver and optional `omp-cli` / `/omp` worker
 - [`references/host-parity.md`](references/host-parity.md) — Claude Code / Codex parity
 - [`references/project-landing-profiles.md`](references/project-landing-profiles.md) — tracked
   repository-specific exact-HEAD readiness checks

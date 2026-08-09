@@ -4,6 +4,26 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.26.0] - 2026-08-09
+
+### Added
+- **Oh My Pi (`omp`) as a supported main driver** alongside Claude Code, Codex, and Grok Build:
+  - Host profile token `omp` (alias `oh-my-pi`); never `omp-cli` as host
+  - Ordinary native-worker launch (`--mode json`, stream UUID, exact `--resume`, run-scoped
+    `--profile`, single selected provider credential)
+  - Managed install `sync_installed_skills.py --apply --target omp` → `~/.omp/agent/skills/elves`
+  - Host parity and dual-role docs (main driver vs optional `omp-cli` / `/omp` worker)
+  - Tests: `tests/test_omp_main_driver.py`
+
+### Notes
+- Phase 1 parked `omp-cli` full-run and `/omp` shortcut remain under other hosts.
+- Elves prewalk is not omp product `--prewalk`.
+- User still owns merge authorization.
+- Land review (Fugu Ultra): no P0. Mitigated P1s for resume Continue. input path, model-matched
+  credential projection, help-grammar exactness, and non-Claude alias checks. Residual (tracked for
+  follow-up): outer filesystem isolation for host-native omp (same class of gap as Grok host Popen),
+  and requiring NDJSON `agent_end` on native-worker phase success (full-run decoder already requires it).
+
 ## [2.25.0] - 2026-08-09
 
 ### Added

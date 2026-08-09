@@ -6,6 +6,7 @@ Usage:
   python3 scripts/sync_installed_skills.py --apply
   python3 scripts/sync_installed_skills.py --apply --target codex
   python3 scripts/sync_installed_skills.py --apply --target grok
+  python3 scripts/sync_installed_skills.py --apply --target omp
 
 `--check` reports drift between this repo checkout and the local installed copies.
 `--apply` overwrites the managed files/directories in the installed copies so they match
@@ -14,7 +15,7 @@ skills are marker-gated: unmarked user-owned alias skill directories are reporte
 are never overwritten.
 When `--target all` is used, the script only operates on **already-installed** Elves skill roots
 it finds (update-only). First-time install of a host must use an explicit target
-(`claude`, `codex`, or `grok`).
+(`claude`, `codex`, `grok`, or `omp`).
 
 Runtime shipment rule (v2.1.0+): ship the entire ``scripts/cobbler_runtime/`` package
 recursively plus required top-level helpers (including ``openrouter_lens.py``). Adding a
@@ -161,7 +162,7 @@ def _bundle_managed_paths(repo_root: Path | None = None) -> list[str]:
 
 
 def build_targets(repo_root: Path | None = None) -> dict[str, dict]:
-    """Return TARGETS keyed for Claude Code, Codex, and Grok Build installs."""
+    """Return TARGETS keyed for Claude Code, Codex, Grok Build, and Oh My Pi installs."""
     managed = _bundle_managed_paths(repo_root)
     return {
         "claude": {
@@ -182,6 +183,12 @@ def build_targets(repo_root: Path | None = None) -> dict[str, dict]:
             "managed_paths": list(managed),
             "cleanup_paths": REPO_ONLY_SCRIPT_PATHS,
         },
+        "omp": {
+            # Oh My Pi native global skill root (B0 frozen: ~/.omp/agent/skills/elves).
+            "root": Path.home() / ".omp" / "agent" / "skills" / "elves",
+            "managed_paths": list(managed),
+            "cleanup_paths": REPO_ONLY_SCRIPT_PATHS,
+        },
     }
 
 
@@ -191,7 +198,7 @@ TARGETS = build_targets()
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Check or sync installed Claude/Codex/Grok Elves skill copies against this repo "
+            "Check or sync installed Claude/Codex/Grok/OMP Elves skill copies against this repo "
             "checkout."
         )
     )
@@ -208,12 +215,13 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--target",
-        choices=("all", "claude", "codex", "grok"),
+        choices=("all", "claude", "codex", "grok", "omp"),
         default="all",
         help=(
             "Which installed skill copy to inspect or sync. "
             "`all` updates only hosts that already have an Elves skill root; "
-            "first-time install requires an explicit host target."
+            "first-time install requires an explicit host target "
+            "(claude, codex, grok, or omp)."
         ),
     )
     return parser.parse_args()
@@ -368,12 +376,14 @@ def check_target(name: str) -> tuple[bool, list[str]]:
     for alias_name in TARGETS[name].get("managed_aliases", []):
         problems.extend(compare_alias(alias_name, alias_root / alias_name))
 
-    # Codex must never receive the Claude alias tree under the skill install.
-    if name == "codex":
+    # Non-Claude installs must never carry a Claude alias tree under the skill root.
+    if name in {"codex", "grok", "omp"}:
         for alias_name in CLAUDE_ALIAS_NAMES:
             alias_under_skill = root / "aliases" / "claude" / alias_name
             if alias_under_skill.exists():
-                problems.append(f"unexpected Claude alias under Codex install: {alias_under_skill}")
+                problems.append(
+                    f"unexpected Claude alias under {name} install: {alias_under_skill}"
+                )
 
     return not problems, problems
 
@@ -532,7 +542,7 @@ def main() -> int:
     if not targets:
         print("No installed Elves skill copies were detected.")
         print(
-            "Use `--target claude`, `--target codex`, or `--target grok` with `--apply` "
+            "Use `--target claude`, `--target codex`, `--target grok`, or `--target omp` with `--apply` "
             "to create one explicitly (`all` only updates existing installs)."
         )
         if args.check and args.target == "all":

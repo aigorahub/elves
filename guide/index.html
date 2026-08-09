@@ -512,7 +512,7 @@
     <div class="masthead-inner">
       <div class="brand-row">
         <a class="wordmark" href="https://github.com/aigorahub/elves">Elves</a>
-        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.25.0 source and releases on GitHub</a>
+        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.26.0 source and releases on GitHub</a>
       </div>
       <h1>Using Elves</h1>
       <p class="intro">Plan with the main agent, hand implementation to a separate worker, then
@@ -541,24 +541,25 @@
     <main id="main">
       <section id="agent-onboarding">
         <h2>New here? Paste this to your agent</h2>
-        <p class="lede">Open Claude Code, Codex, or Grok Build in any directory, paste the block
+        <p class="lede">Open Claude Code, Codex, Grok Build, or Oh My Pi (omp) in any directory, paste the block
           below, and let the agent install Elves and explain how it works. Shell install steps are
           optional if you prefer them: see <a href="#install">Install Elves</a>.</p>
 
         <div class="code-block">
           <button class="copy" type="button" data-copy="agent-onboard">Copy</button>
-          <pre><code id="agent-onboard">Install Elves for whichever coding agents I have on this machine (Claude Code, Codex, and/or Grok Build), then explain how Elves works. Do not start an implementation run unless I ask.
+          <pre><code id="agent-onboard">Install Elves for whichever coding agents I have on this machine (Claude Code, Codex, Grok Build, and/or Oh My Pi / omp), then explain how Elves works. Do not start an implementation run unless I ask.
 
 1. Detect availability:
    - Claude Code: `claude` on PATH and/or `~/.claude`
    - Codex: `codex` on PATH and/or `~/.codex`
    - Grok Build: `grok` on PATH and/or `~/.grok`
+   - Oh My Pi: `omp` on PATH and/or `~/.omp`
    Install only for hosts that are actually present. If several exist, install each with an explicit target (do not rely on `all` for first-time install).
 
 2. Install from a temporary clone of https://github.com/aigorahub/elves.git:
    ELVES_TMP="$(mktemp -d)"
    git clone --depth 1 https://github.com/aigorahub/elves.git "$ELVES_TMP/elves"
-   python3 "$ELVES_TMP/elves/scripts/sync_installed_skills.py" --apply --target &lt;claude|codex|grok&gt;
+   python3 "$ELVES_TMP/elves/scripts/sync_installed_skills.py" --apply --target &lt;claude|codex|grok|omp&gt;
    rm -rf "$ELVES_TMP"
    Use target `claude`, `codex`, or `grok` to match what you detected. Requires Python 3.10 or newer.
 
@@ -568,21 +569,21 @@
    python3 ~/.grok/skills/elves/scripts/install_doctor.py --startup
 
 4. In plain language, explain:
-   - Elves is a skill for Claude Code, Codex, and Grok Build (those are the supported main drivers).
+   - Elves is a skill for Claude Code, Codex, Grok Build, and Oh My Pi / omp (those are the supported main drivers).
    - I own the plan and whether to merge. The driver plans/reviews/lands; a separate worker implements.
    - Default: same subscription, lower-effort native worker. Outcome is usually a landable PR; merge only if I authorize it.
-   - Optional workers (Grok Build under Claude/Codex, Devin, Oh My Pi / omp, OpenCode, …) are not required. Native works with no extra keys.
-   - Required prewalk qualifies Claude Code, Codex, or Grok Build automatically before task launch when matching proof is absent.
+   - Optional workers (Grok under Claude/Codex, Devin, omp-cli /omp shortcut, OpenCode, …) are not required. Native works with no extra keys.
+   - Required prewalk qualifies Claude Code, Codex, Grok Build, or omp automatically before task launch when matching proof is absent.
 
 5. Stop after install + orientation. Offer one short first-run starter prompt I can paste later (chat-to-work: landable PR, do not merge).</code></pre>
         </div>
 
         <div class="note">
           <strong>Hosts.</strong> Supported main drivers are <strong>Claude Code</strong>,
-          <strong>Codex</strong>, and <strong>Grok Build</strong>. Required prewalk uses the same
+          <strong>Codex</strong>, <strong>Grok Build</strong>, and <strong>Oh My Pi (omp)</strong>. Required prewalk uses the same
           automatic qualification contract on each host. Managed skill install targets:
-          <code>~/.claude/skills/elves</code>, <code>~/.codex/skills/elves</code>, and
-          <code>~/.grok/skills/elves</code>. Devin, Oh My Pi (<code>omp</code>), and OpenCode stay optional workers.
+          <code>~/.claude/skills/elves</code>, <code>~/.codex/skills/elves</code>,
+          <code>~/.grok/skills/elves</code>, and <code>~/.omp/agent/skills/elves</code>. Devin and OpenCode stay optional workers; omp-cli remains an optional worker under other hosts.
         </div>
       </section>
 
@@ -755,12 +756,13 @@ python3 ~/.grok/skills/elves/scripts/install_doctor.py --startup</code></pre>
             needs <code>DEVIN_API_KEY</code>. Stored Devin secrets and knowledge are not granted by
             default, and bounded session creation and polling responses share a hard wall-clock
             wait budget.</li>
-          <li><strong>Oh My Pi</strong> (<code>/omp</code> / <code>$elves omp</code>) runs the
-            installed <code>omp</code> CLI headlessly over Elves' isolation snapshot with one
-            provider-matched API key (set <code>ELVES_OMP_MODEL</code>). Optional parked full-run
-            worker is <code>omp-cli</code> — not a main driver; never spell the CLI
-            <code>opm</code>. Shortcut writes are not supported; use full-run for implementation
-            labor. See <code>references/omp-worker.md</code>.</li>
+          <li><strong>Oh My Pi</strong> (<code>/omp</code> / <code>$elves omp</code>) is the
+            optional worker/shortcut under Claude/Codex/Grok: headless <code>omp</code> over Elves'
+            isolation snapshot with one provider-matched API key (set <code>ELVES_OMP_MODEL</code>).
+            Parked full-run labor uses adapter <code>omp-cli</code>. Opening <code>omp</code> as
+            the host with the managed skill root is a supported main driver; that is a different
+            role. Never spell the CLI <code>opm</code>. Shortcut writes are not supported; use
+            full-run for implementation labor. See <code>references/omp-worker.md</code>.</li>
         </ul>
         <p>Manus chooses whether its internal Wide mode activates; the public API has no documented
           force-Wide or create-child endpoint. Cobbler's coverage check and deterministic fallback
@@ -848,7 +850,7 @@ python3 ~/.grok/skills/elves/scripts/install_doctor.py --startup</code></pre>
               <td data-label="Usual choice"><code>omp-cli</code> (parked full-run) or
                 <code>/omp</code> shortcut</td>
               <td data-label="Why">Optional multi-provider coding worker with host-owned PR/merge;
-                not a main driver. See <code>references/omp-worker.md</code>.</td>
+                optional worker under other hosts; omp is also a main driver. See <code>references/omp-worker.md</code>.</td>
             </tr>
           </tbody>
         </table>

@@ -1,11 +1,4 @@
 {
   "schema_version": 1,
-  "approvals": [
-    {
-      "surface": "export:cobbler_runtime.BUILTIN_ADAPTER_NAMES",
-      "release": "2.25.0",
-      "reason": "Phase 1 optional omp-cli parked full-run adapter; additive membership only, no removals",
-      "plan_path": "docs/plans/omp-first-class-harness.md"
-    }
-  ]
+  "approvals": []
 }
