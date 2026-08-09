@@ -97,9 +97,11 @@ assume `./scripts` belongs to the target repository and do not execute mappings 
   shared OAuth file)
 - Devin task → `run_devin.sh <instructions>` (remote session, bounded wait, no default stored
   secret or knowledge grants; creation and polling share one hard wall-clock bound)
+- Oh My Pi task → `run_omp.sh <instructions>` (optional headless `omp` worker shortcut;
+  never `opm`; not a main driver; run-scoped profile isolation)
 
 Codex uses the `$elves` or natural-language forms above, not invented top-level `/fugu`, `/manus`,
-`/grok`, or `/devin` commands. Explicit invocation authorizes the provider call and any associated
+`/grok`, `/devin`, or `/omp` commands. Explicit invocation authorizes the provider call and any associated
 provider usage, but not merge, protected-ref, secret, or approval-bypass authority.
 
 ## Workflow pointers (SKILL.md owns every contract)
