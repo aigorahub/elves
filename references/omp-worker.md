@@ -24,7 +24,6 @@ Install Elves for omp:
 ```bash
 python3 "$ELVES_SKILL_ROOT/scripts/sync_installed_skills.py" --apply --target omp
 # root: ~/.omp/agent/skills/elves
-# (source-checkout shorthand: python3 scripts/sync_installed_skills.py …)
 ```
 
 Open `omp` and load the Elves skill like other hosts. Host owns staging, canonical memory, prewalk
