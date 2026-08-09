@@ -1146,5 +1146,3 @@ def _capture_omp_session_id(state, root, repo_root):
         if session_id:
             return session_id
     return None
-
-

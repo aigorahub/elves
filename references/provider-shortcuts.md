@@ -433,4 +433,3 @@ Codex driver to review.
 - Isolation: shared `isolated_lane` snapshot + single provider-matched API key via `ELVES_OMP_MODEL`.
 - Read-only shortcut; `ELVES_OMP_WRITE` is rejected. Implementation labor uses full-run `omp-cli`.
 - Full reference: [`omp-worker.md`](omp-worker.md).
-

@@ -7,11 +7,12 @@ keeping the planning agent busy, and return to the main agent for review and lan
 
 ## Users
 
-The primary user already works in Claude Code, Codex, or Grok Build. They may also have Devin CLI
-or another supported worker, but Elves must remain useful with one host subscription. Supported
-main drivers are Claude Code, Codex, and Grok Build. All three use the same automatic required-mode
-prewalk qualification and explicit experimental mode. Grok Build is also an optional worker under
-Claude/Codex when permitted.
+The primary user already works in Claude Code, Codex, or Grok Build. They may also have Devin CLI,
+Oh My Pi (`omp` / `omp-cli`), or another supported worker, but Elves must remain useful with one host
+subscription. Supported main drivers are Claude Code, Codex, and Grok Build. All three use the same
+automatic required-mode prewalk qualification and explicit experimental mode. Grok Build and Oh My
+Pi are optional workers under those hosts when permitted (not main drivers; host retains plan, PR,
+and merge authority).
 
 The public guide should lead with a copy-ready agent install/orient prompt, then shell install and
 first-run kickoffs.
