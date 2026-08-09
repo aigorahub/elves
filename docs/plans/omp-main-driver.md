@@ -52,7 +52,7 @@ where possible; do not invent a second decoder.
 
 ```text
 Role A — Main driver (this plan)
-  Token: omp (never omp-cli as host)
+  Host id: omp (never omp-cli as host)
   User opens: omp
   Skill: B0-frozen managed root
   Host: stages, supervises, reviews, prepares PR, enforces readiness
