@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Grok Build, Oh My Pi (omp), Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.27.0"
+  version: "2.28.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -76,7 +76,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.27.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.28.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
@@ -443,6 +443,36 @@ Hard work does **not** mean mid-run nit perfection, nested full reviews, or re-r
 suite between ordinary batches. Correctness on the impact path is non-negotiable; polish and
 full-suite attestation belong at terminal readiness (deferred hygiene).
 
+## Out-of-Scope Findings
+
+A run notices things the plan does not cover. There are three destinations, and only one is right
+for work outside the plan:
+
+| What was noticed | Destination | Settled |
+| --- | --- | --- |
+| In-scope nit, polish, full-suite attestation | deferred hygiene | terminal readiness, this run |
+| Adjacent bug, test or doc, time remaining | Scout Mode | this run, as a commit |
+| Worth doing, outside the plan | **GitHub issue** | a later run |
+
+Out of scope means the plan does not cover it and widening a batch to include it would change what
+the user accepted. Do not fix it, do not widen the batch, and do not drop it. **File it**:
+
+```bash
+gh issue list --search "<keywords>" --state all --limit 5   # never file a duplicate
+gh issue create --title "<imperative and specific>" --body "<body>" --label enhancement
+```
+
+The body carries what and where (`file:line`), why it matters, why it was out of scope for this
+run, and the branch or PR that found it. Never a secret value: cite the location and the credential
+type, and recommend rotation.
+
+Record every issue URL in the execution log and list them in the terminal report, so the run names
+what it deferred instead of leaving it in a transcript nobody re-reads. Without `gh` or without a
+repository, write the same entries to the run notes and say so in the report.
+
+A run that files more than a handful is describing a different project than the one it was asked to
+build. Say that in the report rather than filing thirty issues.
+
 ## Run Mode
 
 Persist under `## Run Control`. **Finite** (default) ends at completion. **Open-ended** continues
@@ -497,7 +527,9 @@ is broken. That template is per-finding and is distinct from `references/plan-te
 shapes a batched run.
 
 Findings the user does not select are filed with `gh issue create` rather than carried in memory or
-fixed opportunistically. This is the same rule the run loop applies to anything noticed in passing.
+fixed opportunistically, in the shape and with the guards described under **Out-of-Scope
+Findings**. Discovery differs only in volume: a survey is expected to produce several issues, where
+an ordinary run should produce few.
 
 ## Planning
 
