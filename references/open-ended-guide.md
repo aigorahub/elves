@@ -83,7 +83,7 @@ Open-ended mode does not mean random activity forever. It means:
 - Keep making materially useful progress
 - Expand coverage when local discoveries flatten out
 - Cluster duplicates instead of rediscovering them endlessly
-- If no materially new action remains after multiple expansion attempts, log that coverage is saturated and continue in lower-probability scout mode
+- If no materially new action remains after multiple expansion attempts, log that coverage is saturated and continue in lower-probability scout mode. **Exception: a Discovery pass never escalates into scout mode**, because it promised the user read-only on source. Broaden the survey or file issues instead. See the Discovery phase in `SKILL.md`.
 - If the user explicitly required strict indefinite continuation, broaden the search rather than stopping
 
 ## Communication Rules

@@ -15,6 +15,15 @@ VERSION_FILES = {
     "AGENTS.md": REPO_ROOT / "AGENTS.md",
 }
 
+# Surfaces that display the release version in prose rather than frontmatter.
+# VERSION_FILES only reads frontmatter, so these are invisible to it and can ship
+# stale behind a green check. `{version}` is substituted with the repo skill version.
+INLINE_VERSION_SURFACES = {
+    "SKILL.md": ["User guide (v{version})"],
+    "README.md": ["**Current release: v{version}**"],
+    "guide/index.html": ["v{version} source and releases"],
+}
+
 CHANGELOG_PATH = REPO_ROOT / "CHANGELOG.md"
 
 RECOVERY_ORDER_FILES = {

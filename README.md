@@ -393,6 +393,10 @@ exactly one file below; other docs link instead of restating.
 **Run lifecycle**
 - [`references/plan-template.md`](references/plan-template.md) — how to write a plan (stable
   `B#-A#` acceptance ids)
+- [`references/audit-playbook.md`](references/audit-playbook.md) — Discovery audit categories,
+  the evidence rule, and the leverage rubric
+- [`references/finding-plan-template.md`](references/finding-plan-template.md) — per-finding
+  executor handoff (distinct from `plan-template.md`, which shapes a batched run)
 - [`references/kickoff-prompt-template.md`](references/kickoff-prompt-template.md) — staging
   kickoff, including the worker packet and teardown expectations
 - [`references/survival-guide-template.md`](references/survival-guide-template.md) — Run Control,

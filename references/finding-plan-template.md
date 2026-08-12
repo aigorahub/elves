@@ -97,7 +97,7 @@ executor's environment. Skip the section otherwise.)
 
 (Filled from recon — match the repo's observed conventions.)
 
-- Branch: `elves/discovery/NNN-<slug>` (or the repo's branch-naming convention if one is evident)
+- Branch: follow the repository's own branch-naming convention; Elves does not impose one
 - Commit per step or per logical unit; message style: <match repo, e.g. conventional commits — include an example from `git log`>
 - Do NOT push or open a PR unless the operator instructed it.
 

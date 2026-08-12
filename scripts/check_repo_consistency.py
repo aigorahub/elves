@@ -60,6 +60,15 @@ def main() -> int:
                 f"CHANGELOG.md: latest release `{changelog_version}` does not match repo skill version `{expected}`"
             )
 
+        for label, patterns in INLINE_VERSION_SURFACES.items():
+            text = read_text(REPO_ROOT / label)
+            for pattern in patterns:
+                needle = pattern.format(version=expected)
+                if needle not in text:
+                    errors.append(
+                        f"{label}: missing or stale inline version string `{needle}`"
+                    )
+
     for label, path in RECOVERY_ORDER_FILES.items():
         verify_order(label, read_text(path), RECOVERY_ORDER_TOKENS, errors)
 

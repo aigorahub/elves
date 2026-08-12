@@ -473,6 +473,12 @@ lint in check mode, dependency audit, a cheap side-effect-free test run) but wri
 evidence, no landing authority, and nothing to merge. Implementation happens later, through the
 normal batch loop, once the user picks what to build.
 
+The read-only boundary **overrides open-ended escalation**. Discovery shares its use cases with
+`references/open-ended-guide.md`, and that guide sends a saturated run into Scout Mode, which
+commits code. That escalation does not apply here. When findings saturate during Discovery,
+broaden the survey or file issues; do not enter Scout Mode, fix adjacent bugs, or modify source
+until the user selects work.
+
 Method lives in `references/audit-playbook.md`: nine categories with what to look for in each, and
 a depth rule that scales the pass to repository size. Two contracts from that reference are
 binding:
