@@ -75,6 +75,31 @@ NONSTOP_GUARDRAIL_PHRASES = {
     ],
 }
 
+# Discovery phase: the read-only survey that precedes Planning when no task is named.
+# Anchors only. The boundary (read-only on source, writes confined to advisor-plans/)
+# and the two contracts (evidence, leverage) must restate wherever Discovery appears.
+DISCOVERY_GUARDRAIL_PHRASES = {
+    "SKILL.md": [
+        "## Discovery",
+        "**read-only on source**",
+        "advisor-plans/",
+        "references/audit-playbook.md",
+        "references/finding-plan-template.md",
+        "gh issue create",
+    ],
+    "references/audit-playbook.md": [
+        "## Finding format",
+        "## Prioritization rubric",
+    ],
+    "references/finding-plan-template.md": [
+        "advisor-plans/NNN-short-slug.md",
+        "zero context",
+    ],
+    "README.md": [
+        "references/audit-playbook.md",
+    ],
+}
+
 # Section/contract anchors only — do not pin motivational prose byte-for-byte.
 # Editorial rewording of effort guidance must not break CI.
 EFFORT_GUARDRAIL_PHRASES = {

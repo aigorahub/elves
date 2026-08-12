@@ -127,6 +127,13 @@ def main() -> int:
             if phrase not in text:
                 errors.append(f"{label}: missing effort guardrail phrase `{phrase}`")
 
+    for label, phrases in DISCOVERY_GUARDRAIL_PHRASES.items():
+        path = REPO_ROOT / label
+        text = read_text(path)
+        for phrase in phrases:
+            if phrase not in text:
+                errors.append(f"{label}: missing discovery phase phrase `{phrase}`")
+
     for label, phrases in MIDRUN_TERMINAL_HYGIENE_PHRASES.items():
         path = REPO_ROOT / label
         text = read_text(path)

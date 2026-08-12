@@ -4,6 +4,8 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.27.0] - 2026-08-11
+
 ### Added
 - **Discovery phase** for open-ended runs where no task has been named: structural-debt surveys,
   UX and security sweeps, bug hunting, and backlog generation. Read-only on source; writes only to

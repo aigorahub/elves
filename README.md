@@ -8,7 +8,7 @@ Oh My Pi (omp) driver plans and reviews; a subscription-native (or optional exte
 implements; durable run files let the work survive context compaction. You write the plan and own
 the merge decision. The agent does the middle.
 
-**Current release: v2.26.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.27.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 **New to Elves?** Use the [practical user guide](https://aigorahub.github.io/elves/) — especially
@@ -153,6 +153,23 @@ python3 /path/to/elves/scripts/sync_installed_skills.py --apply --target grok
 # Uninstall: remove the skill root you installed (and Claude aliases only if you want them gone):
 rm -rf ~/.claude/skills/elves ~/.codex/skills/elves ~/.grok/skills/elves
 ```
+
+### No plan yet? Start with Discovery
+
+When you do not know what to work on, ask for a survey instead of a run:
+
+> Do a discovery pass on this repo and tell me what is worth doing.
+
+Discovery is read-only on source. It sweeps the repository against the nine categories in
+[`references/audit-playbook.md`](references/audit-playbook.md), returns findings ranked by impact
+over effort, and writes nothing outside `advisor-plans/`. Every finding cites `file:line` and a
+concrete effect, so "probably slow somewhere" never reaches you. "Not worth doing" is a recorded
+verdict, not a silent omission.
+
+Findings you pick become self-contained executor plans in `advisor-plans/`, one per finding, using
+[`references/finding-plan-template.md`](references/finding-plan-template.md). Those plans feed the
+normal run below. Findings you do not pick are filed with `gh issue create` rather than carried in
+anyone's memory.
 
 ### First run
 
