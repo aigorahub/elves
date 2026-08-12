@@ -58,6 +58,12 @@ Why wrong: in open-ended mode, completing all planned batches means entering sco
 
 If the task is exploratory QA, UX review, bug hunting, or backlog generation, there is no natural done state. The agent should continue generating new scenarios and findings until explicitly stopped.
 
+This mode sets run-control semantics only. The method for the findings themselves is the Discovery
+phase in `SKILL.md`: findings cite `file:line` and a concrete effect, ranking is impact over effort
+discounted by confidence and fix risk, and "not worth doing" is a recorded verdict. Categories and
+the finding shape live in `references/audit-playbook.md`. Open-ended mode decides when to stop;
+Discovery decides what counts as a finding.
+
 ### When findings start repeating, broaden coverage
 
 1. Broaden viewport coverage (mobile, tablet, ultrawide)

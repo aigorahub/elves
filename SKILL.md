@@ -469,8 +469,9 @@ the user already named the work, skip straight to Planning.
 
 Discovery is **read-only on source**. It may run the repository's own read-only checks (type-check,
 lint in check mode, dependency audit, a cheap side-effect-free test run) but writes nothing outside
-`advisor-plans/`. Implementation happens later, through the normal batch loop, once the user picks
-what to build.
+`advisor-plans/`. It runs before `staging` and is not a worker state: there is no readiness
+evidence, no landing authority, and nothing to merge. Implementation happens later, through the
+normal batch loop, once the user picks what to build.
 
 Method lives in `references/audit-playbook.md`: nine categories with what to look for in each, and
 a depth rule that scales the pass to repository size. Two contracts from that reference are
