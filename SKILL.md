@@ -461,6 +461,37 @@ allow stopping? Is work remaining? Audit the current state against every require
 current HEAD — do not rely on intent, partial progress, or memory of earlier work. If not
 justified, continue.
 
+## Discovery
+
+Use this phase when the goal is open-ended and no task has been named yet: "what should we work on
+next", a structural-debt survey, a UX or security sweep, bug hunting, or backlog generation. When
+the user already named the work, skip straight to Planning.
+
+Discovery is **read-only on source**. It may run the repository's own read-only checks (type-check,
+lint in check mode, dependency audit, a cheap side-effect-free test run) but writes nothing outside
+`advisor-plans/`. Implementation happens later, through the normal batch loop, once the user picks
+what to build.
+
+Method lives in `references/audit-playbook.md`: nine categories with what to look for in each, and
+a depth rule that scales the pass to repository size. Two contracts from that reference are
+binding:
+
+- **Evidence.** A finding cites `file:line` and a concrete effect. "Probably has N+1 queries
+  somewhere" is not a finding; `orders/api.ts:142 issues one query per order item inside a loop`
+  is. Never reproduce a secret value; cite the location and credential type, and recommend rotation.
+- **Leverage.** Rank by impact divided by effort, discounted by confidence and by how risky the fix
+  is. "Not worth doing" is a valid verdict and is recorded with one line of reasoning, so the
+  maintainer knows it was considered.
+
+Selected findings become self-contained executor plans in `advisor-plans/`, one per finding, using
+`references/finding-plan-template.md`. Each plan assumes an executor with zero context: it has not
+seen this session, the survey, or the other plans. A plan that says "the pattern discussed above"
+is broken. That template is per-finding and is distinct from `references/plan-template.md`, which
+shapes a batched run.
+
+Findings the user does not select are filed with `gh issue create` rather than carried in memory or
+fixed opportunistically. This is the same rule the run loop applies to anything noticed in passing.
+
 ## Planning
 
 Interactive by default; autonomous expansion of brief prompts is allowed with user approval before
