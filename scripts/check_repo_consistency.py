@@ -60,6 +60,15 @@ def main() -> int:
                 f"CHANGELOG.md: latest release `{changelog_version}` does not match repo skill version `{expected}`"
             )
 
+        for label, patterns in INLINE_VERSION_SURFACES.items():
+            text = read_text(REPO_ROOT / label)
+            for pattern in patterns:
+                needle = pattern.format(version=expected)
+                if needle not in text:
+                    errors.append(
+                        f"{label}: missing or stale inline version string `{needle}`"
+                    )
+
     for label, path in RECOVERY_ORDER_FILES.items():
         verify_order(label, read_text(path), RECOVERY_ORDER_TOKENS, errors)
 
@@ -126,6 +135,13 @@ def main() -> int:
         for phrase in phrases:
             if phrase not in text:
                 errors.append(f"{label}: missing effort guardrail phrase `{phrase}`")
+
+    for label, phrases in DISCOVERY_GUARDRAIL_PHRASES.items():
+        path = REPO_ROOT / label
+        text = read_text(path)
+        for phrase in phrases:
+            if phrase not in text:
+                errors.append(f"{label}: missing discovery phase phrase `{phrase}`")
 
     for label, phrases in MIDRUN_TERMINAL_HYGIENE_PHRASES.items():
         path = REPO_ROOT / label

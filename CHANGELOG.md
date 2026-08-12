@@ -4,6 +4,20 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.27.0] - 2026-08-11
+
+### Added
+- **Discovery phase** for open-ended runs where no task has been named: structural-debt surveys,
+  UX and security sweeps, bug hunting, and backlog generation. Read-only on source; writes only to
+  `advisor-plans/`.
+  - `references/audit-playbook.md`: nine audit categories, the evidence rule (`file:line` and a
+    concrete effect, never a speculative finding, never a secret value), and the leverage rubric
+    (impact over effort, discounted by confidence and fix risk; "not worth doing" is a recorded
+    verdict).
+  - `references/finding-plan-template.md`: per-finding executor handoff, written for a model with
+    zero context. Distinct from `references/plan-template.md`, which shapes a batched run.
+  - Unselected findings are filed with `gh issue create` rather than fixed opportunistically.
+
 ## [2.26.0] - 2026-08-09
 
 ### Added

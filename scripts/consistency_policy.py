@@ -15,6 +15,15 @@ VERSION_FILES = {
     "AGENTS.md": REPO_ROOT / "AGENTS.md",
 }
 
+# Surfaces that display the release version in prose rather than frontmatter.
+# VERSION_FILES only reads frontmatter, so these are invisible to it and can ship
+# stale behind a green check. `{version}` is substituted with the repo skill version.
+INLINE_VERSION_SURFACES = {
+    "SKILL.md": ["User guide (v{version})"],
+    "README.md": ["**Current release: v{version}**"],
+    "guide/index.html": ["v{version} source and releases"],
+}
+
 CHANGELOG_PATH = REPO_ROOT / "CHANGELOG.md"
 
 RECOVERY_ORDER_FILES = {
@@ -72,6 +81,31 @@ NONSTOP_GUARDRAIL_PHRASES = {
         "## Stop Gate Pattern",
         "## Forbidden Stop Reasons",
         "continuation_guard.stop_allowed: false",
+    ],
+}
+
+# Discovery phase: the read-only survey that precedes Planning when no task is named.
+# Anchors only. The boundary (read-only on source, writes confined to advisor-plans/)
+# and the two contracts (evidence, leverage) must restate wherever Discovery appears.
+DISCOVERY_GUARDRAIL_PHRASES = {
+    "SKILL.md": [
+        "## Discovery",
+        "**read-only on source**",
+        "advisor-plans/",
+        "references/audit-playbook.md",
+        "references/finding-plan-template.md",
+        "gh issue create",
+    ],
+    "references/audit-playbook.md": [
+        "## Finding format",
+        "## Prioritization rubric",
+    ],
+    "references/finding-plan-template.md": [
+        "advisor-plans/NNN-short-slug.md",
+        "zero context",
+    ],
+    "README.md": [
+        "references/audit-playbook.md",
     ],
 }
 

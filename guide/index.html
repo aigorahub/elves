@@ -512,7 +512,7 @@
     <div class="masthead-inner">
       <div class="brand-row">
         <a class="wordmark" href="https://github.com/aigorahub/elves">Elves</a>
-        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.26.0 source and releases on GitHub</a>
+        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.27.0 source and releases on GitHub</a>
       </div>
       <h1>Using Elves</h1>
       <p class="intro">Plan with the main agent, hand implementation to a separate worker, then
@@ -804,6 +804,20 @@ python3 ~/.grok/skills/elves/scripts/install_doctor.py --startup</code></pre>
         <p>Describe the change in ordinary language. Elves will help turn it into a durable plan
           before launching the worker. Name the parts that need caution and the evidence that would
           convince you the result is complete.</p>
+
+        <h3>If you do not know what to work on</h3>
+        <p>Ask for a discovery pass instead of a run:</p>
+        <blockquote>
+          <p>Do a discovery pass on this repo and tell me what is worth doing.</p>
+        </blockquote>
+        <p>Discovery is read-only on source. It sweeps the repository against nine audit
+          categories, ranks what it finds by impact over effort, and writes nothing outside
+          <code>advisor-plans/</code>. Every finding names a file and line and the concrete effect,
+          so vague reports never reach you. <em>Not worth doing</em> is a recorded verdict rather
+          than a silent omission, so you can see what was considered and dismissed.</p>
+        <p>Findings you pick become one self-contained plan each, written for an executor with no
+          memory of the survey. Those plans feed the normal run above. Findings you do not pick are
+          filed as GitHub issues rather than carried in anyone's memory.</p>
       </section>
 
       <section id="worker">
