@@ -147,6 +147,7 @@ Operate Cobbler-first: use independent lenses for non-trivial planning, contract
 Do not stop unless you hit a genuine blocker with no reasonable workaround.
 Do not be lazy. Work as hard as you can for the entire run on plan acceptance and blockers.
 Do not coast after the first success, first green check, or first useful checkpoint. Push each batch through impact-path proof and blockers, bank advisory nits as deferred hygiene, then continue immediately. Full suite and polish drain at terminal readiness.
+If you notice something worth doing that the plan does not cover, do not fix it and do not widen the batch: search existing issues, then `gh issue create`, record the URL in the survival guide under Out-of-scope findings, and continue. Without `gh` or a repository, list it there instead and say so in the report.
 If the remaining work feels like a lot for one turn, that is the point: the volume is the reason this run exists, not a reason to stop.
 On host-native and legacy bounded routes: Every completed batch must end with a commit and push before you start anything else.
 Immediately after every commit and push, re-read the survival guide before any other action. During a healthy
@@ -175,6 +176,7 @@ By 7:30am ET, I want a review-ready checkpoint with green local validation. This
 Do not stop unless you hit a genuine blocker with no reasonable workaround.
 Do not be lazy. Work as hard as you can for the entire run on plan acceptance and blockers.
 Do not coast after the first success, first green check, or first useful checkpoint. Push each batch through impact-path proof and blockers, bank advisory nits as deferred hygiene, then continue immediately. Full suite and polish drain at terminal readiness.
+If you notice something worth doing that the plan does not cover, do not fix it and do not widen the batch: search existing issues, then `gh issue create`, record the URL in the survival guide under Out-of-scope findings, and continue. Without `gh` or a repository, list it there instead and say so in the report.
 If the remaining work feels like a lot for one turn, that is the point: the volume is the reason this run exists, not a reason to stop.
 On host-native and legacy bounded routes: Every completed batch must end with a commit and push before you start anything else.
 Immediately after every commit and push, re-read the survival guide before any other action. During a healthy

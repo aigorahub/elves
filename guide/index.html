@@ -512,7 +512,7 @@
     <div class="masthead-inner">
       <div class="brand-row">
         <a class="wordmark" href="https://github.com/aigorahub/elves">Elves</a>
-        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.27.0 source and releases on GitHub</a>
+        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.28.0 source and releases on GitHub</a>
       </div>
       <h1>Using Elves</h1>
       <p class="intro">Plan with the main agent, hand implementation to a separate worker, then
@@ -804,6 +804,36 @@ python3 ~/.grok/skills/elves/scripts/install_doctor.py --startup</code></pre>
         <p>Describe the change in ordinary language. Elves will help turn it into a durable plan
           before launching the worker. Name the parts that need caution and the evidence that would
           convince you the result is complete.</p>
+
+        <h3>What happens to things it notices along the way</h3>
+        <p>A run always finds work the plan did not cover. Elves keeps three destinations apart, so
+          nothing turns into scope creep and nothing gets lost:</p>
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">What it noticed</th>
+              <th scope="col">Where it goes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-label="What it noticed">A nit or polish item inside the plan</td>
+              <td data-label="Where it goes">Deferred hygiene, drained before the run finishes</td>
+            </tr>
+            <tr>
+              <td data-label="What it noticed">An adjacent bug, test or doc, with time left</td>
+              <td data-label="Where it goes">Scout mode, fixed and committed in this run</td>
+            </tr>
+            <tr>
+              <td data-label="What it noticed">Something worth doing, outside the plan</td>
+              <td data-label="Where it goes">A GitHub issue, for a later run</td>
+            </tr>
+          </tbody>
+        </table>
+        <p>The third one is the rule that keeps runs honest. The worker searches existing issues so
+          it does not file a duplicate, opens one naming the file and line and why it was out of
+          scope, records the link, and moves on. It never quietly fixes it and never widens the
+          batch you approved. Your terminal report lists every issue the run opened.</p>
 
         <h3>If you do not know what to work on</h3>
         <p>Ask for a discovery pass instead of a run:</p>

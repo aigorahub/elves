@@ -109,6 +109,28 @@ DISCOVERY_GUARDRAIL_PHRASES = {
     ],
 }
 
+# Out-of-scope findings: work a run notices that the plan does not cover. The rule is
+# "file it, never fix it, never drop it", and it must reach the worker-facing surfaces,
+# not only SKILL.md. Anchors only.
+OUT_OF_SCOPE_GUARDRAIL_PHRASES = {
+    "SKILL.md": [
+        "## Out-of-Scope Findings",
+        "gh issue create",
+        "never file a duplicate",
+        "deferred hygiene",
+        "Scout Mode",
+    ],
+    "references/survival-guide-template.md": [
+        "## Out-of-scope findings",
+        "Filed this run:",
+        "Could not file:",
+    ],
+    "references/kickoff-prompt-template.md": [
+        "do not fix it and do not widen the batch",
+        "gh issue create",
+    ],
+}
+
 # Section/contract anchors only — do not pin motivational prose byte-for-byte.
 # Editorial rewording of effort guidance must not break CI.
 EFFORT_GUARDRAIL_PHRASES = {

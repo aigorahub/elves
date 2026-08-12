@@ -8,7 +8,7 @@ Oh My Pi (omp) driver plans and reviews; a subscription-native (or optional exte
 implements; durable run files let the work survive context compaction. You write the plan and own
 the merge decision. The agent does the middle.
 
-**Current release: v2.27.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.28.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 **New to Elves?** Use the [practical user guide](https://aigorahub.github.io/elves/) — especially
@@ -400,7 +400,7 @@ exactly one file below; other docs link instead of restating.
 - [`references/kickoff-prompt-template.md`](references/kickoff-prompt-template.md) — staging
   kickoff, including the worker packet and teardown expectations
 - [`references/survival-guide-template.md`](references/survival-guide-template.md) — Run Control,
-  Stop Gate, compaction recovery
+  Stop Gate, compaction recovery, and the Out-of-scope findings ledger
 - [`references/execution-log-template.md`](references/execution-log-template.md),
   [`references/learnings-template.md`](references/learnings-template.md) — run memory
 - [`references/schema-and-acceptance.md`](references/schema-and-acceptance.md) — session schema,

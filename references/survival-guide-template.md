@@ -181,6 +181,15 @@ If `Planned batches remaining` is greater than 0, `Stop allowed right now` shoul
 - **Open items:** [none / list: surface — what — why advisory]
 - **Last drained:** [never / batch or HEAD]
 
+## Out-of-scope findings
+
+> Worth doing, but the plan does not cover it. Never fix it, never widen the batch, never drop it.
+> Search first, then `gh issue create`, then record the URL here and in the terminal report.
+> No `gh` or no repository: list them here and say so in the report.
+
+- **Filed this run:** [none / list: `#N <url>` — one line on what and where]
+- **Could not file:** [none / list: what and where, plus the reason `gh` was unavailable]
+
 ---
 
 ## Forbidden Stop Reasons

@@ -4,6 +4,26 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.28.0] - 2026-08-11
+
+### Added
+- **Out-of-scope findings go to GitHub issues.** A run notices things the plan does not cover.
+  Until now the only destinations were deferred hygiene (in-scope nits, drained at terminal) and
+  Scout Mode (adjacent work, committed this run); anything genuinely outside the plan was either
+  fixed as scope creep or lost with the transcript.
+  - New `## Out-of-Scope Findings` in `SKILL.md`: search first, `gh issue create`, record the URL,
+    never fix it, never widen the batch, never drop it. Secrets are cited by location and type.
+  - `references/survival-guide-template.md` gains an Out-of-scope findings ledger (filed this run /
+    could not file), so the run reports what it deferred.
+  - `references/kickoff-prompt-template.md` carries the rule to the worker at launch.
+  - A run filing more than a handful is told to say so in the report rather than file thirty.
+  - `OUT_OF_SCOPE_GUARDRAIL_PHRASES` pins the rule across all three surfaces.
+
+### Fixed
+- The Discovery section claimed "the same rule the run loop applies to anything noticed in passing".
+  No such rule existed in the run loop when v2.27.0 shipped. It exists now, and Discovery points at
+  it instead of asserting it.
+
 ## [2.27.0] - 2026-08-11
 
 ### Added
