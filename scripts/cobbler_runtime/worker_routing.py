@@ -16,7 +16,11 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from .config import load_json_file, load_toml_file
-from .host_profiles import resolve_host_profile, transport_for_host
+from .host_profiles import (
+    resolve_host_profile,
+    supported_efforts_for_host,
+    transport_for_host,
+)
 from .prewalk import PrewalkCapabilities
 from .storage import read_bounded_artifact_bytes
 from .schema import (
@@ -920,7 +924,8 @@ def decide_worker_route(
         raise ValidationIssue("unsupported_host", f"Unsupported host `{host}`", path="host")
     execution = execution_reasoning.strip().lower()
     risk = review_risk.strip().lower()
-    if execution not in REASONING_LEVELS:
+    accepted_efforts = supported_efforts_for_host(host_token)
+    if execution not in accepted_efforts:
         raise ValidationIssue("invalid_execution_reasoning", f"Unknown execution reasoning `{execution}`")
     if risk not in REVIEW_RISKS:
         raise ValidationIssue("invalid_review_risk", f"Unknown review risk `{risk}`")
@@ -983,13 +988,13 @@ def decide_worker_route(
     effort = execution if effort_is_auto else str(effort).lower()
     if provider not in {"auto", "native", "grok"}:
         raise ValidationIssue("invalid_provider_preference", f"Unknown worker provider `{provider}`")
-    if effort not in REASONING_LEVELS:
+    if effort not in accepted_efforts:
         raise ValidationIssue("invalid_worker_effort", f"Unknown worker effort `{effort}`")
     prewalk_token = str(prewalk_value).lower()
     if prewalk_token not in {mode.value for mode in PrewalkMode}:
         raise ValidationIssue("invalid_prewalk_mode", f"Unknown prewalk mode `{prewalk_value}`")
     guide_effort = str(guide_effort_value).lower()
-    if guide_effort not in REASONING_LEVELS:
+    if guide_effort not in accepted_efforts:
         raise ValidationIssue("invalid_worker_effort", f"Unknown guide effort `{guide_effort}`")
 
     grok_info = grok or GrokCapabilities()

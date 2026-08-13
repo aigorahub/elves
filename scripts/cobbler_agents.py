@@ -2823,16 +2823,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Inspect a deterministic native/optional-Grok worker recommendation",
     )
     route_worker.add_argument("--host", choices=("codex", "claude", "grok", "omp"), required=True)
-    route_worker.add_argument("--execution-reasoning", choices=("low", "medium", "high"), required=True)
+    route_worker.add_argument(
+        "--execution-reasoning",
+        choices=("low", "medium", "high", "xhigh", "max"),
+        required=True,
+    )
     route_worker.add_argument("--review-risk", choices=("low", "standard", "high"), required=True)
-    route_worker.add_argument("--driver-effort", choices=("low", "medium", "high"))
+    route_worker.add_argument(
+        "--driver-effort", choices=("low", "medium", "high", "xhigh", "max")
+    )
     route_worker.add_argument("--provider", choices=("auto", "native", "grok"))
-    route_worker.add_argument("--effort", choices=("low", "medium", "high"))
+    route_worker.add_argument(
+        "--effort", choices=("low", "medium", "high", "xhigh", "max")
+    )
     route_worker.add_argument(
         "--prewalk", choices=("off", "auto", "required", "experimental")
     )
     route_worker.add_argument("--guide-model")
-    route_worker.add_argument("--guide-effort", choices=("low", "medium", "high"))
+    route_worker.add_argument(
+        "--guide-effort", choices=("low", "medium", "high", "xhigh", "max")
+    )
     route_worker.add_argument(
         "--probe-prewalk",
         action="store_true",

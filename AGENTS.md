@@ -1,5 +1,5 @@
 ---
-version: "2.28.0"
+version: "2.29.0"
 ---
 
 # Elves: Codex repository adapter
@@ -30,12 +30,12 @@ authenticated live catalog (`references/adaptive-worker-routing.md`).
 The v2.24 helpers — futile re-drive guard (`redrive`), learnings ledger (`learnings`),
 observed-usage ledger (`usage`), salvage previews (`salvage`), and the continuity watchdog
 manager (`continuity`) — are **host-neutral CLI helpers** with identical semantics on Claude
-Code, Codex, and Grok Build: invoke them as
+Code, Codex, Grok Build, and Oh My Pi: invoke them as
 `python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" <verb> …` from any host. They are
 advisory instruments (never landing, merge, credential, or routing authority), there are **no
 per-host slash surfaces for them** — do not invent top-level Codex or Grok commands — and the
 workflow contracts that mandate them (SKILL.md worker-failure recovery, labor completeness,
-Skill Memory) apply to all three hosts unchanged. See the guide's "v2.24 run tools" section.
+Skill Memory) apply to all four hosts unchanged. See the guide's "v2.24 run tools" section.
 
 ## Codex invocation (host-honest)
 

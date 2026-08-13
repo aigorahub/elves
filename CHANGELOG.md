@@ -4,6 +4,30 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.29.0] - 2026-08-13
+
+### Added
+- **OMP prewalk accepts `xhigh` and `max`.** Oh My Pi is the only main-driver route that keeps
+  those two thinking levels instead of folding them down. The native-worker CLI, host profile,
+  route-worker / `decide_worker_route` surface, global `worker.native_effort` preference, and
+  qualification evidence pass `xhigh` and `max` unchanged to `omp --thinking`, so a Luna Max
+  (`openai-codex/gpt-5.6-luna`) guide or execution route stays at the effort the operator asked
+  for. Other hosts still reject those levels at route time.
+
+### Fixed
+- **OMP exact-session prewalk transport.** Create and resume now share one stable
+  worktree-derived `--profile` instead of hashing the session id into a new profile on resume.
+  The guide packet is one private `@file` user message so OMP session history retains it. Resume
+  receives only a positional continuation and never replays the packet. OAuth-backed OMP routes
+  may project a token-protected auth broker only on a plain loopback HTTP URL; remote or
+  incomplete URL/token pairs fail closed.
+
+### Changed
+- **Four-host agent parity on live operator surfaces.** README, the public guide, model
+  onboarding, Cobbler, runtime helper paths, and the host-parity prewalk matrix now name Oh My Pi
+  beside Claude Code, Codex, and Grok Build. v2.24 run tools keep one CLI and one honesty
+  boundary on all four hosts.
+
 ## [2.28.0] - 2026-08-11
 
 ### Added

@@ -27,7 +27,7 @@ DEFAULT_PREFERENCES: dict[str, Any] = {
 
 SAFE_PATHS: dict[str, tuple[type, set[str] | None]] = {
     "worker.provider": (str, {"auto", "native", "grok"}),
-    "worker.native_effort": (str, {"auto", "low", "medium", "high"}),
+    "worker.native_effort": (str, {"auto", "low", "medium", "high", "xhigh", "max"}),
     "worker.prewalk": (str, {"off", "auto", "required", "experimental"}),
     "worker.parallel": (str, {"off", "auto"}),
 }

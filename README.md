@@ -8,7 +8,7 @@ Oh My Pi (omp) driver plans and reviews; a subscription-native (or optional exte
 implements; durable run files let the work survive context compaction. You write the plan and own
 the merge decision. The agent does the middle.
 
-**Current release: v2.28.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.29.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 **New to Elves?** Use the [practical user guide](https://aigorahub.github.io/elves/) — especially
@@ -66,6 +66,17 @@ ELVES_TMP="$(mktemp -d)" && git clone --depth 1 https://github.com/aigorahub/elv
 This installs `~/.grok/skills/elves/` for native Grok Build discovery (first-class host, same
 workflow contract as Claude and Codex). No Claude-style slash aliases. Invoke Elves via Grok Build
 skill discovery or natural language.
+
+### Install (Oh My Pi)
+
+```bash
+ELVES_TMP="$(mktemp -d)" && git clone --depth 1 https://github.com/aigorahub/elves.git "$ELVES_TMP/elves" && python3 "$ELVES_TMP/elves/scripts/sync_installed_skills.py" --apply --target omp && rm -rf "$ELVES_TMP"
+```
+
+This installs `~/.omp/agent/skills/elves/` for native Oh My Pi discovery (first-class host, same
+workflow contract as Claude, Codex, and Grok Build). No Claude-style slash aliases. Invoke Elves
+via omp skill load or natural language. Elves prewalk is not omp product `--prewalk`. OMP prewalk
+accepts `xhigh` and `max` and passes those levels unchanged to `omp --thinking`.
 
 ### Optional provider shortcuts
 
@@ -128,9 +139,9 @@ environment names, timeouts, and follow behavior.
 
 ### Per-project install
 
-Clone into `.claude/skills/elves`, `.codex/skills/elves`, or `.grok/skills/elves` inside your repo
-(remove the nested `.git`), or prefer `scripts/sync_installed_skills.py` over hand-maintaining a
-second tree.
+Clone into `.claude/skills/elves`, `.codex/skills/elves`, `.grok/skills/elves`, or
+`.omp/agent/skills/elves` inside your repo (remove the nested `.git`), or prefer
+`scripts/sync_installed_skills.py` over hand-maintaining a second tree.
 
 ### Validate the install
 
@@ -141,6 +152,8 @@ python3 ~/.claude/skills/elves/scripts/install_doctor.py --startup
 python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup
 # Grok Build:
 python3 ~/.grok/skills/elves/scripts/install_doctor.py --startup
+# Oh My Pi:
+python3 ~/.omp/agent/skills/elves/scripts/install_doctor.py --startup
 ```
 
 ### Update or uninstall
@@ -151,7 +164,7 @@ python3 /path/to/elves/scripts/sync_installed_skills.py --apply --target all
 # Or update one host:
 python3 /path/to/elves/scripts/sync_installed_skills.py --apply --target grok
 # Uninstall: remove the skill root you installed (and Claude aliases only if you want them gone):
-rm -rf ~/.claude/skills/elves ~/.codex/skills/elves ~/.grok/skills/elves
+rm -rf ~/.claude/skills/elves ~/.codex/skills/elves ~/.grok/skills/elves ~/.omp/agent/skills/elves
 ```
 
 ### No plan yet? Start with Discovery
@@ -203,7 +216,7 @@ profile, and apply exact-HEAD `waive` entries — with no auto-promotion. See
 
 ## Who implements
 
-**Default: a subscription-native worker** on the live host (Claude Code, Codex, or Grok Build) in a
+**Default: a subscription-native worker** on the live host (Claude Code, Codex, Grok Build, or Oh My Pi) in a
 separate exact session — no external provider required. Optional work drivers when configured and
 permitted: trusted Grok Build full-run under Claude/Codex, Devin CLI, or other adapters. Missing
 optional provider access never blocks a native run. Repository `allow_grok=false` is an absolute
@@ -241,8 +254,9 @@ compatibility. `auto` makes no qualification model calls and reuses only matchin
 task worker starts only after session, worktree, stream, route-change, retained-context, and
 packet-count checks pass; failure stops with a private evidence path. `experimental` explicitly
 accepts qualification uncertainty after static grammar inspection, reports that status, and keeps
-every real-run continuity and authority check. Claude Code, Codex, and Grok Build share these
-semantics. Grok single-phase native-worker launch remains registry-gated. See the
+every real-run continuity and authority check. Claude Code, Codex, Grok Build, and Oh My Pi share
+these semantics. Grok single-phase native-worker launch remains registry-gated. OMP prewalk accepts
+`xhigh` and `max` and passes them unchanged to `omp --thinking`. See the
 [normative prewalk contract](references/prewalk.md) and
 [host parity matrix](references/host-parity.md).
 

@@ -147,14 +147,20 @@ class OmpHostProfileTests(unittest.TestCase):
                     self.assertEqual(
                         spec.argv[spec.argv.index("--thinking") + 1], effort
                     )
-            with self.assertRaises(ValidationIssue) as caught:
-                build_native_worker_spec(
-                    host="grok",
-                    worktree=repo,
-                    effort="max",
-                    requested_model="grok-4.5",
-                )
-            self.assertEqual(caught.exception.code, "invalid_worker_effort")
+            for other_host, model in (
+                ("grok", "grok-4.5"),
+                ("claude", "claude-opus-5"),
+                ("codex", "gpt-5.6"),
+            ):
+                with self.subTest(host=other_host):
+                    with self.assertRaises(ValidationIssue) as caught:
+                        build_native_worker_spec(
+                            host=other_host,
+                            worktree=repo,
+                            effort="max",
+                            requested_model=model,
+                        )
+                    self.assertEqual(caught.exception.code, "invalid_worker_effort")
 
     def test_omp_behavioral_evidence_accepts_xhigh_to_max_route(self) -> None:
         advertised = advertised_prewalk_capabilities(

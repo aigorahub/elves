@@ -48,18 +48,18 @@ honestly reported acceptance of qualification uncertainty. Every host must provi
 guide→meaningful-edit checkpoint→execution lifecycle and make the same user claim; syntax alone is
 not parity.
 
-| Concern | Claude Code grammar | Codex grammar | Grok Build grammar | Shared requirement |
-|---|---|---|---|---|
-| Fresh identity | caller-generated `--session-id <uuid>` | capture `thread.started.thread_id` | caller-generated `--session-id <uuid>` | exact ID before transition |
-| Guide route | `--model`, `--effort` | `--model`, `model_reasoning_effort` | `--model`, `--effort` | explicit guide model/effort |
-| Resume | `--resume <uuid>` | `codex exec resume <id>` | `--resume <uuid>` | never `--continue`, `--last`, or latest |
-| Resume route | model/effort flags with resume | route/sandbox/Git-root flags before `resume` | model/effort flags with resume | explicit execution model/effort |
-| Worktree | supervisor CWD + narrow allowed roots | `-C` on create; supervisor OS CWD on resume | `--cwd` create; resume-sticky sandbox | exact registered worktree/branch |
-| Stream | stream JSON | JSONL | streaming JSON | one redacted logical follow stream with phase labels |
-| TODO/checkpoint | native mechanism plus private JSON mirror | native mechanism plus private JSON mirror | private JSON mirror is authoritative | same bounded provider-neutral schema |
-| Instruction fidelity | version-bound behavioral evidence | same | version/build-bound behavioral evidence | honest `pruned`, `turn_scoped`, `retained_safe`, or `unsupported` |
-| Git authority | safe mode, `auto` classifier, narrow roots | workspace sandbox, narrow roots | `--permission-mode auto`, narrow roots | no push/protected-ref/PR/merge authority |
-| Failure | exact-session recovery | exact-session recovery | exact-session recovery | no post-edit cold fallback; same stable codes |
+| Concern | Claude Code grammar | Codex grammar | Grok Build grammar | Oh My Pi grammar | Shared requirement |
+|---|---|---|---|---|---|
+| Fresh identity | caller-generated `--session-id <uuid>` | capture `thread.started.thread_id` | caller-generated `--session-id <uuid>` | capture stream `type=session` `id` | exact ID before transition |
+| Guide route | `--model`, `--effort` | `--model`, `model_reasoning_effort` | `--model`, `--effort` | `--model`, `--thinking` (`xhigh`/`max` kept) | explicit guide model/effort |
+| Resume | `--resume <uuid>` | `codex exec resume <id>` | `--resume <uuid>` | `--resume <uuid>` | never `--continue`, `--last`, or latest |
+| Resume route | model/effort flags with resume | route/sandbox/Git-root flags before `resume` | model/effort flags with resume | model/thinking flags with resume | explicit execution model/effort |
+| Worktree | supervisor CWD + narrow allowed roots | `-C` on create; supervisor OS CWD on resume | `--cwd` create; resume-sticky sandbox | `--cwd` create and resume; stable worktree-derived `--profile` | exact registered worktree/branch |
+| Stream | stream JSON | JSONL | streaming JSON | `--mode json` NDJSON | one redacted logical follow stream with phase labels |
+| TODO/checkpoint | native mechanism plus private JSON mirror | native mechanism plus private JSON mirror | private JSON mirror is authoritative | private JSON mirror is authoritative | same bounded provider-neutral schema |
+| Instruction fidelity | version-bound behavioral evidence | same | version/build-bound behavioral evidence | version-bound behavioral evidence | honest `pruned`, `turn_scoped`, `retained_safe`, or `unsupported` |
+| Git authority | safe mode, `auto` classifier, narrow roots | workspace sandbox, narrow roots | `--permission-mode auto`, narrow roots | `--approval-mode yolo`, narrow roots | no push/protected-ref/PR/merge authority |
+| Failure | exact-session recovery | exact-session recovery | exact-session recovery | exact-session recovery | no post-edit cold fallback; same stable codes |
 
 The packet appears only on the guide turn and execution receives only `Continue.`. Static help
 fixtures prove advertised create/resume/route flags but not conversation continuity or instruction
@@ -104,7 +104,7 @@ this section launches lanes at runtime.
 ## v2.24 run-tool parity
 
 The v2.24 helpers (`redrive`, `learnings`, `usage`, `salvage`, `continuity`) have **identical
-semantics on Claude Code, Codex, and Grok Build**: they are host-neutral CLI helpers invoked as
+semantics on Claude Code, Codex, Grok Build, and Oh My Pi**: they are host-neutral CLI helpers invoked as
 `python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" <verb> …` with the target repository as
 the working directory, on every host. No per-host slash aliases exist for them and none should
 be invented; Grok Build reaches them through natural language or direct CLI exactly like the

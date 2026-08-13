@@ -69,9 +69,9 @@ single-phase launch/status/follow remains supported.
   behavioral qualification. The real worker still fails closed on exact session identity,
   registered worktree binding, stream identity, packet count, meaningful transition, forbidden
   paths, Git authority, and post-edit cold fallback.
-- Claude Code, Codex, and Grok Build use the same mode semantics as hosts or eligible worker
-  transports. Grok remains subject to provider consent, repository veto, live model catalog, and
-  API-key requirements. Prewalk adds no credential or provider authority.
+- Claude Code, Codex, Grok Build, and Oh My Pi use the same mode semantics as hosts or eligible
+  worker transports. Grok remains subject to provider consent, repository veto, live model catalog,
+  and API-key requirements. Prewalk adds no credential or provider authority.
 
 A cached canary qualifies only its exact installed version/build and exact route pair. An upgrade
 or route change triggers a new canary under `required`. `auto` falls back instead of spending.
@@ -113,11 +113,13 @@ python3 scripts/cobbler_agents.py native-worker prewalk-capabilities \
   --host claude --json
 python3 scripts/cobbler_agents.py native-worker prewalk-capabilities \
   --host grok --json
+python3 scripts/cobbler_agents.py native-worker prewalk-capabilities \
+  --host omp --json
 ```
 
-The `--host grok` probe is the same read-only shape: it parses installed `grok --help`/`--version`
-grammar, makes zero model calls, and reports a concrete unavailable reason when no installed grok
-binary exists. It never claims behavioral qualification.
+The `--host grok` and `--host omp` probes are the same read-only shape: each parses installed
+`--help`/`--version` grammar, makes zero model calls, and reports a concrete unavailable reason
+when no installed binary exists. They never claim behavioral qualification.
 
 A behavioral qualification artifact is bounded, mode-safe JSON bound to the exact host, transport, and version,
 session, guide and continuation digests, successful create/resume exits, same worktree/session, a
@@ -197,7 +199,7 @@ local auth broker on `127.0.0.1` or `::1`; Elves rejects remote broker projectio
 The guide packet enters as one private `@file` user message. The resume phase receives only the
 continuation message as a positional input.
 
-Use the same shape with `--host claude` or `--host grok`. A previously recorded artifact may still
+Use the same shape with `--host claude`, `--host grok`, or `--host omp`. A previously recorded artifact may still
 be passed with `--prewalk-capability-evidence`. Existing `--model`/`--effort` keep their single-phase
 meaning when prewalk is off; ambiguous mixed phase flags are rejected.
 
@@ -233,4 +235,4 @@ After such a compaction:
 3. Record `prewalk_fallback: prewalk_dequalified_by_compaction` (or equivalent) in
    route evidence.
 
-This rule is normative for Claude Code, Codex, and Grok Build hosts.
+This rule is normative for Claude Code, Codex, Grok Build, and Oh My Pi hosts.

@@ -4,7 +4,7 @@ Start with the user flow, not route vocabulary:
 
 > “Implement this plan while I’m offline. Keep the PR unmerged.”
 
-The live Claude Code or Codex driver classifies execution reasoning separately from review risk,
+The live Claude Code, Codex, Grok Build, or Oh My Pi driver classifies execution reasoning separately from review risk,
 shows one worker recommendation, and asks at most one useful preference question. The default is a
 separate worker on the subscription already in use. The worker receives the complete packet, the
 driver exposes a capability-proven native agent view or exact follow command before parking, and
