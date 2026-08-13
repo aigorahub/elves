@@ -190,6 +190,8 @@ The execution effort is route-dependent, not a fixed `medium`: the grok route de
 `high`, and other routes keep their own defaults. Pass an explicit value only to override the
 route default. A Grok qualification canary recorded at execution effort `medium` before the
 `high` default fails `qualification_route_mismatch` and must be re-recorded at `high`.
+The OMP route accepts `xhigh` and `max`. It passes these levels unchanged to `omp --thinking` in
+both phases. Other host routes keep their narrower effort vocabulary.
 
 Use the same shape with `--host claude` or `--host grok`. A previously recorded artifact may still
 be passed with `--prewalk-capability-evidence`. Existing `--model`/`--effort` keep their single-phase

@@ -30,6 +30,8 @@ Open `omp` and load the Elves skill like other hosts. Host owns staging, canonic
 supervision, PR preparation, and readiness. Native worker sessions use a **separate** run-scoped
 `--profile` from the interactive host profile. Elves prewalk is the exact-session supervisor contract
 in `references/prewalk.md`; **never** pass omp product `--prewalk` as Elves prewalk.
+OMP prewalk accepts `xhigh` and `max` for either phase and passes the selected level unchanged to
+`omp --thinking`.
 
 ## Trusted full-run (parked worker under another host)
 

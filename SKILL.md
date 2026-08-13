@@ -35,7 +35,8 @@ retained guide context, and one packet all pass. Failure stops before the task w
 preserves private evidence. `worker.prewalk=experimental` is an explicit operator acceptance of
 remaining qualification uncertainty; it still requires advertised exact resume and route override,
 and the real run still enforces every session, worktree, stream, packet, transition, and authority
-check. `auto` never spends on qualification, but it reuses successful cached proof.
+check. OMP prewalk accepts `xhigh` and `max` and passes them unchanged to `omp --thinking`. `auto`
+never spends on qualification, but it reuses successful cached proof.
 
 Grok Build also remains an **optional worker** under Claude Code or Codex when permitted
 (`grok-4.5` at `high` when the live catalog offers it). Grok host and worker prewalk use the same

@@ -37,6 +37,7 @@ from .host_profiles import (
     native_worker_profile_view,
     provider_secret_names as _registry_provider_secret_names,
     resolve_host_profile,
+    supported_efforts_for_host,
 )
 from .prewalk import (
     PREWALK_CONTINUATION_INPUT,
@@ -266,7 +267,7 @@ def build_native_worker_spec(
 ) -> NativeWorkerSpec:
     host_profile = resolve_host_profile(host)
     effort_token = effort.strip().lower()
-    if effort_token not in {"low", "medium", "high"}:
+    if effort_token not in supported_efforts_for_host(host):
         raise ValidationIssue("invalid_worker_effort", f"Invalid worker effort `{effort}`")
     if not requested_model or not requested_model.strip():
         raise ValidationIssue(

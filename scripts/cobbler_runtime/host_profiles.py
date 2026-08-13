@@ -208,8 +208,10 @@ def _omp_launch_plan(request: HostLaunchRequest) -> HostLaunchPlan:
             f"{request.cwd}\0{request.session_id or 'create'}".encode("utf-8")
         ).hexdigest()[:12]
     )
-    thinking = {"low": "low", "medium": "medium", "high": "high"}.get(
-        request.effort, "medium"
+    thinking = (
+        request.effort
+        if request.effort in {"low", "medium", "high", "xhigh", "max"}
+        else "medium"
     )
     common = [
         "omp",
@@ -279,6 +281,7 @@ class HostProfile:
     # metadata for the observed-usage ledger: a transport without a usage
     # surface stays literal "unobserved" — never estimated, never zero.
     reports_usage: str
+    supported_efforts: frozenset[str]
     launch_plan: Callable[[HostLaunchRequest], HostLaunchPlan]
     # Installed-binary help probe (no model calls). None => not probeable.
     executable: str | None
@@ -317,6 +320,7 @@ HOST_PROFILES: tuple[HostProfile, ...] = (
         provider_secret_names=frozenset({"OPENAI_API_KEY", "CODEX_API_KEY"}),
         grants_git_write_roots=True,
         reports_usage="turn_completed_token_usage",
+        supported_efforts=frozenset({"low", "medium", "high"}),
         launch_plan=_codex_launch_plan,
         executable="codex",
         version_argv=("--version",),
@@ -340,6 +344,7 @@ HOST_PROFILES: tuple[HostProfile, ...] = (
         provider_secret_names=frozenset({"ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN"}),
         grants_git_write_roots=True,
         reports_usage="stream_json_result_usage",
+        supported_efforts=frozenset({"low", "medium", "high"}),
         launch_plan=_claude_launch_plan,
         executable="claude",
         version_argv=("--version",),
@@ -365,6 +370,7 @@ HOST_PROFILES: tuple[HostProfile, ...] = (
         provider_secret_names=frozenset(),
         grants_git_write_roots=False,
         reports_usage="fixture_replay",
+        supported_efforts=frozenset({"low", "medium", "high"}),
         launch_plan=_fixture_launch_plan,
         executable=None,
         version_argv=(),
@@ -395,6 +401,7 @@ HOST_PROFILES: tuple[HostProfile, ...] = (
         provider_secret_names=frozenset({"XAI_API_KEY"}),
         grants_git_write_roots=True,
         reports_usage="stream_usage_events",
+        supported_efforts=frozenset({"low", "medium", "high"}),
         launch_plan=_grok_launch_plan,
         executable="grok",
         version_argv=("--version",),
@@ -426,6 +433,7 @@ HOST_PROFILES: tuple[HostProfile, ...] = (
         }),
         grants_git_write_roots=True,
         reports_usage="unobserved",
+        supported_efforts=frozenset({"low", "medium", "high", "xhigh", "max"}),
         launch_plan=_omp_launch_plan,
         executable="omp",
         version_argv=("--version",),
@@ -457,6 +465,11 @@ def resolve_host_profile(host: str) -> HostProfile:
 
 def transport_for_host(host: str) -> str:
     return resolve_host_profile(host).transport
+
+
+def supported_efforts_for_host(host: str) -> frozenset[str]:
+    """Return the exact effort vocabulary accepted by one host route."""
+    return resolve_host_profile(host).supported_efforts
 
 
 def provider_secret_names(host: str | None) -> frozenset[str]:

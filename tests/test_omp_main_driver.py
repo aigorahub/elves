@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import tempfile
 import unittest
@@ -14,6 +16,11 @@ from cobbler_runtime.host_profiles import (
 )
 from cobbler_runtime.adapters import build_readonly_invocation
 from cobbler_runtime.native_worker import _native_worker_child_env, build_native_worker_spec
+from cobbler_runtime.prewalk import (
+    PREWALK_CONTINUATION_INPUT,
+    advertised_prewalk_capabilities,
+    load_prewalk_capability_evidence,
+)
 from cobbler_runtime.schema import ValidationIssue
 
 REPO = Path(__file__).resolve().parents[1]
@@ -84,6 +91,86 @@ class OmpHostProfileTests(unittest.TestCase):
             self.assertIn("omp", spec.argv[0])
             self.assertNotIn("--prewalk", spec.argv)
             self.assertEqual(spec.prompt_file_flag, "--append-system-prompt")
+
+    def test_omp_accepts_xhigh_and_max_without_lowering_them(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            (repo / ".git").mkdir()
+            for effort in ("xhigh", "max"):
+                with self.subTest(effort=effort):
+                    spec = build_native_worker_spec(
+                        host="omp",
+                        worktree=repo,
+                        effort=effort,
+                        requested_model="openai-codex/gpt-5.6-luna",
+                    )
+                    self.assertEqual(
+                        spec.argv[spec.argv.index("--thinking") + 1], effort
+                    )
+            with self.assertRaises(ValidationIssue) as caught:
+                build_native_worker_spec(
+                    host="grok",
+                    worktree=repo,
+                    effort="max",
+                    requested_model="grok-4.5",
+                )
+            self.assertEqual(caught.exception.code, "invalid_worker_effort")
+
+    def test_omp_behavioral_evidence_accepts_xhigh_to_max_route(self) -> None:
+        advertised = advertised_prewalk_capabilities(
+            host="omp",
+            version="17.2.15",
+            create_help="--resume SESSION_ID --model --thinking",
+            resume_help="--resume SESSION_ID --model --thinking",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            artifact = Path(tmp) / "omp-prewalk.json"
+            payload = {
+                "artifact_type": "native_prewalk_behavioral_qualification",
+                "schema_version": 1,
+                "host": "omp",
+                "transport": "omp_build",
+                "installed_version": "17.2.15",
+                "session_id": "exact-omp-session",
+                "create_exit_code": 0,
+                "resume_exit_code": 0,
+                "same_session_id": True,
+                "same_worktree": True,
+                "unique_guide_fact_observed": True,
+                "packet_replayed": False,
+                "stream_identity_verified": True,
+                "instruction_fidelity": "retained_safe",
+                "guide_route": {
+                    "model": "openai-codex/gpt-5.6-luna",
+                    "effort": "xhigh",
+                },
+                "execution_route": {
+                    "model": "openai-codex/gpt-5.6-luna",
+                    "effort": "max",
+                },
+                "model_calls_made": True,
+                "guide_prompt_sha256": hashlib.sha256(b"guide").hexdigest(),
+                "continuation_sha256": hashlib.sha256(
+                    PREWALK_CONTINUATION_INPUT.encode("utf-8")
+                ).hexdigest(),
+            }
+            artifact.write_text(json.dumps(payload), encoding="utf-8")
+            artifact.chmod(0o600)
+            qualified = load_prewalk_capability_evidence(
+                artifact,
+                host="omp",
+                installed_version="17.2.15",
+                advertised=advertised,
+            )
+        self.assertTrue(qualified.qualified())
+        self.assertTrue(
+            qualified.route_matches(
+                guide_model="openai-codex/gpt-5.6-luna",
+                guide_effort="xhigh",
+                execution_model="openai-codex/gpt-5.6-luna",
+                execution_effort="max",
+            )
+        )
 
     def test_omp_child_env_projects_single_secret(self) -> None:
         import subprocess

@@ -2889,7 +2889,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     native_worker.add_argument("--host", choices=("codex", "claude", "fixture", "grok", "omp"))
     native_worker.add_argument("--worktree")
-    native_worker.add_argument("--effort", choices=("low", "medium", "high"))
+    native_worker.add_argument(
+        "--effort", choices=("low", "medium", "high", "xhigh", "max")
+    )
     native_worker.add_argument("--model", help="Current driver model observed by the host, or an explicit routed model")
     native_worker.add_argument(
         "--prewalk",
@@ -2897,9 +2899,13 @@ def build_parser() -> argparse.ArgumentParser:
         default="off",
     )
     native_worker.add_argument("--guide-model")
-    native_worker.add_argument("--guide-effort", choices=("low", "medium", "high"))
+    native_worker.add_argument(
+        "--guide-effort", choices=("low", "medium", "high", "xhigh", "max")
+    )
     native_worker.add_argument("--execution-model")
-    native_worker.add_argument("--execution-effort", choices=("low", "medium", "high"))
+    native_worker.add_argument(
+        "--execution-effort", choices=("low", "medium", "high", "xhigh", "max")
+    )
     native_worker.add_argument("--todo-limit", type=int, default=10)
     native_worker.add_argument("--prewalk-capability-evidence")
     native_worker.add_argument("--forbidden-path", action="append")
