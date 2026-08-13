@@ -17,8 +17,15 @@ import time
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping, Sequence
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
+from urllib.request import (
+    HTTPRedirectHandler,
+    ProxyHandler,
+    Request,
+    build_opener,
+)
 
 from .full_run import (
     _git_branch,
@@ -64,6 +71,25 @@ from .storage import StorageError, atomic_write_json
 
 PREWALK_QUALIFICATION_TIMEOUT_SECONDS = 180
 PREWALK_QUALIFICATION_OUTPUT_MAX_BYTES = 1024 * 1024
+OMP_AUTH_BROKER_SETUP_COMMAND = "omp auth-broker serve"
+_OMP_BROKER_CONFIG_MAX_BYTES = 256 * 1024
+_OMP_BROKER_HEALTH_TIMEOUT_SECONDS = 1.0
+_OMP_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1"})
+_OMP_MISSING_AUTH_MESSAGE = (
+    "OMP isolated-profile provider auth is missing. Start a loopback broker with "
+    f"`{OMP_AUTH_BROKER_SETUP_COMMAND}` and persist auth.broker.url plus "
+    "auth.broker.token, or export OMP_AUTH_BROKER_URL and OMP_AUTH_BROKER_TOKEN."
+)
+_OMP_UNHEALTHY_BROKER_MESSAGE = (
+    "OMP auth broker is unhealthy. Start a loopback broker with "
+    f"`{OMP_AUTH_BROKER_SETUP_COMMAND}`."
+)
+_OMP_INCOMPLETE_BROKER_MESSAGE = (
+    "OMP auth broker projection requires both URL and token"
+)
+_OMP_REMOTE_BROKER_MESSAGE = (
+    "OMP auth broker projection accepts only a plain loopback HTTP URL"
+)
 
 
 @dataclass(frozen=True)
@@ -1162,6 +1188,196 @@ def _native_git_contract(worktree: Path) -> dict[str, Any]:
     }
 
 
+def _unquote_yaml_scalar(raw: str) -> str:
+    value = raw.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        quote = value[0]
+        inner = value[1:-1]
+        if quote == '"':
+            return inner.replace("\\\"", '"').replace("\\\\", "\\")
+        return inner.replace("''", "'")
+    return value.split(" #", 1)[0].strip()
+
+
+def _omp_agent_config_path(env: Mapping[str, str]) -> Path | None:
+    agent_dir = str(env.get("PI_CODING_AGENT_DIR") or "").strip()
+    if agent_dir:
+        return Path(agent_dir) / "config.yml"
+    home = str(env.get("HOME") or "").strip()
+    if not home:
+        return None
+    return Path(home) / ".omp" / "agent" / "config.yml"
+
+
+def _parse_omp_broker_settings(text: str) -> tuple[str | None, str | None]:
+    """Read only auth.broker.url and auth.broker.token from a tiny YAML subset."""
+    url: str | None = None
+    token: str | None = None
+    section: str | None = None
+    auth_indent: int | None = None
+    broker_indent: int | None = None
+    for raw in text.splitlines():
+        if "\t" in raw:
+            raise ValidationIssue(
+                "omp_auth_broker_projection_invalid",
+                "OMP auth broker settings are invalid",
+            )
+        if not raw.strip() or raw.lstrip().startswith("#"):
+            continue
+        indent = len(raw) - len(raw.lstrip(" "))
+        stripped = raw.strip()
+        if ":" not in stripped:
+            continue
+        key, _, rest = stripped.partition(":")
+        key = key.strip()
+        value = rest.strip()
+        if indent == 0 and key == "auth":
+            section = "auth"
+            auth_indent = 0
+            broker_indent = None
+            continue
+        if (
+            section in {"auth", "broker"}
+            and auth_indent is not None
+            and indent <= auth_indent
+            and key != "auth"
+        ):
+            section = None
+            broker_indent = None
+        if (
+            section == "auth"
+            and key == "broker"
+            and auth_indent is not None
+            and indent > auth_indent
+        ):
+            section = "broker"
+            broker_indent = indent
+            continue
+        if section == "broker" and broker_indent is not None and indent > broker_indent:
+            parsed = _unquote_yaml_scalar(value) if value else ""
+            if key == "url":
+                url = parsed
+            elif key == "token":
+                token = parsed
+    return url, token
+
+
+def _read_omp_broker_settings(env: Mapping[str, str]) -> tuple[str | None, str | None]:
+    path = _omp_agent_config_path(env)
+    if path is None or not path.is_file():
+        return None, None
+    try:
+        stat_result = path.stat()
+    except OSError as exc:
+        raise ValidationIssue(
+            "omp_auth_broker_projection_invalid",
+            "OMP auth broker settings are unreadable",
+        ) from exc
+    if stat_result.st_size > _OMP_BROKER_CONFIG_MAX_BYTES:
+        raise ValidationIssue(
+            "omp_auth_broker_projection_invalid",
+            "OMP auth broker settings are unreadable",
+        )
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise ValidationIssue(
+            "omp_auth_broker_projection_invalid",
+            "OMP auth broker settings are unreadable",
+        ) from exc
+    return _parse_omp_broker_settings(text)
+
+
+def _validate_omp_loopback_broker_url(url: str) -> None:
+    parsed = urlparse(url)
+    if (
+        parsed.scheme != "http"
+        or parsed.hostname not in _OMP_LOOPBACK_HOSTS
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+        or parsed.path not in {"", "/"}
+    ):
+        raise ValidationIssue(
+            "omp_auth_broker_projection_invalid",
+            _OMP_REMOTE_BROKER_MESSAGE,
+        )
+
+
+class _OmpBrokerNoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, *args: Any, **kwargs: Any) -> Request | None:
+        return None
+
+
+def _probe_omp_broker_health(url: str) -> bool:
+    """Return True when the loopback broker answers HTTP. Never logs the token."""
+    try:
+        opener = build_opener(_OmpBrokerNoRedirect, ProxyHandler({}))
+        opener.open(Request(url, method="GET"), timeout=_OMP_BROKER_HEALTH_TIMEOUT_SECONDS)
+        return True
+    except HTTPError:
+        return True
+    except (URLError, TimeoutError, OSError):
+        return False
+
+
+def _resolve_omp_broker_pair(env: Mapping[str, str]) -> tuple[str, str] | None:
+    env_url = str(env.get("OMP_AUTH_BROKER_URL") or "").strip()
+    env_token = str(env.get("OMP_AUTH_BROKER_TOKEN") or "").strip()
+    if env_url or env_token:
+        if not env_url or not env_token:
+            raise ValidationIssue(
+                "omp_auth_broker_projection_invalid",
+                _OMP_INCOMPLETE_BROKER_MESSAGE,
+            )
+        _validate_omp_loopback_broker_url(env_url)
+        return env_url, env_token
+    cfg_url, cfg_token = _read_omp_broker_settings(env)
+    url = (cfg_url or "").strip()
+    token = (cfg_token or "").strip()
+    if url or token:
+        if not url or not token:
+            raise ValidationIssue(
+                "omp_auth_broker_projection_invalid",
+                _OMP_INCOMPLETE_BROKER_MESSAGE,
+            )
+        _validate_omp_loopback_broker_url(url)
+        return url, token
+    return None
+
+
+def _omp_model_has_api_key(requested_model: str | None, env: Mapping[str, str]) -> bool:
+    names = _omp_provider_secret_for_model(requested_model)
+    return any(bool(str(env.get(name) or "").strip()) for name in names)
+
+
+def preflight_omp_provider_auth(
+    requested_models: Sequence[str | None],
+    *,
+    env: Mapping[str, str] | None = None,
+) -> tuple[str, str] | None:
+    """Fail closed before any OMP model call when isolated-profile auth is missing.
+
+    Environment broker variables override persistent ``auth.broker`` settings.
+    A configured broker must be a paired loopback HTTP URL and must answer.
+    The token never appears in the raised issue.
+    """
+    parent = env if env is not None else os.environ
+    broker = _resolve_omp_broker_pair(parent)
+    if broker is not None and not _probe_omp_broker_health(broker[0]):
+        raise ValidationIssue(
+            "omp_auth_broker_unhealthy",
+            _OMP_UNHEALTHY_BROKER_MESSAGE,
+        )
+    models = tuple(requested_models) or (None,)
+    if any(_omp_model_has_api_key(model, parent) for model in models):
+        return broker
+    if broker is not None:
+        return broker
+    raise ValidationIssue("omp_auth_preflight_missing", _OMP_MISSING_AUTH_MESSAGE)
+
+
 def _omp_provider_secret_for_model(requested_model: str | None) -> tuple[str, ...]:
     """Map a pinned omp model selector to preferred provider secret names."""
     model = (requested_model or "").strip().lower()
@@ -1223,30 +1439,10 @@ def _native_worker_child_env(
         selected = next((n for n in omp_order if n in provider_secret_names and parent.get(n)), None)
         if selected:
             env[selected] = parent[selected]
-        broker_url = parent.get("OMP_AUTH_BROKER_URL", "").strip()
-        broker_token = parent.get("OMP_AUTH_BROKER_TOKEN", "").strip()
-        if bool(broker_url) != bool(broker_token):
-            raise ValidationIssue(
-                "omp_auth_broker_projection_invalid",
-                "OMP auth broker projection requires both URL and token",
-            )
-        if broker_url and broker_token:
-            parsed = urlparse(broker_url)
-            if (
-                parsed.scheme != "http"
-                or parsed.hostname not in {"127.0.0.1", "::1"}
-                or parsed.username is not None
-                or parsed.password is not None
-                or parsed.query
-                or parsed.fragment
-                or parsed.path not in {"", "/"}
-            ):
-                raise ValidationIssue(
-                    "omp_auth_broker_projection_invalid",
-                    "OMP auth broker projection accepts only a plain loopback HTTP URL",
-                )
-            env["OMP_AUTH_BROKER_URL"] = broker_url
-            env["OMP_AUTH_BROKER_TOKEN"] = broker_token
+        broker = preflight_omp_provider_auth((requested_model,), env=parent)
+        if broker is not None:
+            env["OMP_AUTH_BROKER_URL"] = broker[0]
+            env["OMP_AUTH_BROKER_TOKEN"] = broker[1]
     else:
         for name in provider_secret_names:
             if parent.get(name):
@@ -1707,6 +1903,14 @@ def launch_native_worker(
             f"{launch_profile.capability_host}_native_worker_launch_unqualified",
             f"{launch_profile.capability_host} single-phase native-worker launch is feature-gated off",
         )
+    if launch_profile.capability_host == "omp":
+        omp_models: list[str | None] = [spec.requested_model]
+        if prewalk_spec is not None:
+            omp_models = [
+                prewalk_spec.guide.requested_model,
+                prewalk_spec.execution_model,
+            ]
+        preflight_omp_provider_auth(omp_models)
     state_path, log_path = native_worker_paths(repo_root, run_id)
     if state_path.exists():
         raise ValidationIssue("native_worker_run_exists", f"Native worker run `{run_id}` already exists")

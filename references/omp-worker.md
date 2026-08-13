@@ -32,9 +32,13 @@ supervision, PR preparation, and readiness. Native worker sessions use a **separ
 in `references/prewalk.md`; **never** pass omp product `--prewalk` as Elves prewalk.
 OMP prewalk accepts `xhigh` and `max` for either phase and passes the selected level unchanged to
 `omp --thinking`.
-The create and resume phases use the same profile derived from the exact worktree path. For an
-OAuth-backed model, the host may project a token-protected OMP auth broker only on a plain loopback
-HTTP URL. Elves rejects remote broker URLs and incomplete URL/token pairs.
+The create and resume phases use the same profile derived from the exact worktree path. Isolated
+`--profile` state does not inherit host OAuth. Before any model call, Elves preflights provider
+auth: a matching API key, or a paired loopback auth broker. Environment
+`OMP_AUTH_BROKER_URL` / `OMP_AUTH_BROKER_TOKEN` override persistent `auth.broker.url` and
+`auth.broker.token` from the host OMP settings file. Elves rejects incomplete pairs, remote
+broker URLs, and an unhealthy broker, and never prints the broker token. Missing auth stops
+with `omp auth-broker serve`. There is no per-profile login.
 The guide packet is one private `@file` user message so OMP session history retains it. Resume gets
 one positional continuation message and never receives the packet again.
 

@@ -5,8 +5,11 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import subprocess
 import tempfile
+import threading
 import unittest
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from cobbler_runtime.host_profiles import (
@@ -19,6 +22,7 @@ from cobbler_runtime.native_worker import (
     _native_worker_child_env,
     _qualification_assistant_text,
     build_native_worker_spec,
+    preflight_omp_provider_auth,
 )
 from cobbler_runtime.prewalk import (
     PREWALK_CONTINUATION_INPUT,
@@ -28,6 +32,47 @@ from cobbler_runtime.prewalk import (
 from cobbler_runtime.schema import ValidationIssue
 
 REPO = Path(__file__).resolve().parents[1]
+_BROKER_TOKEN = "broker-secret-must-not-leak"
+
+
+def _omp_worktree(root: Path) -> tuple[Path, Path]:
+    worktree = root / "wt"
+    runtime = root / "rt"
+    worktree.mkdir()
+    runtime.mkdir()
+    subprocess.run(["git", "init"], cwd=worktree, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.name", "Elves Test"],
+        cwd=worktree,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.email", "elves@test.invalid"],
+        cwd=worktree,
+        check=True,
+        capture_output=True,
+    )
+    return worktree, runtime
+
+
+def _write_omp_broker_config(home: Path, *, url: str, token: str | None) -> None:
+    agent = home / ".omp" / "agent"
+    agent.mkdir(parents=True)
+    token_line = f"    token: {token}\n" if token is not None else ""
+    (agent / "config.yml").write_text(
+        "auth:\n  broker:\n    url: " + url + "\n" + token_line,
+        encoding="utf-8",
+    )
+
+
+class _BrokerOKHandler(BaseHTTPRequestHandler):
+    def do_GET(self) -> None:
+        self.send_response(200)
+        self.end_headers()
+
+    def log_message(self, *_args: object) -> None:
+        return
 
 
 class OmpHostProfileTests(unittest.TestCase):
@@ -244,8 +289,6 @@ class OmpHostProfileTests(unittest.TestCase):
                 "ANTHROPIC_API_KEY": "sk-ant-test",
                 "XAI_API_KEY": "xai-test",
                 "OPENAI_API_KEY": "sk-oai",
-                "OMP_AUTH_BROKER_URL": "http://127.0.0.1:8766",
-                "OMP_AUTH_BROKER_TOKEN": "broker-secret",
                 "GH_TOKEN": "gh-secret",
                 "HOME": str(Path(tmp) / "home"),
             }
@@ -267,10 +310,8 @@ class OmpHostProfileTests(unittest.TestCase):
             self.assertNotIn("ANTHROPIC_API_KEY", child)
             self.assertNotIn("OPENAI_API_KEY", child)
             self.assertNotIn("GH_TOKEN", child)
-            self.assertEqual(
-                child["OMP_AUTH_BROKER_URL"], "http://127.0.0.1:8766"
-            )
-            self.assertEqual(child["OMP_AUTH_BROKER_TOKEN"], "broker-secret")
+            self.assertNotIn("OMP_AUTH_BROKER_URL", child)
+            self.assertNotIn("OMP_AUTH_BROKER_TOKEN", child)
 
     def test_omp_child_env_rejects_remote_auth_broker(self) -> None:
         import subprocess
@@ -317,6 +358,143 @@ class OmpHostProfileTests(unittest.TestCase):
         self.assertEqual(
             caught.exception.code, "omp_auth_broker_projection_invalid"
         )
+        self.assertNotIn("broker-secret", caught.exception.message)
+
+
+class OmpAuthPreflightTests(unittest.TestCase):
+    def test_missing_auth_fails_before_launch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            worktree, runtime = _omp_worktree(Path(tmp))
+            env = {
+                "PATH": os.environ.get("PATH", "/usr/bin"),
+                "HOME": str(Path(tmp) / "home"),
+            }
+            old = os.environ.copy()
+            try:
+                os.environ.clear()
+                os.environ.update(env)
+                with self.assertRaises(ValidationIssue) as caught:
+                    _native_worker_child_env(
+                        host="omp",
+                        worktree=worktree,
+                        runtime_dir=runtime,
+                        requested_model="openai-codex/gpt-5.6-luna",
+                    )
+            finally:
+                os.environ.clear()
+                os.environ.update(old)
+        self.assertEqual(caught.exception.code, "omp_auth_preflight_missing")
+        self.assertIn("omp auth-broker serve", caught.exception.message)
+        self.assertNotIn(_BROKER_TOKEN, caught.exception.message)
+        self.assertNotIn(_BROKER_TOKEN, json.dumps(caught.exception.to_dict()))
+
+    def test_healthy_broker_from_persistent_settings(self) -> None:
+        server = ThreadingHTTPServer(("127.0.0.1", 0), _BrokerOKHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            url = f"http://127.0.0.1:{server.server_address[1]}"
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                home = root / "home"
+                _write_omp_broker_config(home, url=url, token=_BROKER_TOKEN)
+                worktree, runtime = _omp_worktree(root)
+                env = {
+                    "PATH": os.environ.get("PATH", "/usr/bin"),
+                    "HOME": str(home),
+                }
+                old = os.environ.copy()
+                try:
+                    os.environ.clear()
+                    os.environ.update(env)
+                    child = _native_worker_child_env(
+                        host="omp",
+                        worktree=worktree,
+                        runtime_dir=runtime,
+                        requested_model="openai-codex/gpt-5.6-luna",
+                    )
+                finally:
+                    os.environ.clear()
+                    os.environ.update(old)
+            self.assertEqual(child["OMP_AUTH_BROKER_URL"], url)
+            self.assertEqual(child["OMP_AUTH_BROKER_TOKEN"], _BROKER_TOKEN)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+    def test_env_overrides_persistent_broker_settings(self) -> None:
+        server = ThreadingHTTPServer(("127.0.0.1", 0), _BrokerOKHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            url = f"http://127.0.0.1:{server.server_address[1]}"
+            env = {
+                "HOME": "/tmp/unused-home",
+                "OMP_AUTH_BROKER_URL": url,
+                "OMP_AUTH_BROKER_TOKEN": _BROKER_TOKEN,
+            }
+            pair = preflight_omp_provider_auth(
+                ("openai-codex/gpt-5.6-luna",), env=env
+            )
+            self.assertEqual(pair, (url, _BROKER_TOKEN))
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+    def test_incomplete_settings_fail_closed(self) -> None:
+        env = {
+            "HOME": "/tmp/unused-home",
+            "OMP_AUTH_BROKER_URL": "http://127.0.0.1:8777",
+        }
+        with self.assertRaises(ValidationIssue) as caught:
+            preflight_omp_provider_auth(("openai-codex/gpt-5.6-luna",), env=env)
+        self.assertEqual(caught.exception.code, "omp_auth_broker_projection_invalid")
+        self.assertNotIn(_BROKER_TOKEN, caught.exception.message)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp) / "home"
+            _write_omp_broker_config(
+                home, url="http://127.0.0.1:8777", token=None
+            )
+            with self.assertRaises(ValidationIssue) as config_caught:
+                preflight_omp_provider_auth(
+                    ("xai-oauth/grok-4.6",),
+                    env={"HOME": str(home)},
+                )
+        self.assertEqual(
+            config_caught.exception.code, "omp_auth_broker_projection_invalid"
+        )
+        leak = json.dumps(config_caught.exception.to_dict())
+        self.assertNotIn(_BROKER_TOKEN, leak)
+
+    def test_remote_url_fails_closed(self) -> None:
+        with self.assertRaises(ValidationIssue) as caught:
+            preflight_omp_provider_auth(
+                ("google/gemini-3.7-flash",),
+                env={
+                    "OMP_AUTH_BROKER_URL": "https://broker.example.test",
+                    "OMP_AUTH_BROKER_TOKEN": _BROKER_TOKEN,
+                },
+            )
+        self.assertEqual(caught.exception.code, "omp_auth_broker_projection_invalid")
+        rendered = json.dumps(caught.exception.to_dict())
+        self.assertNotIn(_BROKER_TOKEN, rendered)
+        self.assertNotIn(_BROKER_TOKEN, caught.exception.message)
+
+    def test_unhealthy_broker_fails_closed(self) -> None:
+        with self.assertRaises(ValidationIssue) as caught:
+            preflight_omp_provider_auth(
+                ("openai-codex/gpt-5.6-luna",),
+                env={
+                    "OMP_AUTH_BROKER_URL": "http://127.0.0.1:1",
+                    "OMP_AUTH_BROKER_TOKEN": _BROKER_TOKEN,
+                },
+            )
+        self.assertEqual(caught.exception.code, "omp_auth_broker_unhealthy")
+        self.assertIn("omp auth-broker serve", caught.exception.message)
+        self.assertNotIn(_BROKER_TOKEN, caught.exception.message)
 
 
 class OmpInstallTargetTests(unittest.TestCase):

@@ -194,8 +194,11 @@ route default. A Grok qualification canary recorded at execution effort `medium`
 `high` default fails `qualification_route_mismatch` and must be re-recorded at `high`.
 The OMP route accepts `xhigh` and `max`. It passes these levels unchanged to `omp --thinking` in
 both phases. Other host routes keep their narrower effort vocabulary.
-OMP create and resume use one stable run profile. OAuth-backed OMP routes may use a token-protected
-local auth broker on `127.0.0.1` or `::1`; Elves rejects remote broker projection.
+OMP create and resume use one stable run profile. Isolated `--profile` state does not inherit host
+OAuth. Auth preflight runs before any model call and before spec reports launch-ready: a matching
+API key, or a paired loopback broker from the environment or from persistent `auth.broker`
+settings. Incomplete, remote, or unhealthy broker settings fail closed. The broker token is never
+printed. There is no per-profile login.
 The guide packet enters as one private `@file` user message. The resume phase receives only the
 continuation message as a positional input.
 

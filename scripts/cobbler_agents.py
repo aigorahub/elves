@@ -1110,6 +1110,18 @@ def cmd_native_worker(args: argparse.Namespace) -> int:
             )
     except ValidationIssue as issue:
         return _emit_json({"ok": False, "issues": [issue.to_dict()]}, exit_code=1)
+    if resolve_host_profile(args.host).capability_host == "omp":
+        from cobbler_runtime.native_worker import preflight_omp_provider_auth
+
+        omp_models = (
+            [args.guide_model, execution_model]
+            if prewalk_requested
+            else [args.model]
+        )
+        try:
+            preflight_omp_provider_auth(omp_models)
+        except ValidationIssue as issue:
+            return _emit_json({"ok": False, "issues": [issue.to_dict()]}, exit_code=1)
     if action == "launch":
         try:
             state = launch_native_worker(
