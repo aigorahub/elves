@@ -1110,6 +1110,18 @@ def cmd_native_worker(args: argparse.Namespace) -> int:
             )
     except ValidationIssue as issue:
         return _emit_json({"ok": False, "issues": [issue.to_dict()]}, exit_code=1)
+    if resolve_host_profile(args.host).capability_host == "omp":
+        from cobbler_runtime.native_worker import preflight_omp_provider_auth
+
+        omp_models = (
+            [args.guide_model, execution_model]
+            if prewalk_requested
+            else [args.model]
+        )
+        try:
+            preflight_omp_provider_auth(omp_models)
+        except ValidationIssue as issue:
+            return _emit_json({"ok": False, "issues": [issue.to_dict()]}, exit_code=1)
     if action == "launch":
         try:
             state = launch_native_worker(
@@ -2823,16 +2835,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Inspect a deterministic native/optional-Grok worker recommendation",
     )
     route_worker.add_argument("--host", choices=("codex", "claude", "grok", "omp"), required=True)
-    route_worker.add_argument("--execution-reasoning", choices=("low", "medium", "high"), required=True)
+    route_worker.add_argument(
+        "--execution-reasoning",
+        choices=("low", "medium", "high", "xhigh", "max"),
+        required=True,
+    )
     route_worker.add_argument("--review-risk", choices=("low", "standard", "high"), required=True)
-    route_worker.add_argument("--driver-effort", choices=("low", "medium", "high"))
+    route_worker.add_argument(
+        "--driver-effort", choices=("low", "medium", "high", "xhigh", "max")
+    )
     route_worker.add_argument("--provider", choices=("auto", "native", "grok"))
-    route_worker.add_argument("--effort", choices=("low", "medium", "high"))
+    route_worker.add_argument(
+        "--effort", choices=("low", "medium", "high", "xhigh", "max")
+    )
     route_worker.add_argument(
         "--prewalk", choices=("off", "auto", "required", "experimental")
     )
     route_worker.add_argument("--guide-model")
-    route_worker.add_argument("--guide-effort", choices=("low", "medium", "high"))
+    route_worker.add_argument(
+        "--guide-effort", choices=("low", "medium", "high", "xhigh", "max")
+    )
     route_worker.add_argument(
         "--probe-prewalk",
         action="store_true",
@@ -2889,7 +2911,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     native_worker.add_argument("--host", choices=("codex", "claude", "fixture", "grok", "omp"))
     native_worker.add_argument("--worktree")
-    native_worker.add_argument("--effort", choices=("low", "medium", "high"))
+    native_worker.add_argument(
+        "--effort", choices=("low", "medium", "high", "xhigh", "max")
+    )
     native_worker.add_argument("--model", help="Current driver model observed by the host, or an explicit routed model")
     native_worker.add_argument(
         "--prewalk",
@@ -2897,9 +2921,13 @@ def build_parser() -> argparse.ArgumentParser:
         default="off",
     )
     native_worker.add_argument("--guide-model")
-    native_worker.add_argument("--guide-effort", choices=("low", "medium", "high"))
+    native_worker.add_argument(
+        "--guide-effort", choices=("low", "medium", "high", "xhigh", "max")
+    )
     native_worker.add_argument("--execution-model")
-    native_worker.add_argument("--execution-effort", choices=("low", "medium", "high"))
+    native_worker.add_argument(
+        "--execution-effort", choices=("low", "medium", "high", "xhigh", "max")
+    )
     native_worker.add_argument("--todo-limit", type=int, default=10)
     native_worker.add_argument("--prewalk-capability-evidence")
     native_worker.add_argument("--forbidden-path", action="append")

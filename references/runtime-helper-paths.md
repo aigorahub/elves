@@ -8,7 +8,7 @@ Keep those two roots distinct.
 Commands written as `python3 scripts/<helper>.py ...` are source-checkout shorthand. Use that form
 only when the current checkout actually contains Elves' `scripts/` directory.
 
-## Installed Claude Code, Codex, or Grok Build skill
+## Installed Claude Code, Codex, Grok Build, or Oh My Pi skill
 
 For an installed skill, set `ELVES_SKILL_ROOT` to the directory containing the active Elves
 `SKILL.md`, then invoke the helper by its absolute installed path:
@@ -23,13 +23,17 @@ ELVES_SKILL_ROOT="$HOME/.codex/skills/elves"
 # Grok Build global install (use this instead when Grok Build is the active host)
 ELVES_SKILL_ROOT="$HOME/.grok/skills/elves"
 
+# Oh My Pi global install (use this instead when omp is the active host)
+ELVES_SKILL_ROOT="$HOME/.omp/agent/skills/elves"
+
 python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" doctor \
   --repo-root "$PWD" --json
 ```
 
-A project-local install uses its active `.claude/skills/elves`, `.codex/skills/elves`, or
-`.grok/skills/elves` directory instead. Resolve the path from the skill that was actually loaded; do
-not assume the global copy won when a project-local copy may shadow it.
+A project-local install uses its active `.claude/skills/elves`, `.codex/skills/elves`,
+`.grok/skills/elves`, or `.omp/agent/skills/elves` directory instead. Resolve the path from the
+skill that was actually loaded; do not assume the global copy won when a project-local copy may
+shadow it.
 
 Keep the target repository as the working directory. Do not `cd` into the installed skill merely to
 make a relative helper path work. When the working directory is not the target repository, pass the

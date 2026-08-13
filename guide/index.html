@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A practical guide to installing Elves, running work, watching a worker, and reviewing the result in Claude Code, Codex, or Grok Build.">
+  <meta name="description" content="A practical guide to installing Elves, running work, watching a worker, and reviewing the result in Claude Code, Codex, Grok Build, or Oh My Pi.">
   <meta name="theme-color" content="#172637">
   <title>Using Elves</title>
   <script>document.documentElement.classList.replace("no-js", "js");</script>
@@ -512,7 +512,7 @@
     <div class="masthead-inner">
       <div class="brand-row">
         <a class="wordmark" href="https://github.com/aigorahub/elves">Elves</a>
-        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.28.0 source and releases on GitHub</a>
+        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.29.0 source and releases on GitHub</a>
       </div>
       <h1>Using Elves</h1>
       <p class="intro">Plan with the main agent, hand implementation to a separate worker, then
@@ -595,7 +595,7 @@
 
         <ol class="path">
           <li><span><strong>Plan.</strong> Agree on the outcome, constraints, acceptance criteria,
-            and risky areas with Claude Code, Codex, or Grok Build.</span></li>
+            and risky areas with Claude Code, Codex, Grok Build, or Oh My Pi.</span></li>
           <li><span><strong>Work.</strong> Elves recommends a worker, gives it one complete packet,
             and shows its live output or provides an exact follow command before the driver
             parks.</span></li>
@@ -865,7 +865,7 @@ python3 ~/.grok/skills/elves/scripts/install_doctor.py --startup</code></pre>
           </thead>
           <tbody>
             <tr>
-              <td data-label="Situation">Single native host (Claude Code, Codex, or Grok Build)</td>
+              <td data-label="Situation">Single native host (Claude Code, Codex, Grok Build, or Oh My Pi)</td>
               <td data-label="Usual choice">Same model, lower effort</td>
               <td data-label="Why">Keeps the exact observed model identity on the subscription
                 already in use while leaving the stronger live driver available for review.</td>
@@ -933,7 +933,7 @@ python3 ~/.grok/skills/elves/scripts/install_doctor.py --startup</code></pre>
           <pre><code id="prewalk-probe"># Read-only: inspects installed help/version and makes no model call.
 python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" \
   native-worker prewalk-capabilities --host codex --json
-# Use --host claude for Claude Code or --host grok for Grok Build.
+# Use --host claude, --host grok, or --host omp.
 
 # A real launch with --prewalk required runs qualification automatically.
 # Use --prewalk experimental only when you explicitly accept qualification uncertainty.</code></pre>
@@ -949,8 +949,10 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" \
         <p><code>experimental</code> is an explicit operator choice that accepts qualification
           uncertainty after static grammar inspection. It reports
           <code>exact_session_experimental</code> and keeps every real-run continuity and authority
-          check. Claude Code, Codex, and Grok Build share these semantics. Grok single-phase
-          native-worker launch remains registry-gated.</p>
+          check. Claude Code, Codex, Grok Build, and Oh My Pi share these semantics. Grok
+          single-phase native-worker launch remains registry-gated. OMP prewalk accepts
+          <code>xhigh</code> and <code>max</code> and passes them unchanged to
+          <code>omp --thinking</code>.</p>
 
         <h3>Use the optional open-source Grok worker</h3>
         <p>Install from the <a href="https://github.com/xai-org/grok-build">official Grok Build
@@ -1237,7 +1239,7 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" continuity status</code></
 
   <footer>
     <div class="footer-inner">
-      <p>Elves is an open Agent Skill for Claude Code, Codex, and compatible hosts.</p>
+      <p>Elves is an open Agent Skill for Claude Code, Codex, Grok Build, Oh My Pi, and compatible hosts.</p>
       <p><a href="https://github.com/aigorahub/elves">Main Elves page on GitHub</a> ·
         <a href="https://github.com/aigorahub/elves/blob/main/CHANGELOG.md">Changelog</a> ·
         <a href="https://github.com/aigorahub/elves/releases">Releases</a></p>

@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Grok Build, Oh My Pi (omp), Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.28.0"
+  version: "2.29.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -35,7 +35,8 @@ retained guide context, and one packet all pass. Failure stops before the task w
 preserves private evidence. `worker.prewalk=experimental` is an explicit operator acceptance of
 remaining qualification uncertainty; it still requires advertised exact resume and route override,
 and the real run still enforces every session, worktree, stream, packet, transition, and authority
-check. `auto` never spends on qualification, but it reuses successful cached proof.
+check. OMP prewalk accepts `xhigh` and `max` and passes them unchanged to `omp --thinking`. `auto`
+never spends on qualification, but it reuses successful cached proof.
 
 Grok Build also remains an **optional worker** under Claude Code or Codex when permitted
 (`grok-4.5` at `high` when the live catalog offers it). Grok host and worker prewalk use the same
@@ -76,12 +77,12 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.28.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.29.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
 **Runtime helper paths:** every `python3 scripts/...` example is **source-checkout shorthand**.
-In an installed Claude Code, Codex, or Grok Build skill, resolve helpers from the **active Elves skill root**
+In an installed Claude Code, Codex, Grok Build, or Oh My Pi skill, resolve helpers from the **active Elves skill root**
 (`~/.claude/skills/elves`, `~/.codex/skills/elves`, `~/.grok/skills/elves`, or `~/.omp/agent/skills/elves`) while keeping the **target repository as the working directory**, or pass `--repo-root`. An **installed Elves bundle never requires a repo-only helper**.
 See `references/runtime-helper-paths.md`.
 
@@ -178,6 +179,7 @@ Invocation:
 - Claude Code: `/cobbler <task>`, `/cobbler-mode`, `/setup-cobbler` (aliases `/council`, `/ec`, `/elves-council`, `/setup-council` remain)
 - Codex: `$elves cobbler: <task>`, `$elves council: <task>`, `$elves cobbler-mode`, `$elves setup-cobbler`, or natural language — **Do not invent top-level Codex slash commands**; **do not assume Codex has a top-level `/cobbler` command**
 - Grok Build: natural language for Cobbler intents (no Claude-style slash aliases)
+- Oh My Pi: natural language for Cobbler intents (no Claude-style slash aliases)
 
 **Cobbler Mode** is current-thread chat state (**not durable run state**). Exit with "Cobbler Mode: off".
 
@@ -185,7 +187,7 @@ Invocation:
 
 ### Who implements (native default, optional extras)
 
-**Default: subscription-native worker** on the live host (Claude Code, Codex, or Grok Build). It
+**Default: subscription-native worker** on the live host (Claude Code, Codex, Grok Build, or Oh My Pi). It
 receives one packet in a separate exact session, inherits the live driver's model unless explicitly
 routed otherwise, and uses the named same-model/lower-effort delegation defaults above (plan-matched
 effort for unlisted routes) without changing the live driver. No optional external implement CLI is
@@ -310,6 +312,9 @@ required capability, then execute it without an extra confirmation prompt:
   `--profile` and private HOME/XDG isolation, never spell the CLI `opm`, never pass omp product
   `--prewalk` as Elves prewalk. Prefer explicit model pin via `ELVES_OMP_MODEL`. See
   `references/omp-worker.md`.
+  Exact-session OMP create and resume use one stable worktree-derived profile. Isolated profiles
+  do not inherit host OAuth. Auth preflight reads a loopback broker from the environment or
+  persistent `auth.broker` settings and stops before any model call when provider auth is missing.
 
 The slash spellings are Claude Code managed aliases. Codex uses `$elves fugu|manus|grok|devin|omp …`
 or natural language; **never invent top-level Codex slash commands**. These are optional paid
@@ -814,7 +819,7 @@ idempotent; the ledger never reflows, reorders, or rewrites content it did not e
 The five v2.24 helpers — futile re-drive guard (`redrive`), learnings ledger (`learnings`),
 observed-usage ledger (`usage`), salvage previews (`salvage`), and the continuity watchdog
 manager (`continuity`) — are **host-neutral CLI helpers** with identical semantics on Claude
-Code, Codex, and Grok Build. Invoke as
+Code, Codex, Grok Build, and Oh My Pi. Invoke as
 `python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" <verb> …` from any host; do **not** invent
 per-host slash surfaces for them. They are advisory instruments (never landing, merge,
 credential, or routing authority). Continuity only writes OS timer templates — Elves never

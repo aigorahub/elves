@@ -36,7 +36,7 @@ decorative metrics, repeated cards, or ornamental motion.
 - Direct and specific
 - Helpful without chatter
 - Honest about capability and fallbacks
-- Consistent across Claude Code and Codex
+- Consistent across Claude Code, Codex, Grok Build, and Oh My Pi
 
 Use ordinary words. Prefer short paragraphs and real commands. Do not use em dashes or emojis.
 

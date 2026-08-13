@@ -140,6 +140,8 @@ class GlobalPreferencesTests(unittest.TestCase):
             self.assertEqual(
                 load_preferences(path)["worker"]["prewalk"], "experimental"
             )
+            set_preference("worker.native_effort", "max", path=path)
+            self.assertEqual(load_preferences(path)["worker"]["native_effort"], "max")
             with self.assertRaises(ValidationIssue) as caught:
                 set_preference("worker.prewalk", "enabled", path=path)
             self.assertEqual(caught.exception.code, "invalid_global_preference")
@@ -168,6 +170,31 @@ class RouteDecisionMatrixTests(unittest.TestCase):
                 self.assertEqual(decision.worker_effort, reasoning)
                 self.assertEqual(decision.worker_model_policy, "inherit_live_driver_model")
                 self.assertFalse(decision.model_calls_made)
+
+    def test_omp_route_accepts_xhigh_and_max(self) -> None:
+        for reasoning in ("xhigh", "max"):
+            with self.subTest(reasoning=reasoning):
+                decision = self.decide(
+                    host="omp",
+                    execution_reasoning=reasoning,
+                    explicit_intent={
+                        "worker": {
+                            "native_effort": reasoning,
+                            "prewalk_guide_effort": reasoning,
+                        }
+                    },
+                )
+                self.assertEqual(decision.provider, "native")
+                self.assertEqual(decision.worker_effort, reasoning)
+                self.assertEqual(decision.prewalk.guide.effort, reasoning)
+                self.assertEqual(decision.prewalk.execution.effort, reasoning)
+
+    def test_non_omp_route_rejects_max_effort(self) -> None:
+        for host in ("codex", "claude", "grok"):
+            with self.subTest(host=host):
+                with self.assertRaises(ValidationIssue) as caught:
+                    self.decide(host=host, execution_reasoning="max")
+                self.assertEqual(caught.exception.code, "invalid_execution_reasoning")
 
     def test_prewalk_routes_are_distinct_capability_gated_and_model_free(self) -> None:
         unqualified = self.decide(

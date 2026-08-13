@@ -30,6 +30,17 @@ Open `omp` and load the Elves skill like other hosts. Host owns staging, canonic
 supervision, PR preparation, and readiness. Native worker sessions use a **separate** run-scoped
 `--profile` from the interactive host profile. Elves prewalk is the exact-session supervisor contract
 in `references/prewalk.md`; **never** pass omp product `--prewalk` as Elves prewalk.
+OMP prewalk accepts `xhigh` and `max` for either phase and passes the selected level unchanged to
+`omp --thinking`.
+The create and resume phases use the same profile derived from the exact worktree path. Isolated
+`--profile` state does not inherit host OAuth. Before any model call, Elves preflights provider
+auth: a matching API key, or a paired loopback auth broker. Environment
+`OMP_AUTH_BROKER_URL` / `OMP_AUTH_BROKER_TOKEN` override persistent `auth.broker.url` and
+`auth.broker.token` from the host OMP settings file. Elves rejects incomplete pairs, remote
+broker URLs, and an unhealthy broker, and never prints the broker token. Missing auth stops
+with `omp auth-broker serve`. There is no per-profile login.
+The guide packet is one private `@file` user message so OMP session history retains it. Resume gets
+one positional continuation message and never receives the packet again.
 
 ## Trusted full-run (parked worker under another host)
 

@@ -1,7 +1,7 @@
 # How Cobbler works
 
 For a full implementation run, you can simply ask: “Implement this plan while I’m offline.” The
-live Claude Code, Codex, or Grok Build driver plans and reviews, while deterministic adaptive
+live Claude Code, Codex, Grok Build, or Oh My Pi driver plans and reviews, while deterministic adaptive
 routing chooses a separate subscription-native worker by default or a permitted capability-qualified
 Grok worker (when Grok is not already the host). The choice and fallback remain inspectable; see
 [`../references/adaptive-worker-routing.md`](../references/adaptive-worker-routing.md).
@@ -180,9 +180,9 @@ and `/elves-council`. Codex supports `$elves council: <task>` and natural Counci
 ## External-agent setup and model onboarding
 
 Setup is optional. Native-only Elves needs no external tools or keys. **Supported main drivers are
-Claude Code, Codex, and Grok Build** — they run Elves. Other CLIs and services (Antigravity, Gemini,
+Claude Code, Codex, Grok Build, and Oh My Pi (omp)** — they run Elves. Other CLIs and services (Antigravity, Gemini,
 OpenCode, OpenRouter, Muse, AlphaEvolve, etc.) are optional multi-agent routes only. Grok Build is
-also an optional **worker** under Claude/Codex when permitted. Exotic interfaces beyond the three
+also an optional **worker** under Claude/Codex when permitted. Exotic interfaces beyond the four
 supported hosts are **not heavily tested**. **Prefer PRs** (or issues) when something breaks.
 Supported hosts share one onboarding protocol (`references/model-onboarding.md`):
 
@@ -239,7 +239,7 @@ guardrails.
 ## CouncilElves launch
 
 See [`references/councilelves-launch-prompt.md`](../references/councilelves-launch-prompt.md) for the
-plan→implement→review overview. **Default is host-native** (Claude Code, Codex, or Grok Build
+plan→implement→review overview. **Default is host-native** (Claude Code, Codex, Grok Build, or Oh My Pi)
 implements itself). For trusted Grok full-run as a **work driver** under Claude/Codex, the current
 normative path is one packet, one exact session, one launch, feature-branch progress, and a
 `parked_monitor` host. Optional external implementers and the host-import writer lease are capability

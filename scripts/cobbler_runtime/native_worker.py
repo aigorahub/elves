@@ -17,7 +17,15 @@ import time
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping, Sequence
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlparse
+from urllib.request import (
+    HTTPRedirectHandler,
+    ProxyHandler,
+    Request,
+    build_opener,
+)
 
 from .full_run import (
     _git_branch,
@@ -37,6 +45,7 @@ from .host_profiles import (
     native_worker_profile_view,
     provider_secret_names as _registry_provider_secret_names,
     resolve_host_profile,
+    supported_efforts_for_host,
 )
 from .prewalk import (
     PREWALK_CONTINUATION_INPUT,
@@ -62,6 +71,25 @@ from .storage import StorageError, atomic_write_json
 
 PREWALK_QUALIFICATION_TIMEOUT_SECONDS = 180
 PREWALK_QUALIFICATION_OUTPUT_MAX_BYTES = 1024 * 1024
+OMP_AUTH_BROKER_SETUP_COMMAND = "omp auth-broker serve"
+_OMP_BROKER_CONFIG_MAX_BYTES = 256 * 1024
+_OMP_BROKER_HEALTH_TIMEOUT_SECONDS = 1.0
+_OMP_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1"})
+_OMP_MISSING_AUTH_MESSAGE = (
+    "OMP isolated-profile provider auth is missing. Start a loopback broker with "
+    f"`{OMP_AUTH_BROKER_SETUP_COMMAND}` and persist auth.broker.url plus "
+    "auth.broker.token, or export OMP_AUTH_BROKER_URL and OMP_AUTH_BROKER_TOKEN."
+)
+_OMP_UNHEALTHY_BROKER_MESSAGE = (
+    "OMP auth broker is unhealthy. Start a loopback broker with "
+    f"`{OMP_AUTH_BROKER_SETUP_COMMAND}`."
+)
+_OMP_INCOMPLETE_BROKER_MESSAGE = (
+    "OMP auth broker projection requires both URL and token"
+)
+_OMP_REMOTE_BROKER_MESSAGE = (
+    "OMP auth broker projection accepts only a plain loopback HTTP URL"
+)
 
 
 @dataclass(frozen=True)
@@ -85,6 +113,8 @@ class NativeWorkerSpec:
     watcher_command: str | None = None
     git_write_roots: tuple[str, ...] = ()
     prompt_file_flag: str | None = None
+    positional_input: bool = False
+    input_file_prefix: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -266,7 +296,7 @@ def build_native_worker_spec(
 ) -> NativeWorkerSpec:
     host_profile = resolve_host_profile(host)
     effort_token = effort.strip().lower()
-    if effort_token not in {"low", "medium", "high"}:
+    if effort_token not in supported_efforts_for_host(host):
         raise ValidationIssue("invalid_worker_effort", f"Invalid worker effort `{effort}`")
     if not requested_model or not requested_model.strip():
         raise ValidationIssue(
@@ -312,6 +342,8 @@ def build_native_worker_spec(
         watcher_command=watcher_command,
         git_write_roots=git_write_roots if host_profile.grants_git_write_roots else (),
         prompt_file_flag=plan.prompt_file_flag,
+        positional_input=plan.positional_input,
+        input_file_prefix=plan.input_file_prefix,
     )
 
 
@@ -495,7 +527,7 @@ def _run_bounded_qualification_phase(
     argv = list(spec.argv)
     stdin_handle = tempfile.TemporaryFile(mode="w+b")
     try:
-        if spec.prompt_file_flag:
+        if spec.prompt_file_flag or spec.input_file_prefix:
             prompt_fd, prompt_name = tempfile.mkstemp(
                 prefix=".qualification-prompt-",
                 suffix=".txt",
@@ -508,7 +540,12 @@ def _run_bounded_qualification_phase(
                 handle.write(input_text)
                 handle.flush()
                 os.fsync(handle.fileno())
-            argv.extend((spec.prompt_file_flag, str(prompt_path)))
+            if spec.prompt_file_flag:
+                argv.extend((spec.prompt_file_flag, str(prompt_path)))
+            else:
+                argv.append(f"{spec.input_file_prefix}{prompt_path}")
+        elif spec.positional_input:
+            argv.append(input_text)
         else:
             stdin_handle.write(input_text.encode("utf-8"))
             stdin_handle.flush()
@@ -517,7 +554,11 @@ def _run_bounded_qualification_phase(
             argv,
             cwd=str(worktree),
             env=child_env,
-            stdin=subprocess.DEVNULL if spec.prompt_file_flag else stdin_handle,
+            stdin=(
+                subprocess.DEVNULL
+                if spec.prompt_file_flag or spec.input_file_prefix or spec.positional_input
+                else stdin_handle
+            ),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=False,
@@ -601,6 +642,50 @@ def _run_bounded_qualification_phase(
         stdin_handle.close()
         if prompt_path is not None:
             prompt_path.unlink(missing_ok=True)
+
+
+def _qualification_assistant_text(stdout: str) -> str:
+    """Return assistant text from raw output and OMP typed stream events."""
+    texts = [stdout]
+    deltas: list[str] = []
+
+    def append_message(message: Any) -> None:
+        if not isinstance(message, dict) or message.get("role") != "assistant":
+            return
+        content = message.get("content")
+        if not isinstance(content, list):
+            return
+        for part in content:
+            if not isinstance(part, dict) or part.get("type") != "text":
+                continue
+            value = part.get("text")
+            if isinstance(value, str):
+                texts.append(value)
+
+    for line in stdout.splitlines():
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(event, dict):
+            continue
+        event_type = event.get("type")
+        if event_type == "message_update":
+            update = event.get("assistantMessageEvent")
+            if isinstance(update, dict) and update.get("type") == "text_delta":
+                delta = update.get("delta")
+                if isinstance(delta, str):
+                    deltas.append(delta)
+        elif event_type in {"message_end", "message_start", "turn_end"}:
+            append_message(event.get("message"))
+        elif event_type == "agent_end":
+            messages = event.get("messages")
+            if isinstance(messages, list):
+                for message in messages:
+                    append_message(message)
+    if deltas:
+        texts.append("".join(deltas))
+    return "\n".join(texts)
 
 
 def _write_qualification_artifact(path: Path, payload: dict[str, Any]) -> None:
@@ -791,7 +876,7 @@ def qualify_installed_prewalk_transport(
                 f"ELVES_PREWALK_CANARY_GUIDE {memory_fact} {guide_file_fact}"
             )
             checks["unique_guide_fact_observed"] = (
-                guide_marker in guide_result.stdout
+                guide_marker in _qualification_assistant_text(guide_result.stdout)
             )
             session_id = guide_spec.session_id or (
                 guide_result.observed_session_ids[0]
@@ -821,7 +906,9 @@ def qualify_installed_prewalk_transport(
                     "ELVES_PREWALK_CANARY_EXECUTION "
                     f"{memory_fact} {execution_file_fact}"
                 )
-                checks["same_worktree"] = execution_marker in execution_result.stdout
+                checks["same_worktree"] = execution_marker in _qualification_assistant_text(
+                    execution_result.stdout
+                )
                 checks["same_session_id"] = bool(
                     session_id
                     and guide_result.observed_session_ids
@@ -1101,6 +1188,196 @@ def _native_git_contract(worktree: Path) -> dict[str, Any]:
     }
 
 
+def _unquote_yaml_scalar(raw: str) -> str:
+    value = raw.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        quote = value[0]
+        inner = value[1:-1]
+        if quote == '"':
+            return inner.replace("\\\"", '"').replace("\\\\", "\\")
+        return inner.replace("''", "'")
+    return value.split(" #", 1)[0].strip()
+
+
+def _omp_agent_config_path(env: Mapping[str, str]) -> Path | None:
+    agent_dir = str(env.get("PI_CODING_AGENT_DIR") or "").strip()
+    if agent_dir:
+        return Path(agent_dir) / "config.yml"
+    home = str(env.get("HOME") or "").strip()
+    if not home:
+        return None
+    return Path(home) / ".omp" / "agent" / "config.yml"
+
+
+def _parse_omp_broker_settings(text: str) -> tuple[str | None, str | None]:
+    """Read only auth.broker.url and auth.broker.token from a tiny YAML subset."""
+    url: str | None = None
+    token: str | None = None
+    section: str | None = None
+    auth_indent: int | None = None
+    broker_indent: int | None = None
+    for raw in text.splitlines():
+        if "\t" in raw:
+            raise ValidationIssue(
+                "omp_auth_broker_projection_invalid",
+                "OMP auth broker settings are invalid",
+            )
+        if not raw.strip() or raw.lstrip().startswith("#"):
+            continue
+        indent = len(raw) - len(raw.lstrip(" "))
+        stripped = raw.strip()
+        if ":" not in stripped:
+            continue
+        key, _, rest = stripped.partition(":")
+        key = key.strip()
+        value = rest.strip()
+        if indent == 0 and key == "auth":
+            section = "auth"
+            auth_indent = 0
+            broker_indent = None
+            continue
+        if (
+            section in {"auth", "broker"}
+            and auth_indent is not None
+            and indent <= auth_indent
+            and key != "auth"
+        ):
+            section = None
+            broker_indent = None
+        if (
+            section == "auth"
+            and key == "broker"
+            and auth_indent is not None
+            and indent > auth_indent
+        ):
+            section = "broker"
+            broker_indent = indent
+            continue
+        if section == "broker" and broker_indent is not None and indent > broker_indent:
+            parsed = _unquote_yaml_scalar(value) if value else ""
+            if key == "url":
+                url = parsed
+            elif key == "token":
+                token = parsed
+    return url, token
+
+
+def _read_omp_broker_settings(env: Mapping[str, str]) -> tuple[str | None, str | None]:
+    path = _omp_agent_config_path(env)
+    if path is None or not path.is_file():
+        return None, None
+    try:
+        stat_result = path.stat()
+    except OSError as exc:
+        raise ValidationIssue(
+            "omp_auth_broker_projection_invalid",
+            "OMP auth broker settings are unreadable",
+        ) from exc
+    if stat_result.st_size > _OMP_BROKER_CONFIG_MAX_BYTES:
+        raise ValidationIssue(
+            "omp_auth_broker_projection_invalid",
+            "OMP auth broker settings are unreadable",
+        )
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise ValidationIssue(
+            "omp_auth_broker_projection_invalid",
+            "OMP auth broker settings are unreadable",
+        ) from exc
+    return _parse_omp_broker_settings(text)
+
+
+def _validate_omp_loopback_broker_url(url: str) -> None:
+    parsed = urlparse(url)
+    if (
+        parsed.scheme != "http"
+        or parsed.hostname not in _OMP_LOOPBACK_HOSTS
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+        or parsed.path not in {"", "/"}
+    ):
+        raise ValidationIssue(
+            "omp_auth_broker_projection_invalid",
+            _OMP_REMOTE_BROKER_MESSAGE,
+        )
+
+
+class _OmpBrokerNoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, *args: Any, **kwargs: Any) -> Request | None:
+        return None
+
+
+def _probe_omp_broker_health(url: str) -> bool:
+    """Return True when the loopback broker answers HTTP. Never logs the token."""
+    try:
+        opener = build_opener(_OmpBrokerNoRedirect, ProxyHandler({}))
+        opener.open(Request(url, method="GET"), timeout=_OMP_BROKER_HEALTH_TIMEOUT_SECONDS)
+        return True
+    except HTTPError:
+        return True
+    except (URLError, TimeoutError, OSError):
+        return False
+
+
+def _resolve_omp_broker_pair(env: Mapping[str, str]) -> tuple[str, str] | None:
+    env_url = str(env.get("OMP_AUTH_BROKER_URL") or "").strip()
+    env_token = str(env.get("OMP_AUTH_BROKER_TOKEN") or "").strip()
+    if env_url or env_token:
+        if not env_url or not env_token:
+            raise ValidationIssue(
+                "omp_auth_broker_projection_invalid",
+                _OMP_INCOMPLETE_BROKER_MESSAGE,
+            )
+        _validate_omp_loopback_broker_url(env_url)
+        return env_url, env_token
+    cfg_url, cfg_token = _read_omp_broker_settings(env)
+    url = (cfg_url or "").strip()
+    token = (cfg_token or "").strip()
+    if url or token:
+        if not url or not token:
+            raise ValidationIssue(
+                "omp_auth_broker_projection_invalid",
+                _OMP_INCOMPLETE_BROKER_MESSAGE,
+            )
+        _validate_omp_loopback_broker_url(url)
+        return url, token
+    return None
+
+
+def _omp_model_has_api_key(requested_model: str | None, env: Mapping[str, str]) -> bool:
+    names = _omp_provider_secret_for_model(requested_model)
+    return any(bool(str(env.get(name) or "").strip()) for name in names)
+
+
+def preflight_omp_provider_auth(
+    requested_models: Sequence[str | None],
+    *,
+    env: Mapping[str, str] | None = None,
+) -> tuple[str, str] | None:
+    """Fail closed before any OMP model call when isolated-profile auth is missing.
+
+    Environment broker variables override persistent ``auth.broker`` settings.
+    A configured broker must be a paired loopback HTTP URL and must answer.
+    The token never appears in the raised issue.
+    """
+    parent = env if env is not None else os.environ
+    broker = _resolve_omp_broker_pair(parent)
+    if broker is not None and not _probe_omp_broker_health(broker[0]):
+        raise ValidationIssue(
+            "omp_auth_broker_unhealthy",
+            _OMP_UNHEALTHY_BROKER_MESSAGE,
+        )
+    models = tuple(requested_models) or (None,)
+    if any(_omp_model_has_api_key(model, parent) for model in models):
+        return broker
+    if broker is not None:
+        return broker
+    raise ValidationIssue("omp_auth_preflight_missing", _OMP_MISSING_AUTH_MESSAGE)
+
+
 def _omp_provider_secret_for_model(requested_model: str | None) -> tuple[str, ...]:
     """Map a pinned omp model selector to preferred provider secret names."""
     model = (requested_model or "").strip().lower()
@@ -1162,6 +1439,10 @@ def _native_worker_child_env(
         selected = next((n for n in omp_order if n in provider_secret_names and parent.get(n)), None)
         if selected:
             env[selected] = parent[selected]
+        broker = preflight_omp_provider_auth((requested_model,), env=parent)
+        if broker is not None:
+            env["OMP_AUTH_BROKER_URL"] = broker[0]
+            env["OMP_AUTH_BROKER_TOKEN"] = broker[1]
     else:
         for name in provider_secret_names:
             if parent.get(name):
@@ -1334,6 +1615,8 @@ def _run_worker_phase(
     child_env: dict[str, str],
     expected_session_id: str | None,
     prompt_file_flag: str | None = None,
+    positional_input: bool = False,
+    input_file_prefix: str | None = None,
 ) -> _PhaseResult:
     from .context import redact_text
 
@@ -1365,7 +1648,7 @@ def _run_worker_phase(
     log_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     prompt_path: Path | None = None
     effective_argv = list(argv)
-    if prompt_file_flag:
+    if prompt_file_flag or input_file_prefix:
         prompt_fd, prompt_name = tempfile.mkstemp(
             prefix=".prewalk-prompt-",
             suffix=".txt",
@@ -1386,7 +1669,12 @@ def _run_worker_phase(
                 pass
             prompt_path.unlink(missing_ok=True)
             raise
-        effective_argv.extend((prompt_file_flag, str(prompt_path)))
+        if prompt_file_flag:
+            effective_argv.extend((prompt_file_flag, str(prompt_path)))
+        else:
+            effective_argv.append(f"{input_file_prefix}{prompt_path}")
+    elif positional_input:
+        effective_argv.append(input_text)
     try:
         with tempfile.TemporaryFile(mode="w+t", encoding="utf-8") as child_input, log_path.open(
             "a", encoding="utf-8"
@@ -1399,7 +1687,11 @@ def _run_worker_phase(
                 effective_argv,
                 cwd=str(worktree),
                 env=env,
-                stdin=subprocess.DEVNULL if prompt_file_flag else child_input,
+                stdin=(
+                    subprocess.DEVNULL
+                    if prompt_file_flag or input_file_prefix or positional_input
+                    else child_input
+                ),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -1611,6 +1903,14 @@ def launch_native_worker(
             f"{launch_profile.capability_host}_native_worker_launch_unqualified",
             f"{launch_profile.capability_host} single-phase native-worker launch is feature-gated off",
         )
+    if launch_profile.capability_host == "omp":
+        omp_models: list[str | None] = [spec.requested_model]
+        if prewalk_spec is not None:
+            omp_models = [
+                prewalk_spec.guide.requested_model,
+                prewalk_spec.execution_model,
+            ]
+        preflight_omp_provider_auth(omp_models)
     state_path, log_path = native_worker_paths(repo_root, run_id)
     if state_path.exists():
         raise ValidationIssue("native_worker_run_exists", f"Native worker run `{run_id}` already exists")
@@ -1663,6 +1963,8 @@ def launch_native_worker(
         "stderr_tail": None,
         "git_write_roots": list(launch_spec.git_write_roots),
         "prompt_file_flag": launch_spec.prompt_file_flag,
+        "positional_input": launch_spec.positional_input,
+        "input_file_prefix": launch_spec.input_file_prefix,
         "git_network_push": "disabled",
         "git_authority_mode": "fixture" if launch_spec.host == "fixture" else "feature_only",
         **git_contract,
@@ -1698,6 +2000,8 @@ def launch_native_worker(
                 "paths": paths.to_dict(),
                 "argv": list(prewalk_spec.guide.argv),
                 "prompt_file_flag": prewalk_spec.guide.prompt_file_flag,
+                "positional_input": prewalk_spec.guide.positional_input,
+                "input_file_prefix": prewalk_spec.guide.input_file_prefix,
                 "fixture_script": (
                     prewalk_spec.guide.argv[1]
                     if prewalk_spec.guide.host == "fixture"
@@ -1714,6 +2018,16 @@ def launch_native_worker(
                     prewalk_spec.execution_spec(
                         prewalk_spec.guide.session_id or "prewalk-session-preview"
                     ).prompt_file_flag
+                ),
+                "positional_input": (
+                    prewalk_spec.execution_spec(
+                        prewalk_spec.guide.session_id or "prewalk-session-preview"
+                    ).positional_input
+                ),
+                "input_file_prefix": (
+                    prewalk_spec.execution_spec(
+                        prewalk_spec.guide.session_id or "prewalk-session-preview"
+                    ).input_file_prefix
                 ),
                 "fixture_script": prewalk_spec.execution_fixture_script,
                 "transient_retries": 0,
@@ -1796,6 +2110,8 @@ def _supervise_single_phase(
         child_env=child_env,
         expected_session_id=state.get("session_id"),
         prompt_file_flag=state.get("prompt_file_flag"),
+        positional_input=bool(state.get("positional_input")),
+        input_file_prefix=state.get("input_file_prefix"),
     )
     return _terminalize_native_worker(
         state_path=state_path,
@@ -1903,6 +2219,8 @@ def _run_clean_single_phase_fallback(
         child_env=child_env,
         expected_session_id=fresh.session_id,
         prompt_file_flag=fresh.prompt_file_flag,
+        positional_input=fresh.positional_input,
+        input_file_prefix=fresh.input_file_prefix,
     )
     return _terminalize_native_worker(
         state_path=state_path,
@@ -1939,6 +2257,8 @@ def _run_execution_with_transient_retries(
         child_env=child_env,
         expected_session_id=session_id,
         prompt_file_flag=resumed.prompt_file_flag,
+        positional_input=resumed.positional_input,
+        input_file_prefix=resumed.input_file_prefix,
     )
     for retry_number, backoff_seconds in enumerate(
         _PREWALK_TRANSIENT_BACKOFF_SECONDS, start=1
@@ -1969,6 +2289,8 @@ def _run_execution_with_transient_retries(
             child_env=child_env,
             expected_session_id=session_id,
             prompt_file_flag=resumed.prompt_file_flag,
+            positional_input=resumed.positional_input,
+            input_file_prefix=resumed.input_file_prefix,
         )
     return result
 
@@ -2025,6 +2347,8 @@ def _supervise_prewalk(
         child_env=child_env,
         expected_session_id=state.get("session_id"),
         prompt_file_flag=state["prewalk"].get("prompt_file_flag"),
+        positional_input=bool(state["prewalk"].get("positional_input")),
+        input_file_prefix=state["prewalk"].get("input_file_prefix"),
     )
     session_id = str(state.get("session_id") or "")
     if not session_id:
@@ -2060,6 +2384,8 @@ def _supervise_prewalk(
             child_env=child_env,
             expected_session_id=session_id,
             prompt_file_flag=resumed_guide.prompt_file_flag,
+            positional_input=resumed_guide.positional_input,
+            input_file_prefix=resumed_guide.input_file_prefix,
         )
         if recovery.session_mismatch or session_id not in recovery.observed_session_ids:
             return _terminalize_native_worker(

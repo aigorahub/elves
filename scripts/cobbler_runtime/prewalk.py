@@ -22,7 +22,7 @@ import subprocess
 import uuid
 from typing import Any, Mapping, Sequence
 
-from .host_profiles import host_profile_or_none
+from .host_profiles import host_profile_or_none, supported_efforts_for_host
 from .schema import ValidationIssue
 from .storage import (
     StorageError,
@@ -877,8 +877,11 @@ def experimental_prewalk_capabilities(
 
 def _qualification_phase_routes(
     data: Mapping[str, Any],
+    *,
+    host: str,
 ) -> dict[str, tuple[str | None, str]]:
     """Validate the guide/execution route bindings shared by evidence loaders."""
+    supported_efforts = supported_efforts_for_host(host)
     routes: dict[str, tuple[str | None, str]] = {}
     for role in ("guide", "execution"):
         route = data.get(f"{role}_route")
@@ -897,10 +900,11 @@ def _qualification_phase_routes(
                 max_chars=200,
             )
         effort = route.get("effort")
-        if effort not in {"low", "medium", "high"}:
+        if effort not in supported_efforts:
+            choices = ", ".join(sorted(supported_efforts))
             raise ValidationIssue(
                 "prewalk_route_change_unqualified",
-                "Qualification phase effort must be low, medium, or high",
+                f"Qualification phase effort must be one of: {choices}",
                 path=f"{role}_route.effort",
             )
         routes[role] = (model, str(effort))
@@ -1003,7 +1007,7 @@ def load_prewalk_capability_evidence(
             "Qualification did not prove the canonical minimal continuation input",
             path="continuation_sha256",
         )
-    routes = _qualification_phase_routes(data)
+    routes = _qualification_phase_routes(data, host=host)
     model_calls_made = data.get("model_calls_made")
     if model_calls_made is not True:
         raise ValidationIssue(
@@ -1222,7 +1226,7 @@ def load_grok_prewalk_qualification(
             "Grok prewalk qualification must report an observed instruction fidelity",
             path="instruction_fidelity",
         )
-    routes = _qualification_phase_routes(data)
+    routes = _qualification_phase_routes(data, host="grok")
     return PrewalkCapabilities(
         host="grok",
         transport="grok_build",

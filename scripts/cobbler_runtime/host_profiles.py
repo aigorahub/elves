@@ -58,6 +58,8 @@ class HostLaunchPlan:
     session_id_source: str
     stdin_packet: bool
     prompt_file_flag: str | None = None
+    positional_input: bool = False
+    input_file_prefix: str | None = None
 
 
 def _codex_launch_plan(request: HostLaunchRequest) -> HostLaunchPlan:
@@ -199,17 +201,17 @@ def _omp_launch_plan(request: HostLaunchRequest) -> HostLaunchPlan:
     Session identity is stream-captured (type=session id). Never --continue/-c.
     Never product --prewalk (Elves owns prewalk trajectory).
 
-    Create: packet via --append-system-prompt plus a short user message.
-    Resume: no append-system-prompt; stdin carries Continue. only (no packet replay).
+    Create: packet via one private @file user message so session history retains it.
+    Resume: one positional continuation message only (no packet replay).
     """
     profile = (
         "elves-omp-host-"
-        + hashlib.sha256(
-            f"{request.cwd}\0{request.session_id or 'create'}".encode("utf-8")
-        ).hexdigest()[:12]
+        + hashlib.sha256(request.cwd.encode("utf-8")).hexdigest()[:12]
     )
-    thinking = {"low": "low", "medium": "medium", "high": "high"}.get(
-        request.effort, "medium"
+    thinking = (
+        request.effort
+        if request.effort in {"low", "medium", "high", "xhigh", "max"}
+        else "medium"
     )
     common = [
         "omp",
@@ -227,16 +229,18 @@ def _omp_launch_plan(request: HostLaunchRequest) -> HostLaunchPlan:
         "yolo",
     ]
     if request.session_id is None:
-        argv = tuple([*common, "Follow the system packet."])
+        argv = tuple(common)
         resume = None
         sid = None
-        prompt_flag = "--append-system-prompt"
+        prompt_flag = None
+        input_file_prefix = "@"
     else:
         sid = exact_session_id(request.session_id)
-        # Resume omits append-system-prompt so prewalk can feed Continue. on stdin alone.
+        # Resume receives the next user message as one positional argument.
         argv = tuple([*common, "--resume", sid])
         resume = argv
         prompt_flag = None
+        input_file_prefix = None
     if "--prewalk" in argv or "-c" in argv or "--continue" in argv:
         raise ValidationIssue(
             "omp_prewalk_or_continue_forbidden",
@@ -249,6 +253,8 @@ def _omp_launch_plan(request: HostLaunchRequest) -> HostLaunchPlan:
         session_id_source="stream.session.id",
         stdin_packet=False,
         prompt_file_flag=prompt_flag,
+        positional_input=request.session_id is not None,
+        input_file_prefix=input_file_prefix,
     )
 
 
@@ -279,6 +285,7 @@ class HostProfile:
     # metadata for the observed-usage ledger: a transport without a usage
     # surface stays literal "unobserved" — never estimated, never zero.
     reports_usage: str
+    supported_efforts: frozenset[str]
     launch_plan: Callable[[HostLaunchRequest], HostLaunchPlan]
     # Installed-binary help probe (no model calls). None => not probeable.
     executable: str | None
@@ -317,6 +324,7 @@ HOST_PROFILES: tuple[HostProfile, ...] = (
         provider_secret_names=frozenset({"OPENAI_API_KEY", "CODEX_API_KEY"}),
         grants_git_write_roots=True,
         reports_usage="turn_completed_token_usage",
+        supported_efforts=frozenset({"low", "medium", "high"}),
         launch_plan=_codex_launch_plan,
         executable="codex",
         version_argv=("--version",),
@@ -340,6 +348,7 @@ HOST_PROFILES: tuple[HostProfile, ...] = (
         provider_secret_names=frozenset({"ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN"}),
         grants_git_write_roots=True,
         reports_usage="stream_json_result_usage",
+        supported_efforts=frozenset({"low", "medium", "high"}),
         launch_plan=_claude_launch_plan,
         executable="claude",
         version_argv=("--version",),
@@ -365,6 +374,7 @@ HOST_PROFILES: tuple[HostProfile, ...] = (
         provider_secret_names=frozenset(),
         grants_git_write_roots=False,
         reports_usage="fixture_replay",
+        supported_efforts=frozenset({"low", "medium", "high"}),
         launch_plan=_fixture_launch_plan,
         executable=None,
         version_argv=(),
@@ -395,6 +405,7 @@ HOST_PROFILES: tuple[HostProfile, ...] = (
         provider_secret_names=frozenset({"XAI_API_KEY"}),
         grants_git_write_roots=True,
         reports_usage="stream_usage_events",
+        supported_efforts=frozenset({"low", "medium", "high"}),
         launch_plan=_grok_launch_plan,
         executable="grok",
         version_argv=("--version",),
@@ -420,12 +431,14 @@ HOST_PROFILES: tuple[HostProfile, ...] = (
             "ANTHROPIC_API_KEY",
             "OPENAI_API_KEY",
             "CODEX_API_KEY",
+            "OMP_AUTH_BROKER_TOKEN",
             "XAI_API_KEY",
             "GEMINI_API_KEY",
             "GOOGLE_API_KEY",
         }),
         grants_git_write_roots=True,
         reports_usage="unobserved",
+        supported_efforts=frozenset({"low", "medium", "high", "xhigh", "max"}),
         launch_plan=_omp_launch_plan,
         executable="omp",
         version_argv=("--version",),
@@ -457,6 +470,11 @@ def resolve_host_profile(host: str) -> HostProfile:
 
 def transport_for_host(host: str) -> str:
     return resolve_host_profile(host).transport
+
+
+def supported_efforts_for_host(host: str) -> frozenset[str]:
+    """Return the exact effort vocabulary accepted by one host route."""
+    return resolve_host_profile(host).supported_efforts
 
 
 def provider_secret_names(host: str | None) -> frozenset[str]:

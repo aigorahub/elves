@@ -4,6 +4,35 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.29.0] - 2026-08-13
+
+### Added
+- **OMP prewalk accepts `xhigh` and `max`.** Oh My Pi is the only main-driver route that keeps
+  those two thinking levels instead of folding them down. The native-worker CLI, host profile,
+  route-worker / `decide_worker_route` surface, global `worker.native_effort` preference, and
+  qualification evidence pass `xhigh` and `max` unchanged to `omp --thinking`, so a Luna Max
+  (`openai-codex/gpt-5.6-luna`) guide or execution route stays at the effort the operator asked
+  for. Other hosts still reject those levels at route time.
+
+### Fixed
+- **OMP exact-session prewalk transport.** Create and resume now share one stable
+  worktree-derived `--profile` instead of hashing the session id into a new profile on resume.
+  The guide packet is one private `@file` user message so OMP session history retains it. Resume
+  receives only a positional continuation and never replays the packet.
+- **OMP isolated-profile auth preflight.** Spec and launch no longer report ready and then start
+  a model with no credentials. Elves reads persistent `auth.broker.url` and `auth.broker.token`
+  when `OMP_AUTH_BROKER_*` is absent, keeps environment variables as the override, accepts only
+  a paired plain loopback HTTP URL, health-checks the broker, and stops before any model call
+  when provider auth is missing. Incomplete, remote, or unhealthy broker settings fail closed.
+  The token never appears in command output, logs, packets, or Git. Isolated `--profile` design
+  is unchanged; there is no per-profile login.
+
+### Changed
+- **Four-host agent parity on live operator surfaces.** README, the public guide, model
+  onboarding, Cobbler, runtime helper paths, and the host-parity prewalk matrix now name Oh My Pi
+  beside Claude Code, Codex, and Grok Build. v2.24 run tools keep one CLI and one honesty
+  boundary on all four hosts.
+
 ## [2.28.0] - 2026-08-11
 
 ### Added
