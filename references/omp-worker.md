@@ -32,6 +32,11 @@ supervision, PR preparation, and readiness. Native worker sessions use a **separ
 in `references/prewalk.md`; **never** pass omp product `--prewalk` as Elves prewalk.
 OMP prewalk accepts `xhigh` and `max` for either phase and passes the selected level unchanged to
 `omp --thinking`.
+The create and resume phases use the same profile derived from the exact worktree path. For an
+OAuth-backed model, the host may project a token-protected OMP auth broker only on a plain loopback
+HTTP URL. Elves rejects remote broker URLs and incomplete URL/token pairs.
+The guide packet is one private `@file` user message so OMP session history retains it. Resume gets
+one positional continuation message and never receives the packet again.
 
 ## Trusted full-run (parked worker under another host)
 

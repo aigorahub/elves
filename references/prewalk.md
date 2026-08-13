@@ -192,6 +192,10 @@ route default. A Grok qualification canary recorded at execution effort `medium`
 `high` default fails `qualification_route_mismatch` and must be re-recorded at `high`.
 The OMP route accepts `xhigh` and `max`. It passes these levels unchanged to `omp --thinking` in
 both phases. Other host routes keep their narrower effort vocabulary.
+OMP create and resume use one stable run profile. OAuth-backed OMP routes may use a token-protected
+local auth broker on `127.0.0.1` or `::1`; Elves rejects remote broker projection.
+The guide packet enters as one private `@file` user message. The resume phase receives only the
+continuation message as a positional input.
 
 Use the same shape with `--host claude` or `--host grok`. A previously recorded artifact may still
 be passed with `--prewalk-capability-evidence`. Existing `--model`/`--effort` keep their single-phase

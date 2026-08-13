@@ -15,7 +15,11 @@ from cobbler_runtime.host_profiles import (
     resolve_host_profile,
 )
 from cobbler_runtime.adapters import build_readonly_invocation
-from cobbler_runtime.native_worker import _native_worker_child_env, build_native_worker_spec
+from cobbler_runtime.native_worker import (
+    _native_worker_child_env,
+    _qualification_assistant_text,
+    build_native_worker_spec,
+)
 from cobbler_runtime.prewalk import (
     PREWALK_CONTINUATION_INPUT,
     advertised_prewalk_capabilities,
@@ -27,6 +31,34 @@ REPO = Path(__file__).resolve().parents[1]
 
 
 class OmpHostProfileTests(unittest.TestCase):
+    def test_qualification_text_reassembles_omp_deltas(self) -> None:
+        stdout = "\n".join(
+            (
+                json.dumps(
+                    {
+                        "type": "message_update",
+                        "assistantMessageEvent": {
+                            "type": "text_delta",
+                            "delta": "ELVES_PREWALK_",
+                        },
+                    }
+                ),
+                json.dumps(
+                    {
+                        "type": "message_update",
+                        "assistantMessageEvent": {
+                            "type": "text_delta",
+                            "delta": "CANARY_GUIDE token fact",
+                        },
+                    }
+                ),
+            )
+        )
+        self.assertIn(
+            "ELVES_PREWALK_CANARY_GUIDE token fact",
+            _qualification_assistant_text(stdout),
+        )
+
     def test_omp_resolves_and_omp_cli_is_not_host(self) -> None:
         profile = resolve_host_profile("omp")
         self.assertEqual(profile.host, "omp")
@@ -53,12 +85,14 @@ class OmpHostProfileTests(unittest.TestCase):
         self.assertIn("json", create.argv)
         self.assertIn("--cwd", create.argv)
         self.assertIn("--profile", create.argv)
-        self.assertEqual(create.prompt_file_flag, "--append-system-prompt")
-        self.assertIn("Follow the system packet.", create.argv)
+        self.assertIsNone(create.prompt_file_flag)
+        self.assertEqual(create.input_file_prefix, "@")
+        self.assertNotIn("Follow the system packet.", create.argv)
         self.assertNotIn("--prewalk", create.argv)
         self.assertNotIn("--continue", create.argv)
         self.assertNotIn("-c", create.argv)
         self.assertIsNone(create.session_id)
+        self.assertFalse(create.positional_input)
         sid = "019fe47e-339d-7000-84a0-b0553db4969e"
         resume = profile.launch_plan(
             HostLaunchRequest(
@@ -72,6 +106,11 @@ class OmpHostProfileTests(unittest.TestCase):
         )
         self.assertIn("--resume", resume.argv)
         self.assertIn(sid, resume.argv)
+        create_profile = create.argv[create.argv.index("--profile") + 1]
+        resume_profile = resume.argv[resume.argv.index("--profile") + 1]
+        self.assertEqual(create_profile, resume_profile)
+        self.assertTrue(resume.positional_input)
+        self.assertIsNone(resume.input_file_prefix)
         self.assertIsNone(resume.prompt_file_flag)
         self.assertNotIn("Follow the system packet.", resume.argv)
         self.assertNotIn("--prewalk", resume.argv)
@@ -90,7 +129,8 @@ class OmpHostProfileTests(unittest.TestCase):
             self.assertEqual(spec.host, "omp")
             self.assertIn("omp", spec.argv[0])
             self.assertNotIn("--prewalk", spec.argv)
-            self.assertEqual(spec.prompt_file_flag, "--append-system-prompt")
+            self.assertIsNone(spec.prompt_file_flag)
+            self.assertEqual(spec.input_file_prefix, "@")
 
     def test_omp_accepts_xhigh_and_max_without_lowering_them(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -198,6 +238,8 @@ class OmpHostProfileTests(unittest.TestCase):
                 "ANTHROPIC_API_KEY": "sk-ant-test",
                 "XAI_API_KEY": "xai-test",
                 "OPENAI_API_KEY": "sk-oai",
+                "OMP_AUTH_BROKER_URL": "http://127.0.0.1:8766",
+                "OMP_AUTH_BROKER_TOKEN": "broker-secret",
                 "GH_TOKEN": "gh-secret",
                 "HOME": str(Path(tmp) / "home"),
             }
@@ -219,6 +261,56 @@ class OmpHostProfileTests(unittest.TestCase):
             self.assertNotIn("ANTHROPIC_API_KEY", child)
             self.assertNotIn("OPENAI_API_KEY", child)
             self.assertNotIn("GH_TOKEN", child)
+            self.assertEqual(
+                child["OMP_AUTH_BROKER_URL"], "http://127.0.0.1:8766"
+            )
+            self.assertEqual(child["OMP_AUTH_BROKER_TOKEN"], "broker-secret")
+
+    def test_omp_child_env_rejects_remote_auth_broker(self) -> None:
+        import subprocess
+
+        with tempfile.TemporaryDirectory() as tmp:
+            worktree = Path(tmp) / "wt"
+            runtime = Path(tmp) / "rt"
+            worktree.mkdir()
+            runtime.mkdir()
+            subprocess.run(["git", "init"], cwd=worktree, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.name", "Elves Test"],
+                cwd=worktree,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "elves@test.invalid"],
+                cwd=worktree,
+                check=True,
+                capture_output=True,
+            )
+            old = os.environ.copy()
+            try:
+                os.environ.clear()
+                os.environ.update(
+                    {
+                        "PATH": old.get("PATH", "/usr/bin"),
+                        "HOME": str(Path(tmp) / "home"),
+                        "OMP_AUTH_BROKER_URL": "https://broker.example.test",
+                        "OMP_AUTH_BROKER_TOKEN": "broker-secret",
+                    }
+                )
+                with self.assertRaises(ValidationIssue) as caught:
+                    _native_worker_child_env(
+                        host="omp",
+                        worktree=worktree,
+                        runtime_dir=runtime,
+                        requested_model="openai-codex/gpt-5.6-luna",
+                    )
+            finally:
+                os.environ.clear()
+                os.environ.update(old)
+        self.assertEqual(
+            caught.exception.code, "omp_auth_broker_projection_invalid"
+        )
 
 
 class OmpInstallTargetTests(unittest.TestCase):

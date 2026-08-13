@@ -311,6 +311,8 @@ required capability, then execute it without an extra confirmation prompt:
   `--profile` and private HOME/XDG isolation, never spell the CLI `opm`, never pass omp product
   `--prewalk` as Elves prewalk. Prefer explicit model pin via `ELVES_OMP_MODEL`. See
   `references/omp-worker.md`.
+  Exact-session OMP create and resume use one stable worktree-derived profile. OAuth-backed OMP
+  routes may project only a token-protected loopback auth broker.
 
 The slash spellings are Claude Code managed aliases. Codex uses `$elves fugu|manus|grok|devin|omp …`
 or natural language; **never invent top-level Codex slash commands**. These are optional paid

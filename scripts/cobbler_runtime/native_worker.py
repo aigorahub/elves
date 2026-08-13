@@ -18,6 +18,7 @@ from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from .full_run import (
     _git_branch,
@@ -86,6 +87,8 @@ class NativeWorkerSpec:
     watcher_command: str | None = None
     git_write_roots: tuple[str, ...] = ()
     prompt_file_flag: str | None = None
+    positional_input: bool = False
+    input_file_prefix: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -313,6 +316,8 @@ def build_native_worker_spec(
         watcher_command=watcher_command,
         git_write_roots=git_write_roots if host_profile.grants_git_write_roots else (),
         prompt_file_flag=plan.prompt_file_flag,
+        positional_input=plan.positional_input,
+        input_file_prefix=plan.input_file_prefix,
     )
 
 
@@ -496,7 +501,7 @@ def _run_bounded_qualification_phase(
     argv = list(spec.argv)
     stdin_handle = tempfile.TemporaryFile(mode="w+b")
     try:
-        if spec.prompt_file_flag:
+        if spec.prompt_file_flag or spec.input_file_prefix:
             prompt_fd, prompt_name = tempfile.mkstemp(
                 prefix=".qualification-prompt-",
                 suffix=".txt",
@@ -509,7 +514,12 @@ def _run_bounded_qualification_phase(
                 handle.write(input_text)
                 handle.flush()
                 os.fsync(handle.fileno())
-            argv.extend((spec.prompt_file_flag, str(prompt_path)))
+            if spec.prompt_file_flag:
+                argv.extend((spec.prompt_file_flag, str(prompt_path)))
+            else:
+                argv.append(f"{spec.input_file_prefix}{prompt_path}")
+        elif spec.positional_input:
+            argv.append(input_text)
         else:
             stdin_handle.write(input_text.encode("utf-8"))
             stdin_handle.flush()
@@ -518,7 +528,11 @@ def _run_bounded_qualification_phase(
             argv,
             cwd=str(worktree),
             env=child_env,
-            stdin=subprocess.DEVNULL if spec.prompt_file_flag else stdin_handle,
+            stdin=(
+                subprocess.DEVNULL
+                if spec.prompt_file_flag or spec.input_file_prefix or spec.positional_input
+                else stdin_handle
+            ),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=False,
@@ -602,6 +616,50 @@ def _run_bounded_qualification_phase(
         stdin_handle.close()
         if prompt_path is not None:
             prompt_path.unlink(missing_ok=True)
+
+
+def _qualification_assistant_text(stdout: str) -> str:
+    """Return assistant text from raw output and OMP typed stream events."""
+    texts = [stdout]
+    deltas: list[str] = []
+
+    def append_message(message: Any) -> None:
+        if not isinstance(message, dict) or message.get("role") != "assistant":
+            return
+        content = message.get("content")
+        if not isinstance(content, list):
+            return
+        for part in content:
+            if not isinstance(part, dict) or part.get("type") != "text":
+                continue
+            value = part.get("text")
+            if isinstance(value, str):
+                texts.append(value)
+
+    for line in stdout.splitlines():
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(event, dict):
+            continue
+        event_type = event.get("type")
+        if event_type == "message_update":
+            update = event.get("assistantMessageEvent")
+            if isinstance(update, dict) and update.get("type") == "text_delta":
+                delta = update.get("delta")
+                if isinstance(delta, str):
+                    deltas.append(delta)
+        elif event_type in {"message_end", "message_start", "turn_end"}:
+            append_message(event.get("message"))
+        elif event_type == "agent_end":
+            messages = event.get("messages")
+            if isinstance(messages, list):
+                for message in messages:
+                    append_message(message)
+    if deltas:
+        texts.append("".join(deltas))
+    return "\n".join(texts)
 
 
 def _write_qualification_artifact(path: Path, payload: dict[str, Any]) -> None:
@@ -792,7 +850,7 @@ def qualify_installed_prewalk_transport(
                 f"ELVES_PREWALK_CANARY_GUIDE {memory_fact} {guide_file_fact}"
             )
             checks["unique_guide_fact_observed"] = (
-                guide_marker in guide_result.stdout
+                guide_marker in _qualification_assistant_text(guide_result.stdout)
             )
             session_id = guide_spec.session_id or (
                 guide_result.observed_session_ids[0]
@@ -822,7 +880,9 @@ def qualify_installed_prewalk_transport(
                     "ELVES_PREWALK_CANARY_EXECUTION "
                     f"{memory_fact} {execution_file_fact}"
                 )
-                checks["same_worktree"] = execution_marker in execution_result.stdout
+                checks["same_worktree"] = execution_marker in _qualification_assistant_text(
+                    execution_result.stdout
+                )
                 checks["same_session_id"] = bool(
                     session_id
                     and guide_result.observed_session_ids
@@ -1163,6 +1223,30 @@ def _native_worker_child_env(
         selected = next((n for n in omp_order if n in provider_secret_names and parent.get(n)), None)
         if selected:
             env[selected] = parent[selected]
+        broker_url = parent.get("OMP_AUTH_BROKER_URL", "").strip()
+        broker_token = parent.get("OMP_AUTH_BROKER_TOKEN", "").strip()
+        if bool(broker_url) != bool(broker_token):
+            raise ValidationIssue(
+                "omp_auth_broker_projection_invalid",
+                "OMP auth broker projection requires both URL and token",
+            )
+        if broker_url and broker_token:
+            parsed = urlparse(broker_url)
+            if (
+                parsed.scheme != "http"
+                or parsed.hostname not in {"127.0.0.1", "::1"}
+                or parsed.username is not None
+                or parsed.password is not None
+                or parsed.query
+                or parsed.fragment
+                or parsed.path not in {"", "/"}
+            ):
+                raise ValidationIssue(
+                    "omp_auth_broker_projection_invalid",
+                    "OMP auth broker projection accepts only a plain loopback HTTP URL",
+                )
+            env["OMP_AUTH_BROKER_URL"] = broker_url
+            env["OMP_AUTH_BROKER_TOKEN"] = broker_token
     else:
         for name in provider_secret_names:
             if parent.get(name):
@@ -1335,6 +1419,8 @@ def _run_worker_phase(
     child_env: dict[str, str],
     expected_session_id: str | None,
     prompt_file_flag: str | None = None,
+    positional_input: bool = False,
+    input_file_prefix: str | None = None,
 ) -> _PhaseResult:
     from .context import redact_text
 
@@ -1366,7 +1452,7 @@ def _run_worker_phase(
     log_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     prompt_path: Path | None = None
     effective_argv = list(argv)
-    if prompt_file_flag:
+    if prompt_file_flag or input_file_prefix:
         prompt_fd, prompt_name = tempfile.mkstemp(
             prefix=".prewalk-prompt-",
             suffix=".txt",
@@ -1387,7 +1473,12 @@ def _run_worker_phase(
                 pass
             prompt_path.unlink(missing_ok=True)
             raise
-        effective_argv.extend((prompt_file_flag, str(prompt_path)))
+        if prompt_file_flag:
+            effective_argv.extend((prompt_file_flag, str(prompt_path)))
+        else:
+            effective_argv.append(f"{input_file_prefix}{prompt_path}")
+    elif positional_input:
+        effective_argv.append(input_text)
     try:
         with tempfile.TemporaryFile(mode="w+t", encoding="utf-8") as child_input, log_path.open(
             "a", encoding="utf-8"
@@ -1400,7 +1491,11 @@ def _run_worker_phase(
                 effective_argv,
                 cwd=str(worktree),
                 env=env,
-                stdin=subprocess.DEVNULL if prompt_file_flag else child_input,
+                stdin=(
+                    subprocess.DEVNULL
+                    if prompt_file_flag or input_file_prefix or positional_input
+                    else child_input
+                ),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -1664,6 +1759,8 @@ def launch_native_worker(
         "stderr_tail": None,
         "git_write_roots": list(launch_spec.git_write_roots),
         "prompt_file_flag": launch_spec.prompt_file_flag,
+        "positional_input": launch_spec.positional_input,
+        "input_file_prefix": launch_spec.input_file_prefix,
         "git_network_push": "disabled",
         "git_authority_mode": "fixture" if launch_spec.host == "fixture" else "feature_only",
         **git_contract,
@@ -1699,6 +1796,8 @@ def launch_native_worker(
                 "paths": paths.to_dict(),
                 "argv": list(prewalk_spec.guide.argv),
                 "prompt_file_flag": prewalk_spec.guide.prompt_file_flag,
+                "positional_input": prewalk_spec.guide.positional_input,
+                "input_file_prefix": prewalk_spec.guide.input_file_prefix,
                 "fixture_script": (
                     prewalk_spec.guide.argv[1]
                     if prewalk_spec.guide.host == "fixture"
@@ -1715,6 +1814,16 @@ def launch_native_worker(
                     prewalk_spec.execution_spec(
                         prewalk_spec.guide.session_id or "prewalk-session-preview"
                     ).prompt_file_flag
+                ),
+                "positional_input": (
+                    prewalk_spec.execution_spec(
+                        prewalk_spec.guide.session_id or "prewalk-session-preview"
+                    ).positional_input
+                ),
+                "input_file_prefix": (
+                    prewalk_spec.execution_spec(
+                        prewalk_spec.guide.session_id or "prewalk-session-preview"
+                    ).input_file_prefix
                 ),
                 "fixture_script": prewalk_spec.execution_fixture_script,
                 "transient_retries": 0,
@@ -1797,6 +1906,8 @@ def _supervise_single_phase(
         child_env=child_env,
         expected_session_id=state.get("session_id"),
         prompt_file_flag=state.get("prompt_file_flag"),
+        positional_input=bool(state.get("positional_input")),
+        input_file_prefix=state.get("input_file_prefix"),
     )
     return _terminalize_native_worker(
         state_path=state_path,
@@ -1904,6 +2015,8 @@ def _run_clean_single_phase_fallback(
         child_env=child_env,
         expected_session_id=fresh.session_id,
         prompt_file_flag=fresh.prompt_file_flag,
+        positional_input=fresh.positional_input,
+        input_file_prefix=fresh.input_file_prefix,
     )
     return _terminalize_native_worker(
         state_path=state_path,
@@ -1940,6 +2053,8 @@ def _run_execution_with_transient_retries(
         child_env=child_env,
         expected_session_id=session_id,
         prompt_file_flag=resumed.prompt_file_flag,
+        positional_input=resumed.positional_input,
+        input_file_prefix=resumed.input_file_prefix,
     )
     for retry_number, backoff_seconds in enumerate(
         _PREWALK_TRANSIENT_BACKOFF_SECONDS, start=1
@@ -1970,6 +2085,8 @@ def _run_execution_with_transient_retries(
             child_env=child_env,
             expected_session_id=session_id,
             prompt_file_flag=resumed.prompt_file_flag,
+            positional_input=resumed.positional_input,
+            input_file_prefix=resumed.input_file_prefix,
         )
     return result
 
@@ -2026,6 +2143,8 @@ def _supervise_prewalk(
         child_env=child_env,
         expected_session_id=state.get("session_id"),
         prompt_file_flag=state["prewalk"].get("prompt_file_flag"),
+        positional_input=bool(state["prewalk"].get("positional_input")),
+        input_file_prefix=state["prewalk"].get("input_file_prefix"),
     )
     session_id = str(state.get("session_id") or "")
     if not session_id:
@@ -2061,6 +2180,8 @@ def _supervise_prewalk(
             child_env=child_env,
             expected_session_id=session_id,
             prompt_file_flag=resumed_guide.prompt_file_flag,
+            positional_input=resumed_guide.positional_input,
+            input_file_prefix=resumed_guide.input_file_prefix,
         )
         if recovery.session_mismatch or session_id not in recovery.observed_session_ids:
             return _terminalize_native_worker(

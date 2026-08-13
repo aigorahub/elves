@@ -58,6 +58,8 @@ class HostLaunchPlan:
     session_id_source: str
     stdin_packet: bool
     prompt_file_flag: str | None = None
+    positional_input: bool = False
+    input_file_prefix: str | None = None
 
 
 def _codex_launch_plan(request: HostLaunchRequest) -> HostLaunchPlan:
@@ -199,14 +201,12 @@ def _omp_launch_plan(request: HostLaunchRequest) -> HostLaunchPlan:
     Session identity is stream-captured (type=session id). Never --continue/-c.
     Never product --prewalk (Elves owns prewalk trajectory).
 
-    Create: packet via --append-system-prompt plus a short user message.
-    Resume: no append-system-prompt; stdin carries Continue. only (no packet replay).
+    Create: packet via one private @file user message so session history retains it.
+    Resume: one positional continuation message only (no packet replay).
     """
     profile = (
         "elves-omp-host-"
-        + hashlib.sha256(
-            f"{request.cwd}\0{request.session_id or 'create'}".encode("utf-8")
-        ).hexdigest()[:12]
+        + hashlib.sha256(request.cwd.encode("utf-8")).hexdigest()[:12]
     )
     thinking = (
         request.effort
@@ -229,16 +229,18 @@ def _omp_launch_plan(request: HostLaunchRequest) -> HostLaunchPlan:
         "yolo",
     ]
     if request.session_id is None:
-        argv = tuple([*common, "Follow the system packet."])
+        argv = tuple(common)
         resume = None
         sid = None
-        prompt_flag = "--append-system-prompt"
+        prompt_flag = None
+        input_file_prefix = "@"
     else:
         sid = exact_session_id(request.session_id)
-        # Resume omits append-system-prompt so prewalk can feed Continue. on stdin alone.
+        # Resume receives the next user message as one positional argument.
         argv = tuple([*common, "--resume", sid])
         resume = argv
         prompt_flag = None
+        input_file_prefix = None
     if "--prewalk" in argv or "-c" in argv or "--continue" in argv:
         raise ValidationIssue(
             "omp_prewalk_or_continue_forbidden",
@@ -251,6 +253,8 @@ def _omp_launch_plan(request: HostLaunchRequest) -> HostLaunchPlan:
         session_id_source="stream.session.id",
         stdin_packet=False,
         prompt_file_flag=prompt_flag,
+        positional_input=request.session_id is not None,
+        input_file_prefix=input_file_prefix,
     )
 
 
@@ -427,6 +431,7 @@ HOST_PROFILES: tuple[HostProfile, ...] = (
             "ANTHROPIC_API_KEY",
             "OPENAI_API_KEY",
             "CODEX_API_KEY",
+            "OMP_AUTH_BROKER_TOKEN",
             "XAI_API_KEY",
             "GEMINI_API_KEY",
             "GOOGLE_API_KEY",
