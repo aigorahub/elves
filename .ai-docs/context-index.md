@@ -64,8 +64,9 @@ the runtime surfaces, and the checks that usually matter before editing.
   promotion, current-version examples, and changed human-facing docs.
 - `scripts/pr_portfolio_report.py`: read-only PR stack health summary for merge state, checks, and
   unresolved review threads.
-- `scripts/preflight.sh`: staging preflight for git, gh, environment, validation gates,
-  notifications, and worktree ownership.
+- `scripts/preflight.sh`: staging preflight for git, gh, environment, non-browser validation
+  gates, notifications, and worktree ownership. Does not run Playwright, host-browser, or E2E
+  checks; those never block launch.
 - `scripts/preflight_worktree.py`: explicit dedicated-worktree helper used by
   `./scripts/preflight.sh --create-worktree`.
 - `scripts/validate_survival_guide.py`: advisory validator for required survival-guide sections.

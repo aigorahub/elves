@@ -150,6 +150,13 @@ def main() -> int:
             if phrase not in text:
                 errors.append(f"{label}: missing out-of-scope findings phrase `{phrase}`")
 
+    for label, phrases in BROWSER_GUARDRAIL_PHRASES.items():
+        path = REPO_ROOT / label
+        text = read_text(path)
+        for phrase in phrases:
+            if phrase not in text:
+                errors.append(f"{label}: missing browser guardrail phrase `{phrase}`")
+
     for label, phrases in MIDRUN_TERMINAL_HYGIENE_PHRASES.items():
         path = REPO_ROOT / label
         text = read_text(path)

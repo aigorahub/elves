@@ -2,6 +2,10 @@
 
 Patterns for verifying code actually works, beyond running `npm test`. Add these to the `## Tool Configuration` section of your survival guide.
 
+Headless browser and Playwright patterns below are **user-opt-in**. Elves does not run them during
+preflight, does not open a host browser unless the user explicitly asked, and never blocks a run
+on missing or failed browser checks.
+
 ## 1. Headless Browser Verification
 
 **When:** Web apps with multi-step user flows (signup, checkout, onboarding).
@@ -162,5 +166,6 @@ Do not narrow the pattern to one spelling such as `'/video/`; common JSX and HTM
 exists at the path the framework actually serves, including case sensitivity and base-path rules.
 
 This sweep is a focused static check. It does not prove that bundling, deployment rewrites, routing,
-or the browser request succeeds. For user-facing asset changes, follow it with the smallest relevant
-browser or deployed-preview check and confirm that the asset request returns successfully.
+or the HTTP request succeeds. For user-facing asset changes, confirm the file exists at the served
+path and that a `curl` (or equivalent) request returns successfully. Do not open a host browser
+unless the user explicitly asked.

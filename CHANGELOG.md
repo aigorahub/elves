@@ -4,6 +4,12 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+### Changed
+- **Browser is last resort and never blocks a run.** Preflight no longer dry-runs `e2e` scripts,
+  Playwright, or `make e2e`. Elves does not open a host browser or run E2E unless the user
+  explicitly asked. Missing browser tools, failed visual checks, and skipped E2E are not launch,
+  readiness, or landing blockers.
+
 ## [2.29.0] - 2026-08-13
 
 ### Added

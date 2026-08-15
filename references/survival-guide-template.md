@@ -566,7 +566,7 @@ test: npm test --if-present
 # test: cargo test
 # test: make test
 
-# --- E2E (optional) ---
+# --- E2E (optional; only when the user asked for browser proof) ---
 # e2e: npx playwright test
 # e2e: pnpm exec playwright test
 # e2e: make e2e

@@ -571,6 +571,8 @@ python3 "$ELVES_SKILL_ROOT/scripts/acceptance_contract.py" validate \
   --repo-root . --session .elves-session.json
 ```
 
+Preflight does not run browser, Playwright, or E2E checks. Those never block launch.
+
 **One run owns one branch and one checkout.** Prefer a dedicated worktree when other agents may
 touch the repo (`./scripts/preflight.sh --create-worktree <branch> --base origin/main`; `--dry-run`
 first). The helper prints the branch, worktree path, base ref, and collision tripwire, and does not reuse, delete, or repair existing worktrees. `START_TIP` is the collision tripwire.
@@ -620,8 +622,8 @@ Impact path: changed surface → affected consumer → selected test. Touched-su
 broad at high-risk checkpoints and **terminal** (full suite or project full gate). Do not re-run a
 large full suite between ordinary batches when the impact path is green. Bug-fix protocol for
 blockers: category → category test → fix all. Queue pure advisories under **Deferred hygiene**
-(survival guide + execution-log digest); drain at terminal. Details:
-`references/validation-guide.md`.
+(survival guide + execution-log digest); drain at terminal. Do not open a host browser or run E2E
+unless the user explicitly asked. Details: `references/validation-guide.md`.
 
 ### 7. Review
 
@@ -676,6 +678,14 @@ Rule out collision first. Otherwise fetch and merge (no rebase). Complex conflic
 
 Never weaken, delete, or skip a test merely to obtain green. Legitimate behavior-driven updates
 with preserved/improved coverage and evidence are allowed.
+
+## Browser
+
+Do not use a host browser, Playwright MCP, or interactive page inspection unless the user
+explicitly asked. Browser checks are last resort, never part of preflight, and never block a run.
+Missing browser tools, failed visual checks, or skipped E2E are not launch, readiness, or landing
+blockers. Prefer repo unit/integration tests, curl, and configured non-browser gates. If the user
+asked for browser proof and it is unavailable or fails, record that honestly and continue.
 
 ## Compaction Recovery
 

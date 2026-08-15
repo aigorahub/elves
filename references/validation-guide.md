@@ -92,8 +92,9 @@ user configured in the survival guide under `## Tool Configuration`.
    are not new blockers.
 2. **Selected unit / integration tests** for the code you changed and its consumers. Prefer the
    relevant suites, not the entire test suite, unless the suite is small or the plan requires full.
-3. **E2E / browser** for UI flows you touched when configured (strongly recommended for UI work).
-   Prefer the flows you changed, not every browser project, mid-run.
+3. **E2E / browser** only when the user explicitly asked, or configured an `e2e:` gate in the
+   survival guide. Last resort. Never block a run. Prefer the flows they named, not every
+   browser project. Skip host-browser and Playwright MCP tools unless asked.
 
 ### Terminal / high-risk gate order
 
@@ -107,12 +108,12 @@ failing:
 
 | Project Type   | Lint                          | Typecheck                      | Build                   | Test                    | E2E                                         |
 |----------------|-------------------------------|--------------------------------|-------------------------|-------------------------|---------------------------------------------|
-| Node (npm)     | `npm run lint --if-present`   | `npm run typecheck --if-present` | `npm run build --if-present` | `npm test --if-present` | `npx playwright test` (if installed)        |
-| Node (pnpm)    | `pnpm lint`                   | `pnpm typecheck`               | `pnpm build`            | `pnpm test`             | `pnpm exec playwright test`                 |
+| Node (npm)     | `npm run lint --if-present`   | `npm run typecheck --if-present` | `npm run build --if-present` | `npm test --if-present` | only if the user configured `e2e:` or asked |
+| Node (pnpm)    | `pnpm lint`                   | `pnpm typecheck`               | `pnpm build`            | `pnpm test`             | only if the user configured `e2e:` or asked |
 | Python         | `ruff check .`                | `mypy .`                       | (none)                  | `pytest`                | (none)                                      |
 | Go             | `golangci-lint run`           | (built into compile)           | `go build ./...`        | `go test ./...`         | (none)                                      |
 | Rust           | `cargo clippy`                | (built into compile)           | `cargo build`           | `cargo test`            | (none)                                      |
-| Makefile       | `make lint`                   | `make typecheck`               | `make build`            | `make test`             | `make e2e`                                  |
+| Makefile       | `make lint`                   | `make typecheck`               | `make build`            | `make test`             | only if the user configured `e2e:` or asked |
 
 ### User Overrides
 
@@ -179,15 +180,13 @@ review.
 
 ## Headless App Testing
 
-For web applications, exercise the flows you touched (mid-run) or the critical paths (terminal)
-with E2E or equivalent. This catches classes of problems unit tests miss: broken routes, missing
-environment variables, UI regressions, API integration failures.
+Do not open a host browser or run Playwright/Cypress unless the user explicitly asked. Browser
+checks never block a run. Prefer unit/integration tests and `curl` against key endpoints.
 
-If the project has Playwright or Cypress, use them. If it doesn't, even a basic `curl` against key
-endpoints after starting the dev server is better than nothing for runtime acceptance.
-
-The user may also configure visual review, simulated user walkthroughs, or custom validation
-scripts under `## Tool Configuration`.
+If the user asked for browser proof, or configured an `e2e:` command under `## Tool Configuration`,
+run only that named gate. Treat missing browsers, failed visual checks, or skipped E2E as advisory
+unless the user also made that proof an acceptance criterion — and even then, record unavailability
+honestly rather than stalling launch or landing.
 
 ---
 

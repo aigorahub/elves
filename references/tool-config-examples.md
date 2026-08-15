@@ -6,7 +6,9 @@
 >
 > The agent reads `## Tool Configuration` in the survival guide and uses those commands in
 > preference to auto-discovery. If a field is blank or commented out, the agent falls back to
-> auto-discovery as documented in SKILL.md.
+> auto-discovery as documented in SKILL.md. Leave `e2e:` commented unless you want browser proof;
+> Elves does not run browser or E2E checks unless the user explicitly asked, and they never block
+> a run.
 
 Elves helper commands in this reference use source-checkout shorthand. From an installed Claude
 Code or Codex skill, invoke helpers from the active Elves skill root while the target repository

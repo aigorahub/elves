@@ -268,7 +268,7 @@ lanes:
 
 - **Primary gate:** [e.g., "All unit tests: `npm test`"]
 - **Secondary gate (if applicable):** [e.g., "Integration tests: `npm run test:integration`"]
-- **E2E (if applicable):** [e.g., "Playwright: `npx playwright test`"]
+- **E2E (only if the user asked for browser proof):** [e.g., "Playwright: `npx playwright test`"]
 - **Minimum coverage threshold (if applicable):** [e.g., "Must not decrease coverage below 80%"]
 - **Known flaky tests (skip or ignore):** [e.g., "`tests/integration/email.test.ts` (mocks SMTP, unreliable in CI)"]
 - **Durable doc expectations (if applicable):** [e.g., "Promote reusable lessons to learnings; update `.ai-docs/gotchas.md` when a hidden dependency is discovered"]

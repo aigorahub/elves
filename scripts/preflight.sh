@@ -317,11 +317,6 @@ check_npm_script() {
   return 1
 }
 
-playwright_config_present() {
-  [ -f playwright.config.js ]  || [ -f playwright.config.cjs ] || \
-  [ -f playwright.config.mjs ] || [ -f playwright.config.ts ]
-}
-
 run_gate() {
   local LABEL="$1"
   local CMD="$2"
@@ -370,22 +365,6 @@ if [ $PROJECT_NODE -eq 1 ]; then
         info "Skipping ${NODE_MGR} ${SCRIPT} — not defined in package.json"
       fi
     done
-
-    if check_npm_script "e2e"; then
-      case "$NODE_MGR" in
-        npm)  GATE_CMD="npm run e2e --if-present" ;;
-        pnpm) GATE_CMD="pnpm e2e" ;;
-        yarn) GATE_CMD="yarn e2e" ;;
-      esac
-      run_gate "  ${GATE_CMD}" "${GATE_CMD}"
-    elif playwright_config_present; then
-      case "$NODE_MGR" in
-        npm)  GATE_CMD="npx playwright test" ;;
-        pnpm) GATE_CMD="pnpm exec playwright test" ;;
-        yarn) GATE_CMD="yarn playwright test" ;;
-      esac
-      run_gate "  ${GATE_CMD}" "${GATE_CMD}"
-    fi
   fi
 fi
 
@@ -420,7 +399,7 @@ fi
 
 if [ $PROJECT_MAKE -eq 1 ]; then
   echo -e "  ${CYAN}Makefile${RESET}"
-  for TARGET in lint typecheck build test e2e; do
+  for TARGET in lint typecheck build test; do
     if make -n "$TARGET" &>/dev/null 2>&1; then
       run_gate "  make ${TARGET}" "make ${TARGET}"
     else

@@ -384,8 +384,9 @@ paste the equivalent table extracted from every Confidence: trailer. If none wer
 "No worker confidence signal was reported; full baseline review required."]
 
 Use the coordinator's exact-tip evidence map. Request only tests whose inputs changed or whose
-consumers are reasonably affected. At terminal readiness, require the project's one broad gate;
-request E2E or browser proof only when the changed surface can affect it. Reuse unchanged evidence.
+consumers are reasonably affected. At terminal readiness, require the project's one broad gate.
+Do not request E2E or browser proof unless the user explicitly asked. Reuse unchanged evidence.
+Browser checks never block a run.
 
 Assess:
 - Is the branch green and ready to merge — for the human to merge, for an opt-in merge-on-green commit, or for the reviewed-PR landing command if the user invoked it?

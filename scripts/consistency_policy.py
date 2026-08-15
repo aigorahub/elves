@@ -131,6 +131,28 @@ OUT_OF_SCOPE_GUARDRAIL_PHRASES = {
     ],
 }
 
+# Browser is last resort: never part of preflight, never a run blocker, only when asked.
+BROWSER_GUARDRAIL_PHRASES = {
+    "SKILL.md": [
+        "## Browser",
+        "unless the user explicitly asked",
+        "never part of preflight",
+        "never block a run",
+    ],
+    "references/validation-guide.md": [
+        "unless the user explicitly asked",
+        "never block a run",
+    ],
+    "references/kickoff-prompt-template.md": [
+        "unless the user explicitly asked",
+        "never block a run",
+    ],
+    "references/review-subagent.md": [
+        "unless the user explicitly asked",
+        "never block a run",
+    ],
+}
+
 # Section/contract anchors only — do not pin motivational prose byte-for-byte.
 # Editorial rewording of effort guidance must not break CI.
 EFFORT_GUARDRAIL_PHRASES = {

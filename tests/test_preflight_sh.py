@@ -400,6 +400,70 @@ exec {shlex.quote(str(real_git))} "$@"
         self.assertIn("mode: report (read-only; pass --apply to remove candidates)", result.stdout)
         self.assertNotIn("GitHub CLI (gh)", result.stdout)
 
+    def test_preflight_does_not_run_browser_or_e2e_gates(self) -> None:
+        self.write_fake_gh()
+        repo = self.create_repo(with_remote=True)
+        (repo / "package.json").write_text(
+            '{"name":"preflight-browser","scripts":{"e2e":"npx playwright test"}}\n'
+        )
+        (repo / "playwright.config.ts").write_text("export default {};\n")
+        (repo / "Makefile").write_text("e2e:\n\ttouch e2e.ran\n")
+        self.run_git(repo, "add", "package.json", "playwright.config.ts", "Makefile")
+        self.run_git(
+            repo,
+            "-c",
+            "user.name=Elves Test",
+            "-c",
+            "user.email=elves@example.com",
+            "commit",
+            "-m",
+            "add browser fixtures",
+        )
+        invocation_log = self.root / "browser-invocations.log"
+        self.write_executable(
+            "node",
+            """#!/usr/bin/env bash
+exit 1
+""",
+        )
+        self.write_executable(
+            "npx",
+            f"""#!/usr/bin/env bash
+printf 'npx %s\\n' "$*" >> {invocation_log}
+exit 0
+""",
+        )
+        self.write_executable(
+            "npm",
+            f"""#!/usr/bin/env bash
+printf 'npm %s\\n' "$*" >> {invocation_log}
+exit 0
+""",
+        )
+        self.write_executable(
+            "playwright",
+            f"""#!/usr/bin/env bash
+printf 'playwright %s\\n' "$*" >> {invocation_log}
+exit 0
+""",
+        )
+
+        result = self.run_preflight(repo)
+
+        combined = result.stdout + result.stderr
+        self.assertEqual(result.returncode, 0, combined)
+        self.assertNotIn("npx playwright", combined)
+        self.assertNotIn("npm run e2e", combined)
+        self.assertNotIn("make e2e", combined)
+        self.assertFalse((repo / "e2e.ran").exists())
+        if invocation_log.exists():
+            logged = invocation_log.read_text()
+            self.assertNotIn("playwright", logged)
+            self.assertNotIn("e2e", logged)
+        source = PREFLIGHT_SCRIPT.read_text()
+        self.assertNotIn("playwright_config_present", source)
+        self.assertNotIn("npx playwright test", source)
+
     def test_preflight_gc_worktrees_apply_removes_merged_worktree_via_wrapper(self) -> None:
         repo = self.create_repo(with_remote=True)
         worktree = self.root / "repo-wrapper-merged"

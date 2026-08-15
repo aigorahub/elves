@@ -71,10 +71,11 @@ Stage this Elves run. Do not start implementing the batches in this call.
 - Configure optional public API surface snapshot behavior if this project has public contract
   surfaces. Default to `api-surface-snapshot.enabled: auto`, keep `required: false` unless I
   explicitly opt in, and keep snapshot artifacts under ignored `.elves/api-surface/`.
-- Run preflight and log any warnings or blockers
+- Run preflight and log any warnings or blockers. Preflight does not run browser or E2E checks.
 - Record any durable-doc paths the run should use (`.ai-docs/*`) if the repo keeps them
 
 **Non-negotiables:**
+- Do not use a host browser or E2E unless the user explicitly asked. Browser checks never block a run.
 - [Hard rule 1]
 - [Hard rule 2]
 - [Hard rule 3]
@@ -118,10 +119,11 @@ Stage this Elves run. Do not start implementing the batches in this call.
 - Configure optional public API surface snapshot behavior if this project has public contract
   surfaces. Default to `api-surface-snapshot.enabled: auto`, keep `required: false` unless I
   explicitly opt in, and keep snapshot artifacts under ignored `.elves/api-surface/`.
-- Run preflight and log any warnings or blockers
+- Run preflight and log any warnings or blockers. Preflight does not run browser or E2E checks.
 - Record any durable-doc paths the run should use (`.ai-docs/*`) if the repo keeps them
 
 **Non-negotiables:**
+- Do not use a host browser or E2E unless the user explicitly asked. Browser checks never block a run.
 - Never modify public /api/* response shapes
 - All commits must pass lint and typecheck before push
 - Do not touch the OAuth routes or password reset flow
@@ -160,7 +162,7 @@ Do not send a final response unless the survival guide Stop Gate says stopping i
 Before any final response, audit the current state against every requirement at the current HEAD — do not rely on intent, partial progress, or memory of earlier work.
 Use your judgment. Work in small batches and commit frequently.
 Make the commit subjects read like progress reports.
-Mid-run: impact-path validation (selected tests / touched E2E). Terminal: full suite or project full gate, then drain deferred hygiene.
+Mid-run: impact-path validation (selected tests). Terminal: full suite or project full gate, then drain deferred hygiene. Do not use a host browser or E2E unless the user explicitly asked. Browser checks never block a run.
 After every host-owned or legacy bounded push, read PR comments and checks, fix blockers, and re-check for regressions against earlier verified work. During a healthy trusted full-run, do this once at terminal/safety wake, never once per worker push.
 If the run uses paid compute, remote jobs, or long-lived servers, keep the survival guide's `Active Compute` section current after every host-owned push and topology change; use bounded worker telemetry while a trusted full-run remains healthy.
 Keep going until the plan is done, I stop you, or you hit a true blocker.
@@ -189,7 +191,7 @@ Do not send a final response unless the survival guide Stop Gate says stopping i
 Before any final response, audit the current state against every requirement at the current HEAD — do not rely on intent, partial progress, or memory of earlier work.
 Use your judgment. Work in small batches and commit frequently.
 Make the commit subjects read like progress reports.
-Mid-run: impact-path validation (selected tests / touched E2E). Terminal: full suite or project full gate, then drain deferred hygiene.
+Mid-run: impact-path validation (selected tests). Terminal: full suite or project full gate, then drain deferred hygiene. Do not use a host browser or E2E unless the user explicitly asked. Browser checks never block a run.
 After every host-owned or legacy bounded push, read PR comments and checks, fix blockers, and re-check for regressions against earlier verified work. During a healthy trusted full-run, do this once at terminal/safety wake, never once per worker push.
 If the run uses paid compute, remote jobs, or long-lived servers, keep the survival guide's `Active Compute` section current after every host-owned push and topology change; use bounded worker telemetry while a trusted full-run remains healthy.
 Keep going until the plan is done, I stop you, or you hit a true blocker.
@@ -324,6 +326,7 @@ staging is launch-ready. Goal/memory authority is the survival guide Stop Gate +
 **Hard rules:**
 - You never merge.
 - Supported main driver is this host (Claude Code or Codex). Optional tools never required.
+- Do not use a host browser or E2E unless the user explicitly asked. Browser checks never block a run.
 - Do not stop unless Stop Gate allows it, I stop you, or a true blocker.
 
 **Stop when:** plan batches are done (or true blocker), PR is landable, you did not merge.
@@ -377,6 +380,7 @@ Authority remains Stop Gate until Readiness; then landing rules above.
 **Hard rules:**
 - Merge only via regular merge commit after landing criteria; never squash.
 - Main driver is this host; optional tools are optional.
+- Do not use a host browser or E2E unless the user explicitly asked. Browser checks never block a run.
 - Do not stop mid-run because a work driver "finished a turn" — check completeness.
 
 **Stop when:** PR is merged with a merge commit, or a true blocker prevents safe merge (report exactly what remains).
