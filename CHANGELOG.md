@@ -11,7 +11,9 @@ All notable changes to the Elves skill are documented here.
   installed host's own model catalog instead of any list inside Elves. On Codex that catalog is
   `codex debug models`, read locally with no model call, so every model and reasoning level the
   host publishes (including `xhigh` and `max` on the frontier models) is available the day it
-  ships, and a retired model stops being selectable without an Elves edit. A host that publishes
+  ships. The catalog only widens what a host profile already accepts: a model the catalog does
+  not list keeps the floor rather than being refused, so an unreadable catalog can never authorise
+  a route the profile would refuse. A host that publishes
   no catalog, or a machine where the catalog cannot be read, keeps the conservative
   `low`/`medium`/`high` floor rather than guessing. `ELVES_CODEX_MODEL_CATALOG` points the reader
   at a catalog file for offline and test use.

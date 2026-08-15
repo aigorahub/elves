@@ -29,7 +29,8 @@ same continuity contract.
 **Oh My Pi may drive Elves.** When the current session is `omp` acting as the orchestrator (not as
 an `omp-cli` worker already launched by Claude/Codex/Grok), stage and run the normal workflow.
 Install with `sync_installed_skills.py --apply --target omp` into `~/.omp/agent/skills/elves`. `worker.prewalk=required` automatically runs one bounded live
-qualification canary when matching version-and-route-bound evidence is absent. It proceeds only
+qualification canary when matching evidence bound to the installed version and the exact
+execution route is absent. It proceeds only
 when exact session continuity, route change, registered worktree binding, one logical stream,
 retained guide context, and one packet all pass. Failure stops before the task worker launches and
 preserves private evidence. `worker.prewalk=experimental` is an explicit operator acceptance of
@@ -64,7 +65,8 @@ and an operator pins both phase routes there (v2.30+): a strong guide orients an
 TODO, then the same session resumes on a cheaper or differently tuned execution route. Elves stores
 no model names of its own. Every route is checked against the host's own live catalog: a model is
 usable at a reasoning level when the installed host publishes that level for that model, so new
-models and new levels need no Elves edit and a retired one stops being selectable. Grok Build is
+models and new reasoning levels need no Elves edit. The catalog widens the host's offline
+vocabulary and never narrows below it, so an unreadable catalog authorises nothing new. Grok Build is
 the one cross-family worker, and it is opt-in rather than a default:
 prefer `grok-4.5` at explicit `high` when the authenticated live catalog returns it.
 Composer 2.5 is retired and is never selected. Unlisted native routes use plan-matched effort, and

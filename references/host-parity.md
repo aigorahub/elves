@@ -68,7 +68,8 @@ fixtures prove advertised create/resume/route flags but not conversation continu
 pruning. The current persisted-instruction transport activates only for behaviorally proven
 `retained_safe`; `pruned` and `turn_scoped` remain schema states for future delivery mechanisms.
 Consequently `auto` remains off for an unqualified installed version. `required` runs the bounded
-live canary and either records exact-version-and-route proof or stops before task launch with
+live canary and either records proof bound to the exact installed version and execution route,
+or stops before task launch with
 evidence. `experimental` proceeds only from advertised exact-resume and route-override grammar,
 reports `exact_session_experimental`, and retains all real-run continuity checks. No host may
 silently start a new session or claim behavioral qualification from static help.

@@ -3,12 +3,18 @@
 Elves never hardcodes provider model names.  `codex debug models` renders the
 catalog the installed binary holds for the authenticated account, including the
 reasoning levels each model accepts.  Reading it keeps route validation honest
-across model launches, renames, retirements, and account tiers.  When the
-catalog cannot be read, callers keep their conservative offline vocabulary
-instead of guessing: an unreadable catalog never widens a route.
+across model launches, renames, retirements, and account tiers.
+
+The catalog only ever *widens* the offline vocabulary a host profile already
+accepts.  An unreadable, oversized, or unparsable catalog reports a stable
+reason and widens nothing, so no failure of this reader can authorise a route
+the profile floor would refuse.
 
 The probe reads local state only.  It launches no inference turn, spends no
-tokens, and is bounded in both wall time and bytes.
+tokens, and is bounded in wall time and in bytes: the command's stdout is read
+through a byte-capped pipe rather than buffered whole, and a file override is
+read through the shared fd-bound artifact reader (O_NOFOLLOW open, fstat
+identity match, size check on the descriptor actually read).
 """
 
 from __future__ import annotations
@@ -19,12 +25,22 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
-from typing import Any
+from typing import Any, Callable
+
+from .storage import read_bounded_artifact_bytes
 
 
 CODEX_CATALOG_ENV = "ELVES_CODEX_MODEL_CATALOG"
 CODEX_CATALOG_MAX_BYTES = 4 * 1024 * 1024
 CODEX_CATALOG_TIMEOUT_SECONDS = 5
+
+# Stable reasons a policy failure maps to, mirroring the artifact reader's
+# vocabulary so an operator sees why a catalog was refused.
+_ARTIFACT_REASONS = {
+    "artifact_not_regular": "override_not_a_file",
+    "artifact_writable_by_others": "override_writable_by_others",
+    "artifact_too_large": "override_too_large",
+}
 
 
 @dataclass(frozen=True)
@@ -77,12 +93,8 @@ class CodexModelCatalog:
         }
 
 
-def _parse_catalog_payload(text: str) -> tuple[tuple[str, tuple[str, ...]], ...] | None:
+def _parse_catalog_rows(payload: Any) -> tuple[tuple[str, tuple[str, ...]], ...] | None:
     """Parse only anchored catalog rows, never diagnostic prose."""
-    try:
-        payload = json.loads(text)
-    except (json.JSONDecodeError, ValueError):
-        return None
     if not isinstance(payload, dict):
         return None
     models = payload.get("models")
@@ -118,19 +130,21 @@ def _parse_catalog_payload(text: str) -> tuple[tuple[str, tuple[str, ...]], ...]
 
 
 def _catalog_from_text(text: str, *, source: str) -> CodexModelCatalog:
-    routes = _parse_catalog_payload(text)
+    try:
+        payload = json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        return CodexModelCatalog(source=source, reason="catalog_unparsable")
+    routes = _parse_catalog_rows(payload)
     if routes is None:
         return CodexModelCatalog(source=source, reason="catalog_unparsable")
     if not routes:
         return CodexModelCatalog(source=source, reason="catalog_empty")
-    client_version = None
-    try:
-        payload = json.loads(text)
-        raw_version = payload.get("client_version") if isinstance(payload, dict) else None
-        if isinstance(raw_version, str) and raw_version.strip():
-            client_version = raw_version.strip()
-    except (json.JSONDecodeError, ValueError):
-        client_version = None
+    raw_version = payload.get("client_version")
+    client_version = (
+        raw_version.strip()
+        if isinstance(raw_version, str) and raw_version.strip()
+        else None
+    )
     return CodexModelCatalog(
         available=True,
         source=source,
@@ -139,69 +153,127 @@ def _catalog_from_text(text: str, *, source: str) -> CodexModelCatalog:
     )
 
 
+def read_bounded_command_output(argv: list[str]) -> tuple[int, str]:
+    """Run one local command, reading at most the catalog byte bound.
+
+    ``capture_output`` would buffer everything a misbehaving binary prints
+    before any limit could apply, so stdout is read through a capped pipe and
+    the child is killed as soon as it exceeds the bound.
+    """
+    limit = CODEX_CATALOG_MAX_BYTES
+    with subprocess.Popen(
+        argv,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+    ) as child:
+        assert child.stdout is not None
+        try:
+            raw = child.stdout.read(limit + 1)
+        except OSError:
+            child.kill()
+            raise
+        if len(raw) > limit:
+            child.kill()
+            child.wait(timeout=CODEX_CATALOG_TIMEOUT_SECONDS)
+            return 0, ""
+        try:
+            child.wait(timeout=CODEX_CATALOG_TIMEOUT_SECONDS)
+        except subprocess.TimeoutExpired:
+            child.kill()
+            raise
+        return child.returncode, raw.decode("utf-8", errors="replace")
+
+
 def probe_codex_model_catalog(
     executable: str = "codex",
     *,
-    runner: Any = subprocess.run,
+    reader: Callable[[list[str]], tuple[int, str]] | None = None,
     env: dict[str, str] | None = None,
 ) -> CodexModelCatalog:
-    """Read the installed catalog once, failing closed with a stable reason."""
+    """Read the installed catalog once, failing closed with a stable reason.
+
+    ``reader`` runs one local command and returns ``(returncode, stdout)``
+    bounded to ``CODEX_CATALOG_MAX_BYTES``; tests inject their own.
+    """
     environ = os.environ if env is None else env
     override = (environ.get(CODEX_CATALOG_ENV) or "").strip()
     if override:
-        path = Path(override)
         try:
-            if not path.is_file():
-                return CodexModelCatalog(
-                    source="catalog_override", reason="override_not_a_file"
-                )
-            if path.stat().st_size > CODEX_CATALOG_MAX_BYTES:
-                return CodexModelCatalog(
-                    source="catalog_override", reason="override_too_large"
-                )
-            text = path.read_text(encoding="utf-8", errors="replace")
+            raw = read_bounded_artifact_bytes(
+                Path(override), max_bytes=CODEX_CATALOG_MAX_BYTES
+            )
+        except ValueError as exc:
+            return CodexModelCatalog(
+                source="catalog_override",
+                reason=_ARTIFACT_REASONS.get(str(exc), "override_unreadable"),
+            )
         except OSError:
             return CodexModelCatalog(
-                source="catalog_override", reason="override_unreadable"
+                source="catalog_override", reason="override_not_a_file"
             )
-        return _catalog_from_text(text, source="catalog_override")
+        return _catalog_from_text(
+            raw.decode("utf-8", errors="replace"), source="catalog_override"
+        )
 
     located = shutil.which(executable)
     if not located:
         return CodexModelCatalog(
             source="installed_binary", reason="executable_not_found"
         )
+    invoke = reader if reader is not None else read_bounded_command_output
     try:
-        result = runner(
-            [located, "debug", "models"],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=CODEX_CATALOG_TIMEOUT_SECONDS,
-        )
-    except (OSError, subprocess.SubprocessError):
+        returncode, stdout = invoke([located, "debug", "models"])
+    except (OSError, subprocess.SubprocessError, ValueError):
         return CodexModelCatalog(
             source="installed_binary:debug_models", reason="catalog_command_failed"
         )
-    if getattr(result, "returncode", 1) != 0:
+    if returncode != 0:
         return CodexModelCatalog(
             source="installed_binary:debug_models",
-            reason=f"catalog_command_exit_{getattr(result, 'returncode', 'unknown')}",
-        )
-    stdout = result.stdout or ""
-    if len(stdout) > CODEX_CATALOG_MAX_BYTES:
-        return CodexModelCatalog(
-            source="installed_binary:debug_models", reason="catalog_too_large"
+            reason=f"catalog_command_exit_{returncode}",
         )
     return _catalog_from_text(stdout, source="installed_binary:debug_models")
 
 
-_CACHE: dict[tuple[str, str], CodexModelCatalog] = {}
+def _catalog_cache_identity(executable: str) -> tuple[Any, ...]:
+    """Identify the exact catalog source, so a swapped file re-probes.
+
+    The process cache must not outlive the thing it read.  An override is
+    keyed by device/inode/size/mtime and the installed probe by the resolved
+    executable and its mtime, so replacing either invalidates the entry
+    instead of leaving obsolete route authority in memory.
+    """
+    override = (os.environ.get(CODEX_CATALOG_ENV) or "").strip()
+    if override:
+        try:
+            info = os.stat(override)
+        except OSError:
+            return ("override", override, None)
+        return (
+            "override",
+            override,
+            info.st_dev,
+            info.st_ino,
+            info.st_size,
+            info.st_mtime_ns,
+        )
+    located = shutil.which(executable)
+    if not located:
+        return ("installed", executable, None)
+    try:
+        info = os.stat(located)
+    except OSError:
+        return ("installed", located, None)
+    return ("installed", located, info.st_size, info.st_mtime_ns)
+
+
+_CACHE: dict[tuple[Any, ...], CodexModelCatalog] = {}
 
 
 def codex_model_catalog(executable: str = "codex") -> CodexModelCatalog:
     """Return the process-cached catalog for one installed Codex binary."""
-    key = (executable, (os.environ.get(CODEX_CATALOG_ENV) or "").strip())
+    key = _catalog_cache_identity(executable)
     cached = _CACHE.get(key)
     if cached is None:
         cached = probe_codex_model_catalog(executable)

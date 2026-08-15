@@ -56,8 +56,11 @@ from cobbler_runtime.worker_routing import (  # noqa: E402
 )
 from cobbler_runtime.codex_catalog import (  # noqa: E402
     CODEX_CATALOG_ENV,
+    CODEX_CATALOG_MAX_BYTES,
     CodexModelCatalog,
+    codex_model_catalog,
     probe_codex_model_catalog,
+    read_bounded_command_output,
     reset_codex_model_catalog_cache,
 )
 from cobbler_runtime.host_profiles import (  # noqa: E402
@@ -219,6 +222,7 @@ class RouteDecisionMatrixTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "catalog.json"
             path.write_text(CODEX_CATALOG_FIXTURE, encoding="utf-8")
+            path.chmod(0o600)
             with mock.patch.dict(os.environ, {CODEX_CATALOG_ENV: str(path)}):
                 reset_codex_model_catalog_cache()
                 self.addCleanup(reset_codex_model_catalog_cache)
@@ -1698,13 +1702,33 @@ class CodexModelCatalogTests(unittest.TestCase):
     def setUp(self) -> None:
         reset_codex_model_catalog_cache()
         self.addCleanup(reset_codex_model_catalog_cache)
+        # An installed binary is a precondition of the command probe, and CI
+        # machines have none: pin the lookup so these tests exercise the
+        # reader rather than the absent-executable arm (covered separately).
+        located = mock.patch(
+            "cobbler_runtime.codex_catalog.shutil.which",
+            return_value="/usr/bin/codex",
+        )
+        located.start()
+        self.addCleanup(located.stop)
 
     def _catalog(self) -> CodexModelCatalog:
         return probe_codex_model_catalog(
-            runner=lambda *_a, **_k: subprocess.CompletedProcess(
-                [], 0, CODEX_CATALOG_FIXTURE, ""
-            )
+            reader=lambda _argv: (0, CODEX_CATALOG_FIXTURE)
         )
+
+    def test_absent_binary_reports_its_own_reason(self) -> None:
+        with mock.patch(
+            "cobbler_runtime.codex_catalog.shutil.which", return_value=None
+        ):
+            catalog = probe_codex_model_catalog(
+                reader=lambda _argv: self.fail(
+                    "an absent binary must not be invoked"
+                )
+            )
+        self.assertFalse(catalog.available)
+        self.assertEqual(catalog.reason, "executable_not_found")
+        self.assertEqual(catalog.efforts_union(), frozenset())
 
     def test_catalog_binds_each_model_to_its_own_levels(self) -> None:
         catalog = self._catalog()
@@ -1726,28 +1750,37 @@ class CodexModelCatalogTests(unittest.TestCase):
         self.assertFalse(catalog.supports("catalog-levelless-model"))
 
     def test_unreadable_catalog_fails_closed_with_a_reason(self) -> None:
-        for stdout, returncode, reason in (
-            ("not json at all", 0, "catalog_unparsable"),
-            (json.dumps({"models": []}), 0, "catalog_empty"),
-            ("", 2, "catalog_command_exit_2"),
+        def failing_reader(_argv):
+            raise OSError("no such binary")
+
+        for reader, reason in (
+            (lambda _argv: (0, "not json at all"), "catalog_unparsable"),
+            (lambda _argv: (0, json.dumps({"models": []})), "catalog_empty"),
+            (lambda _argv: (2, ""), "catalog_command_exit_2"),
+            (failing_reader, "catalog_command_failed"),
         ):
             with self.subTest(reason=reason):
-                catalog = probe_codex_model_catalog(
-                    runner=lambda *_a, _s=stdout, _r=returncode, **_k: (
-                        subprocess.CompletedProcess([], _r, _s, "")
-                    )
-                )
+                catalog = probe_codex_model_catalog(reader=reader)
                 self.assertFalse(catalog.available)
                 self.assertEqual(catalog.reason, reason)
+                # A failed read widens nothing: no models, no levels.
                 self.assertEqual(catalog.efforts_union(), frozenset())
+                self.assertEqual(catalog.models, ())
+                self.assertEqual(
+                    supported_efforts_for_route(
+                        "codex", "catalog-execution-model", catalog=catalog
+                    ),
+                    frozenset({"low", "medium", "high"}),
+                )
 
     def test_file_override_replaces_the_installed_probe(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "catalog.json"
             path.write_text(CODEX_CATALOG_FIXTURE, encoding="utf-8")
+            path.chmod(0o600)
             with mock.patch.dict(os.environ, {CODEX_CATALOG_ENV: str(path)}):
                 catalog = probe_codex_model_catalog(
-                    runner=lambda *_a, **_k: self.fail(
+                    reader=lambda _argv: self.fail(
                         "an override must not launch the installed binary"
                     )
                 )
@@ -1756,9 +1789,78 @@ class CodexModelCatalogTests(unittest.TestCase):
             with mock.patch.dict(
                 os.environ, {CODEX_CATALOG_ENV: str(path / "missing.json")}
             ):
-                missing = probe_codex_model_catalog(runner=lambda *_a, **_k: None)
+                missing = probe_codex_model_catalog(reader=lambda _argv: (0, ""))
             self.assertFalse(missing.available)
             self.assertEqual(missing.reason, "override_not_a_file")
+
+    def test_override_read_is_fd_bound_and_size_bound(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            real = root / "catalog.json"
+            real.write_text(CODEX_CATALOG_FIXTURE, encoding="utf-8")
+            real.chmod(0o600)
+
+            # A symlink is not a regular file to the fd-bound reader.
+            link = root / "catalog-link.json"
+            link.symlink_to(real)
+            with mock.patch.dict(os.environ, {CODEX_CATALOG_ENV: str(link)}):
+                followed = probe_codex_model_catalog(reader=lambda _argv: (0, ""))
+            self.assertFalse(followed.available)
+            self.assertEqual(followed.reason, "override_not_a_file")
+
+            # A world-writable catalog could be edited by anyone on the box.
+            loose = root / "loose.json"
+            loose.write_text(CODEX_CATALOG_FIXTURE, encoding="utf-8")
+            loose.chmod(0o666)
+            with mock.patch.dict(os.environ, {CODEX_CATALOG_ENV: str(loose)}):
+                writable = probe_codex_model_catalog(reader=lambda _argv: (0, ""))
+            self.assertFalse(writable.available)
+            self.assertEqual(writable.reason, "override_writable_by_others")
+
+            # Oversized input is refused rather than read into memory.
+            big = root / "big.json"
+            big.write_text("x" * (CODEX_CATALOG_MAX_BYTES + 1), encoding="utf-8")
+            big.chmod(0o600)
+            with mock.patch.dict(os.environ, {CODEX_CATALOG_ENV: str(big)}):
+                oversized = probe_codex_model_catalog(reader=lambda _argv: (0, ""))
+            self.assertFalse(oversized.available)
+            self.assertEqual(oversized.reason, "override_too_large")
+
+    def test_command_output_is_read_through_a_capped_pipe(self) -> None:
+        flood = (
+            "python3 -c \"import sys; sys.stdout.write('x' * "
+            f"{CODEX_CATALOG_MAX_BYTES * 2})\""
+        )
+        returncode, text = read_bounded_command_output(["sh", "-c", flood])
+        # Over-bound output is refused, not buffered whole and then measured.
+        self.assertEqual(text, "")
+        self.assertEqual(returncode, 0)
+        code, ok = read_bounded_command_output(["sh", "-c", "printf '{\"models\":[]}'"])
+        self.assertEqual(code, 0)
+        self.assertEqual(ok, '{"models":[]}')
+
+    def test_cache_re_probes_when_the_override_file_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "catalog.json"
+            path.write_text(CODEX_CATALOG_FIXTURE, encoding="utf-8")
+            path.chmod(0o600)
+            with mock.patch.dict(os.environ, {CODEX_CATALOG_ENV: str(path)}):
+                first = codex_model_catalog()
+                self.assertTrue(first.route_supported("catalog-execution-model", "max"))
+                narrowed = json.dumps(
+                    {
+                        "models": [
+                            {
+                                "slug": "catalog-execution-model",
+                                "supported_reasoning_levels": [{"effort": "low"}],
+                            }
+                        ]
+                    }
+                )
+                path.write_text(narrowed, encoding="utf-8")
+                os.utime(path, (0, 0))
+                second = codex_model_catalog()
+            self.assertFalse(second.route_supported("catalog-execution-model", "max"))
 
     def test_route_efforts_follow_the_catalog_and_fall_back_to_the_floor(self) -> None:
         catalog = self._catalog()
@@ -1793,6 +1895,7 @@ class CodexModelCatalogTests(unittest.TestCase):
             (repo / ".git").mkdir()
             catalog_path = repo / "catalog.json"
             catalog_path.write_text(CODEX_CATALOG_FIXTURE, encoding="utf-8")
+            catalog_path.chmod(0o600)
             with mock.patch.dict(os.environ, {CODEX_CATALOG_ENV: str(catalog_path)}):
                 reset_codex_model_catalog_cache()
                 spec = build_native_worker_spec(

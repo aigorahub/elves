@@ -958,8 +958,10 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" \
         <p>The two prewalk phases take separate routes, so a strong model can orient and write the
           bounded TODO before a cheaper model does the work in the same session. Elves keeps no
           model list of its own: each route is checked against the host's own live catalog, so any
-          model and reasoning level the installed host publishes is available, and anything it
-          retires stops being selectable.</p>
+          model and reasoning level the installed host publishes is available the day it ships. The
+          catalog widens what the host already accepts and never narrows below it: when it cannot be
+          read, the conservative <code>low</code>/<code>medium</code>/<code>high</code> floor
+          applies.</p>
 
         <div class="code-block">
           <button class="copy" type="button" data-copy="prewalk-two-route">Copy</button>
