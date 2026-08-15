@@ -85,19 +85,31 @@ the same provider label. The worker route is always described as a `(model, effo
 | permitted Grok Build handoff | `grok-4.5` at `high` when present in the live catalog | cross-family; explicitly opted in; Composer 2.5 is retired |
 
 **Native delegation stays inside one model family.** Every native row above lowers effort on the
-exact observed driver model and never substitutes a sibling by default. Elves no longer defines a
+exact observed driver model and never substitutes a sibling. Elves no longer defines a
 Fable→Opus route: a driver planning at Fable 5 `max`/`ultra` hands off to `claude-fable-5` at
 `low`, which is a capable implementation worker, rather than crossing into the Opus family.
 
-**Codex GPT-5.6 sibling routing (v2.29+):** Codex multi-agent v2 supports model changes on exact
-resume, enabling cross-sibling delegation within the GPT-5.6 family (`gpt-5.6-sol`,
-`gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-daybreak-blue-latest`, `gpt-5.5`). An operator may pin
-`--guide-model gpt-5.6-sol --execution-model gpt-5.6-luna` or similar combinations. This is true
-prewalk: the exact session, worktree, and stream are preserved while Codex accepts the new model
-on resume. A qualified Sol→Luna route reuses cached proof when another Sol→Luna or Sol→Sol run
-completes, and all GPT-5.6 siblings share this qualification pool when effort matches. Other
-hosts (Claude Code, Grok Build, Oh My Pi) still require exact model matches unless their
-transports prove equivalent resume capabilities.
+**Two-route prewalk (v2.30+).** Automatic delegation stays same-family, but an operator running
+exact-session prewalk pins both phase routes explicitly, and the two may be different models:
+
+```
+--guide-model <strong-model> --guide-effort <level> \
+  --execution-model <cheaper-model> --execution-effort <level>
+```
+
+The guide phase orients, writes the bounded TODO and checkpoint, and makes the first real edit;
+the execution phase resumes that exact session, in the same worktree, on one stream. Nothing
+here is a model name Elves knows. Both routes are validated against the host's own live catalog,
+so a pin is accepted when the installed host publishes that reasoning level for that model.
+
+**Where the proof binds.** The bounded qualification canary proves properties of the *execution*
+route: that this transport resumes one exact session, and that the model resuming retains the
+guide phase's instructions across the resume. So a cached proof is reused for any guide route and
+for no other execution route. Switching guide model or guide effort costs nothing; changing the
+execution model or its level requires its own canary. This rule is identical on Claude Code,
+Codex, Grok Build, and Oh My Pi. Guide-phase quality is never assumed: every run checks the guide's
+TODO, checkpoint, meaningful edit, session identity, and worktree binding against real evidence
+before the transition, which is stricter than any canary.
 
 The only cross-family worker is the explicitly permitted, capability-probed Grok Build handoff,
 which a user opts into rather than receiving as a default.

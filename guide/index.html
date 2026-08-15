@@ -512,7 +512,7 @@
     <div class="masthead-inner">
       <div class="brand-row">
         <a class="wordmark" href="https://github.com/aigorahub/elves">Elves</a>
-        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.29.0 source and releases on GitHub</a>
+        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.30.0 source and releases on GitHub</a>
       </div>
       <h1>Using Elves</h1>
       <p class="intro">Plan with the main agent, hand implementation to a separate worker, then
@@ -953,6 +953,36 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" \
           single-phase native-worker launch remains registry-gated. OMP prewalk accepts
           <code>xhigh</code> and <code>max</code> and passes them unchanged to
           <code>omp --thinking</code>.</p>
+
+        <h3>Pin a strong guide and a cheap execution route</h3>
+        <p>The two prewalk phases take separate routes, so a strong model can orient and write the
+          bounded TODO before a cheaper model does the work in the same session. Elves keeps no
+          model list of its own: each route is checked against the host's own live catalog, so any
+          model and reasoning level the installed host publishes is available, and anything it
+          retires stops being selectable.</p>
+
+        <div class="code-block">
+          <button class="copy" type="button" data-copy="prewalk-two-route">Copy</button>
+          <pre><code id="prewalk-two-route"># Read the levels the installed host publishes for each model.
+codex debug models | python3 -c 'import json,sys
+for m in json.load(sys.stdin)["models"]:
+    print(m["slug"], [l["effort"] for l in m.get("supported_reasoning_levels", [])])'
+
+# Pin both phase routes: strong guide, cheaper execution.
+python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" native-worker launch --json \
+  --host codex --worktree &lt;registered-worktree&gt; --run-id &lt;run-id&gt; --packet &lt;packet&gt; \
+  --prewalk required \
+  --guide-model &lt;strong-model&gt; --guide-effort xhigh \
+  --execution-model &lt;cheaper-model&gt; --execution-effort max</code></pre>
+        </div>
+
+        <p>Qualification binds the execution route, which is what the canary proves: this transport
+          resumes one exact session, and the model that resumes keeps the guide phase's
+          instructions. One canary therefore serves every guide route, so trying different guides
+          or guide levels spends nothing extra. Changing the execution model or its level runs a
+          new canary under <code>required</code>. The guide phase is never taken on trust: its
+          TODO, checkpoint, first real edit, session identity, and worktree binding are checked on
+          every run before the handoff.</p>
 
         <h3>Use the optional open-source Grok worker</h3>
         <p>Install from the <a href="https://github.com/xai-org/grok-build">official Grok Build

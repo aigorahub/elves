@@ -8,8 +8,9 @@ readiness), ``prewalk`` (advertised/probe capabilities), and
 ``worker_routing`` (transport naming) so no host ``if/elif`` chain exists at
 those call sites.  New hosts become table rows, not new branches.
 
-This module intentionally imports only :mod:`cobbler_runtime.schema` so every
-runtime consumer can depend on it without an import cycle.
+This module intentionally imports only :mod:`cobbler_runtime.schema` and
+:mod:`cobbler_runtime.codex_catalog` (which imports nothing from the package)
+so every runtime consumer can depend on it without an import cycle.
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+from .codex_catalog import CodexModelCatalog, codex_model_catalog
 from .schema import AMBIGUOUS_SESSION_TOKENS, ValidationIssue
 
 
@@ -63,8 +65,10 @@ class HostLaunchPlan:
 
 
 def _codex_launch_plan(request: HostLaunchRequest) -> HostLaunchPlan:
-    # Codex multi-agent v2 supports model and reasoning-effort changes on
-    # exact resume. Effort uses the config override; model uses the flag.
+    # `codex exec resume` accepts a route override: the model comes from the
+    # flag and the reasoning level from the config override. This is the
+    # exec-resume surface, unrelated to the multi-agent `spawn_agent` graph
+    # and its per-model version gating.
     common = [
         "codex", "exec", "--json", "--ignore-user-config", "--ignore-rules",
         "--sandbox", "workspace-write", "-c", f'model_reasoning_effort="{request.effort}"',
@@ -79,8 +83,8 @@ def _codex_launch_plan(request: HostLaunchRequest) -> HostLaunchPlan:
         sid = exact_session_id(request.session_id)
         # Keep exec-level sandbox, additional-write-root options, model,
         # and config overrides before the resume subcommand. The supervisor
-        # binds the exact OS cwd. Codex v2 preserves the session/worktree
-        # binding while accepting the new model and effort.
+        # binds the exact OS cwd. Resume keeps the session and worktree
+        # binding while accepting the new model and reasoning level.
         argv = tuple(common + ["resume", sid, "-"])
         resume = argv
     return HostLaunchPlan(
@@ -289,7 +293,14 @@ class HostProfile:
     # metadata for the observed-usage ledger: a transport without a usage
     # surface stays literal "unobserved" — never estimated, never zero.
     reports_usage: str
+    # Offline floor only. It is the vocabulary Elves accepts when no live
+    # catalog can be read; a host whose installed binary publishes a catalog
+    # (`live_model_catalog`) widens it per model from that catalog instead of
+    # from a hardcoded list.
     supported_efforts: frozenset[str]
+    # Reads the installed binary's own model catalog, or None when the host
+    # publishes none. Never launches an inference turn.
+    live_model_catalog: Callable[[], CodexModelCatalog] | None
     launch_plan: Callable[[HostLaunchRequest], HostLaunchPlan]
     # Installed-binary help probe (no model calls). None => not probeable.
     executable: str | None
@@ -329,6 +340,7 @@ HOST_PROFILES: tuple[HostProfile, ...] = (
         grants_git_write_roots=True,
         reports_usage="turn_completed_token_usage",
         supported_efforts=frozenset({"low", "medium", "high"}),
+        live_model_catalog=codex_model_catalog,
         launch_plan=_codex_launch_plan,
         executable="codex",
         version_argv=("--version",),
@@ -353,6 +365,7 @@ HOST_PROFILES: tuple[HostProfile, ...] = (
         grants_git_write_roots=True,
         reports_usage="stream_json_result_usage",
         supported_efforts=frozenset({"low", "medium", "high"}),
+        live_model_catalog=None,
         launch_plan=_claude_launch_plan,
         executable="claude",
         version_argv=("--version",),
@@ -379,6 +392,7 @@ HOST_PROFILES: tuple[HostProfile, ...] = (
         grants_git_write_roots=False,
         reports_usage="fixture_replay",
         supported_efforts=frozenset({"low", "medium", "high"}),
+        live_model_catalog=None,
         launch_plan=_fixture_launch_plan,
         executable=None,
         version_argv=(),
@@ -410,6 +424,7 @@ HOST_PROFILES: tuple[HostProfile, ...] = (
         grants_git_write_roots=True,
         reports_usage="stream_usage_events",
         supported_efforts=frozenset({"low", "medium", "high"}),
+        live_model_catalog=None,
         launch_plan=_grok_launch_plan,
         executable="grok",
         version_argv=("--version",),
@@ -443,6 +458,7 @@ HOST_PROFILES: tuple[HostProfile, ...] = (
         grants_git_write_roots=True,
         reports_usage="unobserved",
         supported_efforts=frozenset({"low", "medium", "high", "xhigh", "max"}),
+        live_model_catalog=None,
         launch_plan=_omp_launch_plan,
         executable="omp",
         version_argv=("--version",),
@@ -476,9 +492,46 @@ def transport_for_host(host: str) -> str:
     return resolve_host_profile(host).transport
 
 
-def supported_efforts_for_host(host: str) -> frozenset[str]:
-    """Return the exact effort vocabulary accepted by one host route."""
-    return resolve_host_profile(host).supported_efforts
+def supported_efforts_for_host(
+    host: str, *, catalog: CodexModelCatalog | None = None
+) -> frozenset[str]:
+    """Return the effort vocabulary one host accepts for any of its models.
+
+    The profile row is the offline floor.  When the installed binary publishes
+    its own model catalog, every reasoning level that catalog advertises joins
+    the floor, so a provider that ships a new level does not need an Elves
+    edit.  An unreadable catalog leaves the floor untouched.
+    """
+    profile = resolve_host_profile(host)
+    if profile.live_model_catalog is None:
+        return profile.supported_efforts
+    live = catalog if catalog is not None else profile.live_model_catalog()
+    if not live.available:
+        return profile.supported_efforts
+    return profile.supported_efforts | live.efforts_union()
+
+
+def supported_efforts_for_route(
+    host: str,
+    model: str | None = None,
+    *,
+    catalog: CodexModelCatalog | None = None,
+) -> frozenset[str]:
+    """Return the effort vocabulary one exact (host, model) route accepts.
+
+    The live catalog is the authority for a model it lists: Elves keeps no
+    model names of its own, so a model that supports `max` is accepted at
+    `max` and a model that stops at `high` is not.  A model the catalog does
+    not list (or a host that publishes no catalog) keeps the offline floor.
+    """
+    profile = resolve_host_profile(host)
+    if profile.live_model_catalog is None or not model:
+        return profile.supported_efforts
+    live = catalog if catalog is not None else profile.live_model_catalog()
+    if not live.available:
+        return profile.supported_efforts
+    efforts = live.efforts_for(model)
+    return efforts or profile.supported_efforts
 
 
 def provider_secret_names(host: str | None) -> frozenset[str]:

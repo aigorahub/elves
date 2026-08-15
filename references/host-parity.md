@@ -54,6 +54,8 @@ not parity.
 | Guide route | `--model`, `--effort` | `--model`, `model_reasoning_effort` | `--model`, `--effort` | `--model`, `--thinking` (`xhigh`/`max` kept) | explicit guide model/effort |
 | Resume | `--resume <uuid>` | `codex exec resume <id>` | `--resume <uuid>` | `--resume <uuid>` | never `--continue`, `--last`, or latest |
 | Resume route | model/effort flags with resume | route/sandbox/Git-root flags before `resume` | model/effort flags with resume | model/thinking flags with resume | explicit execution model/effort |
+| Route vocabulary | installed help grammar | live `codex debug models` catalog per model | authenticated live catalog | installed help grammar (`xhigh`/`max` kept) | Elves stores no model names; unreadable catalog keeps the offline floor |
+| Proof reuse | one canary per execution route, reused for any guide route | same | same | same | guide-phase quality checked per run, not by canary |
 | Worktree | supervisor CWD + narrow allowed roots | `-C` on create; supervisor OS CWD on resume | `--cwd` create; resume-sticky sandbox | `--cwd` create and resume; stable worktree-derived `--profile` | exact registered worktree/branch |
 | Stream | stream JSON | JSONL | streaming JSON | `--mode json` NDJSON | one redacted logical follow stream with phase labels |
 | TODO/checkpoint | native mechanism plus private JSON mirror | native mechanism plus private JSON mirror | private JSON mirror is authoritative | private JSON mirror is authoritative | same bounded provider-neutral schema |

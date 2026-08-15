@@ -1020,8 +1020,6 @@ def cmd_native_worker(args: argparse.Namespace) -> int:
             ):
                 cache_path = prewalk_qualification_cache_path(
                     capabilities,
-                    guide_model=args.guide_model,
-                    guide_effort=args.guide_effort,
                     execution_model=execution_model,
                     execution_effort=execution_effort,
                 )

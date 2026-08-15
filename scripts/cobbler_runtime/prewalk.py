@@ -22,7 +22,7 @@ import subprocess
 import uuid
 from typing import Any, Mapping, Sequence
 
-from .host_profiles import host_profile_or_none, supported_efforts_for_host
+from .host_profiles import host_profile_or_none, supported_efforts_for_route
 from .schema import ValidationIssue
 from .storage import (
     StorageError,
@@ -165,39 +165,28 @@ class PrewalkCapabilities:
         execution_model: str | None,
         execution_effort: str,
     ) -> bool:
+        """Return whether recorded proof covers the requested phase routes."""
         if self.evidence_source == "deterministic_fixture":
             return True
-        # Effort must match exactly
-        if self.qualified_guide_effort != guide_effort:
+        # The canary proves two things, and both are properties of the
+        # execution route: that this transport resumes one exact session in one
+        # worktree on one stream, and that the model which resumes retains the
+        # guide phase's instructions across that resume. So the execution model
+        # and effort must match the recorded proof exactly.
+        if self.qualified_execution_effort is None:
             return False
         if self.qualified_execution_effort != execution_effort:
             return False
-        # Model matching: exact match or GPT-5.6 sibling cross-delegation
-        guide_matches = self.qualified_guide_model == guide_model
-        execution_matches = self.qualified_execution_model == execution_model
-        # Allow GPT-5.6 sibling substitution when host is Codex
-        # (Codex multi-agent v2 supports model change on exact resume)
-        if not guide_matches or not execution_matches:
-            from .worker_routing import is_gpt_56_sibling
-            if self.host == "codex" and self.transport == "codex_exec":
-                # Guide model: allow qualified sibling → requested sibling
-                if not guide_matches:
-                    if not (
-                        is_gpt_56_sibling(self.qualified_guide_model)
-                        and is_gpt_56_sibling(guide_model)
-                    ):
-                        return False
-                # Execution model: allow qualified sibling → requested sibling
-                if not execution_matches:
-                    if not (
-                        is_gpt_56_sibling(self.qualified_execution_model)
-                        and is_gpt_56_sibling(execution_model)
-                    ):
-                        return False
-            else:
-                # Non-Codex hosts or other transports: require exact match
-                return False
-        return True
+        if self.qualified_execution_model != execution_model:
+            return False
+        # The guide route is free. A different guide model or effort cannot
+        # weaken either proof: the guide phase only writes the session the
+        # execution phase resumes. Every guide-phase failure mode (missing or
+        # invalid TODO, missing checkpoint, missing meaningful edit, session or
+        # worktree drift) is checked per run by the transition kernel against
+        # real evidence, which is stricter than any canary. `guide_model` and
+        # `guide_effort` stay recorded in the artifact as provenance.
+        return self.qualified_guide_effort is not None
 
     def unavailable_reason(self) -> str | None:
         if not self.advertised_exact_resume:
@@ -906,7 +895,6 @@ def _qualification_phase_routes(
     host: str,
 ) -> dict[str, tuple[str | None, str]]:
     """Validate the guide/execution route bindings shared by evidence loaders."""
-    supported_efforts = supported_efforts_for_host(host)
     routes: dict[str, tuple[str | None, str]] = {}
     for role in ("guide", "execution"):
         route = data.get(f"{role}_route")
@@ -924,6 +912,10 @@ def _qualification_phase_routes(
                 code="prewalk_route_change_unqualified",
                 max_chars=200,
             )
+        # Each phase route is checked against the levels its own model
+        # advertises, so a recorded artifact cannot claim a level the
+        # installed catalog does not offer for that model.
+        supported_efforts = supported_efforts_for_route(host, model)
         effort = route.get("effort")
         if effort not in supported_efforts:
             choices = ", ".join(sorted(supported_efforts))
