@@ -186,6 +186,16 @@ class PrewalkCapabilities:
         # worktree drift) is checked per run by the transition kernel against
         # real evidence, which is stricter than any canary. `guide_model` and
         # `guide_effort` stay recorded in the artifact as provenance.
+        #
+        # Binding the guide model was considered and rejected. The risk it
+        # would appear to cover — a long guide phase thinning the execution
+        # turn's context — is not a property of which model guided: the same
+        # guide model produces wildly different history between two runs, and
+        # the canary's own guide turn is trivial next to any real one. Prewalk
+        # already answers that risk in the design rather than the proof: the
+        # bounded TODO and checkpoint are written to the worktree, so the
+        # execution phase's instructions live on disk and not only in a
+        # context window.
         return self.qualified_guide_effort is not None
 
     def unavailable_reason(self) -> str | None:

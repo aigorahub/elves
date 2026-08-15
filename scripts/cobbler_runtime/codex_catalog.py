@@ -23,6 +23,7 @@ from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 from typing import Any, Callable
@@ -33,6 +34,16 @@ from .storage import read_bounded_artifact_bytes
 CODEX_CATALOG_ENV = "ELVES_CODEX_MODEL_CATALOG"
 CODEX_CATALOG_MAX_BYTES = 4 * 1024 * 1024
 CODEX_CATALOG_TIMEOUT_SECONDS = 5
+CODEX_CATALOG_MAX_MODELS = 256
+
+# A catalog row becomes route authority, and an effort token is interpolated
+# into the host's own config override (`model_reasoning_effort="<effort>"`).
+# Accept only conservative identifiers, so a malformed or hostile catalog
+# cannot certify an invented route or carry configuration punctuation into
+# that override. New provider names remain free to appear; new *grammars* do
+# not.
+_SLUG_RE = re.compile(r"[a-z0-9][a-z0-9._/-]{0,127}\Z")
+_EFFORT_RE = re.compile(r"[a-z0-9][a-z0-9_-]{0,31}\Z")
 
 # Stable reasons a policy failure maps to, mirroring the artifact reader's
 # vocabulary so an operator sees why a catalog was refused.
@@ -109,7 +120,7 @@ def _parse_catalog_rows(payload: Any) -> tuple[tuple[str, tuple[str, ...]], ...]
         if not isinstance(slug, str) or not slug.strip():
             continue
         slug = slug.strip().lower()
-        if slug in seen:
+        if slug in seen or not _SLUG_RE.match(slug):
             continue
         levels = entry.get("supported_reasoning_levels")
         efforts: list[str] = []
@@ -118,7 +129,7 @@ def _parse_catalog_rows(payload: Any) -> tuple[tuple[str, tuple[str, ...]], ...]
                 effort = level.get("effort") if isinstance(level, dict) else level
                 if isinstance(effort, str) and effort.strip():
                     token = effort.strip().lower()
-                    if token not in efforts:
+                    if token not in efforts and _EFFORT_RE.match(token):
                         efforts.append(token)
         if not efforts:
             # A model with no advertised levels binds no route: skip it rather
@@ -126,6 +137,8 @@ def _parse_catalog_rows(payload: Any) -> tuple[tuple[str, tuple[str, ...]], ...]
             continue
         seen.add(slug)
         routes.append((slug, tuple(efforts)))
+        if len(routes) >= CODEX_CATALOG_MAX_MODELS:
+            break
     return tuple(routes)
 
 

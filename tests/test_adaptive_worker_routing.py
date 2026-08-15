@@ -218,6 +218,51 @@ class RouteDecisionMatrixTests(unittest.TestCase):
                         caught.exception.code, "invalid_execution_reasoning"
                     )
 
+    def test_pinned_guide_effort_is_checked_against_its_own_model(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "catalog.json"
+            path.write_text(CODEX_CATALOG_FIXTURE, encoding="utf-8")
+            path.chmod(0o600)
+            with mock.patch.dict(os.environ, {CODEX_CATALOG_ENV: str(path)}):
+                reset_codex_model_catalog_cache()
+                self.addCleanup(reset_codex_model_catalog_cache)
+                # `catalog-narrow-model` publishes low and high only. The
+                # host-wide union contains max because another model offers
+                # it, which must not qualify this guide route.
+                narrow = self.decide(
+                    host="codex",
+                    execution_reasoning="high",
+                    explicit_intent={
+                        "worker": {
+                            "prewalk": "auto",
+                            "prewalk_guide_model": "catalog-narrow-model",
+                            "prewalk_guide_effort": "max",
+                        }
+                    },
+                )
+                self.assertEqual(narrow.prewalk.actual_mode, "off")
+                self.assertEqual(
+                    narrow.prewalk.fallback_reason,
+                    "prewalk_capability_unavailable:"
+                    "guide_effort_unsupported_by_model",
+                )
+                supported = self.decide(
+                    host="codex",
+                    execution_reasoning="high",
+                    explicit_intent={
+                        "worker": {
+                            "prewalk": "auto",
+                            "prewalk_guide_model": "catalog-guide-model",
+                            "prewalk_guide_effort": "max",
+                        }
+                    },
+                )
+                self.assertNotEqual(
+                    supported.prewalk.fallback_reason,
+                    "prewalk_capability_unavailable:"
+                    "guide_effort_unsupported_by_model",
+                )
+
     def test_codex_route_accepts_a_level_the_live_catalog_publishes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "catalog.json"
@@ -1716,6 +1761,38 @@ class CodexModelCatalogTests(unittest.TestCase):
         return probe_codex_model_catalog(
             reader=lambda _argv: (0, CODEX_CATALOG_FIXTURE)
         )
+
+    def test_hostile_catalog_rows_cannot_certify_invented_routes(self) -> None:
+        hostile = json.dumps(
+            {
+                "models": [
+                    {
+                        "slug": "catalog-execution-model",
+                        "supported_reasoning_levels": [
+                            {"effort": "high"},
+                            # Configuration punctuation would otherwise reach
+                            # `model_reasoning_effort="<effort>"` verbatim.
+                            {"effort": 'max"\nsandbox_mode="danger-full-access'},
+                            {"effort": "a" * 64},
+                            {"effort": "level with spaces"},
+                        ],
+                    },
+                    {
+                        "slug": 'evil"model',
+                        "supported_reasoning_levels": [{"effort": "max"}],
+                    },
+                ]
+            }
+        )
+        catalog = probe_codex_model_catalog(reader=lambda _argv: (0, hostile))
+        self.assertTrue(catalog.available)
+        # Only the conservative identifier survives.
+        self.assertEqual(
+            catalog.efforts_for("catalog-execution-model"), frozenset({"high"})
+        )
+        self.assertEqual(catalog.models, ("catalog-execution-model",))
+        self.assertEqual(catalog.efforts_union(), frozenset({"high"}))
+        self.assertFalse(catalog.supports('evil"model'))
 
     def test_absent_binary_reports_its_own_reason(self) -> None:
         with mock.patch(

@@ -523,6 +523,12 @@ def supported_efforts_for_route(
     model names of its own, so a model that supports `max` is accepted at
     `max` and a model that stops at `high` is not.  A model the catalog does
     not list (or a host that publishes no catalog) keeps the offline floor.
+
+    Absence is deliberately not treated as retirement.  A driver reports the
+    model identity it observes, which need not be the catalog slug, and a
+    catalog is scoped to one account and tier.  Refusing every unlisted model
+    would break working runs to guess at a retirement, so absence narrows
+    nothing: it simply wins no catalog-only levels.
     """
     profile = resolve_host_profile(host)
     if profile.live_model_catalog is None or not model:
