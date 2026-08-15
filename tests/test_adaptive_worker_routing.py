@@ -48,9 +48,11 @@ from cobbler_runtime.worker_routing import (  # noqa: E402
     GROK_COMPLEX_MODEL,
     GROK_RETIRED_COMPOSER_MODEL,
     GROK_WORKER_MODEL,
+    GPT_56_SIBLINGS,
     GrokCapabilityEvidence,
     GrokCapabilities,
     decide_worker_route,
+    is_gpt_56_sibling,
     probe_grok_capabilities,
     discover_repository_worker_policy,
 )
@@ -1611,6 +1613,205 @@ class GrokPrewalkQualificationArtifactGateTests(unittest.TestCase):
                 rejection["issues"][0]["code"], "prewalk_capability_unavailable"
             )
             self.assertEqual(rejection["issues"][0]["path"], "host")
+
+
+class GPT56SiblingRoutingTests(unittest.TestCase):
+    """Test GPT-5.6 sibling routing for Codex multi-agent v2 prewalk."""
+
+    def test_is_gpt_56_sibling_recognizes_canonical_slugs(self) -> None:
+        """Verify GPT-5.6 siblings are recognized by canonical Codex desktop slugs."""
+        for model in GPT_56_SIBLINGS:
+            self.assertTrue(is_gpt_56_sibling(model), f"{model} should be recognized")
+        
+        # Verify non-siblings are rejected
+        self.assertFalse(is_gpt_56_sibling("gpt-4.8"))
+        self.assertFalse(is_gpt_56_sibling("claude-fable-5"))
+        self.assertFalse(is_gpt_56_sibling("grok-4.5"))
+        self.assertFalse(is_gpt_56_sibling(None))
+        self.assertFalse(is_gpt_56_sibling(""))
+
+    def test_is_gpt_56_sibling_handles_case_variations(self) -> None:
+        """Verify case-insensitive matching for GPT-5.6 siblings."""
+        self.assertTrue(is_gpt_56_sibling("GPT-5.6-sol"))
+        self.assertTrue(is_gpt_56_sibling("gpt-5.6-TERRA"))
+        self.assertTrue(is_gpt_56_sibling("GPT-5.6-Luna"))
+
+    def test_codex_prewalk_accepts_sibling_guide_to_execution_route(self) -> None:
+        """Verify Codex prewalk accepts Sol→Luna and other sibling combinations."""
+        caps = PrewalkCapabilities(
+            host="codex",
+            transport="codex_exec",
+            installed_version="0.123.0",
+            advertised_exact_resume=True,
+            advertised_route_override_on_resume=True,
+            behaviorally_verified_session_continuity=True,
+            worktree_binding_verified=True,
+            stream_identity_verified=True,
+            instruction_fidelity="retained_safe",
+            evidence_source="test_artifact",
+            model_calls_made=True,
+            qualified_guide_model="gpt-5.6-sol",
+            qualified_guide_effort="high",
+            qualified_execution_model="gpt-5.6-sol",
+            qualified_execution_effort="medium",
+        )
+        
+        # Sol→Luna sibling route should match
+        self.assertTrue(
+            caps.route_matches(
+                guide_model="gpt-5.6-sol",
+                guide_effort="high",
+                execution_model="gpt-5.6-luna",
+                execution_effort="medium",
+            )
+        )
+        
+        # Terra→Luna sibling route should match
+        self.assertTrue(
+            caps.route_matches(
+                guide_model="gpt-5.6-terra",
+                guide_effort="high",
+                execution_model="gpt-5.6-luna",
+                execution_effort="medium",
+            )
+        )
+        
+        # Luna→Terra sibling route should match
+        self.assertTrue(
+            caps.route_matches(
+                guide_model="gpt-5.6-luna",
+                guide_effort="high",
+                execution_model="gpt-5.6-terra",
+                execution_effort="medium",
+            )
+        )
+
+    def test_codex_prewalk_requires_matching_effort_for_siblings(self) -> None:
+        """Verify effort must match exactly even for sibling routes."""
+        caps = PrewalkCapabilities(
+            host="codex",
+            transport="codex_exec",
+            installed_version="0.123.0",
+            advertised_exact_resume=True,
+            advertised_route_override_on_resume=True,
+            behaviorally_verified_session_continuity=True,
+            worktree_binding_verified=True,
+            stream_identity_verified=True,
+            instruction_fidelity="retained_safe",
+            evidence_source="test_artifact",
+            model_calls_made=True,
+            qualified_guide_model="gpt-5.6-sol",
+            qualified_guide_effort="high",
+            qualified_execution_model="gpt-5.6-sol",
+            qualified_execution_effort="medium",
+        )
+        
+        # Different guide effort should not match
+        self.assertFalse(
+            caps.route_matches(
+                guide_model="gpt-5.6-sol",
+                guide_effort="medium",  # Changed from high
+                execution_model="gpt-5.6-luna",
+                execution_effort="medium",
+            )
+        )
+        
+        # Different execution effort should not match
+        self.assertFalse(
+            caps.route_matches(
+                guide_model="gpt-5.6-sol",
+                guide_effort="high",
+                execution_model="gpt-5.6-luna",
+                execution_effort="low",  # Changed from medium
+            )
+        )
+
+    def test_non_codex_hosts_require_exact_model_match(self) -> None:
+        """Verify Claude, Grok, and OMP require exact model matches (no sibling routing)."""
+        for host, transport in [
+            ("claude", "claude_code"),
+            ("grok", "grok_build"),
+            ("omp", "omp_build"),
+        ]:
+            caps = PrewalkCapabilities(
+                host=host,
+                transport=transport,
+                installed_version="1.0.0",
+                advertised_exact_resume=True,
+                advertised_route_override_on_resume=True,
+                behaviorally_verified_session_continuity=True,
+                worktree_binding_verified=True,
+                stream_identity_verified=True,
+                instruction_fidelity="retained_safe",
+                evidence_source="test_artifact",
+                model_calls_made=True,
+                qualified_guide_model="gpt-5.6-sol",
+                qualified_guide_effort="high",
+                qualified_execution_model="gpt-5.6-sol",
+                qualified_execution_effort="medium",
+            )
+            
+            # Same model should match
+            self.assertTrue(
+                caps.route_matches(
+                    guide_model="gpt-5.6-sol",
+                    guide_effort="high",
+                    execution_model="gpt-5.6-sol",
+                    execution_effort="medium",
+                ),
+                f"{host} should accept exact model match",
+            )
+            
+            # Different sibling should NOT match for non-Codex hosts
+            self.assertFalse(
+                caps.route_matches(
+                    guide_model="gpt-5.6-sol",
+                    guide_effort="high",
+                    execution_model="gpt-5.6-luna",
+                    execution_effort="medium",
+                ),
+                f"{host} should reject sibling routes",
+            )
+
+    def test_codex_prewalk_rejects_non_sibling_cross_family(self) -> None:
+        """Verify Codex prewalk rejects non-GPT-5.6 cross-model routes."""
+        caps = PrewalkCapabilities(
+            host="codex",
+            transport="codex_exec",
+            installed_version="0.123.0",
+            advertised_exact_resume=True,
+            advertised_route_override_on_resume=True,
+            behaviorally_verified_session_continuity=True,
+            worktree_binding_verified=True,
+            stream_identity_verified=True,
+            instruction_fidelity="retained_safe",
+            evidence_source="test_artifact",
+            model_calls_made=True,
+            qualified_guide_model="gpt-5.6-sol",
+            qualified_guide_effort="high",
+            qualified_execution_model="gpt-5.6-sol",
+            qualified_execution_effort="medium",
+        )
+        
+        # GPT-5.6 → GPT-4.8 should NOT match
+        self.assertFalse(
+            caps.route_matches(
+                guide_model="gpt-5.6-sol",
+                guide_effort="high",
+                execution_model="gpt-4.8",
+                execution_effort="medium",
+            )
+        )
+        
+        # GPT-5.6 → Claude should NOT match
+        self.assertFalse(
+            caps.route_matches(
+                guide_model="gpt-5.6-sol",
+                guide_effort="high",
+                execution_model="claude-fable-5",
+                execution_effort="medium",
+            )
+        )
 
 
 if __name__ == "__main__":

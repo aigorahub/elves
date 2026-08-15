@@ -4,6 +4,18 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+### Added
+- **Codex GPT-5.6 sibling prewalk routing.** Codex multi-agent v2 supports model changes on exact
+  resume, enabling cross-sibling delegation within the GPT-5.6 family (`gpt-5.6-sol`,
+  `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-daybreak-blue-latest`, `gpt-5.5`). Operators may pin
+  `--guide-model gpt-5.6-sol --execution-model gpt-5.6-luna` or similar combinations for true
+  prewalk: the exact session, worktree, and stream are preserved while Codex accepts the new model
+  on resume. A qualification artifact for one GPT-5.6 sibling pair (e.g., Sol→Luna) enables any
+  sibling-to-sibling route when effort matches, allowing smart guides (Sol/Terra) to orient and
+  write bounded TODOs before continuing on Luna for cheap execution. Claude Code, Grok Build, and
+  Oh My Pi still require exact model matches. See `references/prewalk.md` and
+  `references/adaptive-worker-routing.md` for host parity and routing details.
+
 ## [2.29.0] - 2026-08-13
 
 ### Added

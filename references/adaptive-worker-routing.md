@@ -85,11 +85,22 @@ the same provider label. The worker route is always described as a `(model, effo
 | permitted Grok Build handoff | `grok-4.5` at `high` when present in the live catalog | cross-family; explicitly opted in; Composer 2.5 is retired |
 
 **Native delegation stays inside one model family.** Every native row above lowers effort on the
-exact observed driver model and never substitutes a sibling. Elves no longer defines a
+exact observed driver model and never substitutes a sibling by default. Elves no longer defines a
 Fable→Opus route: a driver planning at Fable 5 `max`/`ultra` hands off to `claude-fable-5` at
-`low`, which is a capable implementation worker, rather than crossing into the Opus family. The
-only cross-family worker is the explicitly permitted, capability-probed Grok Build handoff, which
-a user opts into rather than receiving as a default.
+`low`, which is a capable implementation worker, rather than crossing into the Opus family.
+
+**Codex GPT-5.6 sibling routing (v2.29+):** Codex multi-agent v2 supports model changes on exact
+resume, enabling cross-sibling delegation within the GPT-5.6 family (`gpt-5.6-sol`,
+`gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-daybreak-blue-latest`, `gpt-5.5`). An operator may pin
+`--guide-model gpt-5.6-sol --execution-model gpt-5.6-luna` or similar combinations. This is true
+prewalk: the exact session, worktree, and stream are preserved while Codex accepts the new model
+on resume. A qualified Sol→Luna route reuses cached proof when another Sol→Luna or Sol→Sol run
+completes, and all GPT-5.6 siblings share this qualification pool when effort matches. Other
+hosts (Claude Code, Grok Build, Oh My Pi) still require exact model matches unless their
+transports prove equivalent resume capabilities.
+
+The only cross-family worker is the explicitly permitted, capability-probed Grok Build handoff,
+which a user opts into rather than receiving as a default.
 
 These named defaults apply to a separate worker and to the execution phase of an exact-session
 prewalk. An explicit user route still wins. Unlisted native routes use the plan's low/medium/high

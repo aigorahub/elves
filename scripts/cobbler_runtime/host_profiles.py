@@ -63,6 +63,8 @@ class HostLaunchPlan:
 
 
 def _codex_launch_plan(request: HostLaunchRequest) -> HostLaunchPlan:
+    # Codex multi-agent v2 supports model and reasoning-effort changes on
+    # exact resume. Effort uses the config override; model uses the flag.
     common = [
         "codex", "exec", "--json", "--ignore-user-config", "--ignore-rules",
         "--sandbox", "workspace-write", "-c", f'model_reasoning_effort="{request.effort}"',
@@ -75,8 +77,10 @@ def _codex_launch_plan(request: HostLaunchRequest) -> HostLaunchPlan:
         resume = None
     else:
         sid = exact_session_id(request.session_id)
-        # Keep exec-level sandbox and additional-write-root options before
-        # the resume subcommand. The supervisor binds the exact OS cwd.
+        # Keep exec-level sandbox, additional-write-root options, model,
+        # and config overrides before the resume subcommand. The supervisor
+        # binds the exact OS cwd. Codex v2 preserves the session/worktree
+        # binding while accepting the new model and effort.
         argv = tuple(common + ["resume", sid, "-"])
         resume = argv
     return HostLaunchPlan(

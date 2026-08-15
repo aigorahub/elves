@@ -59,11 +59,17 @@ only its effort. The named delegation defaults are: GPT-5.6 at `xhigh`/extra-hig
 same GPT-5.6 model at `medium`; GPT-4.8 Max/UltraCode → the same GPT-4.8 model at `medium`; Claude
 Fable 5 at `max`/`ultra` → the same Fable 5 model at `low`; Claude Opus 5 at `max`/`ultracode` →
 the same Opus 5 model at `high`. Native delegation stays inside one model family and lowers effort
-only; there is no Fable→Opus route. Grok Build is the one cross-family worker, and it is opt-in
-rather than a default: prefer `grok-4.5` at explicit `high` when the authenticated live catalog
-returns it (Composer 2.5 is retired and is never selected). Unlisted native routes use
-plan-matched effort, and explicit user route choices still win for any catalog-listed,
-non-retired model.
+only by default. Codex multi-agent v2 (v2.29+) additionally supports cross-sibling delegation
+within the GPT-5.6 family: operators may pin `--guide-model gpt-5.6-sol --execution-model
+gpt-5.6-luna` or similar combinations (`gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`,
+`gpt-daybreak-blue-latest`, `gpt-5.5`). This is true prewalk — Codex accepts `--model` on exact
+resume, preserving the session, worktree, and stream. Qualification for one GPT-5.6 sibling pair
+enables any sibling-to-sibling route when effort matches. Other hosts (Claude Code, Grok Build,
+Oh My Pi) still require exact model matches. There is no Fable→Opus route. Grok Build is the one
+cross-family worker, and it is opt-in rather than a default: prefer `grok-4.5` at explicit `high`
+when the authenticated live catalog returns it (Composer 2.5 is retired and is never selected).
+Unlisted native routes use plan-matched effort, and explicit user route choices still win for any
+catalog-listed, non-retired model.
 Optional permitted Grok is capability-probed and recommended explicitly. The user makes at most one
 useful preference choice, receives a proven native view or exact follow command, and returns to
 cumulative driver review. Trusted full-run delegation keeps that path

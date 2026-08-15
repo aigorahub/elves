@@ -167,12 +167,37 @@ class PrewalkCapabilities:
     ) -> bool:
         if self.evidence_source == "deterministic_fixture":
             return True
-        return bool(
-            self.qualified_guide_model == guide_model
-            and self.qualified_guide_effort == guide_effort
-            and self.qualified_execution_model == execution_model
-            and self.qualified_execution_effort == execution_effort
-        )
+        # Effort must match exactly
+        if self.qualified_guide_effort != guide_effort:
+            return False
+        if self.qualified_execution_effort != execution_effort:
+            return False
+        # Model matching: exact match or GPT-5.6 sibling cross-delegation
+        guide_matches = self.qualified_guide_model == guide_model
+        execution_matches = self.qualified_execution_model == execution_model
+        # Allow GPT-5.6 sibling substitution when host is Codex
+        # (Codex multi-agent v2 supports model change on exact resume)
+        if not guide_matches or not execution_matches:
+            from .worker_routing import is_gpt_56_sibling
+            if self.host == "codex" and self.transport == "codex_exec":
+                # Guide model: allow qualified sibling → requested sibling
+                if not guide_matches:
+                    if not (
+                        is_gpt_56_sibling(self.qualified_guide_model)
+                        and is_gpt_56_sibling(guide_model)
+                    ):
+                        return False
+                # Execution model: allow qualified sibling → requested sibling
+                if not execution_matches:
+                    if not (
+                        is_gpt_56_sibling(self.qualified_execution_model)
+                        and is_gpt_56_sibling(execution_model)
+                    ):
+                        return False
+            else:
+                # Non-Codex hosts or other transports: require exact match
+                return False
+        return True
 
     def unavailable_reason(self) -> str | None:
         if not self.advertised_exact_resume:

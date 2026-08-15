@@ -47,6 +47,16 @@ GROK_UPSTREAM_SEMANTIC_COMMIT = "7cfcb20d2b50b0d18801a6c0af2e401c0e060894"
 MAX_GROK_GOAL_CANARY_ARTIFACT_BYTES = 64 * 1024
 MAX_GROK_GOAL_CANARY_PROMPT_BYTES = 32 * 1024
 
+# GPT-5.6 sibling models: Codex multi-agent v2 supports cross-sibling
+# delegation within the 5.6 family via model change on exact resume.
+GPT_56_SIBLINGS = frozenset({
+    "gpt-5.6-sol",
+    "gpt-5.6-terra",
+    "gpt-5.6-luna",
+    "gpt-daybreak-blue-latest",  # defensive cybersecurity variant
+    "gpt-5.5",  # complex coding/research
+})
+
 
 @dataclass(frozen=True)
 class GrokCapabilityEvidence:
@@ -163,6 +173,19 @@ _DEFAULT_MODEL_RE = re.compile(
     rf"(?im)^\s*Default model:\s*(?P<model>{_MODEL_ID_RE})\s*$"
 )
 _SHA256_RE = re.compile(r"[0-9a-f]{64}")
+
+
+def is_gpt_56_sibling(model: str | None) -> bool:
+    """Return whether a model is a GPT-5.6 family sibling."""
+    if model is None:
+        return False
+    normalized = model.strip().lower()
+    # Match canonical Codex desktop slugs plus any future 5.6 variants
+    if normalized in GPT_56_SIBLINGS:
+        return True
+    # Also accept variants with different casing or "gpt5.6" without hyphen
+    base = normalized.replace("gpt-", "gpt").replace("gpt5.6", "gpt-5.6")
+    return base in {s.replace("gpt-", "gpt") for s in GPT_56_SIBLINGS}
 
 
 def select_preferred_grok_worker_model(
