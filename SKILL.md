@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Grok Build, Oh My Pi (omp), Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.29.0"
+  version: "2.30.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -29,7 +29,8 @@ same continuity contract.
 **Oh My Pi may drive Elves.** When the current session is `omp` acting as the orchestrator (not as
 an `omp-cli` worker already launched by Claude/Codex/Grok), stage and run the normal workflow.
 Install with `sync_installed_skills.py --apply --target omp` into `~/.omp/agent/skills/elves`. `worker.prewalk=required` automatically runs one bounded live
-qualification canary when matching version-and-route-bound evidence is absent. It proceeds only
+qualification canary when matching evidence bound to the installed version and the exact
+execution route is absent. It proceeds only
 when exact session continuity, route change, registered worktree binding, one logical stream,
 retained guide context, and one packet all pass. Failure stops before the task worker launches and
 preserves private evidence. `worker.prewalk=experimental` is an explicit operator acceptance of
@@ -59,11 +60,17 @@ only its effort. The named delegation defaults are: GPT-5.6 at `xhigh`/extra-hig
 same GPT-5.6 model at `medium`; GPT-4.8 Max/UltraCode → the same GPT-4.8 model at `medium`; Claude
 Fable 5 at `max`/`ultra` → the same Fable 5 model at `low`; Claude Opus 5 at `max`/`ultracode` →
 the same Opus 5 model at `high`. Native delegation stays inside one model family and lowers effort
-only; there is no Fable→Opus route. Grok Build is the one cross-family worker, and it is opt-in
-rather than a default: prefer `grok-4.5` at explicit `high` when the authenticated live catalog
-returns it (Composer 2.5 is retired and is never selected). Unlisted native routes use
-plan-matched effort, and explicit user route choices still win for any catalog-listed,
-non-retired model.
+only; there is no Fable→Opus route. Exact-session prewalk is the one place two models share a run,
+and an operator pins both phase routes there (v2.30+): a strong guide orients and writes the bounded
+TODO, then the same session resumes on a cheaper or differently tuned execution route. Elves stores
+no model names of its own. Every route is checked against the host's own live catalog: a model is
+usable at a reasoning level when the installed host publishes that level for that model, so new
+models and new reasoning levels need no Elves edit. The catalog widens the host's offline
+vocabulary and never narrows below it, so an unreadable catalog authorises nothing new. Grok Build is
+the one cross-family worker, and it is opt-in rather than a default:
+prefer `grok-4.5` at explicit `high` when the authenticated live catalog returns it.
+Composer 2.5 is retired and is never selected. Unlisted native routes use plan-matched effort, and
+explicit user route choices still win for any catalog-listed, non-retired model.
 Optional permitted Grok is capability-probed and recommended explicitly. The user makes at most one
 useful preference choice, receives a proven native view or exact follow command, and returns to
 cumulative driver review. Trusted full-run delegation keeps that path
@@ -77,7 +84,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.29.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.30.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 

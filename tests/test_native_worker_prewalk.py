@@ -530,12 +530,30 @@ class CapabilityEvidenceTests(unittest.TestCase):
                 execution_effort="low",
             )
         )
-        self.assertFalse(
+        # The proof binds the execution route: another guide model reuses it,
+        # another execution model does not.
+        self.assertTrue(
             qualified.route_matches(
                 guide_model="other-guide",
-                guide_effort="high",
+                guide_effort="medium",
                 execution_model="execution-model",
                 execution_effort="low",
+            )
+        )
+        self.assertFalse(
+            qualified.route_matches(
+                guide_model="guide-model",
+                guide_effort="high",
+                execution_model="other-execution-model",
+                execution_effort="low",
+            )
+        )
+        self.assertFalse(
+            qualified.route_matches(
+                guide_model="guide-model",
+                guide_effort="high",
+                execution_model="execution-model",
+                execution_effort="medium",
             )
         )
         for fidelity in ("pruned", "turn_scoped", "unsupported"):
@@ -546,14 +564,26 @@ class CapabilityEvidenceTests(unittest.TestCase):
                     unavailable.unavailable_reason(),
                     "prewalk_instruction_pruning_unqualified",
                 )
+        # Another guide model builds on the same proof; another execution
+        # model has no proof and fails closed.
+        build_native_worker_prewalk_spec(
+            host="codex",
+            worktree=REPO_ROOT,
+            guide_effort="high",
+            execution_effort="low",
+            guide_model="other-guide",
+            execution_model="execution-model",
+            capabilities=qualified,
+            requested_mode="required",
+        )
         with self.assertRaises(ValidationIssue) as caught:
             build_native_worker_prewalk_spec(
                 host="codex",
                 worktree=REPO_ROOT,
                 guide_effort="high",
                 execution_effort="low",
-                guide_model="other-guide",
-                execution_model="execution-model",
+                guide_model="guide-model",
+                execution_model="other-execution-model",
                 capabilities=qualified,
                 requested_mode="required",
             )
@@ -844,11 +874,19 @@ class GrokPrewalkQualificationLoaderTests(unittest.TestCase):
                 execution_effort="high",
             )
         )
-        self.assertFalse(
+        self.assertTrue(
             capabilities.route_matches(
                 guide_model="other-guide",
                 guide_effort="high",
                 execution_model="grok-4.5",
+                execution_effort="high",
+            )
+        )
+        self.assertFalse(
+            capabilities.route_matches(
+                guide_model="guide-model",
+                guide_effort="high",
+                execution_model="grok-4.6",
                 execution_effort="high",
             )
         )
@@ -1592,8 +1630,6 @@ class AutomaticPrewalkQualificationTests(unittest.TestCase):
             self.assertEqual(len(calls), 2)
             cache_path = prewalk_qualification_cache_path(
                 advertised,
-                guide_model="guide-model",
-                guide_effort="high",
                 execution_model="execution-model",
                 execution_effort="medium",
                 cache_root=cache_root,
@@ -1613,6 +1649,22 @@ class AutomaticPrewalkQualificationTests(unittest.TestCase):
                 ),
             )
             self.assertTrue(reused.qualified())
+            self.assertEqual(len(calls), 2)
+
+            # A different guide route reuses the same cached proof: the canary
+            # binds the execution route, so no second canary is spent.
+            other_guide = qualify_installed_prewalk_transport(
+                host="codex",
+                guide_model="other-guide-model",
+                guide_effort="low",
+                execution_model="execution-model",
+                execution_effort="medium",
+                cache_root=cache_root,
+                phase_runner=lambda **_kwargs: self.fail(
+                    "a guide-route change must reuse the execution-route proof"
+                ),
+            )
+            self.assertTrue(other_guide.qualified())
             self.assertEqual(len(calls), 2)
 
     def test_required_canary_failure_stops_with_private_attempt_evidence(self) -> None:

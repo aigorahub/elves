@@ -54,6 +54,19 @@ from cobbler_runtime.worker_routing import (  # noqa: E402
     probe_grok_capabilities,
     discover_repository_worker_policy,
 )
+from cobbler_runtime.codex_catalog import (  # noqa: E402
+    CODEX_CATALOG_ENV,
+    CODEX_CATALOG_MAX_BYTES,
+    CodexModelCatalog,
+    codex_model_catalog,
+    probe_codex_model_catalog,
+    read_bounded_command_output,
+    reset_codex_model_catalog_cache,
+)
+from cobbler_runtime.host_profiles import (  # noqa: E402
+    supported_efforts_for_host,
+    supported_efforts_for_route,
+)
 from tests.test_native_worker_prewalk import (  # noqa: E402
     write_grok_qualification_artifact,
 )
@@ -189,12 +202,77 @@ class RouteDecisionMatrixTests(unittest.TestCase):
                 self.assertEqual(decision.prewalk.guide.effort, reasoning)
                 self.assertEqual(decision.prewalk.execution.effort, reasoning)
 
-    def test_non_omp_route_rejects_max_effort(self) -> None:
-        for host in ("codex", "claude", "grok"):
-            with self.subTest(host=host):
-                with self.assertRaises(ValidationIssue) as caught:
-                    self.decide(host=host, execution_reasoning="max")
-                self.assertEqual(caught.exception.code, "invalid_execution_reasoning")
+    def test_route_rejects_max_effort_no_installed_catalog_offers(self) -> None:
+        # Pin an unreadable catalog so the offline floor is exercised on every
+        # machine, with or without an installed Codex.
+        with mock.patch.dict(
+            os.environ, {CODEX_CATALOG_ENV: "/nonexistent/elves-codex-catalog.json"}
+        ):
+            reset_codex_model_catalog_cache()
+            self.addCleanup(reset_codex_model_catalog_cache)
+            for host in ("codex", "claude", "grok"):
+                with self.subTest(host=host):
+                    with self.assertRaises(ValidationIssue) as caught:
+                        self.decide(host=host, execution_reasoning="max")
+                    self.assertEqual(
+                        caught.exception.code, "invalid_execution_reasoning"
+                    )
+
+    def test_pinned_guide_effort_is_checked_against_its_own_model(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "catalog.json"
+            path.write_text(CODEX_CATALOG_FIXTURE, encoding="utf-8")
+            path.chmod(0o600)
+            with mock.patch.dict(os.environ, {CODEX_CATALOG_ENV: str(path)}):
+                reset_codex_model_catalog_cache()
+                self.addCleanup(reset_codex_model_catalog_cache)
+                # `catalog-narrow-model` publishes low and high only. The
+                # host-wide union contains max because another model offers
+                # it, which must not qualify this guide route.
+                narrow = self.decide(
+                    host="codex",
+                    execution_reasoning="high",
+                    explicit_intent={
+                        "worker": {
+                            "prewalk": "auto",
+                            "prewalk_guide_model": "catalog-narrow-model",
+                            "prewalk_guide_effort": "max",
+                        }
+                    },
+                )
+                self.assertEqual(narrow.prewalk.actual_mode, "off")
+                self.assertEqual(
+                    narrow.prewalk.fallback_reason,
+                    "prewalk_capability_unavailable:"
+                    "guide_effort_unsupported_by_model",
+                )
+                supported = self.decide(
+                    host="codex",
+                    execution_reasoning="high",
+                    explicit_intent={
+                        "worker": {
+                            "prewalk": "auto",
+                            "prewalk_guide_model": "catalog-guide-model",
+                            "prewalk_guide_effort": "max",
+                        }
+                    },
+                )
+                self.assertNotEqual(
+                    supported.prewalk.fallback_reason,
+                    "prewalk_capability_unavailable:"
+                    "guide_effort_unsupported_by_model",
+                )
+
+    def test_codex_route_accepts_a_level_the_live_catalog_publishes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "catalog.json"
+            path.write_text(CODEX_CATALOG_FIXTURE, encoding="utf-8")
+            path.chmod(0o600)
+            with mock.patch.dict(os.environ, {CODEX_CATALOG_ENV: str(path)}):
+                reset_codex_model_catalog_cache()
+                self.addCleanup(reset_codex_model_catalog_cache)
+                decision = self.decide(host="codex", execution_reasoning="max")
+                self.assertEqual(decision.worker_effort, "max")
 
     def test_prewalk_routes_are_distinct_capability_gated_and_model_free(self) -> None:
         unqualified = self.decide(
@@ -1362,7 +1440,8 @@ class GrokPrewalkQualificationGateTests(unittest.TestCase):
             },
             grok_prewalk_qualification=self._grok_qualification(),
         )
-        route_changed = self.decide(
+        # Another guide model reuses proof recorded on this execution route.
+        guide_changed = self.decide(
             explicit_intent={
                 "worker": {
                     "provider": "grok",
@@ -1374,7 +1453,22 @@ class GrokPrewalkQualificationGateTests(unittest.TestCase):
                 evidence_source="artifact:/fixture/grok-qualification.json"
             ),
         )
+        # An execution route the artifact never proved falls back instead.
+        route_changed = self.decide(
+            explicit_intent={
+                "worker": {
+                    "provider": "grok",
+                    "prewalk": "auto",
+                    "prewalk_guide_model": "guide-model",
+                }
+            },
+            grok_prewalk_qualification=self._grok_qualification(
+                evidence_source="artifact:/fixture/grok-qualification.json",
+                qualified_execution_model="a-model-never-qualified",
+            ),
+        )
         self.assertEqual(activated.prewalk.actual_mode, "exact_session")
+        self.assertEqual(guide_changed.prewalk.actual_mode, "exact_session")
         self.assertEqual(route_changed.prewalk.actual_mode, "off")
         self.assertEqual(
             route_changed.prewalk.fallback_reason,
@@ -1611,6 +1705,405 @@ class GrokPrewalkQualificationArtifactGateTests(unittest.TestCase):
                 rejection["issues"][0]["code"], "prewalk_capability_unavailable"
             )
             self.assertEqual(rejection["issues"][0]["path"], "host")
+
+
+CODEX_CATALOG_FIXTURE = json.dumps(
+    {
+        "client_version": "0.147.0",
+        "models": [
+            {
+                "slug": "catalog-guide-model",
+                "supported_reasoning_levels": [
+                    {"effort": "low"},
+                    {"effort": "medium"},
+                    {"effort": "high"},
+                    {"effort": "xhigh"},
+                    {"effort": "max"},
+                ],
+            },
+            {
+                "slug": "catalog-execution-model",
+                "supported_reasoning_levels": [
+                    {"effort": "low"},
+                    {"effort": "medium"},
+                    {"effort": "high"},
+                    {"effort": "xhigh"},
+                    {"effort": "max"},
+                ],
+            },
+            {
+                "slug": "catalog-narrow-model",
+                "supported_reasoning_levels": [{"effort": "low"}, {"effort": "high"}],
+            },
+            {"slug": "catalog-levelless-model", "supported_reasoning_levels": []},
+        ],
+    }
+)
+
+
+class CodexModelCatalogTests(unittest.TestCase):
+    """The installed catalog, not an Elves list, decides which routes exist."""
+
+    def setUp(self) -> None:
+        reset_codex_model_catalog_cache()
+        self.addCleanup(reset_codex_model_catalog_cache)
+        # An installed binary is a precondition of the command probe, and CI
+        # machines have none: pin the lookup so these tests exercise the
+        # reader rather than the absent-executable arm (covered separately).
+        located = mock.patch(
+            "cobbler_runtime.codex_catalog.shutil.which",
+            return_value="/usr/bin/codex",
+        )
+        located.start()
+        self.addCleanup(located.stop)
+
+    def _catalog(self) -> CodexModelCatalog:
+        return probe_codex_model_catalog(
+            reader=lambda _argv: (0, CODEX_CATALOG_FIXTURE)
+        )
+
+    def test_hostile_catalog_rows_cannot_certify_invented_routes(self) -> None:
+        hostile = json.dumps(
+            {
+                "models": [
+                    {
+                        "slug": "catalog-execution-model",
+                        "supported_reasoning_levels": [
+                            {"effort": "high"},
+                            # Configuration punctuation would otherwise reach
+                            # `model_reasoning_effort="<effort>"` verbatim.
+                            {"effort": 'max"\nsandbox_mode="danger-full-access'},
+                            {"effort": "a" * 64},
+                            {"effort": "level with spaces"},
+                        ],
+                    },
+                    {
+                        "slug": 'evil"model',
+                        "supported_reasoning_levels": [{"effort": "max"}],
+                    },
+                ]
+            }
+        )
+        catalog = probe_codex_model_catalog(reader=lambda _argv: (0, hostile))
+        self.assertTrue(catalog.available)
+        # Only the conservative identifier survives.
+        self.assertEqual(
+            catalog.efforts_for("catalog-execution-model"), frozenset({"high"})
+        )
+        self.assertEqual(catalog.models, ("catalog-execution-model",))
+        self.assertEqual(catalog.efforts_union(), frozenset({"high"}))
+        self.assertFalse(catalog.supports('evil"model'))
+
+    def test_absent_binary_reports_its_own_reason(self) -> None:
+        with mock.patch(
+            "cobbler_runtime.codex_catalog.shutil.which", return_value=None
+        ):
+            catalog = probe_codex_model_catalog(
+                reader=lambda _argv: self.fail(
+                    "an absent binary must not be invoked"
+                )
+            )
+        self.assertFalse(catalog.available)
+        self.assertEqual(catalog.reason, "executable_not_found")
+        self.assertEqual(catalog.efforts_union(), frozenset())
+
+    def test_catalog_binds_each_model_to_its_own_levels(self) -> None:
+        catalog = self._catalog()
+        self.assertTrue(catalog.available)
+        self.assertEqual(catalog.client_version, "0.147.0")
+        self.assertEqual(
+            catalog.efforts_for("catalog-execution-model"),
+            frozenset({"low", "medium", "high", "xhigh", "max"}),
+        )
+        self.assertEqual(
+            catalog.efforts_for("catalog-narrow-model"), frozenset({"low", "high"})
+        )
+        self.assertTrue(catalog.route_supported("catalog-execution-model", "max"))
+        self.assertFalse(catalog.route_supported("catalog-narrow-model", "max"))
+        # Case and surrounding space never invent a route.
+        self.assertTrue(catalog.route_supported(" Catalog-Execution-Model ", "MAX"))
+        self.assertFalse(catalog.supports("model-not-in-catalog"))
+        # A model advertising no levels binds no route.
+        self.assertFalse(catalog.supports("catalog-levelless-model"))
+
+    def test_unreadable_catalog_fails_closed_with_a_reason(self) -> None:
+        def failing_reader(_argv):
+            raise OSError("no such binary")
+
+        for reader, reason in (
+            (lambda _argv: (0, "not json at all"), "catalog_unparsable"),
+            (lambda _argv: (0, json.dumps({"models": []})), "catalog_empty"),
+            (lambda _argv: (2, ""), "catalog_command_exit_2"),
+            (failing_reader, "catalog_command_failed"),
+        ):
+            with self.subTest(reason=reason):
+                catalog = probe_codex_model_catalog(reader=reader)
+                self.assertFalse(catalog.available)
+                self.assertEqual(catalog.reason, reason)
+                # A failed read widens nothing: no models, no levels.
+                self.assertEqual(catalog.efforts_union(), frozenset())
+                self.assertEqual(catalog.models, ())
+                self.assertEqual(
+                    supported_efforts_for_route(
+                        "codex", "catalog-execution-model", catalog=catalog
+                    ),
+                    frozenset({"low", "medium", "high"}),
+                )
+
+    def test_file_override_replaces_the_installed_probe(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "catalog.json"
+            path.write_text(CODEX_CATALOG_FIXTURE, encoding="utf-8")
+            path.chmod(0o600)
+            with mock.patch.dict(os.environ, {CODEX_CATALOG_ENV: str(path)}):
+                catalog = probe_codex_model_catalog(
+                    reader=lambda _argv: self.fail(
+                        "an override must not launch the installed binary"
+                    )
+                )
+            self.assertTrue(catalog.available)
+            self.assertEqual(catalog.source, "catalog_override")
+            with mock.patch.dict(
+                os.environ, {CODEX_CATALOG_ENV: str(path / "missing.json")}
+            ):
+                missing = probe_codex_model_catalog(reader=lambda _argv: (0, ""))
+            self.assertFalse(missing.available)
+            self.assertEqual(missing.reason, "override_not_a_file")
+
+    def test_override_read_is_fd_bound_and_size_bound(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            real = root / "catalog.json"
+            real.write_text(CODEX_CATALOG_FIXTURE, encoding="utf-8")
+            real.chmod(0o600)
+
+            # A symlink is not a regular file to the fd-bound reader.
+            link = root / "catalog-link.json"
+            link.symlink_to(real)
+            with mock.patch.dict(os.environ, {CODEX_CATALOG_ENV: str(link)}):
+                followed = probe_codex_model_catalog(reader=lambda _argv: (0, ""))
+            self.assertFalse(followed.available)
+            self.assertEqual(followed.reason, "override_not_a_file")
+
+            # A world-writable catalog could be edited by anyone on the box.
+            loose = root / "loose.json"
+            loose.write_text(CODEX_CATALOG_FIXTURE, encoding="utf-8")
+            loose.chmod(0o666)
+            with mock.patch.dict(os.environ, {CODEX_CATALOG_ENV: str(loose)}):
+                writable = probe_codex_model_catalog(reader=lambda _argv: (0, ""))
+            self.assertFalse(writable.available)
+            self.assertEqual(writable.reason, "override_writable_by_others")
+
+            # Oversized input is refused rather than read into memory.
+            big = root / "big.json"
+            big.write_text("x" * (CODEX_CATALOG_MAX_BYTES + 1), encoding="utf-8")
+            big.chmod(0o600)
+            with mock.patch.dict(os.environ, {CODEX_CATALOG_ENV: str(big)}):
+                oversized = probe_codex_model_catalog(reader=lambda _argv: (0, ""))
+            self.assertFalse(oversized.available)
+            self.assertEqual(oversized.reason, "override_too_large")
+
+    def test_command_output_is_read_through_a_capped_pipe(self) -> None:
+        flood = (
+            "python3 -c \"import sys; sys.stdout.write('x' * "
+            f"{CODEX_CATALOG_MAX_BYTES * 2})\""
+        )
+        returncode, text = read_bounded_command_output(["sh", "-c", flood])
+        # Over-bound output is refused, not buffered whole and then measured.
+        self.assertEqual(text, "")
+        self.assertEqual(returncode, 0)
+        code, ok = read_bounded_command_output(["sh", "-c", "printf '{\"models\":[]}'"])
+        self.assertEqual(code, 0)
+        self.assertEqual(ok, '{"models":[]}')
+
+    def test_cache_re_probes_when_the_override_file_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "catalog.json"
+            path.write_text(CODEX_CATALOG_FIXTURE, encoding="utf-8")
+            path.chmod(0o600)
+            with mock.patch.dict(os.environ, {CODEX_CATALOG_ENV: str(path)}):
+                first = codex_model_catalog()
+                self.assertTrue(first.route_supported("catalog-execution-model", "max"))
+                narrowed = json.dumps(
+                    {
+                        "models": [
+                            {
+                                "slug": "catalog-execution-model",
+                                "supported_reasoning_levels": [{"effort": "low"}],
+                            }
+                        ]
+                    }
+                )
+                path.write_text(narrowed, encoding="utf-8")
+                os.utime(path, (0, 0))
+                second = codex_model_catalog()
+            self.assertFalse(second.route_supported("catalog-execution-model", "max"))
+
+    def test_route_efforts_follow_the_catalog_and_fall_back_to_the_floor(self) -> None:
+        catalog = self._catalog()
+        floor = frozenset({"low", "medium", "high"})
+        # A listed model accepts exactly what the catalog advertises, including
+        # levels no Elves table names.
+        self.assertIn(
+            "max", supported_efforts_for_route("codex", "catalog-execution-model", catalog=catalog)
+        )
+        self.assertNotIn(
+            "max", supported_efforts_for_route("codex", "catalog-narrow-model", catalog=catalog)
+        )
+        # An unlisted model, and any host without a catalog, keep the floor.
+        self.assertEqual(
+            supported_efforts_for_route("codex", "model-not-in-catalog", catalog=catalog),
+            floor,
+        )
+        self.assertEqual(supported_efforts_for_route("claude", "claude-opus-5"), floor)
+        # Host level is the union, so a level any model offers is not rejected
+        # before the model is known.
+        self.assertIn("max", supported_efforts_for_host("codex", catalog=catalog))
+        self.assertEqual(
+            supported_efforts_for_host(
+                "codex", catalog=CodexModelCatalog(reason="executable_not_found")
+            ),
+            floor,
+        )
+
+    def test_worker_spec_accepts_catalog_levels_only_for_listed_models(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            (repo / ".git").mkdir()
+            catalog_path = repo / "catalog.json"
+            catalog_path.write_text(CODEX_CATALOG_FIXTURE, encoding="utf-8")
+            catalog_path.chmod(0o600)
+            with mock.patch.dict(os.environ, {CODEX_CATALOG_ENV: str(catalog_path)}):
+                reset_codex_model_catalog_cache()
+                spec = build_native_worker_spec(
+                    host="codex",
+                    worktree=repo,
+                    effort="max",
+                    requested_model="catalog-execution-model",
+                )
+                self.assertIn(
+                    'model_reasoning_effort="max"', " ".join(spec.argv)
+                )
+                with self.assertRaises(ValidationIssue) as caught:
+                    build_native_worker_spec(
+                        host="codex",
+                        worktree=repo,
+                        effort="max",
+                        requested_model="catalog-narrow-model",
+                    )
+                self.assertEqual(caught.exception.code, "invalid_worker_effort")
+
+
+class PrewalkExecutionRouteProofTests(unittest.TestCase):
+    """Qualification binds the execution route; the guide route stays free."""
+
+    def _qualified(self) -> PrewalkCapabilities:
+        return PrewalkCapabilities(
+            host="codex",
+            transport="codex_exec",
+            installed_version="0.147.0",
+            advertised_exact_resume=True,
+            advertised_route_override_on_resume=True,
+            behaviorally_verified_session_continuity=True,
+            worktree_binding_verified=True,
+            stream_identity_verified=True,
+            instruction_fidelity="retained_safe",
+            evidence_source="test_artifact",
+            model_calls_made=True,
+            qualified_guide_model="catalog-guide-model",
+            qualified_guide_effort="xhigh",
+            qualified_execution_model="catalog-execution-model",
+            qualified_execution_effort="max",
+        )
+
+    def test_any_guide_route_reuses_one_execution_route_proof(self) -> None:
+        caps = self._qualified()
+        for guide_model, guide_effort in (
+            ("catalog-guide-model", "xhigh"),
+            ("catalog-guide-model", "max"),
+            ("catalog-execution-model", "high"),
+            ("catalog-narrow-model", "low"),
+            (None, "medium"),
+        ):
+            with self.subTest(guide=(guide_model, guide_effort)):
+                self.assertTrue(
+                    caps.route_matches(
+                        guide_model=guide_model,
+                        guide_effort=guide_effort,
+                        execution_model="catalog-execution-model",
+                        execution_effort="max",
+                    )
+                )
+
+    def test_execution_route_must_match_the_proof_exactly(self) -> None:
+        caps = self._qualified()
+        for execution_model, execution_effort in (
+            ("catalog-guide-model", "max"),
+            ("catalog-execution-model", "xhigh"),
+            (None, "max"),
+        ):
+            with self.subTest(execution=(execution_model, execution_effort)):
+                self.assertFalse(
+                    caps.route_matches(
+                        guide_model="catalog-guide-model",
+                        guide_effort="xhigh",
+                        execution_model=execution_model,
+                        execution_effort=execution_effort,
+                    )
+                )
+
+    def test_every_host_shares_one_rule(self) -> None:
+        for host, transport in (
+            ("codex", "codex_exec"),
+            ("claude", "claude_code"),
+            ("grok", "grok_build"),
+            ("omp", "omp_build"),
+        ):
+            with self.subTest(host=host):
+                caps = PrewalkCapabilities(
+                    host=host,
+                    transport=transport,
+                    qualified_guide_model="guide-model",
+                    qualified_guide_effort="high",
+                    qualified_execution_model="execution-model",
+                    qualified_execution_effort="medium",
+                    evidence_source="test_artifact",
+                )
+                self.assertTrue(
+                    caps.route_matches(
+                        guide_model="a-different-guide",
+                        guide_effort="low",
+                        execution_model="execution-model",
+                        execution_effort="medium",
+                    )
+                )
+                self.assertFalse(
+                    caps.route_matches(
+                        guide_model="guide-model",
+                        guide_effort="high",
+                        execution_model="a-different-execution-model",
+                        execution_effort="medium",
+                    )
+                )
+
+    def test_unqualified_capabilities_match_no_route(self) -> None:
+        advertised = PrewalkCapabilities(host="codex", transport="codex_exec")
+        self.assertFalse(
+            advertised.route_matches(
+                guide_model="catalog-guide-model",
+                guide_effort="xhigh",
+                execution_model="catalog-execution-model",
+                execution_effort="max",
+            )
+        )
+        self.assertFalse(
+            advertised.route_matches(
+                guide_model=None,
+                guide_effort="max",
+                execution_model=None,
+                execution_effort="max",
+            )
+        )
 
 
 if __name__ == "__main__":

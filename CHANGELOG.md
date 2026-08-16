@@ -4,6 +4,37 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.30.0] - 2026-08-15
+
+### Added
+- **Catalog-derived prewalk routes.** Both prewalk phase routes are now validated against the
+  installed host's own model catalog instead of any list inside Elves. On Codex that catalog is
+  `codex debug models`, read locally with no model call, so every model and reasoning level the
+  host publishes (including `xhigh` and `max` on the frontier models) is available the day it
+  ships. The catalog only widens what a host profile already accepts: a model the catalog does
+  not list keeps the floor rather than being refused, so an unreadable catalog can never authorise
+  a route the profile would refuse. A host that publishes
+  no catalog, or a machine where the catalog cannot be read, keeps the conservative
+  `low`/`medium`/`high` floor rather than guessing. `ELVES_CODEX_MODEL_CATALOG` points the reader
+  at a catalog file for offline and test use.
+- **Strong guide, cheap execution.** An operator can pin a strong guide route and a cheaper
+  execution route on the same prewalk session: the guide orients, writes the bounded TODO and
+  checkpoint, and makes the first real edit, then that exact session resumes on the execution
+  route in the same worktree on one stream. Verified against codex-cli 0.147.0, where
+  `codex exec --model <model> resume <session-id>` keeps the thread and applies the new route.
+
+### Changed
+- **Qualification binds the execution route.** The bounded canary proves two things, and both
+  belong to the execution route: this transport resumes one exact session, and the model that
+  resumes retains the guide phase's instructions. Cached proof is therefore reused for any guide
+  model and any guide effort, and for no other execution route. Changing guide or guide effort now
+  costs nothing; changing the execution model or level still runs a new canary under `required`.
+  The rule is identical on Claude Code, Codex, Grok Build, and Oh My Pi. Guide-phase quality is
+  never assumed: TODO, checkpoint, meaningful edit, session identity, and worktree binding are
+  checked against real evidence on every run before the handoff.
+- The qualification cache key carries the execution route, so guide-route changes hit the cache
+  instead of missing it.
+
 ## [2.29.0] - 2026-08-13
 
 ### Added

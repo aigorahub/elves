@@ -9,9 +9,14 @@ import subprocess
 import tempfile
 import threading
 import unittest
+from unittest import mock
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from cobbler_runtime.codex_catalog import (
+    CODEX_CATALOG_ENV,
+    reset_codex_model_catalog_cache,
+)
 from cobbler_runtime.host_profiles import (
     HostLaunchRequest,
     host_profile_or_none,
@@ -192,20 +197,30 @@ class OmpHostProfileTests(unittest.TestCase):
                     self.assertEqual(
                         spec.argv[spec.argv.index("--thinking") + 1], effort
                     )
-            for other_host, model in (
-                ("grok", "grok-4.5"),
-                ("claude", "claude-opus-5"),
-                ("codex", "gpt-5.6"),
+            # Pin an unreadable Codex catalog so the offline floor is the rule
+            # here on every machine, installed host or not. Catalog-derived
+            # widening has its own coverage in test_adaptive_worker_routing.
+            with mock.patch.dict(
+                os.environ, {CODEX_CATALOG_ENV: "/nonexistent/elves-codex-catalog.json"}
             ):
-                with self.subTest(host=other_host):
-                    with self.assertRaises(ValidationIssue) as caught:
-                        build_native_worker_spec(
-                            host=other_host,
-                            worktree=repo,
-                            effort="max",
-                            requested_model=model,
+                reset_codex_model_catalog_cache()
+                self.addCleanup(reset_codex_model_catalog_cache)
+                for other_host, model in (
+                    ("grok", "grok-4.5"),
+                    ("claude", "claude-opus-5"),
+                    ("codex", "gpt-5.6"),
+                ):
+                    with self.subTest(host=other_host):
+                        with self.assertRaises(ValidationIssue) as caught:
+                            build_native_worker_spec(
+                                host=other_host,
+                                worktree=repo,
+                                effort="max",
+                                requested_model=model,
+                            )
+                        self.assertEqual(
+                            caught.exception.code, "invalid_worker_effort"
                         )
-                    self.assertEqual(caught.exception.code, "invalid_worker_effort")
 
     def test_omp_behavioral_evidence_accepts_xhigh_to_max_route(self) -> None:
         advertised = advertised_prewalk_capabilities(

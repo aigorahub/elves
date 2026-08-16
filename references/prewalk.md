@@ -56,8 +56,9 @@ single-phase launch/status/follow remains supported.
 - The safe global convenience preference defaults to `auto` in
   `${XDG_CONFIG_HOME:-~/.config}/elves/config.json`.
 - `auto` makes no qualification model calls. It activates on medium/high or multi-step work only
-  when matching successful proof is cached for the exact installed version/build and phase routes.
-  It skips clearly atomic low-reasoning work and records an honest fallback.
+  when matching successful proof is cached for the exact installed version/build and the exact
+  execution route. It skips clearly atomic low-reasoning work and records a fallback with the
+  concrete reason.
 - `required` automatically runs one bounded live qualification canary when matching cached proof is
   absent. The canary has a 180-second hard wall budget and 1 MiB combined output limit. It launches
   no task worker until exact resume, route change, same session, same worktree, one logical stream,
@@ -73,8 +74,22 @@ single-phase launch/status/follow remains supported.
   worker transports. Grok remains subject to provider consent, repository veto, live model catalog,
   and API-key requirements. Prewalk adds no credential or provider authority.
 
-A cached canary qualifies only its exact installed version/build and exact route pair. An upgrade
-or route change triggers a new canary under `required`. `auto` falls back instead of spending.
+A cached canary qualifies one exact installed version/build and one exact **execution** route
+(model and reasoning level). That is what the canary proves: this transport resumes one exact
+session, and the model that resumes retains the guide phase's instructions across the resume.
+Because neither property belongs to the guide route, the same proof covers any guide model and any
+guide effort, and covers no other execution route. An upgrade, or a change of execution model or
+execution level, triggers a new canary under `required`; `auto` falls back instead of spending.
+Guide-phase quality is never assumed from a canary: the transition kernel checks the guide's TODO,
+checkpoint, meaningful edit, session identity, and worktree binding on every run.
+
+Both phase routes are validated against the installed host's own model catalog. Elves stores no
+model names: a pin is accepted when the host publishes that reasoning level for that model, and a
+host that publishes no catalog (or whose catalog cannot be read) keeps the conservative offline
+vocabulary rather than guessing. On Codex the catalog comes from `codex debug models`, a local
+read with no model call, cached for the process. `ELVES_CODEX_MODEL_CATALOG=<path>` points the
+reader at a catalog file instead, for offline hosts and tests; an unreadable, oversized, or
+unparsable file reports its reason and keeps the floor, and never widens a route.
 
 Sakana's Claude Code-compatible Fugu endpoint does not change that. A Claude Code host pointed at
 `https://api.sakana.ai` advertises the same `--resume <uuid>` grammar, but advertised grammar has
@@ -164,7 +179,9 @@ Provider cache tokens are telemetry only. Cache hits neither prove nor gate traj
 | Fresh identity | capture `thread.started.thread_id` | caller-generated UUID | caller-generated UUID via `--session-id` (create-only) | exact ID before transition |
 | Guide route | `--model`, `model_reasoning_effort` | `--model`, `--effort` | `--model`, `--effort` | explicitly pinned |
 | Exact resume | `codex exec resume <id>` | `--resume <uuid>` | exact `--resume <uuid>` | never `--last`/`--continue` |
-| Resume route | flags before `resume`; OS CWD | model/effort with resume; supervisor CWD | model/effort with resume; supervisor `--cwd`; sandbox resume-sticky | explicit execution route, same worktree |
+| Resume route | flags before `resume`; OS CWD; `--model` and `model_reasoning_effort` apply on resume | model/effort with resume; supervisor CWD | model/effort with resume; supervisor `--cwd`; sandbox resume-sticky | explicit execution route, same worktree |
+| Route vocabulary | live `codex debug models` catalog per model | installed help grammar | authenticated live catalog | no model names stored by Elves |
+| Proof reuse | one canary per execution route, any guide route | same | same | identical rule on every host |
 | Stream | JSONL | stream JSON | streaming JSON (no tool-call events; `sessionId` only on `end`) | one redacted logical follow log |
 | Authority | workspace sandbox + narrow Git roots | `auto` classifier + narrow Git roots | `--permission-mode auto`, never yolo/always-approve | existing no-push/protected-ref checks |
 | TODO/checkpoint | native mechanism + private JSON mirror | native mechanism + private JSON mirror | private JSON mirror is authoritative (installed `plan.json` persistence is vestigial) | bounded provider-neutral schema |
@@ -193,7 +210,12 @@ The execution effort is route-dependent, not a fixed `medium`: the grok route de
 route default. A Grok qualification canary recorded at execution effort `medium` before the
 `high` default fails `qualification_route_mismatch` and must be re-recorded at `high`.
 The OMP route accepts `xhigh` and `max`. It passes these levels unchanged to `omp --thinking` in
-both phases. Other host routes keep their narrower effort vocabulary.
+both phases. The Codex route accepts whatever `codex debug models` publishes for the pinned model,
+which currently includes `xhigh` and `max` on the frontier models and stops lower on others; a
+model the catalog does not list, and a machine where the catalog cannot be read, keep the
+conservative `low`/`medium`/`high` floor. A strong guide at a high level handing off to a cheaper
+execution model at its own level is the intended shape of this lane. One canary per execution
+route serves every guide route, so trying several guides costs nothing more.
 OMP create and resume use one stable run profile. Isolated `--profile` state does not inherit host
 OAuth. Auth preflight runs before any model call and before spec reports launch-ready: a matching
 API key, or a paired loopback broker from the environment or from persistent `auth.broker`

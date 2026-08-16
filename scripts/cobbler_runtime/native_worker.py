@@ -45,7 +45,7 @@ from .host_profiles import (
     native_worker_profile_view,
     provider_secret_names as _registry_provider_secret_names,
     resolve_host_profile,
-    supported_efforts_for_host,
+    supported_efforts_for_route,
 )
 from .prewalk import (
     PREWALK_CONTINUATION_INPUT,
@@ -296,8 +296,6 @@ def build_native_worker_spec(
 ) -> NativeWorkerSpec:
     host_profile = resolve_host_profile(host)
     effort_token = effort.strip().lower()
-    if effort_token not in supported_efforts_for_host(host):
-        raise ValidationIssue("invalid_worker_effort", f"Invalid worker effort `{effort}`")
     if not requested_model or not requested_model.strip():
         raise ValidationIssue(
             "current_worker_model_required",
@@ -305,6 +303,10 @@ def build_native_worker_spec(
             path="requested_model",
         )
     requested_model = requested_model.strip()
+    # The live catalog is the authority on which reasoning levels this exact
+    # model accepts; hosts without one keep the profile's offline floor.
+    if effort_token not in supported_efforts_for_route(host, requested_model):
+        raise ValidationIssue("invalid_worker_effort", f"Invalid worker effort `{effort}`")
     cwd = str(worktree.resolve())
     git_write_roots = _git_write_roots(worktree)
     model_policy = "host_pinned_current_model"
@@ -465,20 +467,23 @@ def _qualification_cache_root(
 def prewalk_qualification_cache_path(
     capabilities: PrewalkCapabilities,
     *,
-    guide_model: str,
-    guide_effort: str,
     execution_model: str,
     execution_effort: str,
     cache_root: Path | None = None,
     env: dict[str, str] | None = None,
 ) -> Path:
-    """Return the private cache key for one installed build and route pair."""
+    """Return the private cache key for one installed build and execution route.
+
+    The key carries the execution route only, matching what the canary proves
+    (``PrewalkCapabilities.route_matches``): one guide model orienting before a
+    proven execution route does not need its own canary, so switching guides or
+    guide effort reuses the cached proof instead of spending a new one.
+    """
     identity = {
         "host": capabilities.host,
         "transport": capabilities.transport,
         "installed_version": capabilities.installed_version,
         "installed_build_commit": capabilities.installed_build_commit,
-        "guide": {"model": guide_model, "effort": guide_effort},
         "execution": {"model": execution_model, "effort": execution_effort},
     }
     digest = hashlib.sha256(
@@ -756,8 +761,6 @@ def qualify_installed_prewalk_transport(
         )
     cache_path = prewalk_qualification_cache_path(
         advertised,
-        guide_model=guide_model,
-        guide_effort=guide_effort,
         execution_model=execution_model,
         execution_effort=execution_effort,
         cache_root=cache_root,

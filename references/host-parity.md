@@ -54,6 +54,8 @@ not parity.
 | Guide route | `--model`, `--effort` | `--model`, `model_reasoning_effort` | `--model`, `--effort` | `--model`, `--thinking` (`xhigh`/`max` kept) | explicit guide model/effort |
 | Resume | `--resume <uuid>` | `codex exec resume <id>` | `--resume <uuid>` | `--resume <uuid>` | never `--continue`, `--last`, or latest |
 | Resume route | model/effort flags with resume | route/sandbox/Git-root flags before `resume` | model/effort flags with resume | model/thinking flags with resume | explicit execution model/effort |
+| Route vocabulary | installed help grammar | live `codex debug models` catalog per model | authenticated live catalog | installed help grammar (`xhigh`/`max` kept) | Elves stores no model names; unreadable catalog keeps the offline floor |
+| Proof reuse | one canary per execution route, reused for any guide route | same | same | same | guide-phase quality checked per run, not by canary |
 | Worktree | supervisor CWD + narrow allowed roots | `-C` on create; supervisor OS CWD on resume | `--cwd` create; resume-sticky sandbox | `--cwd` create and resume; stable worktree-derived `--profile` | exact registered worktree/branch |
 | Stream | stream JSON | JSONL | streaming JSON | `--mode json` NDJSON | one redacted logical follow stream with phase labels |
 | TODO/checkpoint | native mechanism plus private JSON mirror | native mechanism plus private JSON mirror | private JSON mirror is authoritative | private JSON mirror is authoritative | same bounded provider-neutral schema |
@@ -66,7 +68,8 @@ fixtures prove advertised create/resume/route flags but not conversation continu
 pruning. The current persisted-instruction transport activates only for behaviorally proven
 `retained_safe`; `pruned` and `turn_scoped` remain schema states for future delivery mechanisms.
 Consequently `auto` remains off for an unqualified installed version. `required` runs the bounded
-live canary and either records exact-version-and-route proof or stops before task launch with
+live canary and either records proof bound to the exact installed version and execution route,
+or stops before task launch with
 evidence. `experimental` proceeds only from advertised exact-resume and route-override grammar,
 reports `exact_session_experimental`, and retains all real-run continuity checks. No host may
 silently start a new session or claim behavioral qualification from static help.

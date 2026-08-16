@@ -87,9 +87,32 @@ the same provider label. The worker route is always described as a `(model, effo
 **Native delegation stays inside one model family.** Every native row above lowers effort on the
 exact observed driver model and never substitutes a sibling. Elves no longer defines a
 Fable→Opus route: a driver planning at Fable 5 `max`/`ultra` hands off to `claude-fable-5` at
-`low`, which is a capable implementation worker, rather than crossing into the Opus family. The
-only cross-family worker is the explicitly permitted, capability-probed Grok Build handoff, which
-a user opts into rather than receiving as a default.
+`low`, which is a capable implementation worker, rather than crossing into the Opus family.
+
+**Two-route prewalk (v2.30+).** Automatic delegation stays same-family, but an operator running
+exact-session prewalk pins both phase routes explicitly, and the two may be different models:
+
+```
+--guide-model <strong-model> --guide-effort <level> \
+  --execution-model <cheaper-model> --execution-effort <level>
+```
+
+The guide phase orients, writes the bounded TODO and checkpoint, and makes the first real edit;
+the execution phase resumes that exact session, in the same worktree, on one stream. Nothing
+here is a model name Elves knows. Both routes are validated against the host's own live catalog,
+so a pin is accepted when the installed host publishes that reasoning level for that model.
+
+**Where the proof binds.** The bounded qualification canary proves properties of the *execution*
+route: that this transport resumes one exact session, and that the model resuming retains the
+guide phase's instructions across the resume. So a cached proof is reused for any guide route and
+for no other execution route. Switching guide model or guide effort costs nothing; changing the
+execution model or its level requires its own canary. This rule is identical on Claude Code,
+Codex, Grok Build, and Oh My Pi. Guide-phase quality is never assumed: every run checks the guide's
+TODO, checkpoint, meaningful edit, session identity, and worktree binding against real evidence
+before the transition, which is stricter than any canary.
+
+The only cross-family worker is the explicitly permitted, capability-probed Grok Build handoff,
+which a user opts into rather than receiving as a default.
 
 These named defaults apply to a separate worker and to the execution phase of an exact-session
 prewalk. An explicit user route still wins. Unlisted native routes use the plan's low/medium/high

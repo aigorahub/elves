@@ -19,6 +19,7 @@ from .config import load_json_file, load_toml_file
 from .host_profiles import (
     resolve_host_profile,
     supported_efforts_for_host,
+    supported_efforts_for_route,
     transport_for_host,
 )
 from .prewalk import PrewalkCapabilities
@@ -1134,6 +1135,21 @@ def decide_worker_route(
     guide_policy = "explicit_guide_model_pin" if guide_model else "inherit_live_driver_model"
     actual_prewalk = "off"
     prewalk_fallback: str | None = None
+    # `accepted_efforts` above is the host-wide union, the only vocabulary
+    # available before a model is known. Once an explicit guide model is
+    # pinned, its own catalog row is the authority: a level that model does
+    # not publish must not be reported as a qualified route just because some
+    # other model publishes it. The launch builder would reject it anyway;
+    # reporting the fallback here keeps the decision honest.
+    if (
+        guide_model
+        and selected_provider == "native"
+        and guide_effort not in supported_efforts_for_route(host_token, guide_model)
+    ):
+        requested_prewalk = PrewalkMode.OFF
+        prewalk_fallback = (
+            "prewalk_capability_unavailable:guide_effort_unsupported_by_model"
+        )
     if requested_prewalk is not PrewalkMode.OFF:
         if selected_provider != "native":
             # Qualification-based gating (never a categorical veto): a grok
