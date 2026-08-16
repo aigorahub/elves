@@ -8,7 +8,7 @@ Oh My Pi (omp) driver plans and reviews; a subscription-native (or optional exte
 implements; durable run files let the work survive context compaction. You write the plan and own
 the merge decision. The agent does the middle.
 
-**Current release: v2.30.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.31.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 **New to Elves?** Use the [practical user guide](https://aigorahub.github.io/elves/) — especially
@@ -405,9 +405,11 @@ Codex adapter (invocation surface only — same workflow, same safety). Each con
 exactly one file below; other docs link instead of restating.
 
 **Elves (Grok Bot):** [`skills/elves-grok-bot/SKILL.md`](skills/elves-grok-bot/SKILL.md) is the
-unattended-run kernel for Grok Bot non-git work (HubSpot, Gmail, LinkedIn, CRM). Invoked via
-natural "use elves". Four files, Stop Gate, 1-minute watchdog. Not for coding runs — root
-`SKILL.md` remains authoritative for Claude Code, Codex, Grok Build, and Oh My Pi code work.
+unattended-run kernel for Grok Bot non-git work (HubSpot, Gmail, LinkedIn, CRM). Grok Bot is
+not Grok Build and not a fifth coding host. Technical name `elves-grok-bot`; invoked via
+natural "use elves", not `/goal`. Four files, Stop Gate, 1-minute watchdog, one fire at a
+time, terminal status, intent-before-send. Not for coding runs — root `SKILL.md` remains
+authoritative for Claude Code, Codex, Grok Build, and Oh My Pi code work.
 
 **Run lifecycle**
 - [`references/plan-template.md`](references/plan-template.md) — how to write a plan (stable

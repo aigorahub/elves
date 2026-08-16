@@ -14,6 +14,7 @@ automatic required-mode prewalk qualification and explicit experimental mode. Gr
 optional worker under Claude/Codex when permitted. Oh My Pi as `omp-cli` (and the `/omp` shortcut)
 remains an optional worker under other hosts; that is separate from the `omp` main-driver host.
 The user owns merge authorization; the host enforces it.
+Grok Bot is a separate non-git kernel (`skills/elves-grok-bot/SKILL.md`), not a fifth coding host.
 
 The public guide should lead with a copy-ready agent install/orient prompt, then shell install and
 first-run kickoffs.
