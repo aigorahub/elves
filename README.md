@@ -406,7 +406,7 @@ exactly one file below; other docs link instead of restating.
 
 **Elves (Grok Bot):** [`skills/elves-grok-bot/SKILL.md`](skills/elves-grok-bot/SKILL.md) is the
 unattended-run kernel for Grok Bot non-git work (HubSpot, Gmail, LinkedIn, CRM). Invoked via
-natural "use elves". Four files, Stop Gate, 15-minute watchdog. Not for coding runs — root
+natural "use elves". Four files, Stop Gate, 1-minute watchdog. Not for coding runs — root
 `SKILL.md` remains authoritative for Claude Code, Codex, Grok Build, and Oh My Pi code work.
 
 **Run lifecycle**

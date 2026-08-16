@@ -38,7 +38,11 @@ Mid-run ping: answer in a few sentences and continue.
 
 ## Watchdog
 
-Reminder every 15 minutes, waking hours. Each fire: read survival → session → plan → ledger. If the gate is closed, do the next batch. Do not recap instead of working. When all M-A# are proven, recap once and delete the reminder.
+Reminder every minute, waking hours (cron: `* 7-20 * * *`). Each fire: read survival → session → plan → ledger. If the gate is closed, do the next batch. Do not recap instead of working. When all M-A# are proven, recap once and delete the reminder.
+
+An interrupted fire (status error "Interrupted before it finished") is NOT a stop. Next fire continues from SURVIVAL/LEDGER.
+
+When a real batch or person lands, send a short progress note. Do not vanish into tool calls after announcing a step.
 
 ## Each wake
 
