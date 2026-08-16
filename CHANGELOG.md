@@ -4,6 +4,17 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.31.0] - 2026-08-16
+
+### Added
+- **Elves (Grok Bot)** (`skills/elves-grok-bot/SKILL.md`) — unattended-run kernel for Grok Bot
+  non-git work (HubSpot, Gmail, LinkedIn, CRM). Invoked via natural "use elves", not `/goal`.
+  Technical skill name is `elves-grok-bot`. Four files, Stop Gate, 1-minute watchdog, one fire
+  at a time, terminal `status` so a user stop stays stopped, and intent-before-send so an
+  interrupted fire does not double-write. Addresses the "1500 contacts done" early-stop
+  failure. Not for coding runs — root `SKILL.md` remains authoritative for Claude Code, Codex,
+  Grok Build, and Oh My Pi. Grok Bot is not a fifth coding host.
+
 ## [2.30.0] - 2026-08-15
 
 ### Added

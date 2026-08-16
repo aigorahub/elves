@@ -512,7 +512,7 @@
     <div class="masthead-inner">
       <div class="brand-row">
         <a class="wordmark" href="https://github.com/aigorahub/elves">Elves</a>
-        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.30.0 source and releases on GitHub</a>
+        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.31.0 source and releases on GitHub</a>
       </div>
       <h1>Using Elves</h1>
       <p class="intro">Plan with the main agent, hand implementation to a separate worker, then
@@ -527,6 +527,7 @@
         <li><a href="#agent-onboarding">Paste this to your agent</a></li>
         <li><a href="#how-it-works">How it works</a></li>
         <li><a href="#install">Install Elves</a></li>
+        <li><a href="#grok-bot">Grok Bot (non-git)</a></li>
         <li><a href="#shortcuts">Provider shortcuts</a></li>
         <li><a href="#first-run">Start a run</a></li>
         <li><a href="#worker">Choose a worker</a></li>
@@ -668,6 +669,21 @@ python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup
 # Grok Build
 python3 ~/.grok/skills/elves/scripts/install_doctor.py --startup</code></pre>
         </div>
+      </section>
+
+      <section id="grok-bot">
+        <h2>Grok Bot (non-git jobs)</h2>
+        <p class="lede">Grok Bot is not Grok Build. Grok Build is a coding host. Grok Bot is for
+          long unattended non-git work such as HubSpot, Gmail, LinkedIn, or CRM.</p>
+        <p>Give Grok Bot the skill at
+          <a href="https://github.com/aigorahub/elves/blob/main/skills/elves-grok-bot/SKILL.md"><code>skills/elves-grok-bot/SKILL.md</code></a>.
+          Then say <strong>use elves</strong>. Do not use <code>/goal</code>.</p>
+        <p>The kernel is four files (PLAN, SURVIVAL, session.json, LEDGER), a closed Stop Gate
+          until every acceptance row has proof, and a one-minute reminder. One fire at a time.
+          A user stop writes a terminal status and deletes that reminder so the next minute does
+          not resume. Write the item intent before each send or CRM write so an interrupted fire
+          does not double-send. Coding runs still use the root skill on Claude Code, Codex,
+          Grok Build, or Oh My Pi.</p>
       </section>
 
       <section id="shortcuts">
@@ -1235,6 +1251,15 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" continuity status</code></
             authenticated live model catalog. A failed core check falls back to the native route
             and records why. Missing goal support alone uses the one-packet fallback without
             disabling an otherwise valid Grok provider.</p>
+        </details>
+
+        <details>
+          <summary>I want Elves on Grok Bot, not Grok Build.</summary>
+          <p><strong>Different product.</strong> Grok Build is a coding host. For Grok Bot
+            outreach or CRM work, give it
+            <a href="https://github.com/aigorahub/elves/blob/main/skills/elves-grok-bot/SKILL.md"><code>skills/elves-grok-bot/SKILL.md</code></a>
+            and say <strong>use elves</strong>. Do not use <code>/goal</code>. That kernel has no
+            git, PR, or merge model.</p>
         </details>
 
         <details>
