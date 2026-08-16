@@ -13,6 +13,8 @@ metadata:
 
 Files are memory. Chat is not. The user owns done. You own the middle.
 
+Do not use `/goal` — that string is reserved for a possible future feature.
+
 ## Stage
 
 Write four files under a run folder:
