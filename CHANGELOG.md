@@ -4,6 +4,17 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+### Added
+- **Long-running job kernel** (`skills/long-running-job/SKILL.md`) — a portable unattended-run
+  kernel for Grok Bot non-git work (HubSpot, Gmail, LinkedIn, outreach, CRM enrichment). Stages
+  four files (PLAN, SURVIVAL, session.json, LEDGER), enforces a Stop Gate until acceptance is
+  proven on disk, recognizes only hard stops, and wakes every 15 minutes during waking hours until
+  complete. Reuses Elves continuity-watchdog semantics (forbidden stops, wake protocol, file-backed
+  memory, ride-along) without the git/worktree/PR/merge apparatus. Not a replacement for coding
+  runs — the root `SKILL.md` remains authoritative for Claude Code, Codex, Grok Build, and Oh My
+  Pi code work. Addresses the "1500 contacts done" early-stop failure mode where an outreach agent
+  stopped after a high-signal slice without proving every acceptance criterion.
+
 ## [2.30.0] - 2026-08-15
 
 ### Added

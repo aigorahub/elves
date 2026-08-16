@@ -404,6 +404,14 @@ The compact canonical workflow is [`SKILL.md`](SKILL.md); [`AGENTS.md`](AGENTS.m
 Codex adapter (invocation surface only — same workflow, same safety). Each contract lives in
 exactly one file below; other docs link instead of restating.
 
+**Long-running non-git jobs:** [`skills/long-running-job/SKILL.md`](skills/long-running-job/SKILL.md)
+is a portable unattended-run kernel for Grok Bot outreach, CRM enrichment, and other side-effect
+labor with no PR/merge model. It ports the continuity watchdog (four files, Stop Gate,
+forbidden stops, 15-minute waking-hours routine) without the git/worktree/PR apparatus. Use for
+HubSpot, Gmail, LinkedIn, or data-migration work where acceptance must be checkable on disk with
+proof. Not a replacement for coding runs — the root `SKILL.md` remains authoritative for
+Claude Code, Codex, Grok Build, and Oh My Pi code work.
+
 **Run lifecycle**
 - [`references/plan-template.md`](references/plan-template.md) — how to write a plan (stable
   `B#-A#` acceptance ids)
