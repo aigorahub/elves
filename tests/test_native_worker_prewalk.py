@@ -24,6 +24,8 @@ if str(SCRIPTS) not in sys.path:
 from cobbler_runtime.prewalk import (  # noqa: E402
     GROK_PREWALK_QUALIFICATION_ARTIFACT_TYPE,
     PREWALK_CONTINUATION_INPUT,
+    PREWALK_QUALIFICATION_SCHEMA_VERSION,
+    PREWALK_SUMMARY_MAX_CHARS,
     advertised_prewalk_capabilities,
     experimental_prewalk_capabilities,
     fixture_prewalk_capabilities,
@@ -38,7 +40,10 @@ from cobbler_runtime.prewalk import (  # noqa: E402
     validate_todo_artifact,
 )
 from cobbler_runtime.native_worker import (  # noqa: E402
+    ObservedRoute,
     PrewalkQualificationResult,
+    _is_provider_error_event,
+    _observed_route_from_event,
     build_native_worker_prewalk_spec,
     native_worker_paths,
     native_worker_status,
@@ -179,6 +184,81 @@ class PrewalkArtifactTests(unittest.TestCase):
             )
         self.assertEqual(caught.exception.code, "prewalk_checkpoint_invalid")
 
+    def test_checkpoint_truncates_long_summary_instead_of_terminalizing(self) -> None:
+        # aigorahub/elves#260: a fully successful execution phase was terminalized
+        # over prose length alone. Length is presentation, not identity or evidence.
+        todo = validate_todo_artifact(_todo(), run_id="run-1", session_id="session-1")
+        long_summary = _checkpoint()
+        long_summary["summary"] = "x" * 4_000
+        normalized = validate_checkpoint_artifact(
+            long_summary, run_id="run-1", session_id="session-1", todo=todo
+        )
+        self.assertLessEqual(len(normalized["summary"]), PREWALK_SUMMARY_MAX_CHARS)
+        self.assertTrue(normalized["summary"].endswith("…"))
+        empty = _checkpoint()
+        empty["summary"] = "   "
+        with self.assertRaises(ValidationIssue) as caught:
+            validate_checkpoint_artifact(
+                empty, run_id="run-1", session_id="session-1", todo=todo
+            )
+        self.assertEqual(caught.exception.code, "prewalk_checkpoint_invalid")
+
+    def test_checkpoint_absent_validation_attempted_normalizes_to_empty(self) -> None:
+        # Absent means "no validation was run" and is honest on its own. A prose
+        # string is never coerced into a command record: that would invent an exit code.
+        todo = validate_todo_artifact(_todo(), run_id="run-1", session_id="session-1")
+        for override in ({}, {"validation_attempted": None}):
+            with self.subTest(override=override):
+                data = _checkpoint()
+                data.pop("validation_attempted")
+                data.update(override)
+                normalized = validate_checkpoint_artifact(
+                    data, run_id="run-1", session_id="session-1", todo=todo
+                )
+                self.assertEqual(normalized["validation_attempted"], [])
+        malformed_values: list[object] = [
+            "ran the tests",
+            ["ran the tests"],
+            [{"command": "x", "exit_code": "0"}],
+            [{"command": "", "exit_code": 0}],
+        ]
+        for malformed in malformed_values:
+            with self.subTest(malformed=malformed):
+                data = _checkpoint()
+                data["validation_attempted"] = malformed
+                with self.assertRaises(ValidationIssue) as caught:
+                    validate_checkpoint_artifact(
+                        data, run_id="run-1", session_id="session-1", todo=todo
+                    )
+                self.assertEqual(caught.exception.code, "prewalk_checkpoint_invalid")
+
+    def test_checkpoint_identity_and_readiness_stay_strict(self) -> None:
+        # The #260 leniency covers prose bounds only. Identity, schema, and the
+        # explicit readiness assertion must still fail closed.
+        todo = validate_todo_artifact(_todo(), run_id="run-1", session_id="session-1")
+        mutations: list[dict[str, object]] = []
+        for key, value in (
+            ("schema_version", 2),
+            ("run_id", "other-run"),
+            ("session_id", "other-session"),
+            ("kind", "some_other_kind"),
+            ("todo_id", "PW-09"),
+            ("ready_for_execution_model", "true"),
+            ("created_at", "2026-01-31T14:05:00"),
+        ):
+            data = _checkpoint()
+            data[key] = value
+            mutations.append(data)
+        missing_readiness = _checkpoint()
+        missing_readiness.pop("ready_for_execution_model")
+        mutations.append(missing_readiness)
+        for data in mutations:
+            with self.subTest(data=data), self.assertRaises(ValidationIssue) as caught:
+                validate_checkpoint_artifact(
+                    data, run_id="run-1", session_id="session-1", todo=todo
+                )
+            self.assertEqual(caught.exception.code, "prewalk_checkpoint_invalid")
+
     def test_artifact_loader_rejects_paths_outside_runtime_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -215,6 +295,59 @@ class PrewalkArtifactTests(unittest.TestCase):
         self.assertIn(paths.checkpoint, text)
         self.assertIn("sent exactly once", text)
         self.assertIn("only `Continue.`", text)
+
+    def test_prompt_states_both_artifact_contracts(self) -> None:
+        # aigorahub/elves#260: the prompt used to say "the Elves prewalk TODO schema"
+        # without stating it. A guide that has not read prewalk.py cannot comply, and
+        # each miss costs a full guide turn before the transition rejects it.
+        paths = prewalk_paths(REPO_ROOT, "prompt-run")
+        text = guide_prompt(run_id="prompt-run", paths=paths, todo_limit=10)
+        for todo_rule in (
+            '"id": "PW-01"',
+            '"description"',
+            '"acceptance"',
+            '"validation"',
+            '"status"',
+            "created_at",
+            "updated_at",
+            "At most one item",
+            "pending",
+            "in_progress",
+            "complete",
+        ):
+            with self.subTest(rule=todo_rule):
+                self.assertIn(todo_rule, text)
+        for checkpoint_rule in (
+            "first_meaningful_edit",
+            "task_complete",
+            "todo_id",
+            "changed_paths",
+            '"summary"',
+            "validation_attempted",
+            '"exit_code"',
+            "ready_for_execution_model",
+            str(PREWALK_SUMMARY_MAX_CHARS),
+            "RFC3339",
+        ):
+            with self.subTest(rule=checkpoint_rule):
+                self.assertIn(checkpoint_rule, text)
+        # The stated example must itself satisfy the validators it describes.
+        blocks = [
+            json.loads(block)
+            for block in re.findall(r"(?ms)^\{$.*?^\}$", text)
+        ]
+        self.assertEqual(len(blocks), 2, "expected exactly one TODO and one checkpoint example")
+        example_todo, example_checkpoint = blocks
+        example_todo["session_id"] = "session-1"
+        example_todo["run_id"] = "run-1"
+        todo = validate_todo_artifact(
+            example_todo, run_id="run-1", session_id="session-1"
+        )
+        example_checkpoint["session_id"] = "session-1"
+        example_checkpoint["run_id"] = "run-1"
+        validate_checkpoint_artifact(
+            example_checkpoint, run_id="run-1", session_id="session-1", todo=todo
+        )
 
 
 class MeaningfulEditTests(unittest.TestCase):
@@ -459,7 +592,9 @@ class CapabilityEvidenceTests(unittest.TestCase):
             path = Path(tmp) / "qualification.json"
             payload = {
                 "artifact_type": "native_prewalk_behavioral_qualification",
-                "schema_version": 1,
+                "schema_version": 2,
+                "route_change_evidence": "unobserved",
+                "observed_execution_route": {"model": None, "effort": None, "source": "unobserved"},
                 "host": "codex",
                 "transport": "codex_exec",
                 "installed_version": "0.144.1",
@@ -615,7 +750,9 @@ class FdBoundEvidenceLoaderTests(unittest.TestCase):
     def _payload(self) -> dict:
         return {
             "artifact_type": "native_prewalk_behavioral_qualification",
-            "schema_version": 1,
+            "schema_version": 2,
+            "route_change_evidence": "unobserved",
+            "observed_execution_route": {"model": None, "effort": None, "source": "unobserved"},
             "host": "codex",
             "transport": "codex_exec",
             "installed_version": "0.144.1",
@@ -1742,3 +1879,397 @@ class AutomaticPrewalkQualificationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ObservedRouteQualificationTests(unittest.TestCase):
+    """aigorahub/elves#258: qualification must record the route that actually ran."""
+
+    CODEX_NOTICE = {
+        "type": "item.completed",
+        "item": {
+            "id": "item_0",
+            "type": "error",
+            "message": (
+                "This session was recorded with model `gpt-5.6-sol` but is resuming "
+                "with `gpt-5.6-luna`. Consider switching back to `gpt-5.6-sol` as it "
+                "may affect Codex performance."
+            ),
+        },
+    }
+
+    def test_codex_resume_notice_names_the_effective_model(self) -> None:
+        observed = _observed_route_from_event(self.CODEX_NOTICE, "codex")
+        self.assertIsNotNone(observed)
+        assert observed is not None
+        self.assertEqual(observed.model, "gpt-5.6-luna")
+        self.assertEqual(observed.source, "codex_resume_model_notice")
+        # Effort is never claimed: no supported transport publishes it.
+        self.assertIsNone(observed.effort)
+        # The signal is an `item.completed` whose *inner* item type is `error`.
+        # Reading the inner type must not turn it into a provider failure.
+        self.assertFalse(_is_provider_error_event(self.CODEX_NOTICE))
+
+    def test_no_signal_is_never_read_as_a_route_observation(self) -> None:
+        for host, event in (
+            ("claude", self.CODEX_NOTICE),
+            ("grok", self.CODEX_NOTICE),
+            ("omp", self.CODEX_NOTICE),
+            ("codex", {"type": "turn.completed", "item": {"type": "error"}}),
+            ("codex", {"type": "item.completed", "item": {"type": "agent_message"}}),
+            ("codex", {"type": "item.completed", "item": {"type": "error"}}),
+            (
+                "codex",
+                {
+                    "type": "item.completed",
+                    "item": {"type": "error", "message": "unrelated failure"},
+                },
+            ),
+        ):
+            with self.subTest(host=host, event=event):
+                self.assertIsNone(_observed_route_from_event(event, host))
+
+    def _advertised(self):
+        return advertised_prewalk_capabilities(
+            host="codex",
+            version="9.9.9",
+            create_help="--model -c model_reasoning_effort resume",
+            resume_help="Usage: resume SESSION_ID --model -c model_reasoning_effort",
+        )
+
+    def _probe(self, advertised):
+        def probe(host, *, behavioral_evidence=None, **_kwargs):
+            if behavioral_evidence is None:
+                return advertised
+            return load_prewalk_capability_evidence(
+                Path(behavioral_evidence),
+                host="codex",
+                installed_version="9.9.9",
+                advertised=advertised,
+            )
+
+        return probe
+
+    def _phase_runner(self, observed_route):
+        """A passing two-phase canary whose execution phase reports ``observed_route``."""
+        state: dict[str, str] = {}
+
+        def phase_runner(*, spec, input_text, **_kwargs):
+            canary_value = (
+                Path(spec.cwd) / ".elves-prewalk-canary.txt"
+            ).read_text(encoding="utf-8").strip()
+            if input_text != PREWALK_CONTINUATION_INPUT:
+                memory = re.search(
+                    r"ELVES_PREWALK_CANARY_GUIDE ([0-9a-f]+)", input_text
+                ).group(1)
+                state["memory"] = memory
+                marker = f"ELVES_PREWALK_CANARY_GUIDE {memory} {canary_value}"
+                event: dict[str, object] = {
+                    "type": "thread.started",
+                    "thread_id": "qualification-session",
+                }
+                route = ObservedRoute()
+            else:
+                marker = (
+                    "ELVES_PREWALK_CANARY_EXECUTION "
+                    f"{state['memory']} {canary_value}"
+                )
+                event = {"type": "turn.started", "thread_id": "qualification-session"}
+                route = observed_route
+            return PrewalkQualificationResult(
+                exit_code=0,
+                stdout=json.dumps(event) + "\n" + marker + "\n",
+                stderr_tail="",
+                observed_session_ids=("qualification-session",),
+                provider_event_count=1,
+                observed_route=route,
+            )
+
+        return phase_runner
+
+    def _qualify(self, observed_route, tmp):
+        return qualify_installed_prewalk_transport(
+            host="codex",
+            guide_model="guide-model",
+            guide_effort="high",
+            execution_model="execution-model",
+            execution_effort="medium",
+            cache_root=Path(tmp),
+            phase_runner=self._phase_runner(observed_route),
+        )
+
+    def test_observed_route_matching_the_request_is_recorded_as_proof(self) -> None:
+        advertised = self._advertised()
+        observed = ObservedRoute(
+            model="execution-model", source="codex_resume_model_notice"
+        )
+        with tempfile.TemporaryDirectory() as tmp, mock.patch(
+            "cobbler_runtime.native_worker.probe_installed_prewalk_capabilities",
+            side_effect=self._probe(advertised),
+        ):
+            qualified = self._qualify(observed, tmp)
+            self.assertTrue(qualified.qualified())
+            cache_path = prewalk_qualification_cache_path(
+                advertised,
+                execution_model="execution-model",
+                execution_effort="medium",
+                cache_root=Path(tmp),
+            )
+            payload = json.loads(cache_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                payload["observed_execution_route"],
+                {
+                    "model": "execution-model",
+                    "effort": None,
+                    "source": "codex_resume_model_notice",
+                },
+            )
+            self.assertEqual(
+                payload["route_change_evidence"], "observed_effective_model"
+            )
+
+    def test_observed_route_contradicting_the_request_fails_qualification(self) -> None:
+        advertised = self._advertised()
+        observed = ObservedRoute(
+            model="some-other-model", source="codex_resume_model_notice"
+        )
+        with tempfile.TemporaryDirectory() as tmp, mock.patch(
+            "cobbler_runtime.native_worker.probe_installed_prewalk_capabilities",
+            side_effect=self._probe(advertised),
+        ):
+            with self.assertRaises(ValidationIssue) as caught:
+                self._qualify(observed, tmp)
+            self.assertEqual(
+                caught.exception.code, "prewalk_route_change_unqualified"
+            )
+            evidence = Path(caught.exception.hint.split("Evidence: ", 1)[1])
+            payload = json.loads(evidence.read_text(encoding="utf-8"))
+            self.assertFalse(payload["qualified"])
+            self.assertFalse(payload["checks"]["route_change"])
+            # Every other continuity fact passed: the route observation alone failed.
+            self.assertTrue(payload["checks"]["same_session_id"])
+            self.assertTrue(payload["checks"]["same_worktree"])
+            self.assertEqual(
+                payload["observed_execution_route"]["model"], "some-other-model"
+            )
+
+    def test_a_host_publishing_no_signal_still_qualifies_at_the_weaker_tier(self) -> None:
+        # Claude Code, Grok Build, and Oh My Pi publish nothing comparable, and Codex
+        # itself is silent whenever the model does not change. Absence must not fail
+        # closed, and the artifact must not dress it up as behavioural proof.
+        advertised = self._advertised()
+        with tempfile.TemporaryDirectory() as tmp, mock.patch(
+            "cobbler_runtime.native_worker.probe_installed_prewalk_capabilities",
+            side_effect=self._probe(advertised),
+        ):
+            qualified = self._qualify(ObservedRoute(), tmp)
+            self.assertTrue(qualified.qualified())
+            cache_path = prewalk_qualification_cache_path(
+                advertised,
+                execution_model="execution-model",
+                execution_effort="medium",
+                cache_root=Path(tmp),
+            )
+            payload = json.loads(cache_path.read_text(encoding="utf-8"))
+            self.assertEqual(payload["route_change_evidence"], "unobserved")
+            self.assertEqual(
+                payload["observed_execution_route"],
+                {"model": None, "effort": None, "source": "unobserved"},
+            )
+            # The requested route is still recorded — as a request, beside the
+            # observation, not in place of it.
+            self.assertEqual(
+                payload["execution_route"],
+                {"model": "execution-model", "effort": "medium"},
+            )
+
+
+class StaleQualificationEvidenceTests(unittest.TestCase):
+    """Fugu P1: proof recorded before #258 must not be reused forever."""
+
+    def _advertised(self):
+        return advertised_prewalk_capabilities(
+            host="codex",
+            version="9.9.9",
+            create_help="--model -c model_reasoning_effort resume",
+            resume_help="Usage: resume SESSION_ID --model -c model_reasoning_effort",
+        )
+
+    def _payload(self, **overrides) -> dict:
+        payload = {
+            "artifact_type": "native_prewalk_behavioral_qualification",
+            "schema_version": PREWALK_QUALIFICATION_SCHEMA_VERSION,
+            "host": "codex",
+            "transport": "codex_exec",
+            "installed_version": "9.9.9",
+            "session_id": "exact-session-1",
+            "create_exit_code": 0,
+            "resume_exit_code": 0,
+            "same_session_id": True,
+            "same_worktree": True,
+            "unique_guide_fact_observed": True,
+            "packet_replayed": False,
+            "stream_identity_verified": True,
+            "instruction_fidelity": "retained_safe",
+            "guide_route": {"model": "guide-model", "effort": "high"},
+            "execution_route": {"model": "execution-model", "effort": "low"},
+            "route_change_evidence": "unobserved",
+            "observed_execution_route": {
+                "model": None,
+                "effort": None,
+                "source": "unobserved",
+            },
+            "model_calls_made": True,
+            "guide_prompt_sha256": hashlib.sha256(b"guide").hexdigest(),
+            "continuation_sha256": hashlib.sha256(
+                PREWALK_CONTINUATION_INPUT.encode("utf-8")
+            ).hexdigest(),
+        }
+        payload.update(overrides)
+        return payload
+
+    def _load(self, payload):
+        advertised = self._advertised()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "qualification.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            path.chmod(0o600)
+            return load_prewalk_capability_evidence(
+                path,
+                host="codex",
+                installed_version="9.9.9",
+                advertised=advertised,
+            )
+
+    def test_current_contract_evidence_loads(self) -> None:
+        self.assertTrue(self._load(self._payload()).qualified())
+
+    def test_pre_observation_evidence_is_rejected(self) -> None:
+        # The cache key carries only the provider build and the requested route, so
+        # without a contract version a schema-1 artifact recorded while route_change
+        # was assumed true would be reused forever, defeating #258. Rejecting it makes
+        # `required` spend one fresh canary and `auto` fall back honestly.
+        stale = self._payload(schema_version=1)
+        stale.pop("route_change_evidence")
+        stale.pop("observed_execution_route")
+        with self.assertRaises(ValidationIssue) as caught:
+            self._load(stale)
+        self.assertEqual(caught.exception.code, "prewalk_capability_unavailable")
+
+    def test_current_contract_requires_recorded_route_evidence(self) -> None:
+        for drop in ("route_change_evidence", "observed_execution_route"):
+            with self.subTest(drop=drop):
+                payload = self._payload()
+                payload.pop(drop)
+                with self.assertRaises(ValidationIssue):
+                    self._load(payload)
+
+    def test_recorded_route_evidence_must_be_internally_honest(self) -> None:
+        dishonest = [
+            # An unobserved tier naming a model it never observed.
+            self._payload(
+                observed_execution_route={
+                    "model": "execution-model",
+                    "effort": None,
+                    "source": "unobserved",
+                }
+            ),
+            # An observed tier naming no model.
+            self._payload(
+                route_change_evidence="observed_effective_model",
+                observed_execution_route={
+                    "model": None,
+                    "effort": None,
+                    "source": "codex_resume_model_notice",
+                },
+            ),
+            # A claimed observed reasoning level: no host publishes one.
+            self._payload(
+                observed_execution_route={
+                    "model": None,
+                    "effort": "high",
+                    "source": "unobserved",
+                }
+            ),
+            # An unknown tier.
+            self._payload(route_change_evidence="probably_fine"),
+            # An unexpected inner key.
+            self._payload(
+                observed_execution_route={
+                    "model": None,
+                    "effort": None,
+                    "source": "unobserved",
+                    "extra": 1,
+                }
+            ),
+        ]
+        for payload in dishonest:
+            with self.subTest(payload=payload["observed_execution_route"]):
+                with self.assertRaises(ValidationIssue):
+                    self._load(payload)
+
+
+class GrokRouteEvidenceTests(unittest.TestCase):
+    """Fugu P3: the newly admitted evidence fields must not carry forged proof."""
+
+    UNOBSERVED = {"model": None, "effort": None, "source": "unobserved"}
+
+    def _load(self, tmp, mutation=None):
+        path = write_grok_qualification_artifact(Path(tmp), mutation=mutation)
+        return load_grok_prewalk_qualification(
+            path,
+            installed_version="0.2.102",
+            installed_build_commit="C1B5909EC707",
+        )
+
+    def test_legacy_artifact_without_route_evidence_still_loads(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertTrue(self._load(tmp).qualified())
+
+    def test_honest_unobserved_route_evidence_loads(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            capabilities = self._load(
+                tmp,
+                {
+                    "route_change_evidence": "unobserved",
+                    "observed_execution_route": dict(self.UNOBSERVED),
+                },
+            )
+            self.assertTrue(capabilities.qualified())
+
+    def test_forged_observed_route_is_rejected(self) -> None:
+        # Grok Build publishes no effective-route signal, so an artifact claiming
+        # behavioural route proof is describing something that cannot have happened.
+        forged = [
+            {
+                "route_change_evidence": "observed_effective_model",
+                "observed_execution_route": {
+                    "model": "some-unrelated-model",
+                    "effort": "invented",
+                    "source": "forged",
+                },
+            },
+            {
+                "route_change_evidence": "observed_effective_model",
+                "observed_execution_route": {
+                    "model": "grok-4.5",
+                    "effort": None,
+                    "source": "hand_written",
+                },
+            },
+            # Half a record is not a record.
+            {"route_change_evidence": "unobserved"},
+            {"observed_execution_route": dict(self.UNOBSERVED)},
+            # An unobserved tier may not name a model.
+            {
+                "route_change_evidence": "unobserved",
+                "observed_execution_route": {
+                    "model": "grok-4.5",
+                    "effort": None,
+                    "source": "unobserved",
+                },
+            },
+        ]
+        for mutation in forged:
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as tmp:
+                with self.assertRaises(ValidationIssue):
+                    self._load(tmp, mutation)

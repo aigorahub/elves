@@ -4,6 +4,60 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.32.0] - 2026-08-21
+
+### Fixed
+- **Prewalk guide prompt states its artifact contracts** (`scripts/cobbler_runtime/prewalk.py`,
+  `references/prewalk.md`) — `guide_prompt()` told the guide to mirror its TODO "using the Elves
+  prewalk TODO schema" and never stated that schema, while the transition validator enforced exact
+  `PW-##` ordering, four exact field names, RFC3339 timestamps, `{command, exit_code}` validation
+  records, a literal `ready_for_execution_model: true`, and an unstated 500-character summary cap.
+  One live run hit three of those in sequence, each after a full paid guide turn; the third
+  terminalized a 44-minute successful execution phase over prose length alone. The prompt now
+  carries a filled example of both artifacts plus the rules, and those examples are test-pinned
+  against the validators they describe. Two bounds are normalized instead of fatal: an over-long
+  `summary` is truncated, and an absent or null `validation_attempted` becomes an empty list.
+  Identity, schema version, `PW-##` ordering, and the readiness assertion stay fail-closed, and a
+  prose validation string is still never coerced into a command record. (#260)
+- **Monitor re-reads events once when a report first turns terminal**
+  (`scripts/cobbler_runtime/full_run_monitor.py`) — reconciliation depth was forced to full only
+  when the *state* was already terminal, which is one poll too late. On the poll where a validated
+  report first turns terminal, an incremental tick could still serve an event summary cached from
+  before the worker's final append, so a parked driver saw the final advisory signal one poll late.
+  The monitor now re-reads the event log once at that boundary, behind the same credential-grant
+  guard as the ordinary read. Ordinary healthy polls still reuse the cache. (#242)
+- **Learnings-ledger section lookups skip the generated digest interior**
+  (`scripts/cobbler_runtime/learnings_ledger.py`) — a `## <section>` heading hand-written between
+  the digest markers is out of contract (that region is wiped on every regenerate) but was read as
+  a real section by `_section_at` and `_section_insert_index`. With cooperating drift, a forged
+  heading naming an entry's recorded section made the rollback drift guard accept a candidate that
+  landed under `## Retired Learnings`, silently retiring an active learning; refusing the candidate
+  did not help, because the fallback placement had the same blindness. Both lookups now skip digest
+  interiors. (#249)
+- **Prewalk qualification records the observed route, not the requested one**
+  (`scripts/cobbler_runtime/native_worker.py`, `scripts/cobbler_runtime/prewalk.py`) —
+  `qualify_prewalk_live` initialised `checks["route_change"] = True` and never derived it from
+  provider evidence, so a CLI that accepted a resume while ignoring an unsupported model or effort
+  override still passed every continuity check and the artifact certified a route that never ran.
+  The canary now reads the effective route a host publishes for itself (Codex names it in an
+  `item.completed` whose inner item type is `error`; that event is still not classified as a
+  provider failure), fails with `prewalk_route_change_unqualified` when the observation contradicts
+  the request, and records `observed_execution_route` plus a `route_change_evidence` tier in the
+  attempt and success artifacts. Hosts that publish no signal — Claude Code, Grok Build, Oh My Pi,
+  and Codex whenever the model does not change — still qualify and are recorded as `unobserved`
+  rather than claiming behavioural proof. Observed effort stays null on every host, because none
+  publishes it. The Grok artifact field set stays closed but now admits these two optional keys, so
+  artifacts recorded before this change still validate. (#258)
+- **Review fixes from the PR #261 Fugu pass.** Recorded qualification evidence now carries a
+  contract version (`PREWALK_QUALIFICATION_SCHEMA_VERSION` = 2): the cache key holds only the
+  provider build and requested route, so proof recorded before observed-route derivation would have
+  been reused indefinitely and the new check would never have run for anyone with an existing cache.
+  The recorded evidence pair is also validated for internal honesty, and the two optional Grok
+  fields are validated rather than merely admitted, so an operator artifact cannot carry forged
+  route proof for a host that publishes no signal. The terminal-boundary event re-read is now once
+  per event-log identity rather than once per poll, so a worker that writes a terminal report and
+  then stays alive finishing cleanup no longer re-parses the same unchanged log on every tick.
+
 ## [2.31.0] - 2026-08-16
 
 ### Added

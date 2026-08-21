@@ -36,6 +36,38 @@ The guide mirrors its native TODO mechanism into private JSON under
   TODO item, changed repository-relative paths, summary, and validation attempted.
 - `session.json`: the exact safe worker-session identity captured or assigned by the supervisor.
 
+The guide prompt states both artifact shapes literally, with one filled example each (#260). A
+guide that has not read `prewalk.py` still has everything it needs, because a semantically correct
+artifact in another dialect fails the transition and terminalizes the run *after* the guide turn
+has already been paid for. Two bounds are normalized rather than enforced: a `summary` longer than
+500 characters is truncated, and an absent or null `validation_attempted` becomes an empty list.
+Everything else stays fail-closed. Leniency never fabricates evidence — a prose `validation`
+string is not coerced into a `{command, exit_code}` record, because that would invent an exit code
+the guide never observed — and it never touches identity, schema version, `PW-##` ordering, or the
+literal `ready_for_execution_model: true` assertion.
+
+Live qualification records the route it **observed**, not the route it requested (#258). The
+canary derives `route_change` from provider evidence: when a host names the model it actually
+resumed with, that name must match the requested execution model or qualification fails with
+`prewalk_route_change_unqualified`. Codex publishes such a notice (an `item.completed` whose inner
+item type is `error`, naming both the recorded and the resuming model) and publishes it only when
+the model actually changes; Claude Code, Grok Build, and Oh My Pi publish nothing comparable
+today. Absence of a signal is not evidence that an override was ignored, so it never fails closed
+— the artifact records `route_change_evidence: unobserved` and an empty `observed_execution_route`
+instead of claiming behavioural proof. No host publishes the reasoning level it actually used, so
+observed effort is always null rather than copied from the request.
+
+Recorded qualification evidence carries its own contract version
+(`PREWALK_QUALIFICATION_SCHEMA_VERSION`, now 2). The private cache key holds only the provider
+build and the requested execution route, so proof recorded before observed-route derivation would
+otherwise be reused forever and the check it never performed would never run. A schema-1 artifact
+is rejected: `required` spends one fresh canary, `auto` falls back without spending. A current
+artifact must record both `route_change_evidence` and `observed_execution_route`, and the pair is
+validated for internal honesty — an `unobserved` tier may not name a model, an
+`observed_effective_model` tier must name one and its source, observed effort must be null on
+every host, and a host that publishes no signal at all (Grok Build) may not record an observed
+tier.
+
 The model-free transition validator requires a clean registered start, unchanged branch/origin/
 protected refs, a real source/test/product-documentation edit tied to the checkpoint, no forbidden
 surface, and no `Close` commit. Runtime-only, plan-only, execution-log-only, empty, mismatched, or

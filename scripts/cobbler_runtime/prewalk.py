@@ -33,11 +33,20 @@ from .storage import (
 
 
 PREWALK_SCHEMA_VERSION = 1
+# Qualification-evidence contract version, separate from the artifact schemas above.
+# aigorahub/elves#258 bumped it to 2: proof recorded before observed-route derivation
+# cannot distinguish "the override was applied" from "route_change was assumed true",
+# and the cache key carries only the provider build and requested route, so a stale
+# schema-1 artifact would otherwise be reused forever. A rejected artifact makes
+# `required` spend one fresh canary and `auto` fall back honestly.
+PREWALK_QUALIFICATION_SCHEMA_VERSION = 2
 PREWALK_STATE_VERSION = 3
 PREWALK_DEFAULT_TODO_LIMIT = 10
 PREWALK_MIN_TODO_LIMIT = 5
 PREWALK_MAX_TODO_LIMIT = 12
 PREWALK_CONTINUATION_INPUT = "Continue."
+PREWALK_SUMMARY_MAX_CHARS = 500
+PREWALK_MAX_VALIDATION_ATTEMPTS = 20
 PREWALK_CAPABILITY_ARTIFACT_MAX_BYTES = 64 * 1024
 PREWALK_RUNTIME_ARTIFACT_MAX_BYTES = 256 * 1024
 PREWALK_PACKET_MAX_BYTES = 4 * 1024 * 1024
@@ -329,6 +338,22 @@ def _required_text(value: object, *, path: str, code: str, max_chars: int = 2_00
     return value.strip()
 
 
+def _normalized_summary(value: object, *, path: str, code: str) -> str:
+    """Require a real summary, but bound its length instead of terminalizing.
+
+    aigorahub/elves#260: a fully successful 44-minute execution phase was rejected
+    as ``prewalk_checkpoint_invalid`` because its summary ran past an unstated cap.
+    Prose length is presentation, not identity and not evidence, so normalize it.
+    An empty or non-string summary still fails: that is a missing field, not a long one.
+    """
+    if not isinstance(value, str) or not value.strip():
+        raise ValidationIssue(code, "Required prewalk text is missing or unbounded", path=path)
+    text = value.strip()
+    if len(text) <= PREWALK_SUMMARY_MAX_CHARS:
+        return text
+    return text[: PREWALK_SUMMARY_MAX_CHARS - 1].rstrip() + "…"
+
+
 def _rfc3339(value: object, *, path: str, code: str) -> str:
     text = _required_text(value, path=path, code=code, max_chars=64)
     try:
@@ -450,9 +475,14 @@ def validate_checkpoint_artifact(
     ]
     if len(set(normalized_paths)) != len(normalized_paths):
         raise ValidationIssue(code, "Checkpoint changed_paths must be unique", path="changed_paths")
-    _required_text(data.get("summary"), path="summary", code=code, max_chars=500)
+    summary = _normalized_summary(data.get("summary"), path="summary", code=code)
+    # aigorahub/elves#260: an absent or null list means "no validation was run" and is
+    # honest on its own. Coercing a prose `validation` string into a command record
+    # would invent an exit code the guide never observed, so malformed entries stay fatal.
     attempts = data.get("validation_attempted")
-    if not isinstance(attempts, list) or len(attempts) > 20:
+    if attempts is None:
+        attempts = []
+    if not isinstance(attempts, list) or len(attempts) > PREWALK_MAX_VALIDATION_ATTEMPTS:
         raise ValidationIssue(code, "validation_attempted must be a bounded list", path="validation_attempted")
     normalized_attempts: list[dict[str, Any]] = []
     for index, raw in enumerate(attempts):
@@ -476,6 +506,7 @@ def validate_checkpoint_artifact(
         raise ValidationIssue(code, "Task-complete checkpoint requires every TODO item complete", path="kind")
     result = dict(data)
     result["changed_paths"] = normalized_paths
+    result["summary"] = summary
     result["validation_attempted"] = normalized_attempts
     return result
 
@@ -691,14 +722,70 @@ after orientation and do not produce a read-only plan.
 
 Before editing, create at most {limit} concrete TODO items. Every item needs an observable
 acceptance condition and its own validation step. Use the host TODO mechanism when available and
-mirror the list to `{paths.todo}` using the Elves prewalk TODO schema. Read the exact session id
-from `{paths.session_identity}` before writing the TODO or checkpoint.
+mirror the list to `{paths.todo}`. Read the exact session id from `{paths.session_identity}`
+(JSON field `session_id`) before writing the TODO or checkpoint.
+
+Both artifacts below are validated exactly as written. A semantically correct artifact in any
+other dialect fails the transition and ends the run, so copy these shapes literally.
+
+`{paths.todo}`:
+
+{{
+  "schema_version": {PREWALK_SCHEMA_VERSION},
+  "run_id": "{run_id}",
+  "session_id": "<the session_id read from the identity file>",
+  "created_at": "2026-01-31T14:05:00Z",
+  "updated_at": "2026-01-31T14:05:00Z",
+  "items": [
+    {{
+      "id": "PW-01",
+      "description": "What this item changes",
+      "acceptance": "The observable condition that proves it",
+      "validation": "The exact command or check that demonstrates it",
+      "status": "in_progress"
+    }}
+  ]
+}}
+
+TODO rules: ids are `PW-01`, `PW-02`, … zero-padded to two digits, unique, and in that exact
+order with no gaps. Every item carries all four of `description`, `acceptance`, `validation`,
+and `status`. `status` is exactly one of `pending`, `in_progress`, `complete`. At most one item
+may be `in_progress`. `created_at` and `updated_at` are RFC3339 with an explicit timezone. Every
+item is required to be non-empty; there is no optional field.
+
+`{paths.checkpoint}`:
+
+{{
+  "schema_version": {PREWALK_SCHEMA_VERSION},
+  "run_id": "{run_id}",
+  "session_id": "<the same session_id>",
+  "kind": "first_meaningful_edit",
+  "todo_id": "PW-01",
+  "changed_paths": ["src/example.py"],
+  "summary": "One or two sentences on what changed and why.",
+  "validation_attempted": [
+    {{"command": "python3 -m unittest tests.test_example", "exit_code": 1}}
+  ],
+  "ready_for_execution_model": true,
+  "created_at": "2026-01-31T14:05:00Z"
+}}
+
+Checkpoint rules: `kind` is exactly `first_meaningful_edit` or `task_complete`. `todo_id` names an
+existing TODO item, and for `first_meaningful_edit` that item may not still be `pending`.
+`changed_paths` is a non-empty list of unique repository-relative paths you actually changed, and
+at least one must be a real task edit rather than runtime or staging memory. `validation_attempted`
+is a list of `{{"command": "<string>", "exit_code": <integer>}}` objects — a plain sentence is not
+accepted there; use an empty list if you ran nothing. `ready_for_execution_model` must be the
+literal `true`. `created_at` is RFC3339 with an explicit timezone. `summary` is bounded at
+{PREWALK_SUMMARY_MAX_CHARS} characters; a longer one is truncated rather than rejected, so keep
+the substance in the first sentence.
 
 Then make the first meaningful task edit. It may be a deliberately failing test when the TODO says
 so. Update that TODO item to in_progress or complete, write the first_meaningful_edit checkpoint to
 `{paths.checkpoint}`, and end this guide turn immediately. Do not create a Close commit and do not
 claim task completion unless every TODO item is truly complete. If the whole task is atomic, write
-a task_complete checkpoint instead.
+a task_complete checkpoint instead; a `task_complete` checkpoint requires every TODO item to be
+`complete`.
 
 On the later exact-session continuation, complete the remaining TODO items and their validations,
 update the same TODO artifact, replace the checkpoint with an explicit task_complete checkpoint,
@@ -938,6 +1025,81 @@ def _qualification_phase_routes(
     return routes
 
 
+_OBSERVED_ROUTE_FIELDS = frozenset({"model", "effort", "source"})
+_ROUTE_EVIDENCE_TIERS = frozenset({"unobserved", "observed_effective_model"})
+
+
+def _validate_route_evidence(
+    data: Mapping[str, Any],
+    *,
+    code: str,
+    require_present: bool,
+    allow_observed: bool,
+) -> None:
+    """Validate recorded observed-route evidence (aigorahub/elves#258).
+
+    The two fields travel together or not at all. ``effort`` is always null: no
+    supported host publishes the reasoning level it actually used, so a non-null
+    observed effort is fabricated evidence by construction. ``allow_observed`` is
+    False for a host that publishes no effective-route signal at all, so an
+    operator-recorded artifact cannot claim behavioural proof that host cannot produce.
+    """
+    evidence = data.get("route_change_evidence")
+    route = data.get("observed_execution_route")
+    if evidence is None and route is None:
+        if require_present:
+            raise ValidationIssue(
+                code,
+                "Qualification must record its route evidence tier",
+                path="route_change_evidence",
+            )
+        return
+    if evidence is None or route is None:
+        raise ValidationIssue(
+            code,
+            "Route evidence tier and observed route must be recorded together",
+            path="observed_execution_route",
+        )
+    if not isinstance(route, Mapping) or set(route) != _OBSERVED_ROUTE_FIELDS:
+        raise ValidationIssue(
+            code,
+            "Observed route must carry exactly model, effort, and source",
+            path="observed_execution_route",
+        )
+    if route.get("effort") is not None:
+        raise ValidationIssue(
+            code,
+            "No supported host publishes an observed reasoning level",
+            path="observed_execution_route.effort",
+        )
+    if evidence not in _ROUTE_EVIDENCE_TIERS:
+        raise ValidationIssue(
+            code, "Unknown route evidence tier", path="route_change_evidence"
+        )
+    if evidence == "unobserved":
+        if route.get("model") is not None or route.get("source") != "unobserved":
+            raise ValidationIssue(
+                code,
+                "An unobserved tier may not name an effective model",
+                path="observed_execution_route",
+            )
+        return
+    if not allow_observed:
+        raise ValidationIssue(
+            code,
+            "This host publishes no effective-route signal to observe",
+            path="route_change_evidence",
+        )
+    for field, limit in (("model", 128), ("source", 64)):
+        value = route.get(field)
+        if not isinstance(value, str) or not value.strip() or len(value) > limit:
+            raise ValidationIssue(
+                code,
+                "An observed tier must name the effective model and its source",
+                path=f"observed_execution_route.{field}",
+            )
+
+
 def load_prewalk_capability_evidence(
     path: Path,
     *,
@@ -997,7 +1159,7 @@ def load_prewalk_capability_evidence(
     expected_host = host.strip().lower().replace("-code", "")
     required = {
         "artifact_type": "native_prewalk_behavioral_qualification",
-        "schema_version": 1,
+        "schema_version": PREWALK_QUALIFICATION_SCHEMA_VERSION,
         "host": expected_host,
         "transport": advertised.transport,
         "installed_version": installed_version,
@@ -1016,6 +1178,12 @@ def load_prewalk_capability_evidence(
                 "Behavioral prewalk qualification does not match the installed host",
                 path=key,
             )
+    _validate_route_evidence(
+        data,
+        code="prewalk_capability_unavailable",
+        require_present=True,
+        allow_observed=True,
+    )
     fidelity = data.get("instruction_fidelity")
     if fidelity not in PREWALK_INSTRUCTION_FIDELITIES or fidelity == "unsupported":
         raise ValidationIssue("prewalk_instruction_pruning_unqualified", "Qualification must report usable instruction fidelity")
@@ -1083,6 +1251,13 @@ _GROK_QUALIFICATION_REQUIRED_FIELDS = frozenset(
         "model_calls_made",
         "instruction_fidelity",
     }
+)
+
+# aigorahub/elves#258 added observed-route recording. These stay optional so an
+# artifact recorded before that change still validates, while the field set remains
+# closed against arbitrary extra keys.
+_GROK_QUALIFICATION_OPTIONAL_FIELDS = frozenset(
+    {"observed_execution_route", "route_change_evidence"}
 )
 
 
@@ -1163,12 +1338,23 @@ def load_grok_prewalk_qualification(
     data = _read_qualification_artifact_json(
         target, limit=PREWALK_CAPABILITY_ARTIFACT_MAX_BYTES, code=code
     )
-    if set(data) != _GROK_QUALIFICATION_REQUIRED_FIELDS:
+    present = set(data)
+    if (
+        not _GROK_QUALIFICATION_REQUIRED_FIELDS.issubset(present)
+        or present - _GROK_QUALIFICATION_REQUIRED_FIELDS
+        - _GROK_QUALIFICATION_OPTIONAL_FIELDS
+    ):
         raise ValidationIssue(
             code,
             "Grok prewalk qualification must carry exactly the required fields",
             path="fields",
         )
+    # Grok Build publishes no effective-route signal, so a recorded observation can
+    # only honestly be the unobserved tier. Admitting the fields without checking
+    # them would let an operator artifact carry forged route proof (#258).
+    _validate_route_evidence(
+        data, code=code, require_present=False, allow_observed=False
+    )
     exact: dict[str, Any] = {
         "artifact_type": GROK_PREWALK_QUALIFICATION_ARTIFACT_TYPE,
         "schema_version": 1,

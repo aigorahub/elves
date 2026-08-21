@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import hashlib
 import os
+import re
 import selectors
 import secrets
 import shlex
@@ -49,6 +50,7 @@ from .host_profiles import (
 )
 from .prewalk import (
     PREWALK_CONTINUATION_INPUT,
+    PREWALK_QUALIFICATION_SCHEMA_VERSION,
     PREWALK_DEFAULT_TODO_LIMIT,
     PREWALK_MAX_TODO_LIMIT,
     PREWALK_MIN_TODO_LIMIT,
@@ -174,6 +176,64 @@ class NativeWorkerPrewalkSpec:
 
 
 @dataclass(frozen=True)
+class ObservedRoute:
+    """What a provider published about the route it actually ran.
+
+    aigorahub/elves#258: qualification used to record the *requested* route as proof.
+    A CLI that accepts a resume command but ignores an unsupported model or effort
+    override still passes every continuity check, so the artifact could certify a
+    route that never ran.
+
+    ``effort`` is None on every supported host today: no transport publishes the
+    reasoning level it actually used, and deriving it from the request would recreate
+    the exact defect this records. ``source`` names the evidence tier.
+    """
+
+    model: str | None = None
+    effort: str | None = None
+    source: str = "unobserved"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"model": self.model, "effort": self.effort, "source": self.source}
+
+
+# codex-cli 0.147.0 announces an applied model override on resume as an
+# `item.completed` whose *inner* item type is `error`:
+#   "This session was recorded with model `A` but is resuming with `B`."
+# The effective model is B. The top-level type is `item.completed`, which is what
+# `_PROVIDER_ERROR_EVENT_TYPES` reads, so this is not a provider failure and must
+# not become one.
+_CODEX_RESUMED_MODEL_RE = re.compile(
+    r"recorded with model `([^`]{1,128})` but is resuming with `([^`]{1,128})`"
+)
+
+
+def _observed_route_from_event(
+    event: dict[str, Any], host: str | None
+) -> ObservedRoute | None:
+    """Return the effective route a host named for itself, or None.
+
+    None means "this host published nothing here". That is not evidence an override
+    was ignored — only a positive, host-published naming of the model actually in use
+    counts as evidence either way.
+    """
+    if (host or "").strip().lower().replace("-code", "") != "codex":
+        return None
+    if event.get("type") != "item.completed":
+        return None
+    item = event.get("item")
+    if not isinstance(item, dict) or item.get("type") != "error":
+        return None
+    message = item.get("message")
+    if not isinstance(message, str):
+        return None
+    match = _CODEX_RESUMED_MODEL_RE.search(message)
+    if match is None:
+        return None
+    return ObservedRoute(model=match.group(2), source="codex_resume_model_notice")
+
+
+@dataclass(frozen=True)
 class PrewalkQualificationResult:
     """One bounded provider phase used only by the live qualification canary."""
 
@@ -184,6 +244,7 @@ class PrewalkQualificationResult:
     provider_event_count: int
     timed_out: bool = False
     output_limit_exceeded: bool = False
+    observed_route: ObservedRoute = ObservedRoute()
 
 
 def native_worker_profiles() -> dict[str, dict[str, Any]]:
@@ -613,6 +674,7 @@ def _run_bounded_qualification_phase(
         stderr = chunks["stderr"].decode("utf-8", errors="replace")
         observed: list[str] = []
         provider_event_count = 0
+        observed_route = ObservedRoute()
         for line in stdout.splitlines():
             event = _parse_provider_event(line)
             if event is None:
@@ -621,6 +683,11 @@ def _run_bounded_qualification_phase(
             session_id = _provider_session_id_from_event(event, host=spec.host)
             if session_id and session_id not in observed:
                 observed.append(session_id)
+            route = _observed_route_from_event(event, spec.host)
+            if route is not None:
+                # Last naming wins: a host that announces the route more than once
+                # is describing the same turn, and the final word is what ran.
+                observed_route = route
         return PrewalkQualificationResult(
             exit_code=(
                 124
@@ -635,6 +702,7 @@ def _run_bounded_qualification_phase(
             provider_event_count=provider_event_count,
             timed_out=timed_out,
             output_limit_exceeded=output_limit_exceeded,
+            observed_route=observed_route,
         )
     finally:
         if selector is not None:
@@ -811,7 +879,9 @@ def qualify_installed_prewalk_transport(
         "stream_identity_verified": False,
         "unique_guide_fact_observed": False,
         "packet_replayed": False,
-        "route_change": True,
+        # aigorahub/elves#258: derived after the execution phase from what the host
+        # published about the route it actually ran. Never initialised true.
+        "route_change": False,
     }
     guide_result: PrewalkQualificationResult | None = None
     execution_result: PrewalkQualificationResult | None = None
@@ -926,6 +996,28 @@ def qualify_installed_prewalk_transport(
                 )
             checks["packet_replayed"] = False
 
+    # aigorahub/elves#258: derive the route-change check from provider evidence.
+    # Only Codex publishes an effective-route signal today, and only when the model
+    # actually changes — the common native route lowers effort within one model and
+    # is silent by construction. Absence of a signal is therefore not evidence that
+    # an override was ignored, and must not fail closed on Claude Code, Grok Build,
+    # or Oh My Pi. It is recorded as the weaker tier instead of being dressed up as
+    # behavioural proof.
+    observed_route = (
+        execution_result.observed_route if execution_result else ObservedRoute()
+    )
+    if observed_route.model:
+        checks["route_change"] = observed_route.model == execution_model
+        if not checks["route_change"]:
+            failure_reason = "prewalk_route_change_unqualified"
+    else:
+        # Tied to the resume actually completing, so the check is never recorded
+        # true for a route that never ran at all.
+        checks["route_change"] = bool(checks["resume_exit_zero"])
+    route_change_evidence = (
+        "observed_effective_model" if observed_route.model else "unobserved"
+    )
+
     qualified = all(
         (
             checks["advertised_exact_resume"],
@@ -972,6 +1064,8 @@ def qualify_installed_prewalk_transport(
             "model": execution_model,
             "effort": execution_effort,
         },
+        "observed_execution_route": observed_route.to_dict(),
+        "route_change_evidence": route_change_evidence,
         "session_id": session_id,
         "checks": checks,
         "qualified": qualified,
@@ -1013,6 +1107,8 @@ def qualify_installed_prewalk_transport(
                 "model": execution_model,
                 "effort": execution_effort,
             },
+            "observed_execution_route": observed_route.to_dict(),
+            "route_change_evidence": route_change_evidence,
             "create_exit_code": 0,
             "resume_exit_code": 0,
             "same_session_id": True,
@@ -1026,7 +1122,7 @@ def qualify_installed_prewalk_transport(
     else:
         success_payload = {
             "artifact_type": "native_prewalk_behavioral_qualification",
-            "schema_version": 1,
+            "schema_version": PREWALK_QUALIFICATION_SCHEMA_VERSION,
             "host": advertised.host,
             "transport": advertised.transport,
             "installed_version": advertised.installed_version,
@@ -1044,6 +1140,8 @@ def qualify_installed_prewalk_transport(
                 "model": execution_model,
                 "effort": execution_effort,
             },
+            "observed_execution_route": observed_route.to_dict(),
+            "route_change_evidence": route_change_evidence,
             "model_calls_made": True,
             "guide_prompt_sha256": attempt_payload["guide_prompt_sha256"],
             "continuation_sha256": attempt_payload["continuation_sha256"],
