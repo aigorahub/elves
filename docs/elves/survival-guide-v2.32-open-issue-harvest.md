@@ -86,25 +86,28 @@ Target release: **2.32.0**.
 
 ## Current position
 
-- **Phase:** staging complete; executing
-- **Active batch:** B0
-- **Next action:** verify and close #244, #245, #247, #248
-- **Blockers:** none at staging
-- **PR:** none yet (open after the first implementation commits land)
+- **Phase:** executing
+- **Active batch:** B3
+- **Next action:** `_section_at` digest-interior skip in `learnings_ledger.py`
+- **Blockers:** none
+- **PR:** open after B3
 
 ---
 
 ## Stop Gate
 
 - **Stop allowed right now:** no
-- **Reason:** staging complete; B0–B4 unstarted
+- **Reason:** B0–B2 complete; B3–B5 remain; no PR yet
 - **continuation_guard.stop_allowed:** false
 
 ---
 
 ## Deferred hygiene
 
-- None at staging. Bank advisory nits mid-run; drain at terminal readiness.
+- One run of `tests.test_full_run_supervisor` errored in `_run_supervision_canary` ("Trusted
+  recursive supervisor could not observe its marker canary"); the identical suite passed on
+  immediate re-run. Same timing-sensitive family as #242, not caused by B2. Decide at terminal
+  whether to file an issue.
 
 ---
 
@@ -123,9 +126,9 @@ Target release: **2.32.0**.
 
 | Id | Title | Status |
 |----|--------|--------|
-| B0 | Reconcile the issue ledger against merged PR #241 | pending |
-| B1 | Prewalk artifact contracts + lenient bounds (#260) | pending |
-| B2 | Terminal-flip events re-read (#242 residual) | pending |
+| B0 | Reconcile the issue ledger against merged PR #241 | complete |
+| B1 | Prewalk artifact contracts + lenient bounds (#260) | complete |
+| B2 | Terminal-flip events re-read (#242 residual) | complete |
 | B3 | Learnings-ledger digest-interior guard (#249 closer) | pending |
 | B4 | Observed effective route (#258) | pending |
 | B5 | Observed-usage wiring (#243) | pending |
@@ -134,5 +137,5 @@ Target release: **2.32.0**.
 
 ## Compaction recovery next action
 
-Read this file → session JSON → plan B0 acceptance → verify the four already-fixed issues against
-`main` and close them.
+Read this file → session JSON → plan B3 acceptance → make `_section_at` skip digest-interior
+lines in `scripts/cobbler_runtime/learnings_ledger.py`.
