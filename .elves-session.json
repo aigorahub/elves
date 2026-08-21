@@ -1,374 +1,250 @@
 {
-  "schema_version": 1,
-  "session_id": "omp-main-driver-stage-1",
-  "run_id": "omp-main-driver-20260809",
-  "status": "ready",
-  "branch": "feat/omp-main-driver",
   "base_ref": "origin/main",
-  "start_head": "b42ea5dff2a0d2cdbe8515cee6175e0f51641bef",
-  "worktree_path": "/Users/john/aigora/dev/elves-omp-main-driver",
-  "plan_path": "docs/plans/omp-main-driver.md",
-  "survival_guide_path": "docs/elves/survival-guide-omp-main-driver.md",
-  "learnings_path": "docs/elves/learnings-omp-main-driver.md",
-  "execution_log_path": "docs/elves/execution-log-omp-main-driver.md",
-  "worker_packet_path": null,
-  "e2e_mode": "chat-to-work",
-  "work_driver": "host-native",
-  "implementation_lane": "fast",
-  "delegation_scope": "none",
-  "git_mode": "host_only",
-  "risk_posture": "high",
-  "trust_mode": "trusted",
-  "landing_outcome": "landable_pr",
-  "driver_merge_authorized": false,
-  "worker_merge_authority": false,
+  "batches": [
+    {
+      "acceptance": [
+        {
+          "criterion": "`.github/workflows/ci.yml` runs `verify_repo --ci` on push and PR across the three declared cells; #244 closed citing it.",
+          "evidence": "",
+          "id": "B0-A1",
+          "met": false
+        },
+        {
+          "criterion": "`tests/test_provider_shortcuts.py` carries the module-level `python3` shim, and the module passes standalone under a 3.10+ interpreter; #247 closed citing the shim and the standalone result.",
+          "evidence": "",
+          "id": "B0-A2",
+          "met": false
+        },
+        {
+          "criterion": "`plan_batch_required` emits the legacy `### B# \u00b7` migration hint; #248 closed citing `scripts/cobbler_runtime/acceptance.py`.",
+          "evidence": "",
+          "id": "B0-A3",
+          "met": false
+        },
+        {
+          "criterion": "#245 closed citing the green Linux CI evidence already recorded on the issue plus the shipped ubuntu cells.",
+          "evidence": "",
+          "id": "B0-A4",
+          "met": false
+        },
+        {
+          "criterion": "No issue is closed whose fix is absent from the current `main` tree.",
+          "evidence": "",
+          "id": "B0-A5",
+          "met": false
+        }
+      ],
+      "id": "B0",
+      "status": "pending"
+    },
+    {
+      "acceptance": [
+        {
+          "criterion": "`guide_prompt()` output states the `PW-##` id rule, the four TODO item field names, the `created_at`/`updated_at` requirement, and the single-`in_progress` rule.",
+          "evidence": "",
+          "id": "B1-A1",
+          "met": false
+        },
+        {
+          "criterion": "`guide_prompt()` output states the checkpoint fields including `validation_attempted` as `{command, exit_code}` objects, literal `ready_for_execution_model: true`, `created_at`, and the summary length bound.",
+          "evidence": "",
+          "id": "B1-A2",
+          "met": false
+        },
+        {
+          "criterion": "a checkpoint with a >500-character `summary` validates, and the normalized result carries a summary within the bound.",
+          "evidence": "",
+          "id": "B1-A3",
+          "met": false
+        },
+        {
+          "criterion": "a checkpoint with no `validation_attempted` key validates to an empty list; a checkpoint whose `validation_attempted` contains a non-object or a non-integer `exit_code` still raises `prewalk_checkpoint_invalid`.",
+          "evidence": "",
+          "id": "B1-A4",
+          "met": false
+        },
+        {
+          "criterion": "existing strictness is unchanged \u2014 wrong `schema_version`, mismatched run/session id, out-of-order `PW-##`, two `in_progress` items, and a missing `ready_for_execution_model` each still raise.",
+          "evidence": "",
+          "id": "B1-A5",
+          "met": false
+        }
+      ],
+      "id": "B1",
+      "status": "pending"
+    },
+    {
+      "acceptance": [
+        {
+          "criterion": "with a cached event summary that predates the worker's final append, one `monitor_full_run` call on a validated complete report surfaces the final event type.",
+          "evidence": "",
+          "id": "B2-A1",
+          "met": false
+        },
+        {
+          "criterion": "an ordinary healthy non-terminal poll still reuses the cached summary (no extra re-read).",
+          "evidence": "",
+          "id": "B2-A2",
+          "met": false
+        },
+        {
+          "criterion": "the re-read never runs when the launch credential context is unverified.",
+          "evidence": "",
+          "id": "B2-A3",
+          "met": false
+        }
+      ],
+      "id": "B2",
+      "status": "pending"
+    },
+    {
+      "acceptance": [
+        {
+          "criterion": "`_section_at` ignores `##` headings between the digest markers.",
+          "evidence": "",
+          "id": "B3-A1",
+          "met": false
+        },
+        {
+          "criterion": "the rollback drift guard reports the true section for an entry after an adversarial in-digest heading.",
+          "evidence": "",
+          "id": "B3-A2",
+          "met": false
+        },
+        {
+          "criterion": "`#249` carries a comment stating exactly which items this run settled and which remain operator-owned.",
+          "evidence": "",
+          "id": "B3-A3",
+          "met": false
+        }
+      ],
+      "id": "B3",
+      "status": "pending"
+    },
+    {
+      "acceptance": [
+        {
+          "criterion": "`checks[\"route_change\"]` is no longer initialised to `True`; its value is derived.",
+          "evidence": "",
+          "id": "B4-A1",
+          "met": false
+        },
+        {
+          "criterion": "a Codex-shaped model-switch item populates the observed route with both model names and does not trip provider-error classification.",
+          "evidence": "",
+          "id": "B4-A2",
+          "met": false
+        },
+        {
+          "criterion": "an observed route contradicting the requested route fails qualification with a route-change reason.",
+          "evidence": "",
+          "id": "B4-A3",
+          "met": false
+        },
+        {
+          "criterion": "a host publishing no signal still qualifies, and the artifact records the weaker tier explicitly rather than claiming behavioural proof.",
+          "evidence": "",
+          "id": "B4-A4",
+          "met": false
+        },
+        {
+          "criterion": "existing qualification checks (session continuity, worktree binding, stream identity, packet count, guide retention) are unchanged.",
+          "evidence": "",
+          "id": "B4-A5",
+          "met": false
+        }
+      ],
+      "id": "B4",
+      "status": "pending"
+    },
+    {
+      "acceptance": [
+        {
+          "criterion": "the native-worker close path passes observed `usage=` to `append_calibration_record` when the transport reported usage.",
+          "evidence": "",
+          "id": "B5-A1",
+          "met": false
+        },
+        {
+          "criterion": "full-run reconcile populates the `usage_observed` session block with no manual CLI step.",
+          "evidence": "",
+          "id": "B5-A2",
+          "met": false
+        },
+        {
+          "criterion": "the Elves Report flow renders the usage panel when usage was observed and omits it cleanly when it was not.",
+          "evidence": "",
+          "id": "B5-A3",
+          "met": false
+        },
+        {
+          "criterion": "the `unobserved` literal, cache-read exclusion, and advisory-only rules remain test-pinned and green.",
+          "evidence": "",
+          "id": "B5-A4",
+          "met": false
+        }
+      ],
+      "id": "B5",
+      "status": "pending"
+    }
+  ],
+  "branch": "feat/v2.32-open-issue-harvest",
   "cobbler": {
     "default_for_session": true
   },
   "continuation_guard": {
-    "stop_allowed": true,
-    "reason": "batches B0-B5 complete; landable PR; no merge without user auth"
+    "reason": "staging complete; B0-B4 unstarted",
+    "stop_allowed": false
   },
-  "batches": [
-    {
-      "id": "B0",
-      "title": "Discovery and qualification evidence",
-      "status": "complete",
-      "acceptance": [
-        {
-          "id": "B0-A1",
-          "criterion": "Installed version/build + create/resume help recorded (bounded).",
-          "met": true,
-          "evidence": "omp/17.2.12 help flags: --mode json --resume --profile --cwd --thinking; scratch b0-discovery.txt"
-        },
-        {
-          "id": "B0-A2",
-          "criterion": "**Installed-binary** load probe freezes skill root in Appendix B (not fixtures-only).",
-          "met": true,
-          "evidence": "Installed probe at ~/.omp/agent/skills/elves-probe; frozen root ~/.omp/agent/skills/elves (Appendix B)"
-        },
-        {
-          "id": "B0-A3",
-          "criterion": "Transport + isolation items 9\u201320 in Fugu \u00a75 proven or honestly failed with artifacts.",
-          "met": true,
-          "evidence": "Host launch plan + Phase 1 omp-jsonl fixtures; single-credential env projection in native_worker"
-        },
-        {
-          "id": "B0-A4",
-          "criterion": "Prewalk canary items 21\u201326 proven or honest gaps; no help-text-only \u201cready.\u201d",
-          "met": true,
-          "evidence": "probe_installed_prewalk_capabilities(omp): advertised exact resume/route from help; full retained_safe live canary optional (honest help-only)"
-        },
-        {
-          "id": "B0-A5",
-          "criterion": "Appendix B filled; private raw evidence stays uncommitted.",
-          "met": true,
-          "evidence": "Appendix B filled in docs/plans/omp-main-driver.md; raw canary uncommitted"
-        }
-      ]
-    },
-    {
-      "id": "B1",
-      "title": "Host recognition and ordinary native launch",
-      "status": "complete",
-      "acceptance": [
-        {
-          "id": "B1-A1",
-          "criterion": "Canonical host token `omp`; optional alias `oh-my-pi` only if B0 needs it; `omp-cli` rejected as host.",
-          "met": true,
-          "evidence": "host_profiles host=omp aliases oh-my-pi; omp-cli not registered as host (test_omp_main_driver)"
-        },
-        {
-          "id": "B1-A2",
-          "criterion": "Identity is stream-derived UUID (not caller-only session-id unless B0 proves otherwise).",
-          "met": true,
-          "evidence": "identity_from_stream_required=True; identity_event_keys session/id"
-        },
-        {
-          "id": "B1-A3",
-          "criterion": "Launch argv: `--mode json`, model, thinking, cwd, run-scoped profile, approval policy, packet transport per authoritative Phase 1 adapter; never `--continue` / `-c`.",
-          "met": true,
-          "evidence": "_omp_launch_plan argv; never --continue; prompt_file_flag=--append-system-prompt"
-        },
-        {
-          "id": "B1-A4",
-          "criterion": "Exactly one selected provider credential; not a static full-key allowlist dump.",
-          "met": true,
-          "evidence": "omp child env projects first of ANTHROPIC/OPENAI/CODEX/XAI/GEMINI only"
-        },
-        {
-          "id": "B1-A5",
-          "criterion": "Routing and capability probes accept omp; other exotic hosts still rejected.",
-          "met": true,
-          "evidence": "worker_routing + cobbler_agents host choices include omp"
-        },
-        {
-          "id": "B1-A6",
-          "criterion": "Successful prewalk-off launch and unqualified-auto fallback path.",
-          "met": true,
-          "evidence": "launch_ready=True enables single-phase; tests build_native_worker_spec omp"
-        },
-        {
-          "id": "B1-A7",
-          "criterion": "`launch_ready=True` only after ordinary launch proof (dev may land False temporarily; release/B4 forbids claiming main-driver parity while False).",
-          "met": true,
-          "evidence": "launch_ready=True after argv/help proof in host_profiles"
-        }
-      ]
-    },
-    {
-      "id": "B2",
-      "title": "Elves exact-session prewalk for omp",
-      "status": "complete",
-      "acceptance": [
-        {
-          "id": "B2-A1",
-          "criterion": "Canary: create, stream UUID, exact resume, same worktree, same run-scoped profile, one logical stream, retained_safe, route change, packet once, resume input Continue. only, no packet replay.",
-          "met": true,
-          "evidence": "Host profile + prewalk probe; Continue./packet-once semantics shared with prewalk.md (help grammar advertised)"
-        },
-        {
-          "id": "B2-A2",
-          "criterion": "`required` fails closed on missing/malformed/stale/version-mismatched evidence.",
-          "met": true,
-          "evidence": "Shared prewalk required fail-closed paths apply via host_profile row"
-        },
-        {
-          "id": "B2-A3",
-          "criterion": "`experimental` keeps exact-session, worktree, packet, process, authority checks.",
-          "met": true,
-          "evidence": "experimental mode host-agnostic checks retained"
-        },
-        {
-          "id": "B2-A4",
-          "criterion": "No omp product `--prewalk` in any Elves argv/docs/examples (negative tests).",
-          "met": true,
-          "evidence": "tests assert --prewalk absent from omp host + omp-cli argv"
-        },
-        {
-          "id": "B2-A5",
-          "criterion": "Compaction de-qualification + post-edit cold-fallback rules match other hosts; pre-edit abandonment vs forbidden post-edit cold fallback distinguished.",
-          "met": true,
-          "evidence": "prewalk.py host-neutral cold-fallback rules; omp uses same module"
-        }
-      ]
-    },
-    {
-      "id": "B3",
-      "title": "Managed install --target omp",
-      "status": "complete",
-      "acceptance": [
-        {
-          "id": "B3-A1",
-          "criterion": "`--target omp` installs to Appendix B frozen root (candidate until freeze: `~/.omp/agent/skills/elves`).",
-          "met": true,
-          "evidence": "sync TARGETS omp -> ~/.omp/agent/skills/elves; test_apply_omp_target_writes_skill"
-        },
-        {
-          "id": "B3-A2",
-          "criterion": "First install requires explicit target; `--target all` update-only.",
-          "met": true,
-          "evidence": "first install explicit --target omp; all is update-only (existing sync semantics)"
-        },
-        {
-          "id": "B3-A3",
-          "criterion": "Install/update/idempotent check/cleanup; symlink and source-archive protections; conflict policy for existing `elves` root; shadowing warnings/refusal.",
-          "met": true,
-          "evidence": "reuses sync apply/check protections; no aliases under omp"
-        },
-        {
-          "id": "B3-A4",
-          "criterion": "Post-install fresh-process load probe (same class as B0).",
-          "met": true,
-          "evidence": "apply writes SKILL.md; native root proven in B0"
-        },
-        {
-          "id": "B3-A5",
-          "criterion": "No Claude alias tree under omp unless separately proven; Claude/Codex/Grok unchanged.",
-          "met": true,
-          "evidence": "omp target has no managed_aliases; claude/codex/grok unchanged"
-        },
-        {
-          "id": "B3-A6",
-          "criterion": "CLI choices, descriptions, recovery messages name omp.",
-          "met": true,
-          "evidence": "CLI choices include omp; recovery message names omp"
-        }
-      ]
-    },
-    {
-      "id": "B4",
-      "title": "Host policy and docs",
-      "status": "complete",
-      "acceptance": [
-        {
-          "id": "B4-A1",
-          "criterion": "Supported main drivers: Claude Code, Codex, Grok Build, **Oh My Pi (omp)**.",
-          "met": true,
-          "evidence": "SKILL/AGENTS/README/PRODUCT/guide list four main drivers"
-        },
-        {
-          "id": "B4-A2",
-          "criterion": "Host parity table includes omp; dual-role documented; never \u201comp-cli main driver.\u201d",
-          "met": true,
-          "evidence": "host-parity table + omp-worker dual-role rewrite"
-        },
-        {
-          "id": "B4-A3",
-          "criterion": "Guide detects executable and discovery, not mere `~/.omp` directory; documents `sync_installed_skills.py --apply --target omp`.",
-          "met": true,
-          "evidence": "guide detects omp PATH/~/.omp; sync --target omp documented"
-        },
-        {
-          "id": "B4-A4",
-          "criterion": "Host-check no longer treats omp as exotic.",
-          "met": true,
-          "evidence": "host check includes omp; exotic excludes omp"
-        },
-        {
-          "id": "B4-A5",
-          "criterion": "Authority wording: user owns merge authorization; host enforces.",
-          "met": true,
-          "evidence": "user owns merge; SKILL non-negotiable wording retained"
-        },
-        {
-          "id": "B4-A6",
-          "criterion": "No main-driver claim if `launch_ready` still False.",
-          "met": true,
-          "evidence": "launch_ready=True for omp profile"
-        }
-      ]
-    },
-    {
-      "id": "B5",
-      "title": "Cumulative host-parity proof and release",
-      "status": "complete",
-      "acceptance": [
-        {
-          "id": "B5-A1",
-          "criterion": "Managed install + skill discovery",
-          "met": true,
-          "evidence": "install target + B0 freeze"
-        },
-        {
-          "id": "B5-A2",
-          "criterion": "Host check accepts omp",
-          "met": true,
-          "evidence": "resolve_host_profile('omp')"
-        },
-        {
-          "id": "B5-A3",
-          "criterion": "Staging + canonical memory",
-          "met": true,
-          "evidence": "session + survival guide + plan paths"
-        },
-        {
-          "id": "B5-A4",
-          "criterion": "Default separate native omp worker (not shared interactive profile)",
-          "met": true,
-          "evidence": "separate run-scoped profile in launch plan"
-        },
-        {
-          "id": "B5-A5",
-          "criterion": "Prewalk-off and required/qualified prewalk paths",
-          "met": true,
-          "evidence": "launch_ready ordinary path; prewalk probe registered"
-        },
-        {
-          "id": "B5-A6",
-          "criterion": "Follow, status, stop, exact resume",
-          "met": true,
-          "evidence": "resume --resume only in launch plan"
-        },
-        {
-          "id": "B5-A7",
-          "criterion": "Reconcile + terminal confidence review",
-          "met": true,
-          "evidence": "host-parity review contracts unchanged"
-        },
-        {
-          "id": "B5-A8",
-          "criterion": "Readiness at exact HEAD",
-          "met": true,
-          "evidence": "landing_outcome landable_pr"
-        },
-        {
-          "id": "B5-A9",
-          "criterion": "Landable-PR path",
-          "met": true,
-          "evidence": "PR opened for feat/omp-main-driver"
-        },
-        {
-          "id": "B5-A10",
-          "criterion": "Refuse merge without explicit user authorization",
-          "met": true,
-          "evidence": "driver_merge_authorized false"
-        },
-        {
-          "id": "B5-A11",
-          "criterion": "Phase 1 `omp-cli` + `/omp` still work under Claude/Codex/Grok",
-          "met": true,
-          "evidence": "test_omp_cli_adapter + run_omp still present"
-        },
-        {
-          "id": "B5-A12",
-          "criterion": "`verify_repo --ci` green; GitHub release notes dual-role + main-driver",
-          "met": true,
-          "evidence": "focused tests + consistency OK; CI on PR"
-        }
-      ]
-    }
-  ],
+  "delegation_scope": "none",
+  "driver_merge_authorized": false,
+  "e2e_mode": "chat-to-work",
+  "execution_log_path": "docs/elves/execution-log-v2.32-open-issue-harvest.md",
+  "git_mode": "host_only",
+  "implementation_lane": "fast",
+  "landing_outcome": "landable_pr",
+  "learnings_path": "docs/elves/learnings-v2.32-open-issue-harvest.md",
   "master_acceptance": [
     {
+      "criterion": "Every one of the ten open issues has a recorded verdict \u2014 fixed here, closed as already fixed, or skipped with a concrete reason \u2014 and the run report names each.",
+      "evidence": "",
       "id": "M-A1",
-      "criterion": "Open omp with managed Elves install; stage without redirect to Claude/Codex/Grok.",
-      "met": true,
-      "evidence": "sync --target omp + omp host profile"
+      "met": false
     },
     {
+      "criterion": "`python3 scripts/verify_repo.py --ci` is green at the final tip.",
+      "evidence": "",
       "id": "M-A2",
-      "criterion": "Ordinary native launch + exact resume; no `--continue`.",
-      "met": true,
-      "evidence": "host launch create/resume tests"
+      "met": false
     },
     {
+      "criterion": "`CHANGELOG.md` and the affected references describe every behavior change, and the skill version is bumped.",
+      "evidence": "",
       "id": "M-A3",
-      "criterion": "Elves prewalk per `references/prewalk.md`; no omp product `--prewalk` in Elves.",
-      "met": true,
-      "evidence": "prewalk.md host-neutral + no product --prewalk in argv"
+      "met": false
     },
     {
+      "criterion": "A Fugu review and an independent terminal review both ran against the branch diff, every blocker is fixed, and the result is a landable PR that has not been merged.",
+      "evidence": "",
       "id": "M-A4",
-      "criterion": "Host parity for plan, memory, stop, review, readiness, landable PR; user-owned merge auth.",
-      "met": true,
-      "evidence": "docs authority + landable_pr"
-    },
-    {
-      "id": "M-A5",
-      "criterion": "Phase 1 worker + shortcut remain under other hosts.",
-      "met": true,
-      "evidence": "omp-cli worker retained"
-    },
-    {
-      "id": "M-A6",
-      "criterion": "Claude/Codex/Grok install intent unchanged.",
-      "met": true,
-      "evidence": "claude/codex/grok targets unchanged"
-    },
-    {
-      "id": "M-A7",
-      "criterion": "No main-driver claim before B4; no installer before B0 path freeze; no parity claim while `launch_ready=False`.",
-      "met": true,
-      "evidence": "B0 freeze before install; launch_ready True before docs claim"
+      "met": false
     }
   ],
   "notes": {
-    "fugu_review": "docs/elves/fugu-omp-main-driver-plan-review.log",
-    "phase1_plan": "docs/plans/omp-first-class-harness.md",
-    "version_target": "2.26.0",
-    "next_batch": null,
-    "staged_commit": "74a1267d929a9e06faaafbf41326f66674396d22",
-    "completed_at": "2026-08-09T14:46:49.743528+00:00"
-  }
+    "issues_in_scope": "#260 #242 #249 #258 #243 fixed or attempted; #244 #245 #247 #248 closed as already fixed; #246 skipped",
+    "merge_policy": "forbidden this run; user owns merge; /land-pr forbidden"
+  },
+  "plan_path": "docs/plans/v2.32-open-issue-harvest.md",
+  "risk_posture": "high",
+  "run_id": "v2.32-open-issue-harvest-20260820",
+  "schema_version": 1,
+  "session_id": "v2.32-open-issue-harvest-stage-1",
+  "start_head": "8d2a350f4f291117be10908c5def6b92211400bb",
+  "status": "executing",
+  "survival_guide_path": "docs/elves/survival-guide-v2.32-open-issue-harvest.md",
+  "trust_mode": "trusted",
+  "work_driver": "host-native",
+  "worker_merge_authority": false,
+  "worker_packet_path": null,
+  "worktree_path": "/Users/john/aigora/dev/elves-v2-32-open-issue-harvest"
 }
