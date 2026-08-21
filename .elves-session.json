@@ -77,25 +77,25 @@
       "acceptance": [
         {
           "criterion": "with a cached event summary that predates the worker's final append, one `monitor_full_run` call on a validated complete report surfaces the final event type.",
-          "evidence": "",
+          "evidence": "test_monitor_rereads_events_when_a_report_first_turns_terminal: with a cache signature matching the events file and a summary from before the final append, one poll on a validated complete report returns events_reused=False and last_event_type=run_complete. Negative control: with the re-read disabled the same test fails on events_reused (True is not false).",
           "id": "B2-A1",
-          "met": false
+          "met": true
         },
         {
           "criterion": "an ordinary healthy non-terminal poll still reuses the cached summary (no extra re-read).",
-          "evidence": "",
+          "evidence": "test_monitor_still_reuses_the_event_cache_on_a_healthy_poll: same staged cache without a terminal report keeps events_reused=True and last_event_type=batch_started.",
           "id": "B2-A2",
-          "met": false
+          "met": true
         },
         {
           "criterion": "the re-read never runs when the launch credential context is unverified.",
-          "evidence": "",
+          "evidence": "test_monitor_skips_the_terminal_reread_without_credential_context: with _launch_evidence_context patched to unverified, the re-read does not run (events_reused stays True).",
           "id": "B2-A3",
-          "met": false
+          "met": true
         }
       ],
       "id": "B2",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "acceptance": [

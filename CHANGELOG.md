@@ -17,6 +17,13 @@ All notable changes to the Elves skill are documented here.
   `summary` is truncated, and an absent or null `validation_attempted` becomes an empty list.
   Identity, schema version, `PW-##` ordering, and the readiness assertion stay fail-closed, and a
   prose validation string is still never coerced into a command record. (#260)
+- **Monitor re-reads events once when a report first turns terminal**
+  (`scripts/cobbler_runtime/full_run_monitor.py`) — reconciliation depth was forced to full only
+  when the *state* was already terminal, which is one poll too late. On the poll where a validated
+  report first turns terminal, an incremental tick could still serve an event summary cached from
+  before the worker's final append, so a parked driver saw the final advisory signal one poll late.
+  The monitor now re-reads the event log once at that boundary, behind the same credential-grant
+  guard as the ordinary read. Ordinary healthy polls still reuse the cache. (#242)
 
 ## [2.31.0] - 2026-08-16
 

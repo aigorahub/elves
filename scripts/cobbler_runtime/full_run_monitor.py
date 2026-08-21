@@ -22,6 +22,8 @@ _KEEP = frozenset(
         "_bind",
         "_refresh_helpers",
         "_KEEP",
+        "_TERMINAL_REPORT_STATUSES",
+        "_TERMINAL_STATE_STATUSES",
         "monitor_full_run",
         "await_full_run",
         "Any",
@@ -30,6 +32,13 @@ _KEEP = frozenset(
         "Sequence",
         "annotations",
     }
+)
+
+# Worker-report terminal vocabulary, distinct from the state machine's: a state can
+# also be `stopped` or `stale`, and neither is ever a worker report status.
+_TERMINAL_REPORT_STATUSES = frozenset({"complete", "failed", "blocked"})
+_TERMINAL_STATE_STATUSES = frozenset(
+    {"complete", "failed", "blocked", "stopped", "stale"}
 )
 
 
@@ -96,7 +105,7 @@ def monitor_full_run(
     if (
         force_full
         or acknowledge_high_risk_checkpoint is not None
-        or state.status in {"complete", "failed", "blocked", "stopped", "stale"}
+        or state.status in _TERMINAL_STATE_STATUSES
         or (state.next_action or "").startswith("driver_wake_")
     ):
         resolved_depth = "full"
@@ -166,10 +175,8 @@ def monitor_full_run(
             and event_signature == cache.get("event_signature")
             and isinstance(cached_event_summary, Mapping)
         )
-    if event_signature is not None and events_reused:
-        events, event_errors = [], []
-    elif event_signature is not None and grant_context_verified:
-        events, event_errors = _read_events(
+    def _load_events() -> tuple[list[dict[str, Any]], list[str]]:
+        return _read_events(
             events_path,
             expected_session_id=session_id,
             expected_branch=state.branch,
@@ -182,6 +189,11 @@ def monitor_full_run(
             allow_partial_final=not identity_retired and bool(state.pid or state.pgid),
             repo_root=Path(repo_root),
         )
+
+    if event_signature is not None and events_reused:
+        events, event_errors = [], []
+    elif event_signature is not None and grant_context_verified:
+        events, event_errors = _load_events()
     elif event_signature is not None:
         events, event_errors = [], [
             "launch credential context cannot be verified for worker evidence"
@@ -238,6 +250,25 @@ def monitor_full_run(
         except StorageError as exc:
             report_errors = [exc.message]
             report = {}
+
+    # aigorahub/elves#242: `resolved_depth` is forced to full only when *state* is
+    # already terminal. On the exact poll where a validated report first turns
+    # terminal, state is still running, so an incremental poll can serve an event
+    # summary cached from before the worker's final append — the parked driver then
+    # sees the final advisory signal one poll late. The docstring already promises
+    # that terminal paths re-read; honor it at this one boundary. The cached
+    # signature was captured before this read, so a later poll re-reads rather than
+    # trusting a summary newer than its own signature.
+    if (
+        events_reused
+        and grant_context_verified
+        and report
+        and not report_errors
+        and report.get("status") in _TERMINAL_REPORT_STATUSES
+        and initial_status not in _TERMINAL_STATE_STATUSES
+    ):
+        events, event_errors = _load_events()
+        events_reused = False
 
     # Process fingerprint is primary liveness for long Grok turns. The process
     # group is tracked independently because a provider can leave descendants

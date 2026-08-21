@@ -6131,6 +6131,116 @@ class FullRunLifecycleTests(unittest.TestCase):
         self.assertLessEqual(len(bounded["transcript_tail"]), 100)
         self.assertTrue(all(len(line) <= 1000 for line in bounded["transcript_tail"]))
 
+    def _run_fixture_to_completion(self) -> dict:
+        prepare_full_run(
+            self.repo,
+            session_id=self.session,
+            branch=self.branch,
+            start_head=self.start_head,
+            worktree=self.repo,
+            packet_path=self.packet,
+            adapter="fixture",
+            fixture_script=self.worker,
+        )
+        launch_full_run(self.repo, session_id=self.session)
+        deadline = time.time() + 30
+        status = monitor_full_run(
+            self.repo, session_id=self.session, stale_after_seconds=60
+        )
+        while (
+            status.get("state") not in {"complete", "failed"}
+            and time.time() < deadline
+        ):
+            time.sleep(0.05)
+            status = monitor_full_run(
+                self.repo, session_id=self.session, stale_after_seconds=60
+            )
+        self.assertEqual(status["state"], "complete", status)
+        return status
+
+    def _stage_one_poll_terminal_boundary(self) -> None:
+        """Rebuild the exact poll where a report turns terminal on a cache-reusing tick.
+
+        The monitor captures the event-log signature at the top of a poll and reads the
+        report after it. The fixture worker — like a real one — writes its complete
+        report *before* appending `run_complete`, so an append can land inside that
+        window: the signature still matches the cache, the cached summary predates the
+        final event, and the report already validates as complete.
+        """
+        root = full_run_root(self.repo, self.session)
+        signature = full_run_module._event_log_signature(
+            self.repo, root / "events.jsonl"
+        )
+        state = load_state(self.repo, self.session)
+        state.status = "healthy"
+        state.completed_at = None
+        state.next_action = "parked_monitor"
+        state.monitor_cache = {
+            "event_signature": signature,
+            "event_summary": {
+                "count": 1,
+                "last_type": "batch_started",
+                "saw_run_complete": False,
+                "high_risk_checkpoints": [],
+                "material_scope_or_assumption_change": False,
+            },
+            "last_remote_audit_at": datetime.now(timezone.utc).isoformat(),
+        }
+        full_run_module.save_state(self.repo, state)
+
+    def test_monitor_rereads_events_when_a_report_first_turns_terminal(self) -> None:
+        # aigorahub/elves#242 (residual): depth is forced to full only once *state* is
+        # already terminal, which is one poll too late. On the poll where a validated
+        # report first turns terminal, a parked driver was shown the cached — stale —
+        # advisory signal, and only the next poll self-corrected.
+        self._run_fixture_to_completion()
+        self._stage_one_poll_terminal_boundary()
+        refreshed = monitor_full_run(
+            self.repo, session_id=self.session, stale_after_seconds=60
+        )
+        # The subject is the event evidence, not this poll's state classification:
+        # rewinding `status` also rewinds past the consumed exit record, which the
+        # staged state can no longer produce. What matters is that the validated
+        # terminal report forced the re-read in the same poll that observed it.
+        self.assertEqual(refreshed["check_summary"]["report_status"], "complete")
+        self.assertFalse(refreshed["check_summary"]["events_reused"])
+        self.assertEqual(
+            refreshed["check_summary"]["last_event_type"], "run_complete"
+        )
+
+    def test_monitor_still_reuses_the_event_cache_on_a_healthy_poll(self) -> None:
+        # The re-read is one boundary, not a policy change: without a terminal report
+        # the incremental poll must still reuse its cached summary.
+        self._run_fixture_to_completion()
+        root = full_run_root(self.repo, self.session)
+        (root / "report.json").rename(root / "report.json.parked")
+        self._stage_one_poll_terminal_boundary()
+        healthy = monitor_full_run(
+            self.repo, session_id=self.session, stale_after_seconds=60
+        )
+        self.assertTrue(healthy["check_summary"]["events_reused"])
+        self.assertEqual(
+            healthy["check_summary"]["last_event_type"], "batch_started"
+        )
+
+    def test_monitor_skips_the_terminal_reread_without_credential_context(self) -> None:
+        # Worker evidence is only read once the launch credential context verifies.
+        # The re-read sits behind the same guard as the ordinary read.
+        self._run_fixture_to_completion()
+        self._stage_one_poll_terminal_boundary()
+        with mock.patch.object(
+            full_run_module,
+            "_launch_evidence_context",
+            return_value=(False, frozenset()),
+        ):
+            guarded = monitor_full_run(
+                self.repo, session_id=self.session, stale_after_seconds=60
+            )
+        self.assertTrue(guarded["check_summary"]["events_reused"])
+        self.assertEqual(
+            guarded["check_summary"]["last_event_type"], "batch_started"
+        )
+
     def test_monitor_surfaces_batch_complete_confidence_signal(self) -> None:
         confident = FAKE_WORKER.replace(
             'emit("batch_complete", batch, f"batch {batch} complete", head=head)',

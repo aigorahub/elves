@@ -79,3 +79,31 @@ Proof: `python3 -m unittest tests.test_native_worker_prewalk` → 55 tests OK. I
 `test_check_repo_consistency`, `test_installed_bundle_smoke`) → 159 tests OK.
 
 B1 acceptance B1-A1..B1-A5 met.
+
+---
+
+## B2 — Terminal-flip events re-read (#242 residual, 2026-08-20)
+
+The residual question on #242 was whether `monitor_full_run` should force one events re-read when
+a validated report first flips the run terminal. It should, and the window is real: the monitor
+captures the event-log signature at the top of a poll and reads the report after it, and a worker
+(the fixture included) writes its complete report *before* appending `run_complete`. An append
+landing inside that window leaves the signature matching the cache while the cached summary
+predates the final event.
+
+Fix: one re-read at that boundary, behind the same `grant_context_verified` guard as the ordinary
+read. `_read_events` is now called through a local `_load_events()` so both call sites cannot
+drift. The two inline terminal-status sets are now named constants
+(`_TERMINAL_REPORT_STATUSES`, `_TERMINAL_STATE_STATUSES`) because the report and state vocabularies
+differ (`stopped`/`stale` are state-only).
+
+Proof: three new tests (re-read, cache still reused on a healthy poll, no re-read without
+credential context). Negative control run: with the re-read disabled the first test fails on
+`events_reused` (`True is not false`). Full `tests.test_full_run_supervisor` → 184 tests OK.
+
+Observation banked as deferred hygiene: one run of the supervisor suite errored in
+`_run_supervision_canary` ("Trusted recursive supervisor could not observe its marker canary")
+and the identical suite passed on immediate re-run. Same timing-sensitive family as #242, and not
+caused by this change.
+
+B2 acceptance B2-A1..B2-A3 met.
