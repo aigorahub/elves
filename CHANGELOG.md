@@ -4,7 +4,7 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
-## [2.32.0] - 2026-08-20
+## [2.32.0] - 2026-08-21
 
 ### Fixed
 - **Prewalk guide prompt states its artifact contracts** (`scripts/cobbler_runtime/prewalk.py`,

@@ -1,0 +1,225 @@
+{
+  "base_ref": "origin/main",
+  "batches": [
+    {
+      "acceptance": [
+        {
+          "criterion": "`.github/workflows/ci.yml` runs `verify_repo --ci` on push and PR across the three declared cells; #244 closed citing it.",
+          "evidence": "commit 92d939e in main: .github/workflows/ci.yml runs verify_repo --ci on push/PR/dispatch across macOS py3.12 (authoritative) + ubuntu py3.12/py3.10 (observational), fetch-depth 0. #244 closed citing it.",
+          "id": "B0-A1",
+          "met": true
+        },
+        {
+          "criterion": "`tests/test_provider_shortcuts.py` carries the module-level `python3` shim, and the module passes standalone under a 3.10+ interpreter; #247 closed citing the shim and the standalone result.",
+          "evidence": "tests/test_provider_shortcuts.py:37-57 shim (commit 0343fa6) present in main; standalone `python3 -m unittest tests.test_provider_shortcuts` on main = 57 tests OK (1 skip), Python 3.14.6. #247 closed.",
+          "id": "B0-A2",
+          "met": true
+        },
+        {
+          "criterion": "`plan_batch_required` emits the legacy `### B# \u00b7` migration hint; #248 closed citing `scripts/cobbler_runtime/acceptance.py`.",
+          "evidence": "scripts/cobbler_runtime/acceptance.py:503-525 (commit 3e0e209) emits the legacy `### B# \u00b7` migration hint inside plan_batch_required. #248 closed.",
+          "id": "B0-A3",
+          "met": true
+        },
+        {
+          "criterion": "#245 closed citing the green Linux CI evidence already recorded on the issue plus the shipped ubuntu cells.",
+          "evidence": "Linux cells shipped with 92d939e; green all-cell evidence recorded on the issue (actions run 31165858018). #245 closed.",
+          "id": "B0-A4",
+          "met": true
+        },
+        {
+          "criterion": "No issue is closed whose fix is absent from the current `main` tree.",
+          "evidence": "All four fix commits verified as ancestors of main via `git merge-base --is-ancestor`; verification run against the main worktree, not this branch.",
+          "id": "B0-A5",
+          "met": true
+        }
+      ],
+      "id": "B0",
+      "status": "complete"
+    },
+    {
+      "acceptance": [
+        {
+          "criterion": "`guide_prompt()` output states the `PW-##` id rule, the four TODO item field names, the `created_at`/`updated_at` requirement, and the single-`in_progress` rule.",
+          "evidence": "guide_prompt() now embeds a filled todo.json example plus the PW-## ordering, four field names, RFC3339 created_at/updated_at, and single-in_progress rules; pinned by test_prompt_states_both_artifact_contracts.",
+          "id": "B1-A1",
+          "met": true
+        },
+        {
+          "criterion": "`guide_prompt()` output states the checkpoint fields including `validation_attempted` as `{command, exit_code}` objects, literal `ready_for_execution_model: true`, `created_at`, and the summary length bound.",
+          "evidence": "Same prompt states the checkpoint shape: kind, todo_id, changed_paths, summary bound (500), validation_attempted as {command, exit_code}, literal ready_for_execution_model true, RFC3339 created_at. Both examples are parsed out of the prompt and run through the real validators in the same test.",
+          "id": "B1-A2",
+          "met": true
+        },
+        {
+          "criterion": "a checkpoint with a >500-character `summary` validates, and the normalized result carries a summary within the bound.",
+          "evidence": "_normalized_summary truncates past PREWALK_SUMMARY_MAX_CHARS; test_checkpoint_truncates_long_summary_instead_of_terminalizing asserts <= cap and that an empty summary still raises.",
+          "id": "B1-A3",
+          "met": true
+        },
+        {
+          "criterion": "a checkpoint with no `validation_attempted` key validates to an empty list; a checkpoint whose `validation_attempted` contains a non-object or a non-integer `exit_code` still raises `prewalk_checkpoint_invalid`.",
+          "evidence": "Absent/null validation_attempted normalizes to []; prose string, list-of-strings, non-integer exit_code, and empty command all still raise prewalk_checkpoint_invalid. test_checkpoint_absent_validation_attempted_normalizes_to_empty.",
+          "id": "B1-A4",
+          "met": true
+        },
+        {
+          "criterion": "existing strictness is unchanged \u2014 wrong `schema_version`, mismatched run/session id, out-of-order `PW-##`, two `in_progress` items, and a missing `ready_for_execution_model` each still raise.",
+          "evidence": "test_checkpoint_identity_and_readiness_stay_strict pins schema_version, run_id, session_id, kind, todo_id, ready_for_execution_model, and naive created_at as fatal; pre-existing TODO strictness tests unchanged and green.",
+          "id": "B1-A5",
+          "met": true
+        }
+      ],
+      "id": "B1",
+      "status": "complete"
+    },
+    {
+      "acceptance": [
+        {
+          "criterion": "with a cached event summary that predates the worker's final append, one `monitor_full_run` call on a validated complete report surfaces the final event type.",
+          "evidence": "test_monitor_rereads_events_when_a_report_first_turns_terminal: with a cache signature matching the events file and a summary from before the final append, one poll on a validated complete report returns events_reused=False and last_event_type=run_complete. Negative control: with the re-read disabled the same test fails on events_reused (True is not false).",
+          "id": "B2-A1",
+          "met": true
+        },
+        {
+          "criterion": "an ordinary healthy non-terminal poll still reuses the cached summary (no extra re-read).",
+          "evidence": "test_monitor_still_reuses_the_event_cache_on_a_healthy_poll: same staged cache without a terminal report keeps events_reused=True and last_event_type=batch_started.",
+          "id": "B2-A2",
+          "met": true
+        },
+        {
+          "criterion": "the re-read never runs when the launch credential context is unverified.",
+          "evidence": "test_monitor_skips_the_terminal_reread_without_credential_context: with _launch_evidence_context patched to unverified, the re-read does not run (events_reused stays True).",
+          "id": "B2-A3",
+          "met": true
+        }
+      ],
+      "id": "B2",
+      "status": "complete"
+    },
+    {
+      "acceptance": [
+        {
+          "criterion": "`_section_at` ignores `##` headings between the digest markers.",
+          "evidence": "_section_at tracks DIGEST_BEGIN/DIGEST_END and skips interior lines; test_section_at_ignores_headings_inside_the_digest_block also pins that a real heading after the block still wins.",
+          "id": "B3-A1",
+          "met": true
+        },
+        {
+          "criterion": "the rollback drift guard reports the true section for an entry after an adversarial in-digest heading.",
+          "evidence": "test_in_digest_heading_cannot_retire_a_restored_entry: a forged in-digest `## Repo Conventions` plus cooperating drift previously restored an active learning into `## Retired Learnings`. Fixing _section_at alone was not enough \u2014 _section_insert_index (the declined-candidate fallback) had the same blindness and is fixed with it. Both tests fail with the guards removed.",
+          "id": "B3-A2",
+          "met": true
+        },
+        {
+          "criterion": "`#249` carries a comment stating exactly which items this run settled and which remain operator-owned.",
+          "evidence": "https://github.com/aigorahub/elves/issues/249#issuecomment-5364103921 states what this run settled, what PR #241 settled, and that items 1 and 3 stay operator-owned.",
+          "id": "B3-A3",
+          "met": true
+        }
+      ],
+      "id": "B3",
+      "status": "complete"
+    },
+    {
+      "acceptance": [
+        {
+          "criterion": "`checks[\"route_change\"]` is no longer initialised to `True`; its value is derived.",
+          "evidence": "checks[\"route_change\"] is initialised False and assigned after the execution phase from execution_result.observed_route; test_observed_route_contradicting_the_request_fails_qualification pins that it can be False.",
+          "id": "B4-A1",
+          "met": true
+        },
+        {
+          "criterion": "a Codex-shaped model-switch item populates the observed route with both model names and does not trip provider-error classification.",
+          "evidence": "_observed_route_from_event parses the codex-cli item.completed/inner-error notice to the resuming model; test_codex_resume_notice_names_the_effective_model also asserts _is_provider_error_event is False for it, and test_no_signal_is_never_read_as_a_route_observation covers wrong host, wrong event type, wrong inner type, and unrelated message.",
+          "id": "B4-A2",
+          "met": true
+        },
+        {
+          "criterion": "an observed route contradicting the requested route fails qualification with a route-change reason.",
+          "evidence": "test_observed_route_contradicting_the_request_fails_qualification: raises prewalk_route_change_unqualified; the attempt artifact shows route_change False while same_session_id and same_worktree stayed True.",
+          "id": "B4-A3",
+          "met": true
+        },
+        {
+          "criterion": "a host publishing no signal still qualifies, and the artifact records the weaker tier explicitly rather than claiming behavioural proof.",
+          "evidence": "test_a_host_publishing_no_signal_still_qualifies_at_the_weaker_tier: qualifies, artifact records route_change_evidence 'unobserved' and an empty observed_execution_route, with the requested route recorded beside it rather than in place of it.",
+          "id": "B4-A4",
+          "met": true
+        },
+        {
+          "criterion": "existing qualification checks (session continuity, worktree binding, stream identity, packet count, guide retention) are unchanged.",
+          "evidence": "tests.test_native_worker_prewalk 60 OK (existing qualification, reuse, failure, and runtime-error tests unchanged); 252 tests OK across the eight prewalk-touching modules.",
+          "id": "B4-A5",
+          "met": true
+        }
+      ],
+      "id": "B4",
+      "status": "complete"
+    }
+  ],
+  "branch": "feat/v2.32-open-issue-harvest",
+  "cobbler": {
+    "default_for_session": true
+  },
+  "continuation_guard": {
+    "reason": "acceptance proven; explicit user merge-on-green authorization recorded 2026-08-21; merge with a regular merge commit only",
+    "stop_allowed": true
+  },
+  "delegation_scope": "none",
+  "driver_merge_authorized": true,
+  "e2e_mode": "chat-to-work",
+  "execution_log_path": "docs/elves/execution-log-v2.32-open-issue-harvest.md",
+  "git_mode": "host_only",
+  "implementation_lane": "fast",
+  "landing": {
+    "driver_authorized": true,
+    "outcome": "complete_and_merge",
+    "worker_merge_authority": false
+  },
+  "landing_outcome": "complete_and_merge",
+  "learnings_path": "docs/elves/learnings-v2.32-open-issue-harvest.md",
+  "master_acceptance": [
+    {
+      "criterion": "Every one of the ten open issues has a recorded verdict \u2014 fixed here, closed as already fixed, or skipped with a concrete reason \u2014 and the run report names each.",
+      "evidence": "All ten issues have a recorded verdict. Fixed here: #260 (B1), #242 residual (B2), #249 closer (B3), #258 (B4). Closed as already fixed: #244, #245, #247, #248. Skipped with a reason posted on the issue: #243, #246, and #249 items 1 and 3.",
+      "id": "M-A1",
+      "met": true
+    },
+    {
+      "criterion": "`python3 scripts/verify_repo.py --ci` is green at the final tip.",
+      "evidence": "python3 scripts/verify_repo.py --ci --base-ref origin/main green at the review-fix tip: 1598 tests, plus consistency, release, public-API, markdown-link, secret-pattern, and installed-bundle gates.",
+      "id": "M-A2",
+      "met": true
+    },
+    {
+      "criterion": "`CHANGELOG.md` and the affected references describe every behavior change, and the skill version is bumped.",
+      "evidence": "CHANGELOG 2.32.0 section describes every behavior change including the review fixes; references/prewalk.md documents the artifact contracts, the observed-route tiers, and the evidence contract version; SKILL.md/AGENTS.md/README.md/guide/index.html version strings synced to 2.32.0.",
+      "id": "M-A3",
+      "met": true
+    },
+    {
+      "criterion": "A Fugu review and an independent terminal review both ran against the branch diff, every blocker is fixed, and the result is a landable PR that has not been merged.",
+      "evidence": "Fugu review (plain fugu/high, read-only) at docs/elves/fugu-v2.32-review.log: no P0, one P1, two P2, one P3. P1, one P2, and the P3 fixed here with regression tests; the other P2 verified pre-existing on main and filed as https://github.com/aigorahub/elves/issues/262. Independent terminal review confirmed writer/loader consistency, no helper name collision, and placement equivalence for balanced digest blocks. PR #261 open and unmerged.",
+      "id": "M-A4",
+      "met": true
+    }
+  ],
+  "notes": {
+    "issues_in_scope": "#260 #242 #249 #258 #243 fixed or attempted; #244 #245 #247 #248 closed as already fixed; #246 skipped",
+    "merge_policy": "user authorized merge-on-green on 2026-08-21; regular merge commit only, never squash"
+  },
+  "plan_path": "docs/plans/v2.32-open-issue-harvest.md",
+  "risk_posture": "high",
+  "run_id": "v2.32-open-issue-harvest-20260820",
+  "schema_version": 1,
+  "session_id": "v2.32-open-issue-harvest-stage-1",
+  "start_head": "8d2a350f4f291117be10908c5def6b92211400bb",
+  "status": "ready",
+  "survival_guide_path": "docs/elves/survival-guide-v2.32-open-issue-harvest.md",
+  "trust_mode": "trusted",
+  "work_driver": "host-native",
+  "worker_merge_authority": false,
+  "worker_packet_path": null,
+  "worktree_path": "/Users/john/aigora/dev/elves-v2-32-open-issue-harvest"
+}
