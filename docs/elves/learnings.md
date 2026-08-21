@@ -370,3 +370,46 @@ structure test asserting the wrapper is present on the entry point and absent on
 - Fable/low workers get smaller, more mechanical batches with exact section/code lists in the
   plan; re-drive budget 2/batch. The width-test/lane grammar is line-based on purpose so the
   parser stays stdlib-only (no yaml dependency).
+
+## Cached verdicts outlive the check that produced them (2026-08-20, v2.32 open-issue harvest)
+
+- Fixing a check is half the work when its result is cached. `qualify_installed_prewalk_transport`
+  keys its cache on host, transport, installed version, build commit, and the requested execution
+  route — nothing about the Elves contract. So the #258 fix would have run for nobody with an
+  existing cache: same provider build, same route, same cache path, old verdict returned forever.
+  A Fugu review caught it; the run's own testing would not have, because every test starts from an
+  empty cache.
+- The cheap repair is a contract version inside the recorded artifact, not a wider cache key. The
+  reuse path already catches `ValidationIssue` and falls through, so a rejected artifact makes
+  `required` spend one fresh canary and `auto` fall back honestly. When you change what a piece of
+  evidence means, bump the version that gates reading it.
+- Generalization for reviewers: for any behavior change behind a cache, ask what an existing cache
+  entry now asserts. If it asserts something the new code would never write, the entry is stale
+  evidence, not a performance detail.
+
+## A stated contract beats a named one (2026-08-20, v2.32 open-issue harvest, #260)
+
+- The prewalk guide prompt said to mirror the TODO "using the Elves prewalk TODO schema" and never
+  stated the schema, while the validator enforced exact ids, field names, RFC3339 timestamps, and
+  an unstated 500-character summary cap. Three live failures came from that one gap, each surfacing
+  only after a full paid model turn; the third terminalized a 44-minute successful execution phase
+  over prose length. Any prompt that names a contract the model cannot read is a defect with a
+  price tag.
+- Pin generated instructions against the validator that consumes them. The test here parses the two
+  JSON examples back out of the rendered prompt and runs them through the real validators, so the
+  documentation cannot drift from the contract it documents.
+- When relaxing a fail-closed validator, sort each bound into identity, evidence, or formatting.
+  Formatting can normalize (truncate a summary; treat an absent list as empty). Evidence never can:
+  coercing a prose `validation` string into a `{command, exit_code}` record would invent an exit
+  code nobody observed. That distinction is the whole safety argument.
+
+## Verify "close on merge", then actually close it (2026-08-20, v2.32 open-issue harvest)
+
+- Five open issues carried maintainer comments saying "close on merge" for a PR that had merged
+  thirteen days earlier. Neither half of the discipline is optional: the merge comment alone is not
+  proof, and a verified-fixed issue left open taxes every later triage pass. Confirm the fix is an
+  ancestor of the default branch (`git merge-base --is-ancestor`), then close citing the exact
+  location.
+- Check the comment thread before trusting the title. #247 was titled as an ordering bug; its own
+  follow-up comment had already established the title was a misattribution and the real cure was a
+  python3 shim. Re-running the suite standalone took 77 seconds and settled it.
