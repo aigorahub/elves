@@ -125,37 +125,37 @@
       "acceptance": [
         {
           "criterion": "`checks[\"route_change\"]` is no longer initialised to `True`; its value is derived.",
-          "evidence": "",
+          "evidence": "checks[\"route_change\"] is initialised False and assigned after the execution phase from execution_result.observed_route; test_observed_route_contradicting_the_request_fails_qualification pins that it can be False.",
           "id": "B4-A1",
-          "met": false
+          "met": true
         },
         {
           "criterion": "a Codex-shaped model-switch item populates the observed route with both model names and does not trip provider-error classification.",
-          "evidence": "",
+          "evidence": "_observed_route_from_event parses the codex-cli item.completed/inner-error notice to the resuming model; test_codex_resume_notice_names_the_effective_model also asserts _is_provider_error_event is False for it, and test_no_signal_is_never_read_as_a_route_observation covers wrong host, wrong event type, wrong inner type, and unrelated message.",
           "id": "B4-A2",
-          "met": false
+          "met": true
         },
         {
           "criterion": "an observed route contradicting the requested route fails qualification with a route-change reason.",
-          "evidence": "",
+          "evidence": "test_observed_route_contradicting_the_request_fails_qualification: raises prewalk_route_change_unqualified; the attempt artifact shows route_change False while same_session_id and same_worktree stayed True.",
           "id": "B4-A3",
-          "met": false
+          "met": true
         },
         {
           "criterion": "a host publishing no signal still qualifies, and the artifact records the weaker tier explicitly rather than claiming behavioural proof.",
-          "evidence": "",
+          "evidence": "test_a_host_publishing_no_signal_still_qualifies_at_the_weaker_tier: qualifies, artifact records route_change_evidence 'unobserved' and an empty observed_execution_route, with the requested route recorded beside it rather than in place of it.",
           "id": "B4-A4",
-          "met": false
+          "met": true
         },
         {
           "criterion": "existing qualification checks (session continuity, worktree binding, stream identity, packet count, guide retention) are unchanged.",
-          "evidence": "",
+          "evidence": "tests.test_native_worker_prewalk 60 OK (existing qualification, reuse, failure, and runtime-error tests unchanged); 252 tests OK across the eight prewalk-touching modules.",
           "id": "B4-A5",
-          "met": false
+          "met": true
         }
       ],
       "id": "B4",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "acceptance": [

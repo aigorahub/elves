@@ -125,3 +125,30 @@ Operator-owned items 1 and 3 recorded on the issue and left alone:
 https://github.com/aigorahub/elves/issues/249#issuecomment-5364103921
 
 B3 acceptance B3-A1..B3-A3 met. The issue stays open for item 1.
+
+---
+
+## B4 — Observed effective route (#258, 2026-08-20)
+
+`checks["route_change"]` no longer starts True. It is derived after the execution phase from
+`ObservedRoute`, a new bounded record of what a host published about the route it ran.
+
+Fail-open by design, and stated as such: only Codex publishes an effective-route signal, and only
+when the model actually changes, so the common native route (same model, lower effort) is silent by
+construction. A missing signal records `route_change_evidence: unobserved`; a signal that
+contradicts the requested execution model fails with `prewalk_route_change_unqualified`. Observed
+effort is always null — no supported host publishes the reasoning level it used, and copying the
+request into that field would recreate the defect.
+
+The Codex notice arrives as `item.completed` with an inner item type of `error`. Parsing reads the
+inner item; the top-level type is what `_PROVIDER_ERROR_EVENT_TYPES` reads, so it is still not
+classified as a provider failure. Test-pinned.
+
+The Grok qualification artifact required an exact field set, so adding keys would have invalidated
+every previously recorded artifact. The check now requires the same required set and admits a
+closed optional set, so old artifacts still validate and arbitrary keys are still rejected.
+
+Proof: `tests.test_native_worker_prewalk` → 60 OK. Impact path across eight prewalk-touching
+modules → 252 OK.
+
+B4 acceptance B4-A1..B4-A5 met.

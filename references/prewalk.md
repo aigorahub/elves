@@ -46,6 +46,17 @@ string is not coerced into a `{command, exit_code}` record, because that would i
 the guide never observed — and it never touches identity, schema version, `PW-##` ordering, or the
 literal `ready_for_execution_model: true` assertion.
 
+Live qualification records the route it **observed**, not the route it requested (#258). The
+canary derives `route_change` from provider evidence: when a host names the model it actually
+resumed with, that name must match the requested execution model or qualification fails with
+`prewalk_route_change_unqualified`. Codex publishes such a notice (an `item.completed` whose inner
+item type is `error`, naming both the recorded and the resuming model) and publishes it only when
+the model actually changes; Claude Code, Grok Build, and Oh My Pi publish nothing comparable
+today. Absence of a signal is not evidence that an override was ignored, so it never fails closed
+— the artifact records `route_change_evidence: unobserved` and an empty `observed_execution_route`
+instead of claiming behavioural proof. No host publishes the reasoning level it actually used, so
+observed effort is always null rather than copied from the request.
+
 The model-free transition validator requires a clean registered start, unchanged branch/origin/
 protected refs, a real source/test/product-documentation edit tied to the checkpoint, no forbidden
 surface, and no `Close` commit. Runtime-only, plan-only, execution-log-only, empty, mismatched, or

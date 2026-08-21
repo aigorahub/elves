@@ -32,6 +32,20 @@ All notable changes to the Elves skill are documented here.
   landed under `## Retired Learnings`, silently retiring an active learning; refusing the candidate
   did not help, because the fallback placement had the same blindness. Both lookups now skip digest
   interiors. (#249)
+- **Prewalk qualification records the observed route, not the requested one**
+  (`scripts/cobbler_runtime/native_worker.py`, `scripts/cobbler_runtime/prewalk.py`) —
+  `qualify_prewalk_live` initialised `checks["route_change"] = True` and never derived it from
+  provider evidence, so a CLI that accepted a resume while ignoring an unsupported model or effort
+  override still passed every continuity check and the artifact certified a route that never ran.
+  The canary now reads the effective route a host publishes for itself (Codex names it in an
+  `item.completed` whose inner item type is `error`; that event is still not classified as a
+  provider failure), fails with `prewalk_route_change_unqualified` when the observation contradicts
+  the request, and records `observed_execution_route` plus a `route_change_evidence` tier in the
+  attempt and success artifacts. Hosts that publish no signal — Claude Code, Grok Build, Oh My Pi,
+  and Codex whenever the model does not change — still qualify and are recorded as `unobserved`
+  rather than claiming behavioural proof. Observed effort stays null on every host, because none
+  publishes it. The Grok artifact field set stays closed but now admits these two optional keys, so
+  artifacts recorded before this change still validate. (#258)
 
 ## [2.31.0] - 2026-08-16
 

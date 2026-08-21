@@ -1165,6 +1165,13 @@ _GROK_QUALIFICATION_REQUIRED_FIELDS = frozenset(
     }
 )
 
+# aigorahub/elves#258 added observed-route recording. These stay optional so an
+# artifact recorded before that change still validates, while the field set remains
+# closed against arbitrary extra keys.
+_GROK_QUALIFICATION_OPTIONAL_FIELDS = frozenset(
+    {"observed_execution_route", "route_change_evidence"}
+)
+
 
 def _read_qualification_artifact_json(
     target: Path, *, limit: int, code: str
@@ -1243,7 +1250,12 @@ def load_grok_prewalk_qualification(
     data = _read_qualification_artifact_json(
         target, limit=PREWALK_CAPABILITY_ARTIFACT_MAX_BYTES, code=code
     )
-    if set(data) != _GROK_QUALIFICATION_REQUIRED_FIELDS:
+    present = set(data)
+    if (
+        not _GROK_QUALIFICATION_REQUIRED_FIELDS.issubset(present)
+        or present - _GROK_QUALIFICATION_REQUIRED_FIELDS
+        - _GROK_QUALIFICATION_OPTIONAL_FIELDS
+    ):
         raise ValidationIssue(
             code,
             "Grok prewalk qualification must carry exactly the required fields",

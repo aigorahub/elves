@@ -39,7 +39,10 @@ from cobbler_runtime.prewalk import (  # noqa: E402
     validate_todo_artifact,
 )
 from cobbler_runtime.native_worker import (  # noqa: E402
+    ObservedRoute,
     PrewalkQualificationResult,
+    _is_provider_error_event,
+    _observed_route_from_event,
     build_native_worker_prewalk_spec,
     native_worker_paths,
     native_worker_status,
@@ -1871,3 +1874,205 @@ class AutomaticPrewalkQualificationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ObservedRouteQualificationTests(unittest.TestCase):
+    """aigorahub/elves#258: qualification must record the route that actually ran."""
+
+    CODEX_NOTICE = {
+        "type": "item.completed",
+        "item": {
+            "id": "item_0",
+            "type": "error",
+            "message": (
+                "This session was recorded with model `gpt-5.6-sol` but is resuming "
+                "with `gpt-5.6-luna`. Consider switching back to `gpt-5.6-sol` as it "
+                "may affect Codex performance."
+            ),
+        },
+    }
+
+    def test_codex_resume_notice_names_the_effective_model(self) -> None:
+        observed = _observed_route_from_event(self.CODEX_NOTICE, "codex")
+        self.assertIsNotNone(observed)
+        assert observed is not None
+        self.assertEqual(observed.model, "gpt-5.6-luna")
+        self.assertEqual(observed.source, "codex_resume_model_notice")
+        # Effort is never claimed: no supported transport publishes it.
+        self.assertIsNone(observed.effort)
+        # The signal is an `item.completed` whose *inner* item type is `error`.
+        # Reading the inner type must not turn it into a provider failure.
+        self.assertFalse(_is_provider_error_event(self.CODEX_NOTICE))
+
+    def test_no_signal_is_never_read_as_a_route_observation(self) -> None:
+        for host, event in (
+            ("claude", self.CODEX_NOTICE),
+            ("grok", self.CODEX_NOTICE),
+            ("omp", self.CODEX_NOTICE),
+            ("codex", {"type": "turn.completed", "item": {"type": "error"}}),
+            ("codex", {"type": "item.completed", "item": {"type": "agent_message"}}),
+            ("codex", {"type": "item.completed", "item": {"type": "error"}}),
+            (
+                "codex",
+                {
+                    "type": "item.completed",
+                    "item": {"type": "error", "message": "unrelated failure"},
+                },
+            ),
+        ):
+            with self.subTest(host=host, event=event):
+                self.assertIsNone(_observed_route_from_event(event, host))
+
+    def _advertised(self):
+        return advertised_prewalk_capabilities(
+            host="codex",
+            version="9.9.9",
+            create_help="--model -c model_reasoning_effort resume",
+            resume_help="Usage: resume SESSION_ID --model -c model_reasoning_effort",
+        )
+
+    def _probe(self, advertised):
+        def probe(host, *, behavioral_evidence=None, **_kwargs):
+            if behavioral_evidence is None:
+                return advertised
+            return load_prewalk_capability_evidence(
+                Path(behavioral_evidence),
+                host="codex",
+                installed_version="9.9.9",
+                advertised=advertised,
+            )
+
+        return probe
+
+    def _phase_runner(self, observed_route):
+        """A passing two-phase canary whose execution phase reports ``observed_route``."""
+        state: dict[str, str] = {}
+
+        def phase_runner(*, spec, input_text, **_kwargs):
+            canary_value = (
+                Path(spec.cwd) / ".elves-prewalk-canary.txt"
+            ).read_text(encoding="utf-8").strip()
+            if input_text != PREWALK_CONTINUATION_INPUT:
+                memory = re.search(
+                    r"ELVES_PREWALK_CANARY_GUIDE ([0-9a-f]+)", input_text
+                ).group(1)
+                state["memory"] = memory
+                marker = f"ELVES_PREWALK_CANARY_GUIDE {memory} {canary_value}"
+                event: dict[str, object] = {
+                    "type": "thread.started",
+                    "thread_id": "qualification-session",
+                }
+                route = ObservedRoute()
+            else:
+                marker = (
+                    "ELVES_PREWALK_CANARY_EXECUTION "
+                    f"{state['memory']} {canary_value}"
+                )
+                event = {"type": "turn.started", "thread_id": "qualification-session"}
+                route = observed_route
+            return PrewalkQualificationResult(
+                exit_code=0,
+                stdout=json.dumps(event) + "\n" + marker + "\n",
+                stderr_tail="",
+                observed_session_ids=("qualification-session",),
+                provider_event_count=1,
+                observed_route=route,
+            )
+
+        return phase_runner
+
+    def _qualify(self, observed_route, tmp):
+        return qualify_installed_prewalk_transport(
+            host="codex",
+            guide_model="guide-model",
+            guide_effort="high",
+            execution_model="execution-model",
+            execution_effort="medium",
+            cache_root=Path(tmp),
+            phase_runner=self._phase_runner(observed_route),
+        )
+
+    def test_observed_route_matching_the_request_is_recorded_as_proof(self) -> None:
+        advertised = self._advertised()
+        observed = ObservedRoute(
+            model="execution-model", source="codex_resume_model_notice"
+        )
+        with tempfile.TemporaryDirectory() as tmp, mock.patch(
+            "cobbler_runtime.native_worker.probe_installed_prewalk_capabilities",
+            side_effect=self._probe(advertised),
+        ):
+            qualified = self._qualify(observed, tmp)
+            self.assertTrue(qualified.qualified())
+            cache_path = prewalk_qualification_cache_path(
+                advertised,
+                execution_model="execution-model",
+                execution_effort="medium",
+                cache_root=Path(tmp),
+            )
+            payload = json.loads(cache_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                payload["observed_execution_route"],
+                {
+                    "model": "execution-model",
+                    "effort": None,
+                    "source": "codex_resume_model_notice",
+                },
+            )
+            self.assertEqual(
+                payload["route_change_evidence"], "observed_effective_model"
+            )
+
+    def test_observed_route_contradicting_the_request_fails_qualification(self) -> None:
+        advertised = self._advertised()
+        observed = ObservedRoute(
+            model="some-other-model", source="codex_resume_model_notice"
+        )
+        with tempfile.TemporaryDirectory() as tmp, mock.patch(
+            "cobbler_runtime.native_worker.probe_installed_prewalk_capabilities",
+            side_effect=self._probe(advertised),
+        ):
+            with self.assertRaises(ValidationIssue) as caught:
+                self._qualify(observed, tmp)
+            self.assertEqual(
+                caught.exception.code, "prewalk_route_change_unqualified"
+            )
+            evidence = Path(caught.exception.hint.split("Evidence: ", 1)[1])
+            payload = json.loads(evidence.read_text(encoding="utf-8"))
+            self.assertFalse(payload["qualified"])
+            self.assertFalse(payload["checks"]["route_change"])
+            # Every other continuity fact passed: the route observation alone failed.
+            self.assertTrue(payload["checks"]["same_session_id"])
+            self.assertTrue(payload["checks"]["same_worktree"])
+            self.assertEqual(
+                payload["observed_execution_route"]["model"], "some-other-model"
+            )
+
+    def test_a_host_publishing_no_signal_still_qualifies_at_the_weaker_tier(self) -> None:
+        # Claude Code, Grok Build, and Oh My Pi publish nothing comparable, and Codex
+        # itself is silent whenever the model does not change. Absence must not fail
+        # closed, and the artifact must not dress it up as behavioural proof.
+        advertised = self._advertised()
+        with tempfile.TemporaryDirectory() as tmp, mock.patch(
+            "cobbler_runtime.native_worker.probe_installed_prewalk_capabilities",
+            side_effect=self._probe(advertised),
+        ):
+            qualified = self._qualify(ObservedRoute(), tmp)
+            self.assertTrue(qualified.qualified())
+            cache_path = prewalk_qualification_cache_path(
+                advertised,
+                execution_model="execution-model",
+                execution_effort="medium",
+                cache_root=Path(tmp),
+            )
+            payload = json.loads(cache_path.read_text(encoding="utf-8"))
+            self.assertEqual(payload["route_change_evidence"], "unobserved")
+            self.assertEqual(
+                payload["observed_execution_route"],
+                {"model": None, "effort": None, "source": "unobserved"},
+            )
+            # The requested route is still recorded — as a request, beside the
+            # observation, not in place of it.
+            self.assertEqual(
+                payload["execution_route"],
+                {"model": "execution-model", "effort": "medium"},
+            )
