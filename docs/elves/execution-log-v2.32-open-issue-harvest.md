@@ -107,3 +107,21 @@ and the identical suite passed on immediate re-run. Same timing-sensitive family
 caused by this change.
 
 B2 acceptance B2-A1..B2-A3 met.
+
+---
+
+## B3 — Learnings-ledger digest-interior guard (#249 closer, 2026-08-20)
+
+The issue named `_section_at`. Fixing only that is not enough: `_section_insert_index` — the path a
+*declined* positional restore falls back to — reads headings the same way, so the drift guard would
+correctly refuse a drifted candidate and then place the entry under the forged in-digest heading
+anyway. Found while building the reproduction; both are fixed together.
+
+Reproduction (now a test): a forged `## Repo Conventions` between the digest markers plus
+cooperating drift restored an active learning into `## Retired Learnings`, silently retiring it.
+Both new tests fail with the guards removed; `tests.test_learnings_ledger` → 24 tests OK with them.
+
+Operator-owned items 1 and 3 recorded on the issue and left alone:
+https://github.com/aigorahub/elves/issues/249#issuecomment-5364103921
+
+B3 acceptance B3-A1..B3-A3 met. The issue stays open for item 1.

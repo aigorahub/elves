@@ -101,25 +101,25 @@
       "acceptance": [
         {
           "criterion": "`_section_at` ignores `##` headings between the digest markers.",
-          "evidence": "",
+          "evidence": "_section_at tracks DIGEST_BEGIN/DIGEST_END and skips interior lines; test_section_at_ignores_headings_inside_the_digest_block also pins that a real heading after the block still wins.",
           "id": "B3-A1",
-          "met": false
+          "met": true
         },
         {
           "criterion": "the rollback drift guard reports the true section for an entry after an adversarial in-digest heading.",
-          "evidence": "",
+          "evidence": "test_in_digest_heading_cannot_retire_a_restored_entry: a forged in-digest `## Repo Conventions` plus cooperating drift previously restored an active learning into `## Retired Learnings`. Fixing _section_at alone was not enough \u2014 _section_insert_index (the declined-candidate fallback) had the same blindness and is fixed with it. Both tests fail with the guards removed.",
           "id": "B3-A2",
-          "met": false
+          "met": true
         },
         {
           "criterion": "`#249` carries a comment stating exactly which items this run settled and which remain operator-owned.",
-          "evidence": "",
+          "evidence": "https://github.com/aigorahub/elves/issues/249#issuecomment-5364103921 states what this run settled, what PR #241 settled, and that items 1 and 3 stay operator-owned.",
           "id": "B3-A3",
-          "met": false
+          "met": true
         }
       ],
       "id": "B3",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "acceptance": [

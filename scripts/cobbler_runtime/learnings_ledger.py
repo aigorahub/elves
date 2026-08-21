@@ -195,12 +195,28 @@ def _body_index(lines: list[str], absolute: int) -> int:
 
 
 def _section_at(lines: list[str], index: int) -> str:
-    """Heading of the section containing ``index`` (digest interior has none)."""
+    """Heading of the section containing ``index`` (digest interior has none).
+
+    aigorahub/elves#249: the region between the digest markers is declared generated
+    output and is wiped on every regenerate, so a heading written there is out of
+    contract by definition. Reading one as a real section let an adversarial in-digest
+    heading plus cooperating drift fool the rollback drift guard into a mis-sectioned
+    restore.
+    """
 
     section = ""
+    in_digest = False
     for position, line in enumerate(lines):
         if position >= index:
             break
+        if line == DIGEST_BEGIN:
+            in_digest = True
+            continue
+        if line == DIGEST_END:
+            in_digest = False
+            continue
+        if in_digest:
+            continue
         heading = HEADING_RE.match(line)
         if heading:
             section = heading.group(1)
@@ -299,13 +315,29 @@ def _ensure_section_heading(lines: list[str], section: str) -> list[str]:
 
 
 def _section_insert_index(doc: ParsedDoc, section: str) -> int:
-    """Index AFTER the last content line of ``section`` (before next heading)."""
+    """Index AFTER the last content line of ``section`` (before next heading).
+
+    aigorahub/elves#249: like ``_section_at``, this skips the generated digest
+    interior. A forged `## <section>` heading between the markers otherwise wins the
+    section lookup here, which is the path a declined positional restore falls back
+    to — so the drift guard would correctly refuse the candidate and then place the
+    entry under the forged heading anyway. The marker lines themselves stay ordinary
+    section content, as they were before.
+    """
 
     in_section = False
+    in_digest = False
     heading_index = None
     last_content = None
     boundary = len(doc.lines)
     for index, line in enumerate(doc.lines):
+        if line == DIGEST_BEGIN or line == DIGEST_END:
+            in_digest = line == DIGEST_BEGIN
+            if in_section:
+                last_content = index
+            continue
+        if in_digest:
+            continue
         heading = HEADING_RE.match(line)
         if heading:
             if in_section:

@@ -24,6 +24,14 @@ All notable changes to the Elves skill are documented here.
   before the worker's final append, so a parked driver saw the final advisory signal one poll late.
   The monitor now re-reads the event log once at that boundary, behind the same credential-grant
   guard as the ordinary read. Ordinary healthy polls still reuse the cache. (#242)
+- **Learnings-ledger section lookups skip the generated digest interior**
+  (`scripts/cobbler_runtime/learnings_ledger.py`) — a `## <section>` heading hand-written between
+  the digest markers is out of contract (that region is wiped on every regenerate) but was read as
+  a real section by `_section_at` and `_section_insert_index`. With cooperating drift, a forged
+  heading naming an entry's recorded section made the rollback drift guard accept a candidate that
+  landed under `## Retired Learnings`, silently retiring an active learning; refusing the candidate
+  did not help, because the fallback placement had the same blindness. Both lookups now skip digest
+  interiors. (#249)
 
 ## [2.31.0] - 2026-08-16
 

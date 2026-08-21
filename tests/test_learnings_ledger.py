@@ -551,3 +551,57 @@ class LedgerContentionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LedgerDigestInteriorSectionTests(unittest.TestCase):
+    """aigorahub/elves#249: generated digest interiors are not real sections."""
+
+    def test_section_at_ignores_headings_inside_the_digest_block(self) -> None:
+        lines = [
+            "# Project Learnings",
+            "",
+            "## Repo Conventions",
+            "",
+            ll.DIGEST_BEGIN,
+            "## Retired Learnings",
+            ll.DIGEST_END,
+            "",
+            "- [L1] entry (evidence: a)",
+        ]
+        self.assertEqual(ll._section_at(lines, len(lines) - 1), "Repo Conventions")
+        # A real heading after the block still wins.
+        lines.insert(7, "## Known Traps")
+        self.assertEqual(ll._section_at(lines, len(lines) - 1), "Known Traps")
+
+    def test_in_digest_heading_cannot_retire_a_restored_entry(self) -> None:
+        # The drift guard trusts a positional restore only when the candidate still
+        # lands in the recorded section. An out-of-contract heading written inside
+        # the generated digest markers used to satisfy that check while the entry
+        # actually landed under Retired Learnings — silently retiring it.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "learnings.md"
+            path.write_text(
+                "# Project Learnings\n\n> Intro blockquote kept verbatim.\n\n"
+                "## Repo Conventions\n\n- [L1] keep me (evidence: a)\n\n"
+                "## Retired Learnings\n\n- [L9] old -> retired because done\n",
+                encoding="utf-8",
+            )
+            ll.apply_edits(
+                path,
+                [{"action": "update", "id": "L1", "text": "keep me edited", "reason": "r"}],
+            )
+            # Cooperating drift: the recorded body coordinate now lands under
+            # Retired Learnings, immediately below a forged in-digest heading
+            # naming the entry's recorded section.
+            path.write_text(
+                "# Project Learnings\n\n## Retired Learnings\n\n"
+                f"{ll.DIGEST_BEGIN}\n## Repo Conventions\n{ll.DIGEST_END}\n\n"
+                "- [L9] old -> retired because done\n\n"
+                "## Repo Conventions\n\n- [L1] keep me edited\n",
+                encoding="utf-8",
+            )
+            ll.rollback_last(path)
+            doc = ll.parse_text(path.read_text(encoding="utf-8"))
+            restored = doc.entries[1]
+            self.assertEqual(restored.section, "Repo Conventions")
+            self.assertFalse(restored.retired, path.read_text(encoding="utf-8"))
