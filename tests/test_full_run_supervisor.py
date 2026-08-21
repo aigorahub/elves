@@ -6208,6 +6208,34 @@ class FullRunLifecycleTests(unittest.TestCase):
             refreshed["check_summary"]["last_event_type"], "run_complete"
         )
 
+    def test_monitor_rereads_a_terminal_report_only_once_per_event_log(self) -> None:
+        # Fugu P1-review finding: a worker can write a valid terminal report and stay
+        # alive for minutes finishing cleanup before its exit record lands. Firing the
+        # boundary re-read on every one of those polls would re-parse the same
+        # unchanged log each tick, which is what the incremental cache exists to avoid.
+        self._run_fixture_to_completion()
+        self._stage_one_poll_terminal_boundary()
+        first = monitor_full_run(
+            self.repo, session_id=self.session, stale_after_seconds=60
+        )
+        self.assertFalse(first["check_summary"]["events_reused"])
+        self.assertEqual(first["check_summary"]["last_event_type"], "run_complete")
+        # Rewind only the state, leaving the recorded re-read marker in place, so the
+        # next poll faces the identical boundary with an unchanged event log.
+        state = load_state(self.repo, self.session)
+        cache = dict(state.monitor_cache or {})
+        self.assertIn("terminal_report_reread_signature", cache)
+        state.status = "healthy"
+        state.completed_at = None
+        state.next_action = "parked_monitor"
+        cache["last_remote_audit_at"] = datetime.now(timezone.utc).isoformat()
+        state.monitor_cache = cache
+        full_run_module.save_state(self.repo, state)
+        second = monitor_full_run(
+            self.repo, session_id=self.session, stale_after_seconds=60
+        )
+        self.assertTrue(second["check_summary"]["events_reused"])
+
     def test_monitor_still_reuses_the_event_cache_on_a_healthy_poll(self) -> None:
         # The re-read is one boundary, not a policy change: without a terminal report
         # the incremental poll must still reuse its cached summary.

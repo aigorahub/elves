@@ -33,6 +33,13 @@ from .storage import (
 
 
 PREWALK_SCHEMA_VERSION = 1
+# Qualification-evidence contract version, separate from the artifact schemas above.
+# aigorahub/elves#258 bumped it to 2: proof recorded before observed-route derivation
+# cannot distinguish "the override was applied" from "route_change was assumed true",
+# and the cache key carries only the provider build and requested route, so a stale
+# schema-1 artifact would otherwise be reused forever. A rejected artifact makes
+# `required` spend one fresh canary and `auto` fall back honestly.
+PREWALK_QUALIFICATION_SCHEMA_VERSION = 2
 PREWALK_STATE_VERSION = 3
 PREWALK_DEFAULT_TODO_LIMIT = 10
 PREWALK_MIN_TODO_LIMIT = 5
@@ -1018,6 +1025,81 @@ def _qualification_phase_routes(
     return routes
 
 
+_OBSERVED_ROUTE_FIELDS = frozenset({"model", "effort", "source"})
+_ROUTE_EVIDENCE_TIERS = frozenset({"unobserved", "observed_effective_model"})
+
+
+def _validate_route_evidence(
+    data: Mapping[str, Any],
+    *,
+    code: str,
+    require_present: bool,
+    allow_observed: bool,
+) -> None:
+    """Validate recorded observed-route evidence (aigorahub/elves#258).
+
+    The two fields travel together or not at all. ``effort`` is always null: no
+    supported host publishes the reasoning level it actually used, so a non-null
+    observed effort is fabricated evidence by construction. ``allow_observed`` is
+    False for a host that publishes no effective-route signal at all, so an
+    operator-recorded artifact cannot claim behavioural proof that host cannot produce.
+    """
+    evidence = data.get("route_change_evidence")
+    route = data.get("observed_execution_route")
+    if evidence is None and route is None:
+        if require_present:
+            raise ValidationIssue(
+                code,
+                "Qualification must record its route evidence tier",
+                path="route_change_evidence",
+            )
+        return
+    if evidence is None or route is None:
+        raise ValidationIssue(
+            code,
+            "Route evidence tier and observed route must be recorded together",
+            path="observed_execution_route",
+        )
+    if not isinstance(route, Mapping) or set(route) != _OBSERVED_ROUTE_FIELDS:
+        raise ValidationIssue(
+            code,
+            "Observed route must carry exactly model, effort, and source",
+            path="observed_execution_route",
+        )
+    if route.get("effort") is not None:
+        raise ValidationIssue(
+            code,
+            "No supported host publishes an observed reasoning level",
+            path="observed_execution_route.effort",
+        )
+    if evidence not in _ROUTE_EVIDENCE_TIERS:
+        raise ValidationIssue(
+            code, "Unknown route evidence tier", path="route_change_evidence"
+        )
+    if evidence == "unobserved":
+        if route.get("model") is not None or route.get("source") != "unobserved":
+            raise ValidationIssue(
+                code,
+                "An unobserved tier may not name an effective model",
+                path="observed_execution_route",
+            )
+        return
+    if not allow_observed:
+        raise ValidationIssue(
+            code,
+            "This host publishes no effective-route signal to observe",
+            path="route_change_evidence",
+        )
+    for field, limit in (("model", 128), ("source", 64)):
+        value = route.get(field)
+        if not isinstance(value, str) or not value.strip() or len(value) > limit:
+            raise ValidationIssue(
+                code,
+                "An observed tier must name the effective model and its source",
+                path=f"observed_execution_route.{field}",
+            )
+
+
 def load_prewalk_capability_evidence(
     path: Path,
     *,
@@ -1077,7 +1159,7 @@ def load_prewalk_capability_evidence(
     expected_host = host.strip().lower().replace("-code", "")
     required = {
         "artifact_type": "native_prewalk_behavioral_qualification",
-        "schema_version": 1,
+        "schema_version": PREWALK_QUALIFICATION_SCHEMA_VERSION,
         "host": expected_host,
         "transport": advertised.transport,
         "installed_version": installed_version,
@@ -1096,6 +1178,12 @@ def load_prewalk_capability_evidence(
                 "Behavioral prewalk qualification does not match the installed host",
                 path=key,
             )
+    _validate_route_evidence(
+        data,
+        code="prewalk_capability_unavailable",
+        require_present=True,
+        allow_observed=True,
+    )
     fidelity = data.get("instruction_fidelity")
     if fidelity not in PREWALK_INSTRUCTION_FIDELITIES or fidelity == "unsupported":
         raise ValidationIssue("prewalk_instruction_pruning_unqualified", "Qualification must report usable instruction fidelity")
@@ -1261,6 +1349,12 @@ def load_grok_prewalk_qualification(
             "Grok prewalk qualification must carry exactly the required fields",
             path="fields",
         )
+    # Grok Build publishes no effective-route signal, so a recorded observation can
+    # only honestly be the unobserved tier. Admitting the fields without checking
+    # them would let an operator artifact carry forged route proof (#258).
+    _validate_route_evidence(
+        data, code=code, require_present=False, allow_observed=False
+    )
     exact: dict[str, Any] = {
         "artifact_type": GROK_PREWALK_QUALIFICATION_ARTIFACT_TYPE,
         "schema_version": 1,

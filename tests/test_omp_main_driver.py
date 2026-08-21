@@ -233,7 +233,9 @@ class OmpHostProfileTests(unittest.TestCase):
             artifact = Path(tmp) / "omp-prewalk.json"
             payload = {
                 "artifact_type": "native_prewalk_behavioral_qualification",
-                "schema_version": 1,
+                "schema_version": 2,
+                "route_change_evidence": "unobserved",
+                "observed_execution_route": {"model": None, "effort": None, "source": "unobserved"},
                 "host": "omp",
                 "transport": "omp_build",
                 "installed_version": "17.2.15",

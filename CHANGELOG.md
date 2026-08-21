@@ -48,6 +48,15 @@ All notable changes to the Elves skill are documented here.
   rather than claiming behavioural proof. Observed effort stays null on every host, because none
   publishes it. The Grok artifact field set stays closed but now admits these two optional keys, so
   artifacts recorded before this change still validate. (#258)
+- **Review fixes from the PR #261 Fugu pass.** Recorded qualification evidence now carries a
+  contract version (`PREWALK_QUALIFICATION_SCHEMA_VERSION` = 2): the cache key holds only the
+  provider build and requested route, so proof recorded before observed-route derivation would have
+  been reused indefinitely and the new check would never have run for anyone with an existing cache.
+  The recorded evidence pair is also validated for internal honesty, and the two optional Grok
+  fields are validated rather than merely admitted, so an operator artifact cannot carry forged
+  route proof for a host that publishes no signal. The terminal-boundary event re-read is now once
+  per event-log identity rather than once per poll, so a worker that writes a terminal report and
+  then stays alive finishing cleanup no longer re-parses the same unchanged log on every tick.
 
 ## [2.31.0] - 2026-08-16
 

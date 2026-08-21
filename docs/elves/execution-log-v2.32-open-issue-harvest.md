@@ -173,3 +173,60 @@ Recorded on the issue: https://github.com/aigorahub/elves/issues/243#issuecommen
 #246 skip also recorded: https://github.com/aigorahub/elves/issues/246#issuecomment-5364155937
 
 Version bumped to 2.32.0 (`SKILL.md`, `CHANGELOG.md`).
+
+---
+
+## Terminal review (2026-08-20)
+
+**Fugu review.** Route: plain `fugu/high`, `review` mode, read-only, no `--include`,
+`--max-wait 540`. Log: `docs/elves/fugu-v2.32-review.log`. Result: no P0, one P1, two P2, one P3.
+The first launch died after writing only its context bundle; re-run in the foreground produced the
+full report.
+
+Each finding was verified against the code before acting.
+
+- **P1 — stale qualification caches bypass the #258 fix. Confirmed, fixed.**
+  `prewalk_qualification_cache_path` keys on host, transport, installed version, build commit, and
+  the requested execution route — no Elves contract version. So proof recorded while
+  `route_change` was assumed true would be reused forever and the new observation would never run
+  for anyone with an existing cache. Added `PREWALK_QUALIFICATION_SCHEMA_VERSION` (2) to the
+  recorded artifact and required it on load. The reuse path already catches `ValidationIssue` and
+  falls through, so `required` spends one fresh canary and `auto` falls back honestly.
+- **P2 — the terminal-boundary re-read fires on every poll. Confirmed, fixed.** A worker can write
+  a valid terminal report and stay alive finishing cleanup; each such poll saw the same terminal
+  report with an unchanged log and re-read it. Now gated on a persisted
+  `terminal_report_reread_signature`, so it fires once per event-log identity. Any later append
+  changes the signature and takes the ordinary read path, so the marker cannot mask new events.
+- **P2 — malformed digest markers. Confirmed real, confirmed pre-existing, filed not fixed.**
+  `git show origin/main:...learnings_ledger.py | grep -n 'in_digest = '` shows four boolean marker
+  scanners already on `main` (lines 103, 180, 212, 573). The two added for #249 match that model,
+  so unterminated and nested sequences are a file-wide pre-existing property, not a regression.
+  The real repair is a shared marker validator across all six scanners plus `_regenerate_digest`,
+  which is a refactor rather than a widening of this batch. Filed:
+  https://github.com/aigorahub/elves/issues/262
+- **P3 — newly admitted Grok evidence fields unvalidated. Confirmed, fixed.** The keys were
+  admitted without checking their contents, so an operator artifact could carry forged route proof
+  for a host that publishes no signal. `_validate_route_evidence` now checks both loaders: the
+  fields travel together, observed effort must be null everywhere, an `unobserved` tier may not
+  name a model, an `observed_effective_model` tier must name one and its source, and Grok may not
+  record an observed tier at all.
+
+**Independent terminal review** (own pass, beyond Fugu):
+
+- Writer/loader consistency: `native_worker.py:1124` is the only producer of the native
+  qualification artifact, and it now writes exactly what `prewalk.py:1161` requires.
+- No `_refresh_helpers` collision: neither `_TERMINAL_STATE_STATUSES` nor
+  `_TERMINAL_REPORT_STATUSES` exists in `full_run`, so the rebind cannot clobber them.
+- `guide_prompt()`'s new literal JSON braces are never re-formatted downstream; the string is used
+  as input text and hashed, nothing more.
+- `_section_insert_index` placement is equivalent to the previous behavior for balanced digest
+  blocks: the marker lines are still counted as section content, and with a balanced block
+  `DIGEST_END` follows the interior, so `last_content` is unchanged.
+- The `_load_events()` closure reads `state.pid`/`state.pgid` before the exit-record handling
+  mutates them, so the boundary re-read uses the same `allow_partial_final` value as the first
+  read in that poll.
+
+**Proof at this tip:** `python3 scripts/verify_repo.py --ci --base-ref origin/main` → 1598 tests
+and every gate OK.
+
+PR: https://github.com/aigorahub/elves/pull/261 — landable, not landed.

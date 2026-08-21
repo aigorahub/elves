@@ -50,6 +50,7 @@ from .host_profiles import (
 )
 from .prewalk import (
     PREWALK_CONTINUATION_INPUT,
+    PREWALK_QUALIFICATION_SCHEMA_VERSION,
     PREWALK_DEFAULT_TODO_LIMIT,
     PREWALK_MAX_TODO_LIMIT,
     PREWALK_MIN_TODO_LIMIT,
@@ -1121,7 +1122,7 @@ def qualify_installed_prewalk_transport(
     else:
         success_payload = {
             "artifact_type": "native_prewalk_behavioral_qualification",
-            "schema_version": 1,
+            "schema_version": PREWALK_QUALIFICATION_SCHEMA_VERSION,
             "host": advertised.host,
             "transport": advertised.transport,
             "installed_version": advertised.installed_version,

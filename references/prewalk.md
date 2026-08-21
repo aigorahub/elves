@@ -57,6 +57,17 @@ today. Absence of a signal is not evidence that an override was ignored, so it n
 instead of claiming behavioural proof. No host publishes the reasoning level it actually used, so
 observed effort is always null rather than copied from the request.
 
+Recorded qualification evidence carries its own contract version
+(`PREWALK_QUALIFICATION_SCHEMA_VERSION`, now 2). The private cache key holds only the provider
+build and the requested execution route, so proof recorded before observed-route derivation would
+otherwise be reused forever and the check it never performed would never run. A schema-1 artifact
+is rejected: `required` spends one fresh canary, `auto` falls back without spending. A current
+artifact must record both `route_change_evidence` and `observed_execution_route`, and the pair is
+validated for internal honesty — an `unobserved` tier may not name a model, an
+`observed_effective_model` tier must name one and its source, observed effort must be null on
+every host, and a host that publishes no signal at all (Grok Build) may not record an observed
+tier.
+
 The model-free transition validator requires a clean registered start, unchanged branch/origin/
 protected refs, a real source/test/product-documentation edit tied to the checkpoint, no forbidden
 surface, and no `Close` commit. Runtime-only, plan-only, execution-log-only, empty, mismatched, or

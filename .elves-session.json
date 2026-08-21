@@ -193,8 +193,8 @@
     "default_for_session": true
   },
   "continuation_guard": {
-    "reason": "staging complete; B0-B4 unstarted",
-    "stop_allowed": false
+    "reason": "B0-B4 complete with proof, B5 skipped with a recorded reason; Fugu and terminal reviews done, blockers fixed; landable PR #261; merge forbidden this run",
+    "stop_allowed": true
   },
   "delegation_scope": "none",
   "driver_merge_authorized": false,
@@ -213,21 +213,21 @@
     },
     {
       "criterion": "`python3 scripts/verify_repo.py --ci` is green at the final tip.",
-      "evidence": "",
+      "evidence": "python3 scripts/verify_repo.py --ci --base-ref origin/main green at the review-fix tip: 1598 tests, plus consistency, release, public-API, markdown-link, secret-pattern, and installed-bundle gates.",
       "id": "M-A2",
-      "met": false
+      "met": true
     },
     {
       "criterion": "`CHANGELOG.md` and the affected references describe every behavior change, and the skill version is bumped.",
-      "evidence": "",
+      "evidence": "CHANGELOG 2.32.0 section describes every behavior change including the review fixes; references/prewalk.md documents the artifact contracts, the observed-route tiers, and the evidence contract version; SKILL.md/AGENTS.md/README.md/guide/index.html version strings synced to 2.32.0.",
       "id": "M-A3",
-      "met": false
+      "met": true
     },
     {
       "criterion": "A Fugu review and an independent terminal review both ran against the branch diff, every blocker is fixed, and the result is a landable PR that has not been merged.",
-      "evidence": "",
+      "evidence": "Fugu review (plain fugu/high, read-only) at docs/elves/fugu-v2.32-review.log: no P0, one P1, two P2, one P3. P1, one P2, and the P3 fixed here with regression tests; the other P2 verified pre-existing on main and filed as https://github.com/aigorahub/elves/issues/262. Independent terminal review confirmed writer/loader consistency, no helper name collision, and placement equivalence for balanced digest blocks. PR #261 open and unmerged.",
       "id": "M-A4",
-      "met": false
+      "met": true
     }
   ],
   "notes": {
@@ -240,7 +240,7 @@
   "schema_version": 1,
   "session_id": "v2.32-open-issue-harvest-stage-1",
   "start_head": "8d2a350f4f291117be10908c5def6b92211400bb",
-  "status": "executing",
+  "status": "ready",
   "survival_guide_path": "docs/elves/survival-guide-v2.32-open-issue-harvest.md",
   "trust_mode": "trusted",
   "work_driver": "host-native",

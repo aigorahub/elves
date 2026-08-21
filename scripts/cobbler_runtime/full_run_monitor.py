@@ -259,6 +259,11 @@ def monitor_full_run(
     # that terminal paths re-read; honor it at this one boundary. The cached
     # signature was captured before this read, so a later poll re-reads rather than
     # trusting a summary newer than its own signature.
+    # Once per event-log identity, not once per poll: a worker can write a valid
+    # terminal report and stay alive for minutes finishing cleanup before its exit
+    # record lands, and every one of those polls would otherwise re-read the same
+    # unchanged log. Any later append changes the signature and takes the ordinary
+    # read path, so this marker cannot mask new events.
     if (
         events_reused
         and grant_context_verified
@@ -266,9 +271,11 @@ def monitor_full_run(
         and not report_errors
         and report.get("status") in _TERMINAL_REPORT_STATUSES
         and initial_status not in _TERMINAL_STATE_STATUSES
+        and cache.get("terminal_report_reread_signature") != event_signature
     ):
         events, event_errors = _load_events()
         events_reused = False
+        cache["terminal_report_reread_signature"] = event_signature
 
     # Process fingerprint is primary liveness for long Grok turns. The process
     # group is tracked independently because a provider can leave descendants

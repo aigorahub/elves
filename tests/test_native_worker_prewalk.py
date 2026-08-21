@@ -24,6 +24,7 @@ if str(SCRIPTS) not in sys.path:
 from cobbler_runtime.prewalk import (  # noqa: E402
     GROK_PREWALK_QUALIFICATION_ARTIFACT_TYPE,
     PREWALK_CONTINUATION_INPUT,
+    PREWALK_QUALIFICATION_SCHEMA_VERSION,
     PREWALK_SUMMARY_MAX_CHARS,
     advertised_prewalk_capabilities,
     experimental_prewalk_capabilities,
@@ -591,7 +592,9 @@ class CapabilityEvidenceTests(unittest.TestCase):
             path = Path(tmp) / "qualification.json"
             payload = {
                 "artifact_type": "native_prewalk_behavioral_qualification",
-                "schema_version": 1,
+                "schema_version": 2,
+                "route_change_evidence": "unobserved",
+                "observed_execution_route": {"model": None, "effort": None, "source": "unobserved"},
                 "host": "codex",
                 "transport": "codex_exec",
                 "installed_version": "0.144.1",
@@ -747,7 +750,9 @@ class FdBoundEvidenceLoaderTests(unittest.TestCase):
     def _payload(self) -> dict:
         return {
             "artifact_type": "native_prewalk_behavioral_qualification",
-            "schema_version": 1,
+            "schema_version": 2,
+            "route_change_evidence": "unobserved",
+            "observed_execution_route": {"model": None, "effort": None, "source": "unobserved"},
             "host": "codex",
             "transport": "codex_exec",
             "installed_version": "0.144.1",
@@ -2076,3 +2081,195 @@ class ObservedRouteQualificationTests(unittest.TestCase):
                 payload["execution_route"],
                 {"model": "execution-model", "effort": "medium"},
             )
+
+
+class StaleQualificationEvidenceTests(unittest.TestCase):
+    """Fugu P1: proof recorded before #258 must not be reused forever."""
+
+    def _advertised(self):
+        return advertised_prewalk_capabilities(
+            host="codex",
+            version="9.9.9",
+            create_help="--model -c model_reasoning_effort resume",
+            resume_help="Usage: resume SESSION_ID --model -c model_reasoning_effort",
+        )
+
+    def _payload(self, **overrides) -> dict:
+        payload = {
+            "artifact_type": "native_prewalk_behavioral_qualification",
+            "schema_version": PREWALK_QUALIFICATION_SCHEMA_VERSION,
+            "host": "codex",
+            "transport": "codex_exec",
+            "installed_version": "9.9.9",
+            "session_id": "exact-session-1",
+            "create_exit_code": 0,
+            "resume_exit_code": 0,
+            "same_session_id": True,
+            "same_worktree": True,
+            "unique_guide_fact_observed": True,
+            "packet_replayed": False,
+            "stream_identity_verified": True,
+            "instruction_fidelity": "retained_safe",
+            "guide_route": {"model": "guide-model", "effort": "high"},
+            "execution_route": {"model": "execution-model", "effort": "low"},
+            "route_change_evidence": "unobserved",
+            "observed_execution_route": {
+                "model": None,
+                "effort": None,
+                "source": "unobserved",
+            },
+            "model_calls_made": True,
+            "guide_prompt_sha256": hashlib.sha256(b"guide").hexdigest(),
+            "continuation_sha256": hashlib.sha256(
+                PREWALK_CONTINUATION_INPUT.encode("utf-8")
+            ).hexdigest(),
+        }
+        payload.update(overrides)
+        return payload
+
+    def _load(self, payload):
+        advertised = self._advertised()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "qualification.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            path.chmod(0o600)
+            return load_prewalk_capability_evidence(
+                path,
+                host="codex",
+                installed_version="9.9.9",
+                advertised=advertised,
+            )
+
+    def test_current_contract_evidence_loads(self) -> None:
+        self.assertTrue(self._load(self._payload()).qualified())
+
+    def test_pre_observation_evidence_is_rejected(self) -> None:
+        # The cache key carries only the provider build and the requested route, so
+        # without a contract version a schema-1 artifact recorded while route_change
+        # was assumed true would be reused forever, defeating #258. Rejecting it makes
+        # `required` spend one fresh canary and `auto` fall back honestly.
+        stale = self._payload(schema_version=1)
+        stale.pop("route_change_evidence")
+        stale.pop("observed_execution_route")
+        with self.assertRaises(ValidationIssue) as caught:
+            self._load(stale)
+        self.assertEqual(caught.exception.code, "prewalk_capability_unavailable")
+
+    def test_current_contract_requires_recorded_route_evidence(self) -> None:
+        for drop in ("route_change_evidence", "observed_execution_route"):
+            with self.subTest(drop=drop):
+                payload = self._payload()
+                payload.pop(drop)
+                with self.assertRaises(ValidationIssue):
+                    self._load(payload)
+
+    def test_recorded_route_evidence_must_be_internally_honest(self) -> None:
+        dishonest = [
+            # An unobserved tier naming a model it never observed.
+            self._payload(
+                observed_execution_route={
+                    "model": "execution-model",
+                    "effort": None,
+                    "source": "unobserved",
+                }
+            ),
+            # An observed tier naming no model.
+            self._payload(
+                route_change_evidence="observed_effective_model",
+                observed_execution_route={
+                    "model": None,
+                    "effort": None,
+                    "source": "codex_resume_model_notice",
+                },
+            ),
+            # A claimed observed reasoning level: no host publishes one.
+            self._payload(
+                observed_execution_route={
+                    "model": None,
+                    "effort": "high",
+                    "source": "unobserved",
+                }
+            ),
+            # An unknown tier.
+            self._payload(route_change_evidence="probably_fine"),
+            # An unexpected inner key.
+            self._payload(
+                observed_execution_route={
+                    "model": None,
+                    "effort": None,
+                    "source": "unobserved",
+                    "extra": 1,
+                }
+            ),
+        ]
+        for payload in dishonest:
+            with self.subTest(payload=payload["observed_execution_route"]):
+                with self.assertRaises(ValidationIssue):
+                    self._load(payload)
+
+
+class GrokRouteEvidenceTests(unittest.TestCase):
+    """Fugu P3: the newly admitted evidence fields must not carry forged proof."""
+
+    UNOBSERVED = {"model": None, "effort": None, "source": "unobserved"}
+
+    def _load(self, tmp, mutation=None):
+        path = write_grok_qualification_artifact(Path(tmp), mutation=mutation)
+        return load_grok_prewalk_qualification(
+            path,
+            installed_version="0.2.102",
+            installed_build_commit="C1B5909EC707",
+        )
+
+    def test_legacy_artifact_without_route_evidence_still_loads(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertTrue(self._load(tmp).qualified())
+
+    def test_honest_unobserved_route_evidence_loads(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            capabilities = self._load(
+                tmp,
+                {
+                    "route_change_evidence": "unobserved",
+                    "observed_execution_route": dict(self.UNOBSERVED),
+                },
+            )
+            self.assertTrue(capabilities.qualified())
+
+    def test_forged_observed_route_is_rejected(self) -> None:
+        # Grok Build publishes no effective-route signal, so an artifact claiming
+        # behavioural route proof is describing something that cannot have happened.
+        forged = [
+            {
+                "route_change_evidence": "observed_effective_model",
+                "observed_execution_route": {
+                    "model": "some-unrelated-model",
+                    "effort": "invented",
+                    "source": "forged",
+                },
+            },
+            {
+                "route_change_evidence": "observed_effective_model",
+                "observed_execution_route": {
+                    "model": "grok-4.5",
+                    "effort": None,
+                    "source": "hand_written",
+                },
+            },
+            # Half a record is not a record.
+            {"route_change_evidence": "unobserved"},
+            {"observed_execution_route": dict(self.UNOBSERVED)},
+            # An unobserved tier may not name a model.
+            {
+                "route_change_evidence": "unobserved",
+                "observed_execution_route": {
+                    "model": "grok-4.5",
+                    "effort": None,
+                    "source": "unobserved",
+                },
+            },
+        ]
+        for mutation in forged:
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as tmp:
+                with self.assertRaises(ValidationIssue):
+                    self._load(tmp, mutation)
