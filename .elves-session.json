@@ -5,37 +5,37 @@
       "acceptance": [
         {
           "criterion": "`.github/workflows/ci.yml` runs `verify_repo --ci` on push and PR across the three declared cells; #244 closed citing it.",
-          "evidence": "",
+          "evidence": "commit 92d939e in main: .github/workflows/ci.yml runs verify_repo --ci on push/PR/dispatch across macOS py3.12 (authoritative) + ubuntu py3.12/py3.10 (observational), fetch-depth 0. #244 closed citing it.",
           "id": "B0-A1",
-          "met": false
+          "met": true
         },
         {
           "criterion": "`tests/test_provider_shortcuts.py` carries the module-level `python3` shim, and the module passes standalone under a 3.10+ interpreter; #247 closed citing the shim and the standalone result.",
-          "evidence": "",
+          "evidence": "tests/test_provider_shortcuts.py:37-57 shim (commit 0343fa6) present in main; standalone `python3 -m unittest tests.test_provider_shortcuts` on main = 57 tests OK (1 skip), Python 3.14.6. #247 closed.",
           "id": "B0-A2",
-          "met": false
+          "met": true
         },
         {
           "criterion": "`plan_batch_required` emits the legacy `### B# \u00b7` migration hint; #248 closed citing `scripts/cobbler_runtime/acceptance.py`.",
-          "evidence": "",
+          "evidence": "scripts/cobbler_runtime/acceptance.py:503-525 (commit 3e0e209) emits the legacy `### B# \u00b7` migration hint inside plan_batch_required. #248 closed.",
           "id": "B0-A3",
-          "met": false
+          "met": true
         },
         {
           "criterion": "#245 closed citing the green Linux CI evidence already recorded on the issue plus the shipped ubuntu cells.",
-          "evidence": "",
+          "evidence": "Linux cells shipped with 92d939e; green all-cell evidence recorded on the issue (actions run 31165858018). #245 closed.",
           "id": "B0-A4",
-          "met": false
+          "met": true
         },
         {
           "criterion": "No issue is closed whose fix is absent from the current `main` tree.",
-          "evidence": "",
+          "evidence": "All four fix commits verified as ancestors of main via `git merge-base --is-ancestor`; verification run against the main worktree, not this branch.",
           "id": "B0-A5",
-          "met": false
+          "met": true
         }
       ],
       "id": "B0",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "acceptance": [

@@ -36,3 +36,22 @@ Triage verdicts:
 | #246 | skip | needs a supervised live launchd/systemd trial across a real machine sleep |
 
 Staged the run: dedicated worktree, plan, survival guide, learnings, session JSON.
+
+---
+
+## B0 — Reconcile the issue ledger against merged PR #241 (2026-08-20)
+
+Verified each fix as an ancestor of `main` (`git merge-base --is-ancestor`), then closed with a
+comment naming the implementing location:
+
+- #244 → closed. `.github/workflows/ci.yml`, commit `92d939e`.
+- #247 → closed. `tests/test_provider_shortcuts.py:37-57` shim, commit `0343fa6`. Re-verified
+  standalone on `main`: `python3 -m unittest tests.test_provider_shortcuts` → 57 tests, OK
+  (1 skip), Python 3.14.6. No order dependency exists.
+- #248 → closed. `scripts/cobbler_runtime/acceptance.py:503-525`, commit `3e0e209`.
+- #245 → closed. Linux cells shipped with `92d939e`; the empirical all-green Linux run is
+  recorded on the issue.
+
+Issue URLs: https://github.com/aigorahub/elves/issues/244, /245, /247, /248.
+
+B0 acceptance B0-A1..B0-A5 met.
