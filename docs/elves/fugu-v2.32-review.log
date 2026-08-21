@@ -81,9 +81,9 @@ index 8ddbb1e..828493e 100644
 --- a/CHANGELOG.md
 +++ b/CHANGELOG.md
 @@ -4,6 +4,51 @@ All notable changes to the Elves skill are documented here.
- 
+
  ## [Unreleased]
- 
+
 +## [2.32.0] - 2026-08-20
 +
 +### Fixed
@@ -130,7 +130,7 @@ index 8ddbb1e..828493e 100644
 +  artifacts recorded before this change still validate. (#258)
 +
  ## [2.31.0] - 2026-08-16
- 
+
  ### Added
 diff --git a/README.md b/README.md
 index a4adf0c..f8d365d 100644
@@ -139,11 +139,11 @@ index a4adf0c..f8d365d 100644
 @@ -8,7 +8,7 @@ Oh My Pi (omp) driver plans and reviews; a subscription-native (or optional exte
  implements; durable run files let the work survive context compaction. You write the plan and own
  the merge decision. The agent does the middle.
- 
+
 -**Current release: v2.31.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 +**Current release: v2.32.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
  are defined once in [`references/glossary.md`](references/glossary.md).
- 
+
  **New to Elves?** Use the [practical user guide](https://aigorahub.github.io/elves/) — especially
 diff --git a/docs/elves/execution-log-v2.32-open-issue-harvest.md b/docs/elves/execution-log-v2.32-open-issue-harvest.md
 new file mode 100644
@@ -867,7 +867,7 @@ index ab88cce..cd105e3 100644
 @@ -36,6 +36,27 @@ The guide mirrors its native TODO mechanism into private JSON under
    TODO item, changed repository-relative paths, summary, and validation attempted.
  - `session.json`: the exact safe worker-session identity captured or assigned by the supervisor.
- 
+
 +The guide prompt states both artifact shapes literally, with one filled example each (#260). A
 +guide that has not read `prewalk.py` still has everything it needs, because a semantically correct
 +artifact in another dialect fails the transition and terminalizes the run *after* the guide turn
@@ -908,7 +908,7 @@ index 093793e..32063a0 100644
 @@ -32,6 +34,13 @@ _KEEP = frozenset(
      }
  )
- 
+
 +# Worker-report terminal vocabulary, distinct from the state machine's: a state can
 +# also be `stopped` or `stale`, and neither is ever a worker report status.
 +_TERMINAL_REPORT_STATUSES = frozenset({"complete", "failed", "blocked"})
@@ -916,7 +916,7 @@ index 093793e..32063a0 100644
 +    {"complete", "failed", "blocked", "stopped", "stale"}
 +)
 +
- 
+
  def _refresh_helpers() -> None:
      """Rebind helpers from full_run so unit-test patches on full_run apply here."""
 @@ -96,7 +105,7 @@ def monitor_full_run(
@@ -956,7 +956,7 @@ index 093793e..32063a0 100644
 @@ -239,6 +251,25 @@ def monitor_full_run(
              report_errors = [exc.message]
              report = {}
- 
+
 +    # aigorahub/elves#242: `resolved_depth` is forced to full only when *state* is
 +    # already terminal. On the exact poll where a validated report first turns
 +    # terminal, state is still running, so an incremental poll can serve an event
@@ -984,8 +984,8 @@ index 064d163..13f8299 100644
 --- a/scripts/cobbler_runtime/learnings_ledger.py
 +++ b/scripts/cobbler_runtime/learnings_ledger.py
 @@ -195,12 +195,28 @@ def _body_index(lines: list[str], absolute: int) -> int:
- 
- 
+
+
  def _section_at(lines: list[str], index: int) -> str:
 -    """Heading of the section containing ``index`` (digest interior has none)."""
 +    """Heading of the section containing ``index`` (digest interior has none).
@@ -996,7 +996,7 @@ index 064d163..13f8299 100644
 +    heading plus cooperating drift fool the rollback drift guard into a mis-sectioned
 +    restore.
 +    """
- 
+
      section = ""
 +    in_digest = False
      for position, line in enumerate(lines):
@@ -1014,8 +1014,8 @@ index 064d163..13f8299 100644
          if heading:
              section = heading.group(1)
 @@ -299,13 +315,29 @@ def _ensure_section_heading(lines: list[str], section: str) -> list[str]:
- 
- 
+
+
  def _section_insert_index(doc: ParsedDoc, section: str) -> int:
 -    """Index AFTER the last content line of ``section`` (before next heading)."""
 +    """Index AFTER the last content line of ``section`` (before next heading).
@@ -1027,7 +1027,7 @@ index 064d163..13f8299 100644
 +    entry under the forged heading anyway. The marker lines themselves stay ordinary
 +    section content, as they were before.
 +    """
- 
+
      in_section = False
 +    in_digest = False
      heading_index = None
@@ -1058,8 +1058,8 @@ index a9f9165..27c0a24 100644
  import shlex
 @@ -173,6 +174,64 @@ class NativeWorkerPrewalkSpec:
          }
- 
- 
+
+
 +@dataclass(frozen=True)
 +class ObservedRoute:
 +    """What a provider published about the route it actually ran.
@@ -1126,8 +1126,8 @@ index a9f9165..27c0a24 100644
      timed_out: bool = False
      output_limit_exceeded: bool = False
 +    observed_route: ObservedRoute = ObservedRoute()
- 
- 
+
+
  def native_worker_profiles() -> dict[str, dict[str, Any]]:
 @@ -613,6 +673,7 @@ def _run_bounded_qualification_phase(
          stderr = chunks["stderr"].decode("utf-8", errors="replace")
@@ -1171,7 +1171,7 @@ index a9f9165..27c0a24 100644
 @@ -926,6 +995,28 @@ def qualify_installed_prewalk_transport(
                  )
              checks["packet_replayed"] = False
- 
+
 +    # aigorahub/elves#258: derive the route-change check from provider evidence.
 +    # Only Codex publishes an effective-route signal today, and only when the model
 +    # actually changes — the common native route lowers effort within one model and
@@ -1239,8 +1239,8 @@ index 74641cb..2800b42 100644
  PREWALK_PACKET_MAX_BYTES = 4 * 1024 * 1024
 @@ -329,6 +331,22 @@ def _required_text(value: object, *, path: str, code: str, max_chars: int = 2_00
      return value.strip()
- 
- 
+
+
 +def _normalized_summary(value: object, *, path: str, code: str) -> str:
 +    """Require a real summary, but bound its length instead of terminalizing.
 +
@@ -1284,9 +1284,9 @@ index 74641cb..2800b42 100644
 +    result["summary"] = summary
      result["validation_attempted"] = normalized_attempts
      return result
- 
+
 @@ -691,14 +715,70 @@ after orientation and do not produce a read-only plan.
- 
+
  Before editing, create at most {limit} concrete TODO items. Every item needs an observable
  acceptance condition and its own validation step. Use the host TODO mechanism when available and
 -mirror the list to `{paths.todo}` using the Elves prewalk TODO schema. Read the exact session id
@@ -1348,7 +1348,7 @@ index 74641cb..2800b42 100644
 +literal `true`. `created_at` is RFC3339 with an explicit timezone. `summary` is bounded at
 +{PREWALK_SUMMARY_MAX_CHARS} characters; a longer one is truncated rather than rejected, so keep
 +the substance in the first sentence.
- 
+
  Then make the first meaningful task edit. It may be a deliberately failing test when the TODO says
  so. Update that TODO item to in_progress or complete, write the first_meaningful_edit checkpoint to
  `{paths.checkpoint}`, and end this guide turn immediately. Do not create a Close commit and do not
@@ -1356,13 +1356,13 @@ index 74641cb..2800b42 100644
 -a task_complete checkpoint instead.
 +a task_complete checkpoint instead; a `task_complete` checkpoint requires every TODO item to be
 +`complete`.
- 
+
  On the later exact-session continuation, complete the remaining TODO items and their validations,
  update the same TODO artifact, replace the checkpoint with an explicit task_complete checkpoint,
 @@ -1085,6 +1165,13 @@ _GROK_QUALIFICATION_REQUIRED_FIELDS = frozenset(
      }
  )
- 
+
 +# aigorahub/elves#258 added observed-route recording. These stay optional so an
 +# artifact recorded before that change still validates, while the field set remains
 +# closed against arbitrary extra keys.
@@ -1370,7 +1370,7 @@ index 74641cb..2800b42 100644
 +    {"observed_execution_route", "route_change_evidence"}
 +)
 +
- 
+
  def _read_qualification_artifact_json(
      target: Path, *, limit: int, code: str
 @@ -1163,7 +1250,12 @@ def load_grok_prewalk_qualification(
@@ -1394,7 +1394,7 @@ index 4b6df1b..165a533 100644
 @@ -6131,6 +6131,116 @@ class FullRunLifecycleTests(unittest.TestCase):
          self.assertLessEqual(len(bounded["transcript_tail"]), 100)
          self.assertTrue(all(len(line) <= 1000 for line in bounded["transcript_tail"]))
- 
+
 +    def _run_fixture_to_completion(self) -> dict:
 +        prepare_full_run(
 +            self.repo,
@@ -1513,7 +1513,7 @@ index efaee3d..8099bfe 100644
 --- a/tests/test_learnings_ledger.py
 +++ b/tests/test_learnings_ledger.py
 @@ -551,3 +551,57 @@ class LedgerContentionTests(unittest.TestCase):
- 
+
  if __name__ == "__main__":
      unittest.main()
 +
@@ -1596,7 +1596,7 @@ index cbfaf75..d3ff97d 100644
 @@ -179,6 +183,81 @@ class PrewalkArtifactTests(unittest.TestCase):
              )
          self.assertEqual(caught.exception.code, "prewalk_checkpoint_invalid")
- 
+
 +    def test_checkpoint_truncates_long_summary_instead_of_terminalizing(self) -> None:
 +        # aigorahub/elves#260: a fully successful execution phase was terminalized
 +        # over prose length alone. Length is presentation, not identity or evidence.
@@ -1678,7 +1678,7 @@ index cbfaf75..d3ff97d 100644
 @@ -216,6 +295,59 @@ class PrewalkArtifactTests(unittest.TestCase):
          self.assertIn("sent exactly once", text)
          self.assertIn("only `Continue.`", text)
- 
+
 +    def test_prompt_states_both_artifact_contracts(self) -> None:
 +        # aigorahub/elves#260: the prompt used to say "the Elves prewalk TODO schema"
 +        # without stating it. A guide that has not read prewalk.py cannot comply, and
@@ -1732,11 +1732,11 @@ index cbfaf75..d3ff97d 100644
 +            example_checkpoint, run_id="run-1", session_id="session-1", todo=todo
 +        )
 +
- 
+
  class MeaningfulEditTests(unittest.TestCase):
      def setUp(self) -> None:
 @@ -1742,3 +1874,205 @@ class AutomaticPrewalkQualificationTests(unittest.TestCase):
- 
+
  if __name__ == "__main__":
      unittest.main()
 +
@@ -4310,7 +4310,7 @@ All four fixes are correctly implemented. No correctness defect, weakened safety
    488	                    )
    489	                except Exception:
    490	                    pass
-   491	
+   491
    492	    if not event_errors and not events_reused and event_signature is not None:
    493	        cache["event_signature"] = event_signature
    494	        cache["event_summary"] = {
@@ -4327,7 +4327,7 @@ All four fixes are correctly implemented. No correctness defect, weakened safety
    505	            ),
    506	            "last_batch_unsure_about_count": last_batch_unsure_about_count,
    507	        }
-   508	
+   508
    509	    if acknowledge_high_risk_checkpoint is not None:
    510	        checkpoint_id = str(acknowledge_high_risk_checkpoint)
    511	        if (
@@ -4354,7 +4354,7 @@ All four fixes are correctly implemented. No correctness defect, weakened safety
    821	        PARKED_MONITOR_WAKE_CONDITIONS,
    822	        parked_monitor_poll_after_seconds,
    823	    )
-   824	
+   824
    825	    material_state_change = bool(
    826	        state.status != initial_status
    827	        or state.next_action != initial_next_action
@@ -4402,7 +4402,7 @@ All four fixes are correctly implemented. No correctness defect, weakened safety
    869	                latest_confidence_from_sidecars,
    870	                record_terminal_calibration,
    871	            )
-   872	
+   872
    873	            conf = last_batch_confidence
    874	            if conf is None:
    875	                conf = latest_confidence_from_sidecars(Path(repo_root))
@@ -4419,7 +4419,7 @@ All four fixes are correctly implemented. No correctness defect, weakened safety
    886	        except Exception:
    887	            pass
    888	    save_state(repo_root, state)
-   889	
+   889
    890	    status = {
    891	        "ok": state.status in {"healthy", "complete", "pending"}
    892	        or state.next_action == "driver_wake_reconcile",
@@ -4482,7 +4482,7 @@ exec
    154	                else None
    155	            ),
    156	        )
-   157	
+   157
    158	    def to_dict(self) -> dict[str, Any]:
    159	        return {
    160	            "mode": "prewalk",
@@ -4500,30 +4500,30 @@ exec
    172	            "instruction_fidelity": self.instruction_fidelity,
    173	            "forbidden_paths": list(self.forbidden_paths),
    174	        }
-   175	
-   176	
+   175
+   176
    177	@dataclass(frozen=True)
    178	class ObservedRoute:
    179	    """What a provider published about the route it actually ran.
-   180	
+   180
    181	    aigorahub/elves#258: qualification used to record the *requested* route as proof.
    182	    A CLI that accepts a resume command but ignores an unsupported model or effort
    183	    override still passes every continuity check, so the artifact could certify a
    184	    route that never ran.
-   185	
+   185
    186	    ``effort`` is None on every supported host today: no transport publishes the
    187	    reasoning level it actually used, and deriving it from the request would recreate
    188	    the exact defect this records. ``source`` names the evidence tier.
    189	    """
-   190	
+   190
    191	    model: str | None = None
    192	    effort: str | None = None
    193	    source: str = "unobserved"
-   194	
+   194
    195	    def to_dict(self) -> dict[str, Any]:
    196	        return {"model": self.model, "effort": self.effort, "source": self.source}
-   197	
-   198	
+   197
+   198
    199	# codex-cli 0.147.0 announces an applied model override on resume as an
    200	# `item.completed` whose *inner* item type is `error`:
    201	#   "This session was recorded with model `A` but is resuming with `B`."
@@ -4533,13 +4533,13 @@ exec
    205	_CODEX_RESUMED_MODEL_RE = re.compile(
    206	    r"recorded with model `([^`]{1,128})` but is resuming with `([^`]{1,128})`"
    207	)
-   208	
-   209	
+   208
+   209
    210	def _observed_route_from_event(
    211	    event: dict[str, Any], host: str | None
    212	) -> ObservedRoute | None:
    213	    """Return the effective route a host named for itself, or None.
-   214	
+   214
    215	    None means "this host published nothing here". That is not evidence an override
    216	    was ignored — only a positive, host-published naming of the model actually in use
    217	    counts as evidence either way.
@@ -4558,12 +4558,12 @@ exec
    230	    if match is None:
    231	        return None
    232	    return ObservedRoute(model=match.group(2), source="codex_resume_model_notice")
-   233	
-   234	
+   233
+   234
    235	@dataclass(frozen=True)
    236	class PrewalkQualificationResult:
    237	    """One bounded provider phase used only by the live qualification canary."""
-   238	
+   238
    239	    exit_code: int
    240	    stdout: str
    241	    stderr_tail: str
@@ -4572,20 +4572,20 @@ exec
    244	    timed_out: bool = False
    245	    output_limit_exceeded: bool = False
    246	    observed_route: ObservedRoute = ObservedRoute()
-   247	
-   248	
+   247
+   248
    249	def native_worker_profiles() -> dict[str, dict[str, Any]]:
    250	    """Semantically matched profiles; a view of the host-profile registry."""
    251	    return native_worker_profile_view()
-   252	
-   253	
+   252
+   253
    254	# Canonical exact-session validation lives in the host-profile registry.
    255	_exact_session_id = _registry_exact_session_id
-   256	
-   257	
+   256
+   257
    258	def _git_write_roots(worktree: Path) -> tuple[str, ...]:
    259	    """Return the least-privilege Git roots needed to commit in a linked worktree.
-   260	
+   260
    261	    A linked checkout stores its index and HEAD under ``.git/worktrees`` while
    262	    objects and branch refs live in the common repository. Granting the common
    263	    ``.git`` directory would also grant config, hooks, tags, and protected refs.
@@ -4678,16 +4678,16 @@ exec
    714	        stdin_handle.close()
    715	        if prompt_path is not None:
    716	            prompt_path.unlink(missing_ok=True)
-   717	
-   718	
+   717
+   718
    719	def _qualification_assistant_text(stdout: str) -> str:
    720	    """Return assistant text from raw output and OMP typed stream events."""
    790	    try:
    791	        yield
    792	    except Exception as exc:
    793	        diagnostics.append(f"{type(exc).__name__}: {exc}")
-   794	
-   795	
+   794
+   795
    796	def qualify_installed_prewalk_transport(
    797	    *,
    798	    host: str,
@@ -4700,7 +4700,7 @@ exec
    805	    phase_runner: Any = None,
    806	) -> PrewalkCapabilities:
    807	    """Load matching proof or run a bounded two-turn live qualification canary.
-   808	
+   808
    809	    This function is called only for an explicit ``required`` launch. It never
    810	    edits the target checkout. A temporary Git worktree holds one changing
    811	    canary file whose unknown contents prove both phases used the same CWD.
@@ -4743,7 +4743,7 @@ exec
    848	            )
    849	        ):
    850	            return cached
-   851	
+   851
    852	    runner = phase_runner or _run_bounded_qualification_phase
    853	    memory_fact = secrets.token_hex(16)
    854	    guide_file_fact = secrets.token_hex(16)
@@ -4889,7 +4889,7 @@ exec
    994	                    and execution_result.provider_event_count
    995	                )
    996	            checks["packet_replayed"] = False
-   997	
+   997
    998	    # aigorahub/elves#258: derive the route-change check from provider evidence.
    999	    # Only Codex publishes an effective-route signal today, and only when the model
   1000	    # actually changes — the common native route lowers effort within one model and
@@ -4911,7 +4911,7 @@ exec
   1016	    route_change_evidence = (
   1017	        "observed_effective_model" if observed_route.model else "unobserved"
   1018	    )
-  1019	
+  1019
   1020	    qualified = all(
   1021	        (
   1022	            checks["advertised_exact_resume"],
@@ -4927,7 +4927,7 @@ exec
   1032	        )
   1033	    )
   1034	    from .context import redact_text
-  1035	
+  1035
   1036	    diagnostic = redact_text(
   1037	        "\n".join(
   1038	            part
@@ -4980,7 +4980,7 @@ exec
   1085	            "Live prewalk qualification did not prove every required transport fact",
   1086	            hint=f"Evidence: {attempt_path}",
   1087	        )
-  1088	
+  1088
   1089	    if advertised.host == "grok":
   1090	        if not advertised.installed_build_commit:
   1091	            raise ValidationIssue(
@@ -5049,8 +5049,8 @@ exec
   1154	            hint=f"Evidence: {cache_path}",
   1155	        )
   1156	    return loaded
-  1157	
-  1158	
+  1157
+  1158
   1159	def parse_codex_thread_id(jsonl: str) -> str:
   1160	    """Capture the exact Codex worker thread id from structured launch output."""
   1161	    for line in jsonl.splitlines():
@@ -5064,20 +5064,20 @@ exec
   1183	    "timeout",
   1184	    "too many requests",
   1185	)
-  1186	
-  1187	
+  1186
+  1187
   1188	def _transient_provider_failure(text: str) -> bool:
   1189	    normalized = text.casefold()
   1190	    return any(marker in normalized for marker in _TRANSIENT_PROVIDER_MARKERS)
-  1191	
-  1192	
+  1191
+  1192
   1193	# Structured stdout event types that report a provider/transport error. Only
   1194	# these stdout events may contribute to transient-failure classification; task
   1195	# narration on stdout (for example a worker discussing a "timeout" bug) never
   1196	# does. Stderr lines remain in scope unconditionally.
   1197	_PROVIDER_ERROR_EVENT_TYPES = frozenset({"error", "turn.failed", "thread.error", "stream_error"})
-  1198	
-  1199	
+  1198
+  1199
   1200	def _parse_provider_event(line: str) -> dict[str, Any] | None:
   1201	    try:
   1202	        event = json.loads(line)
@@ -5086,24 +5086,24 @@ exec
   1205	    if isinstance(event, dict) and isinstance(event.get("type"), str):
   1206	        return event
   1207	    return None
-  1208	
-  1209	
+  1208
+  1209
   1210	def _is_provider_error_event(event: dict[str, Any]) -> bool:
   1211	    return event.get("type") in _PROVIDER_ERROR_EVENT_TYPES
-  1212	
-  1213	
+  1212
+  1213
   1214	def _run_key(run_id: str) -> str:
   1215	    if not run_id.strip() or run_id.startswith("-"):
   1216	        raise ValidationIssue("invalid_native_worker_run_id", "An exact native worker run id is required")
   1217	    safe = "".join(ch if ch.isalnum() else "_" for ch in run_id)[:24]
   1218	    return f"{safe}-{hashlib.sha256(run_id.encode()).hexdigest()[:16]}"
-  1219	
-  1220	
+  1219
+  1220
   1221	def native_worker_paths(repo_root: Path, run_id: str) -> tuple[Path, Path]:
   1222	    root = repo_root.resolve() / ".elves" / "runtime" / "native-worker" / _run_key(run_id)
   1223	    return root / "state.json", root / "follow.jsonl"
-  1224	
-  1225	
+  1224
+  1225
   1226	def _write_private_json(path: Path, data: dict[str, Any]) -> None:
   1227	    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
   1228	    os.chmod(path.parent, 0o700)
@@ -5193,16 +5193,16 @@ exec
     81	    sections: list[str]
     82	    freehand_count: int
     83	    trailing_newline: bool
-    84	
-    85	
+    84
+    85
     86	def history_path(path: Path) -> Path:
     87	    return path.with_name(f"{path.stem}-history.jsonl")
-    88	
-    89	
+    88
+    89
     90	def _lock_path(path: Path) -> Path:
     91	    return path.with_name(f".{path.name}.lock")
-    92	
-    93	
+    92
+    93
     94	def parse_text(text: str) -> ParsedDoc:
     95	    lines = text.split("\n")
     96	    trailing_newline = text.endswith("\n")
@@ -5255,16 +5255,16 @@ exec
    143	        freehand_count=freehand,
    144	        trailing_newline=trailing_newline,
    145	    )
-   146	
-   147	
+   146
+   147
    148	def _read_doc(path: Path) -> tuple[str, ParsedDoc]:
    149	    try:
    150	        text = path.read_text(encoding="utf-8")
    151	    except OSError as exc:
    152	        raise LedgerError("learnings_unreadable", f"cannot read {path}: {exc}") from exc
    153	    return text, parse_text(text)
-   154	
-   155	
+   154
+   155
    156	def validate_file(path: Path) -> dict[str, Any]:
    157	    text, doc = _read_doc(path)
    158	    return {
@@ -5278,16 +5278,16 @@ exec
    166	        "history_path": str(history_path(path)),
    167	        "history_records": _history_record_count(path),
    168	    }
-   169	
-   170	
+   169
+   170
    171	def _body_index(lines: list[str], absolute: int) -> int:
    172	    """Digest-invariant coordinate for a line: digest interior excluded.
-   173	
+   173
    174	    The digest block is the only region whose length changes as entries come
    175	    and go, so positions counted outside it stay valid across regenerations —
    176	    which is what makes rollback byte-identical for mid-section entries.
    177	    """
-   178	
+   178
    179	    body = 0
    180	    in_digest = False
    181	    for index, line in enumerate(lines):
@@ -5304,18 +5304,18 @@ exec
    192	        if not in_digest:
    193	            body += 1
    194	    return body
-   195	
-   196	
+   195
+   196
    197	def _section_at(lines: list[str], index: int) -> str:
    198	    """Heading of the section containing ``index`` (digest interior has none).
-   199	
+   199
    200	    aigorahub/elves#249: the region between the digest markers is declared generated
    201	    output and is wiped on every regenerate, so a heading written there is out of
    202	    contract by definition. Reading one as a real section let an adversarial in-digest
    203	    heading plus cooperating drift fool the rollback drift guard into a mis-sectioned
    204	    restore.
    205	    """
-   206	
+   206
    207	    section = ""
    208	    in_digest = False
    209	    for position, line in enumerate(lines):
@@ -5333,8 +5333,8 @@ exec
    221	        if heading:
    222	            section = heading.group(1)
    223	    return section
-   224	
-   225	
+   224
+   225
    226	def _absolute_index(lines: list[str], body_target: int) -> int:
    227	    body = 0
    228	    in_digest = False
@@ -5352,8 +5352,8 @@ exec
    240	        if not in_digest:
    241	            body += 1
    242	    return len(lines)
-   243	
-   244	
+   243
+   244
    245	def _history_record_count(path: Path) -> int:
    246	    hist = history_path(path)
    247	    if not hist.is_file():
@@ -5362,16 +5362,16 @@ exec
    250	        return sum(1 for line in hist.read_text(encoding="utf-8").splitlines() if line.strip())
    251	    except OSError:
    252	        return 0
-   253	
-   254	
+   253
+   254
    255	def _history_capacity_check(path: Path, rows_needed: int) -> None:
    256	    """Refuse BEFORE any mutation when the history cannot take every row.
-   257	
+   257
    258	    Checking capacity up front keeps refuse-don't-destroy exact on the cap
    259	    path: no phantom rows for edits that never applied, and no applied edit
    260	    without its provenance row.
    261	    """
-   262	
+   262
    263	    hist = history_path(path)
    264	    if not hist.is_file():
    265	        return
@@ -5385,11 +5385,11 @@ exec
    297	    if expect:
    298	        suffix += f" (expect: {expect})"
    299	    return f"- [L{entry_id}] [{today}] {text}{suffix}"
-   300	
-   301	
+   300
+   301
    302	def _ensure_section_heading(lines: list[str], section: str) -> list[str]:
    303	    """Append ``## section`` at EOF when missing (never reorders existing content)."""
-   304	
+   304
    305	    for line in lines:
    306	        heading = HEADING_RE.match(line)
    307	        if heading and heading.group(1) == section:
@@ -5400,11 +5400,11 @@ exec
    312	    result.append(f"## {section}")
    313	    result.append("")
    314	    return result
-   315	
-   316	
+   315
+   316
    317	def _section_insert_index(doc: ParsedDoc, section: str) -> int:
    318	    """Index AFTER the last content line of ``section`` (before next heading).
-   319	
+   319
    320	    aigorahub/elves#249: like ``_section_at``, this skips the generated digest
    321	    interior. A forged `## <section>` heading between the markers otherwise wins the
    322	    section lookup here, which is the path a declined positional restore falls back
@@ -5412,7 +5412,7 @@ exec
    324	    entry under the forged heading anyway. The marker lines themselves stay ordinary
    325	    section content, as they were before.
    326	    """
-   327	
+   327
    328	    in_section = False
    329	    in_digest = False
    330	    heading_index = None
@@ -5449,18 +5449,18 @@ exec
    361	    if candidate < boundary and not doc.lines[candidate].strip():
    362	        candidate += 1
    363	    return candidate
-   364	
-   365	
+   364
+   365
    366	def _serialize(lines: list[str], trailing_newline: bool) -> str:
    367	    text = "\n".join(lines)
    368	    if trailing_newline:
    369	        text += "\n"
    370	    return text
-   600	
-   601	
+   600
+   601
    602	def _remove_exact_line(lines: list[str], line: str, code: str) -> None:
    603	    """Remove the first verbatim occurrence OUTSIDE the digest block."""
-   604	
+   604
    605	    in_digest = False
    606	    for index, candidate in enumerate(lines):
    607	        if candidate == DIGEST_BEGIN:
@@ -5477,11 +5477,11 @@ exec
    618	        "the line recorded in history no longer exists verbatim; "
    619	        "resolve manually instead of forcing a rollback",
    620	    )
-   621	
-   622	
+   621
+   622
    623	def rollback_last(path: Path, *, run_id: str | None = None) -> dict[str, Any]:
    624	    """Invert the most recent non-rollback history row, with provenance."""
-   625	
+   625
    626	    hist = history_path(path)
    627	    if not hist.is_file():
    628	        raise LedgerError("learnings_history_missing", f"{hist} does not exist")
@@ -5501,7 +5501,7 @@ exec
    642	        break
    643	    if target is None:
    644	        raise LedgerError("learnings_history_empty", "nothing left to roll back")
-   645	
+   645
    646	    lock = _lock_path(path)
    647	    with open(lock, "w", encoding="utf-8") as lock_handle:
    648	        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
@@ -5587,17 +5587,17 @@ exec
    323	    if not isinstance(data, dict):
    324	        raise ValidationIssue(invalid_code, "Prewalk artifact must be a JSON object", path=str(target))
    325	    return data
-   326	
-   327	
+   326
+   327
    328	def _required_text(value: object, *, path: str, code: str, max_chars: int = 2_000) -> str:
    329	    if not isinstance(value, str) or not value.strip() or len(value) > max_chars:
    330	        raise ValidationIssue(code, "Required prewalk text is missing or unbounded", path=path)
    331	    return value.strip()
-   332	
-   333	
+   332
+   333
    334	def _normalized_summary(value: object, *, path: str, code: str) -> str:
    335	    """Require a real summary, but bound its length instead of terminalizing.
-   336	
+   336
    337	    aigorahub/elves#260: a fully successful 44-minute execution phase was rejected
    338	    as ``prewalk_checkpoint_invalid`` because its summary ran past an unstated cap.
    339	    Prose length is presentation, not identity and not evidence, so normalize it.
@@ -5609,8 +5609,8 @@ exec
    345	    if len(text) <= PREWALK_SUMMARY_MAX_CHARS:
    346	        return text
    347	    return text[: PREWALK_SUMMARY_MAX_CHARS - 1].rstrip() + "…"
-   348	
-   349	
+   348
+   349
    350	def _rfc3339(value: object, *, path: str, code: str) -> str:
    351	    text = _required_text(value, path=path, code=code, max_chars=64)
    352	    try:
@@ -5620,8 +5620,8 @@ exec
    356	    if parsed.tzinfo is None:
    357	        raise ValidationIssue(code, "Prewalk timestamps require an explicit timezone", path=path)
    358	    return text
-   359	
-   360	
+   359
+   360
    361	def _todo_limit(value: int) -> int:
    362	    if not isinstance(value, int) or isinstance(value, bool) or not PREWALK_MIN_TODO_LIMIT <= value <= PREWALK_MAX_TODO_LIMIT:
    363	        raise ValidationIssue(
@@ -5630,8 +5630,8 @@ exec
    366	            path="todo_limit",
    367	        )
    368	    return value
-   369	
-   370	
+   369
+   370
    371	def validate_todo_artifact(
    372	    data: Mapping[str, Any],
    373	    *,
@@ -5693,16 +5693,16 @@ exec
    429	    result = dict(data)
    430	    result["items"] = normalized
    431	    return result
-   432	
-   433	
+   432
+   433
    434	def _safe_repo_path(value: object, *, path: str, code: str) -> str:
    435	    text = _required_text(value, path=path, code=code, max_chars=1_000).replace("\\", "/")
    436	    pure = PurePosixPath(text)
    437	    if pure.is_absolute() or text.startswith(".git/") or text == ".git" or any(part in {"", ".", ".."} for part in pure.parts):
    438	        raise ValidationIssue(code, "Prewalk changed paths must be safe repository-relative paths", path=path)
    439	    return pure.as_posix()
-   440	
-   441	
+   440
+   441
    442	def validate_checkpoint_artifact(
    443	    data: Mapping[str, Any],
    444	    *,
@@ -5766,8 +5766,8 @@ exec
    502	    result["summary"] = summary
    503	    result["validation_attempted"] = normalized_attempts
    504	    return result
-   505	
-   506	
+   505
+   506
    507	def load_and_validate_transition_artifacts(
    508	    *,
    509	    paths: PrewalkPaths,
@@ -5805,34 +5805,34 @@ exec
    695	        diff_sha256=_diff_digest(root, start_head, changed),
    696	        task_complete=checkpoint.get("kind") == "task_complete",
    697	    )
-   698	
-   699	
+   698
+   699
    700	def packet_digest(path: Path) -> str:
    701	    target = path.resolve(strict=True)
    702	    metadata = target.stat()
    703	    if path.is_symlink() or not target.is_file() or metadata.st_size > PREWALK_PACKET_MAX_BYTES:
    704	        raise ValidationIssue("prewalk_packet_replayed", "Worker packet must be one bounded regular file", path=str(target))
    705	    return hashlib.sha256(target.read_bytes()).hexdigest()
-   706	
-   707	
+   706
+   707
    708	def guide_prompt(*, run_id: str, paths: PrewalkPaths, todo_limit: int) -> str:
    709	    limit = _todo_limit(todo_limit)
    710	    return f"""Begin the implementation task directly.
-   711	
+   711
    712	This is the guide turn for exact-session Elves prewalk run `{run_id}`. Explore the repository
    713	deeply enough to understand relevant behavior, abstractions, tests, and constraints. Do not stop
    714	after orientation and do not produce a read-only plan.
-   715	
+   715
    716	Before editing, create at most {limit} concrete TODO items. Every item needs an observable
    717	acceptance condition and its own validation step. Use the host TODO mechanism when available and
    718	mirror the list to `{paths.todo}`. Read the exact session id from `{paths.session_identity}`
    719	(JSON field `session_id`) before writing the TODO or checkpoint.
-   720	
+   720
    721	Both artifacts below are validated exactly as written. A semantically correct artifact in any
    722	other dialect fails the transition and ends the run, so copy these shapes literally.
-   723	
+   723
    724	`{paths.todo}`:
-   725	
+   725
    726	{{
    727	  "schema_version": {PREWALK_SCHEMA_VERSION},
    728	  "run_id": "{run_id}",
@@ -5849,15 +5849,15 @@ exec
    739	    }}
    740	  ]
    741	}}
-   742	
+   742
    743	TODO rules: ids are `PW-01`, `PW-02`, … zero-padded to two digits, unique, and in that exact
    744	order with no gaps. Every item carries all four of `description`, `acceptance`, `validation`,
    745	and `status`. `status` is exactly one of `pending`, `in_progress`, `complete`. At most one item
    746	may be `in_progress`. `created_at` and `updated_at` are RFC3339 with an explicit timezone. Every
    747	item is required to be non-empty; there is no optional field.
-   748	
+   748
    749	`{paths.checkpoint}`:
-   750	
+   750
    751	{{
    752	  "schema_version": {PREWALK_SCHEMA_VERSION},
    753	  "run_id": "{run_id}",
@@ -5872,7 +5872,7 @@ exec
    762	  "ready_for_execution_model": true,
    763	  "created_at": "2026-01-31T14:05:00Z"
    764	}}
-   765	
+   765
    766	Checkpoint rules: `kind` is exactly `first_meaningful_edit` or `task_complete`. `todo_id` names an
    767	existing TODO item, and for `first_meaningful_edit` that item may not still be `pending`.
    768	`changed_paths` is a non-empty list of unique repository-relative paths you actually changed, and
@@ -5882,22 +5882,22 @@ exec
    772	literal `true`. `created_at` is RFC3339 with an explicit timezone. `summary` is bounded at
    773	{PREWALK_SUMMARY_MAX_CHARS} characters; a longer one is truncated rather than rejected, so keep
    774	the substance in the first sentence.
-   775	
+   775
    776	Then make the first meaningful task edit. It may be a deliberately failing test when the TODO says
    777	so. Update that TODO item to in_progress or complete, write the first_meaningful_edit checkpoint to
    778	`{paths.checkpoint}`, and end this guide turn immediately. Do not create a Close commit and do not
    779	claim task completion unless every TODO item is truly complete. If the whole task is atomic, write
    780	a task_complete checkpoint instead; a `task_complete` checkpoint requires every TODO item to be
    781	`complete`.
-   782	
+   782
    783	On the later exact-session continuation, complete the remaining TODO items and their validations,
    784	update the same TODO artifact, replace the checkpoint with an explicit task_complete checkpoint,
    785	and satisfy the normal worker completion contract. The next input will be only `Continue.`.
-   786	
+   786
    787	The task packet follows and is sent exactly once:
-   788	
+   788
    789	"""
-   790	
+   790
   1135	        instruction_fidelity=str(fidelity),
   1136	        evidence_source=str(path.resolve()),
   1137	        model_calls_made=model_calls_made,
@@ -5906,8 +5906,8 @@ exec
   1140	        qualified_execution_model=routes["execution"][0],
   1141	        qualified_execution_effort=routes["execution"][1],
   1142	    )
-  1143	
-  1144	
+  1143
+  1144
   1145	_GROK_QUALIFICATION_REQUIRED_FIELDS = frozenset(
   1146	    {
   1147	        "artifact_type",
@@ -5930,20 +5930,20 @@ exec
   1164	        "instruction_fidelity",
   1165	    }
   1166	)
-  1167	
+  1167
   1168	# aigorahub/elves#258 added observed-route recording. These stay optional so an
   1169	# artifact recorded before that change still validates, while the field set remains
   1170	# closed against arbitrary extra keys.
   1171	_GROK_QUALIFICATION_OPTIONAL_FIELDS = frozenset(
   1172	    {"observed_execution_route", "route_change_evidence"}
   1173	)
-  1174	
-  1175	
+  1174
+  1175
   1176	def _read_qualification_artifact_json(
   1177	    target: Path, *, limit: int, code: str
   1178	) -> dict[str, Any]:
   1179	    """Read one bounded regular JSON artifact with checks bound to the read fd.
-  1180	
+  1180
   1181	    Mirrors the goal-canary reader: O_NOFOLLOW open, fstat identity match
   1182	    against the pre-open lstat, and mode/size checks on the descriptor
   1183	    actually read, so a check-to-read swap cannot bypass the symlink,
@@ -5983,8 +5983,8 @@ exec
   1217	            path=str(target),
   1218	        )
   1219	    return payload
-  1220	
-  1221	
+  1220
+  1221
   1222	def load_grok_prewalk_qualification(
   1223	    path: Path,
   1224	    *,
@@ -5993,7 +5993,7 @@ exec
   1227	    advertised: PrewalkCapabilities | None = None,
   1228	) -> PrewalkCapabilities:
   1229	    """Validate one bounded grok prewalk qualification artifact, fail closed.
-  1230	
+  1230
   1231	    The artifact is operator-recorded live-canary evidence (this loader never
   1232	    fabricates or launches anything). It must be a bounded (<= 64 KiB) regular
   1233	    non-symlink file that is not group/other-writable, carry exactly the
@@ -6006,7 +6006,7 @@ exec
   1240	    ``turn_scoped`` load as recorded, non-activating evidence (mirroring
   1241	    ``PrewalkCapabilities.qualified()``). ``evidence_source`` is always the
   1242	    resolved artifact path — never a fixture token.
-  1243	
+  1243
   1244	    ``installed_version``/``installed_build_commit`` bind the artifact to a
   1245	    probed installed binary when supplied; standalone loads (no installed
   1246	    grok) still require both facts inside the artifact itself.
@@ -6074,17 +6074,17 @@ exec
 /bin/zsh -lc "nl -ba scripts/cobbler_runtime/learnings_ledger.py | sed -n '370,445p;445,605p;700,770p'" in /private/var/folders/g7/f0rng1cs2cn4lz38zy7_v4xr0000gn/T/elves-iso-a940e740e64f-o_us50lr/snapshot
  succeeded in 0ms:
    370	    return text
-   371	
-   372	
+   371
+   372
    373	def _atomic_write(path: Path, text: str) -> None:
    374	    tmp = path.with_suffix(path.suffix + ".tmp")
    375	    tmp.write_text(text, encoding="utf-8")
    376	    os.replace(tmp, path)
-   377	
-   378	
+   377
+   378
    379	def _regenerate_digest(lines: list[str]) -> list[str]:
    380	    """Regenerate the digest strictly between its markers, if present."""
-   381	
+   381
    382	    try:
    383	        begin = lines.index(DIGEST_BEGIN)
    384	        end = lines.index(DIGEST_END)
@@ -6105,11 +6105,11 @@ exec
    399	            f"- … {len(active) - DIGEST_MAX_ENTRIES} more active learnings (read the sections below)"
    400	        )
    401	    return lines[: begin + 1] + digest_lines + lines[end:]
-   402	
-   403	
+   402
+   403
    404	def ensure_digest_block(lines: list[str]) -> list[str]:
    405	    """Insert an empty digest section after the first `---` if none exists."""
-   406	
+   406
    407	    if DIGEST_BEGIN in lines:
    408	        return lines
    409	    try:
@@ -6123,8 +6123,8 @@ exec
    417	        )
    418	    block = ["", f"## {DIGEST_HEADING}", "", DIGEST_BEGIN, DIGEST_END]
    419	    return lines[:anchor] + block + lines[anchor:]
-   420	
-   421	
+   420
+   421
    422	def _validate_edit(edit: dict[str, Any], doc: ParsedDoc) -> None:
    423	    action = edit.get("action")
    424	    if action not in VALID_ACTIONS:
@@ -6169,8 +6169,8 @@ exec
    462	            raise LedgerError(
    463	                "learnings_edit_invalid", f"{action} requires a non-empty `reason`"
    464	            )
-   465	
-   466	
+   465
+   466
    467	def apply_edits(
    468	    path: Path,
    469	    edits: list[dict[str, Any]],
@@ -6179,7 +6179,7 @@ exec
    472	    _rollback_of: str | None = None,
    473	) -> dict[str, Any]:
    474	    """Apply typed edits atomically under a lock; refuse rather than destroy."""
-   475	
+   475
    476	    if not edits:
    477	        raise LedgerError("learnings_edit_invalid", "no edits supplied")
    478	    lock = _lock_path(path)
@@ -6304,11 +6304,11 @@ exec
    597	            }
    598	        finally:
    599	            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
-   600	
-   601	
+   600
+   601
    602	def _remove_exact_line(lines: list[str], line: str, code: str) -> None:
    603	    """Remove the first verbatim occurrence OUTSIDE the digest block."""
-   604	
+   604
    605	    in_digest = False
    700	                        "expect": "",
    701	                    }
@@ -6317,8 +6317,8 @@ exec
    704	            return {"rolled_back": target["record_id"], "id": target.get("id")}
    705	        finally:
    706	            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
-   707	
-   708	
+   707
+   708
    709	def regenerate_digest_file(path: Path) -> dict[str, Any]:
    710	    lock = _lock_path(path)
    711	    with open(lock, "w", encoding="utf-8") as lock_handle:
@@ -6332,11 +6332,11 @@ exec
    719	            return {"digest_entries": min(active, DIGEST_MAX_ENTRIES), "active": active}
    720	        finally:
    721	            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
-   722	
-   723	
+   722
+   723
    724	def migrate_file(path: Path) -> dict[str, Any]:
    725	    """Assign ids to freehand dated bullets under active category headings."""
-   726	
+   726
    727	    lock = _lock_path(path)
    728	    with open(lock, "w", encoding="utf-8") as lock_handle:
    729	        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
@@ -6566,8 +6566,8 @@ tests/test_full_run_supervisor.py:6677:            json.dumps({"nested": nested}
   1016	            )
   1017	        routes[role] = (model, str(effort))
   1018	    return routes
-  1019	
-  1020	
+  1019
+  1020
   1021	def load_prewalk_capability_evidence(
   1022	    path: Path,
   1023	    *,
@@ -6690,8 +6690,8 @@ tests/test_full_run_supervisor.py:6677:            json.dumps({"nested": nested}
   1140	        qualified_execution_model=routes["execution"][0],
   1141	        qualified_execution_effort=routes["execution"][1],
   1142	    )
-  1143	
-  1144	
+  1143
+  1144
   1145	_GROK_QUALIFICATION_REQUIRED_FIELDS = frozenset(
 
 exec
@@ -6746,7 +6746,7 @@ exec
 /bin/zsh -lc "nl -ba scripts/cobbler_runtime/full_run_monitor.py | sed -n '525,815p'" in /private/var/folders/g7/f0rng1cs2cn4lz38zy7_v4xr0000gn/T/elves-iso-a940e740e64f-o_us50lr/snapshot
  succeeded in 0ms:
    525	        state.pending_high_risk_checkpoint = None
-   526	
+   526
    527	    unacknowledged_high_risk_checkpoints = [
    528	        checkpoint_id
    529	        for checkpoint_id in observed_high_risk_checkpoints
@@ -6758,7 +6758,7 @@ exec
    535	        not in observed_high_risk_checkpoints
    536	    ):
    537	        event_errors.append("pending checkpoint is missing from the event log")
-   538	
+   538
    539	    # Report is evidence only after validation. Completion requires a fully
    540	    # evidenced report, exact head/ancestry, and a clean exit accepted only after
    541	    # the supervisor PID and its entire process group are dead.
@@ -6785,7 +6785,7 @@ exec
    562	        elif report.get("status") == "failed":
    563	            state.status = "failed"
    564	            state.next_action = "driver_wake_error"
-   565	
+   565
    566	    report_errors.extend(
    567	        _validate_git_bound_evidence(state, report, events, observed_head)
    568	    )
@@ -6807,7 +6807,7 @@ exec
    584	        report_errors.append(
    585	            "complete run omitted one or more planned high-risk checkpoints"
    586	        )
-   587	
+   587
    588	    # Protected refs: any movement blocks readiness (policy trust, not OS sandbox).
    589	    # Incremental healthy polls verify local refs only; remote all-ref audit runs
    590	    # on a bounded cadence and always at terminal/safety depth.
@@ -6835,7 +6835,7 @@ exec
    612	        state.status = "failed"
    613	        state.blocker = "; ".join(protected_errors)
    614	        state.next_action = "driver_wake_safety_tripwire"
-   615	
+   615
    616	    # Invalid worker evidence is wake-worthy. Exit-record and event corruption
    617	    # always fail hard. Report validation failures also fail hard unless the
    618	    # report is entirely missing after a clean exit (host reconcilable path).
@@ -6850,13 +6850,13 @@ exec
    627	        state.status = "failed"
    628	        state.blocker = "; ".join(report_errors[:4]) or "untrusted worker evidence"
    629	        state.next_action = "driver_wake_error"
-   630	
+   630
    631	    # Branch mismatch is a safety signal.
    632	    if observed_branch and observed_branch != state.branch:
    633	        state.status = "failed"
    634	        state.blocker = f"worktree branch `{observed_branch}` != staged `{state.branch}`"
    635	        state.next_action = "driver_wake_safety_tripwire"
-   636	
+   636
    637	    # A validated nonzero provider exit is authoritative even if the worker wrote
    638	    # a superficially complete report immediately before terminating.
    639	    if exit_record is not None and state.exit_code != 0:
@@ -6876,7 +6876,7 @@ exec
    653	                else "driver_wake_error"
    654	            )
    655	        )
-   656	
+   656
    657	    if state.status not in {"blocked", "failed", "stopped"} and not (
    658	        identity_retired
    659	        and initial_status in {"complete", "stopped", "failed", "blocked"}
@@ -6956,7 +6956,7 @@ exec
    733	            # A genuinely prepared-but-not-launched session remains pending.
    734	            state.status = "pending"
    735	            state.next_action = "launch"
-   736	
+   736
    737	    # Planned checkpoints gate both an active run and a cleanly completed
    738	    # provider. This closes the race where the worker emits a checkpoint and a
    739	    # complete report before the driver's next poll. Error, blocker, stale, and
@@ -6979,13 +6979,13 @@ exec
    756	            state.next_action = "final_readiness"
    757	    elif state.status != "healthy":
    758	        state.pending_high_risk_checkpoint = None
-   759	
+   759
    760	    # A worker-discovered material contract change is an explicit hand-back,
    761	    # not ordinary progress. Keep the process/result intact and wake the driver
    762	    # so the changed scope or assumption can be resolved before readiness.
    763	    if state.status in {"healthy", "complete"} and observed_material_change:
    764	        state.next_action = "driver_wake_material_scope_or_assumption_change"
-   765	
+   765
    766	    if exit_record is not None and state.fingerprint is not None:
    767	        _retire_process_identity(
    768	            state,
@@ -6993,7 +6993,7 @@ exec
    770	            evidence=exit_record,
    771	        )
    772	        identity_retired = True
-   773	
+   773
    774	    # Terminal states are monotonic across repeated monitor calls. A completed
    775	    # run may still be demoted to failed by newly detected safety corruption,
    776	    # but stopped/failed/blocked never regress to an active state.
@@ -7014,7 +7014,7 @@ exec
    791	        else:
    792	            state.next_action = initial_next_action or "final_readiness"
    793	        state.completed_at = initial_completed_at or state.completed_at
-   794	
+   794
    795	    # Production finalization path: reconcile git + protected refs when complete.
    796	    # Explicit fixture mode may use synthetic heads without mutating git.
    797	    reconcile_payload: dict[str, Any] | None = None
@@ -7032,7 +7032,7 @@ exec
    809	            state.blocker = issue.message
    810	            state.next_action = "driver_wake_error"
    811	            reconcile_payload = {"ok": False, "error": issue.message}
-   812	
+   812
    813	    if state.blocker:
    814	        state.blocker = _redact_full_run_text(
    815	            state.blocker, exact_values=exact_secret_values
@@ -7053,7 +7053,7 @@ exec
   6130	        self.assertLessEqual(len(bounded["events_tail"]), 100)
   6131	        self.assertLessEqual(len(bounded["transcript_tail"]), 100)
   6132	        self.assertTrue(all(len(line) <= 1000 for line in bounded["transcript_tail"]))
-  6133	
+  6133
   6134	    def _run_fixture_to_completion(self) -> dict:
   6135	        prepare_full_run(
   6136	            self.repo,
@@ -7080,10 +7080,10 @@ exec
   6157	            )
   6158	        self.assertEqual(status["state"], "complete", status)
   6159	        return status
-  6160	
+  6160
   6161	    def _stage_one_poll_terminal_boundary(self) -> None:
   6162	        """Rebuild the exact poll where a report turns terminal on a cache-reusing tick.
-  6163	
+  6163
   6164	        The monitor captures the event-log signature at the top of a poll and reads the
   6165	        report after it. The fixture worker — like a real one — writes its complete
   6166	        report *before* appending `run_complete`, so an append can land inside that
@@ -7110,7 +7110,7 @@ exec
   6187	            "last_remote_audit_at": datetime.now(timezone.utc).isoformat(),
   6188	        }
   6189	        full_run_module.save_state(self.repo, state)
-  6190	
+  6190
   6191	    def test_monitor_rereads_events_when_a_report_first_turns_terminal(self) -> None:
   6192	        # aigorahub/elves#242 (residual): depth is forced to full only once *state* is
   6193	        # already terminal, which is one poll too late. On the poll where a validated
@@ -7130,7 +7130,7 @@ exec
   6207	        self.assertEqual(
   6208	            refreshed["check_summary"]["last_event_type"], "run_complete"
   6209	        )
-  6210	
+  6210
   6211	    def test_monitor_still_reuses_the_event_cache_on_a_healthy_poll(self) -> None:
   6212	        # The re-read is one boundary, not a policy change: without a terminal report
   6213	        # the incremental poll must still reuse its cached summary.
@@ -7145,7 +7145,7 @@ exec
   6222	        self.assertEqual(
   6223	            healthy["check_summary"]["last_event_type"], "batch_started"
   6224	        )
-  6225	
+  6225
   6226	    def test_monitor_skips_the_terminal_reread_without_credential_context(self) -> None:
   6227	        # Worker evidence is only read once the launch credential context verifies.
   6228	        # The re-read sits behind the same guard as the ordinary read.
@@ -7163,7 +7163,7 @@ exec
   6240	        self.assertEqual(
   6241	            guarded["check_summary"]["last_event_type"], "batch_started"
   6242	        )
-  6243	
+  6243
   6244	    def test_monitor_surfaces_batch_complete_confidence_signal(self) -> None:
   6245	        confident = FAKE_WORKER.replace(
   6246	            'emit("batch_complete", batch, f"batch {batch} complete", head=head)',
@@ -7209,7 +7209,7 @@ exec
   6285	                or candidate.get("check_summary", {}).get("last_batch_unsure_about")
   6286	                == ["retry bounds in batch 3"]
   6287	            )
-  6288	
+  6288
   6289	        while not _settled(status) and time.time() < deadline:
   6290	            time.sleep(0.05)
   6291	            status = monitor_full_run(
@@ -7251,7 +7251,7 @@ exec
   6327	                ["retry bounds in batch 3"],
   6328	            )
   6329	            self.assertEqual(summary.get("last_batch_unsure_about_count"), 1)
-  6330	
+  6330
   6331	    def test_monitor_resets_signal_when_a_later_batch_omits_it(self) -> None:
   6332	        # Batch signals must not leak forward: a later batch_complete without
   6333	        # the fields resets last_batch_* to the no-signal state (null).
@@ -7265,8 +7265,8 @@ exec
    201	            )
    202	            # Sibling managed entry untouched.
    203	            self.assertIn("- [L3] [2026-08-02] A trap. (evidence: commit def)", text)
-   204	
-   205	
+   204
+   205
    206	class LedgerDigestTests(unittest.TestCase):
    207	    def test_digest_bounded_and_marker_scoped(self) -> None:
    208	        with tempfile.TemporaryDirectory() as tmp:
@@ -7292,7 +7292,7 @@ exec
    228	            for line in content_lines[:-1]:
    229	                self.assertLessEqual(len(line), ll.DIGEST_MAX_LINE_CHARS)
    230	            self.assertIn("more active learnings", content_lines[-1])
-   231	
+   231
    232	    def test_digest_deterministic(self) -> None:
    233	        with tempfile.TemporaryDirectory() as tmp:
    234	            path = _write(Path(tmp), SAMPLE)
@@ -7300,8 +7300,8 @@ exec
    236	            first = path.read_bytes()
    237	            ll.regenerate_digest_file(path)
    238	            self.assertEqual(path.read_bytes(), first)
-   239	
-   240	
+   239
+   240
    241	class LedgerDigestPlacementTests(unittest.TestCase):
    242	    def test_digest_without_separator_lands_before_first_section(self) -> None:
    243	        # aigorahub/elves#249 item 2: no `---` in the file — digest goes after
@@ -7317,8 +7317,8 @@ exec
    253	            text = path.read_text()
    254	            self.assertLess(text.index(ll.DIGEST_BEGIN), text.index("## Repo Conventions"))
    255	            self.assertIn("- [L1] entry", text)
-   256	
-   257	
+   256
+   257
    258	class LedgerLegacyTests(unittest.TestCase):
    259	    def test_legacy_validate_ok_and_edits_refuse_with_migrate_hint(self) -> None:
    260	        with tempfile.TemporaryDirectory() as tmp:
@@ -7334,7 +7334,7 @@ exec
    270	            self.assertEqual(ctx.exception.code, "learnings_legacy_mode")
    271	            self.assertIn("migrate", ctx.exception.message)
    272	            self.assertEqual(path.read_bytes(), before)
-   273	
+   273
    274	    def test_migrate_idempotent(self) -> None:
    275	        with tempfile.TemporaryDirectory() as tmp:
    535	            ]
@@ -7352,15 +7352,15 @@ exec
    547	            self.assertEqual(len(rows), 2)
    548	            self.assertEqual(len({row["record_id"] for row in rows}), 2)
    549	            ll.validate_file(path)
-   550	
-   551	
+   550
+   551
    552	if __name__ == "__main__":
    553	    unittest.main()
-   554	
-   555	
+   554
+   555
    556	class LedgerDigestInteriorSectionTests(unittest.TestCase):
    557	    """aigorahub/elves#249: generated digest interiors are not real sections."""
-   558	
+   558
    559	    def test_section_at_ignores_headings_inside_the_digest_block(self) -> None:
    560	        lines = [
    561	            "# Project Learnings",
@@ -7377,7 +7377,7 @@ exec
    572	        # A real heading after the block still wins.
    573	        lines.insert(7, "## Known Traps")
    574	        self.assertEqual(ll._section_at(lines, len(lines) - 1), "Known Traps")
-   575	
+   575
    576	    def test_in_digest_heading_cannot_retire_a_restored_entry(self) -> None:
    577	        # The drift guard trusts a positional restore only when the candidate still
    578	        # lands in the recorded section. An out-of-contract heading written inside
@@ -7449,7 +7449,7 @@ exec
   1679	            self.assertEqual(state["status"], "executing")
   1680	            self.assertTrue(state["process_identity_matches"])
   1681	            self.assertFalse(state["supervisor_identity_matches"])
-  1682	
+  1682
   1683	class AutomaticPrewalkQualificationTests(unittest.TestCase):
   1684	    def _advertised(self):
   1685	        return advertised_prewalk_capabilities(
@@ -7458,7 +7458,7 @@ exec
   1688	            create_help="--model -c model_reasoning_effort resume",
   1689	            resume_help="Usage: resume SESSION_ID --model -c model_reasoning_effort",
   1690	        )
-  1691	
+  1691
   1692	    def _probe(self, advertised):
   1693	        def probe(host, *, behavioral_evidence=None, **_kwargs):
   1694	            self.assertEqual(host, "codex")
@@ -7470,14 +7470,14 @@ exec
   1700	                installed_version="9.9.9",
   1701	                advertised=advertised,
   1702	            )
-  1703	
+  1703
   1704	        return probe
-  1705	
+  1705
   1706	    def test_required_canary_proves_and_reuses_matching_private_evidence(self) -> None:
   1707	        advertised = self._advertised()
   1708	        state: dict[str, str] = {}
   1709	        calls: list[str] = []
-  1710	
+  1710
   1711	        def phase_runner(*, spec, input_text, **_kwargs):
   1712	            calls.append(input_text)
   1713	            canary_value = (
@@ -7512,7 +7512,7 @@ exec
   1742	                observed_session_ids=("qualification-session",),
   1743	                provider_event_count=1,
   1744	            )
-  1745	
+  1745
   1746	        with tempfile.TemporaryDirectory() as tmp, mock.patch(
   1747	            "cobbler_runtime.native_worker.probe_installed_prewalk_capabilities",
   1748	            side_effect=self._probe(advertised),
@@ -7538,7 +7538,7 @@ exec
   1768	            )
   1769	            self.assertTrue(cache_path.is_file())
   1770	            self.assertEqual(cache_path.stat().st_mode & 0o777, 0o600)
-  1771	
+  1771
   1772	            reused = qualify_installed_prewalk_transport(
   1773	                host="codex",
   1774	                guide_model="guide-model",
@@ -7552,7 +7552,7 @@ exec
   1782	            )
   1783	            self.assertTrue(reused.qualified())
   1784	            self.assertEqual(len(calls), 2)
-  1785	
+  1785
   1786	            # A different guide route reuses the same cached proof: the canary
   1787	            # binds the execution route, so no second canary is spent.
   1788	            other_guide = qualify_installed_prewalk_transport(
@@ -7568,10 +7568,10 @@ exec
   1798	            )
   1799	            self.assertTrue(other_guide.qualified())
   1800	            self.assertEqual(len(calls), 2)
-  1801	
+  1801
   1802	    def test_required_canary_failure_stops_with_private_attempt_evidence(self) -> None:
   1803	        advertised = self._advertised()
-  1804	
+  1804
   1805	        def phase_runner(**_kwargs):
   1806	            return PrewalkQualificationResult(
   1807	                exit_code=0,
@@ -7588,7 +7588,7 @@ exec
   1818	                observed_session_ids=("qualification-session",),
   1819	                provider_event_count=1,
   1820	            )
-  1821	
+  1821
   1822	        with tempfile.TemporaryDirectory() as tmp, mock.patch(
   1823	            "cobbler_runtime.native_worker.probe_installed_prewalk_capabilities",
   1824	            side_effect=self._probe(advertised),
@@ -7612,10 +7612,10 @@ exec
   1842	            self.assertFalse(payload["qualified"])
   1843	            self.assertFalse(payload["checks"]["unique_guide_fact_observed"])
   1844	            self.assertEqual(evidence.stat().st_mode & 0o777, 0o600)
-  1845	
+  1845
   1846	    def test_required_canary_runtime_error_stops_with_attempt_evidence(self) -> None:
   1847	        advertised = self._advertised()
-  1848	
+  1848
   1849	        with tempfile.TemporaryDirectory() as tmp, mock.patch(
   1850	            "cobbler_runtime.native_worker.probe_installed_prewalk_capabilities",
   1851	            side_effect=self._probe(advertised),
@@ -7640,15 +7640,15 @@ exec
   1870	            self.assertFalse(payload["qualified"])
   1871	            self.assertTrue(payload["model_calls_made"])
   1872	            self.assertIn("provider process failed", payload["diagnostic"])
-  1873	
-  1874	
+  1873
+  1874
   1875	if __name__ == "__main__":
   1876	    unittest.main()
-  1877	
-  1878	
+  1877
+  1878
   1879	class ObservedRouteQualificationTests(unittest.TestCase):
   1880	    """aigorahub/elves#258: qualification must record the route that actually ran."""
-  1881	
+  1881
   1882	    CODEX_NOTICE = {
   1883	        "type": "item.completed",
   1884	        "item": {
@@ -7661,7 +7661,7 @@ exec
   1891	            ),
   1892	        },
   1893	    }
-  1894	
+  1894
   1895	    def test_codex_resume_notice_names_the_effective_model(self) -> None:
   1896	        observed = _observed_route_from_event(self.CODEX_NOTICE, "codex")
   1897	        self.assertIsNotNone(observed)
@@ -7674,7 +7674,7 @@ exec
   1903	        # The signal is an `item.completed` whose *inner* item type is `error`.
   1904	        # Reading the inner type must not turn it into a provider failure.
   1905	        self.assertFalse(_is_provider_error_event(self.CODEX_NOTICE))
-  1906	
+  1906
   1907	    def test_no_signal_is_never_read_as_a_route_observation(self) -> None:
   1908	        for host, event in (
   1909	            ("claude", self.CODEX_NOTICE),
@@ -7693,7 +7693,7 @@ exec
   1922	        ):
   1923	            with self.subTest(host=host, event=event):
   1924	                self.assertIsNone(_observed_route_from_event(event, host))
-  1925	
+  1925
   1926	    def _advertised(self):
   1927	        return advertised_prewalk_capabilities(
   1928	            host="codex",
@@ -7701,7 +7701,7 @@ exec
   1930	            create_help="--model -c model_reasoning_effort resume",
   1931	            resume_help="Usage: resume SESSION_ID --model -c model_reasoning_effort",
   1932	        )
-  1933	
+  1933
   1934	    def _probe(self, advertised):
   1935	        def probe(host, *, behavioral_evidence=None, **_kwargs):
   1936	            if behavioral_evidence is None:
@@ -7712,13 +7712,13 @@ exec
   1941	                installed_version="9.9.9",
   1942	                advertised=advertised,
   1943	            )
-  1944	
+  1944
   1945	        return probe
-  1946	
+  1946
   1947	    def _phase_runner(self, observed_route):
   1948	        """A passing two-phase canary whose execution phase reports ``observed_route``."""
   1949	        state: dict[str, str] = {}
-  1950	
+  1950
   1951	        def phase_runner(*, spec, input_text, **_kwargs):
   1952	            canary_value = (
   1953	                Path(spec.cwd) / ".elves-prewalk-canary.txt"
@@ -7749,9 +7749,9 @@ exec
   1978	                provider_event_count=1,
   1979	                observed_route=route,
   1980	            )
-  1981	
+  1981
   1982	        return phase_runner
-  1983	
+  1983
   1984	    def _qualify(self, observed_route, tmp):
   1985	        return qualify_installed_prewalk_transport(
   1986	            host="codex",
@@ -7762,7 +7762,7 @@ exec
   1991	            cache_root=Path(tmp),
   1992	            phase_runner=self._phase_runner(observed_route),
   1993	        )
-  1994	
+  1994
   1995	    def test_observed_route_matching_the_request_is_recorded_as_proof(self) -> None:
   1996	        advertised = self._advertised()
   1997	        observed = ObservedRoute(
@@ -7792,7 +7792,7 @@ exec
   2021	            self.assertEqual(
   2022	                payload["route_change_evidence"], "observed_effective_model"
   2023	            )
-  2024	
+  2024
   2025	    def test_observed_route_contradicting_the_request_fails_qualification(self) -> None:
   2026	        advertised = self._advertised()
   2027	        observed = ObservedRoute(
@@ -7817,7 +7817,7 @@ exec
   2046	            self.assertEqual(
   2047	                payload["observed_execution_route"]["model"], "some-other-model"
   2048	            )
-  2049	
+  2049
   2050	    def test_a_host_publishing_no_signal_still_qualifies_at_the_weaker_tier(self) -> None:
   2051	        # Claude Code, Grok Build, and Oh My Pi publish nothing comparable, and Codex
   2052	        # itself is silent whenever the model does not change. Absence must not fail
@@ -8318,8 +8318,8 @@ scripts/cobbler_runtime/full_run.py:5383:def _event_log_signature(repo_root: Pat
   2238	        except OSError:
   2239	            return False, "pgid membership unreadable"
   2240	    return True, "ok"
-  2241	
-  2242	
+  2241
+  2242
   2243	def _signal_verified_supervisor(
   2244	    fingerprint: Mapping[str, Any],
   2245	    *,
@@ -8348,7 +8348,7 @@ scripts/cobbler_runtime/full_run.py:5383:def _event_log_signature(repo_root: Pat
   2268	            "full_run_fingerprint_mismatch",
   2269	            "Refusing signal: supervisor fingerprint PID is invalid",
   2270	        )
-  2271	
+  2271
   2272	    ok, reason = verify_fingerprint(
   2273	        fingerprint,
   2274	        expected_session_id=expected_session_id,
@@ -8378,11 +8378,11 @@ exec
   5378	            else event
   5379	        )
   5380	    return rows, errors
-  5381	
-  5382	
+  5381
+  5382
   5383	def _event_log_signature(repo_root: Path, events_path: Path) -> dict[str, Any]:
   5384	    """Return a cheap identity for an append-only event log.
-  5385	
+  5385
   5386	    A matching signature lets an ordinary healthy poll reuse the already
   5387	    validated structural summary. Terminal, checkpoint-ack, and forced-full
   5388	    paths still re-read and validate the complete log.
@@ -8531,7 +8531,7 @@ scripts/cobbler_runtime/prewalk.py:1370:        qualified_execution_model=routes
     80	        "prewalk_post_edit_cold_fallback_forbidden",
     81	    }
     82	)
-    83	
+    83
     84	_TODO_ID_RE = re.compile(r"PW-(\d{2})\Z")
     85	_SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
     86	_BUILD_COMMIT_RE = re.compile(r"[0-9a-f]{7,40}\Z")
@@ -8553,19 +8553,19 @@ scripts/cobbler_runtime/prewalk.py:1370:        qualified_execution_model=routes
    102	    "docs/elves/execution-log-",
    103	    "docs/elves/reports/",
    104	)
-   105	
-   106	
+   105
+   106
    107	@dataclass(frozen=True)
    108	class PrewalkPaths:
    109	    root: str
    110	    todo: str
    111	    checkpoint: str
    112	    session_identity: str
-   113	
+   113
    114	    def to_dict(self) -> dict[str, str]:
    115	        return asdict(self)
-   116	
-   117	
+   116
+   117
    118	@dataclass(frozen=True)
    119	class PrewalkCapabilities:
    120	    host: str
@@ -8585,7 +8585,7 @@ scripts/cobbler_runtime/prewalk.py:1370:        qualified_execution_model=routes
    134	    qualified_guide_effort: str | None = None
    135	    qualified_execution_model: str | None = None
    136	    qualified_execution_effort: str | None = None
-   137	
+   137
    138	    def qualified(self) -> bool:
    139	        return bool(
    140	            self.advertised_exact_resume
@@ -8597,10 +8597,10 @@ scripts/cobbler_runtime/prewalk.py:1370:        qualified_execution_model=routes
    146	            and self.qualified_guide_effort is not None
    147	            and self.qualified_execution_effort is not None
    148	        )
-   149	
+   149
    150	    def experimental_eligible(self) -> bool:
    151	        """Return whether an explicit operator may test the advertised lane.
-   152	
+   152
    153	        Experimental mode accepts qualification uncertainty only. The real
    154	        worker supervisor still enforces exact session, worktree, stream,
    155	        packet-count, transition, and authority checks.
@@ -8609,7 +8609,7 @@ scripts/cobbler_runtime/prewalk.py:1370:        qualified_execution_model=routes
    158	            self.advertised_exact_resume
    159	            and self.advertised_route_override_on_resume
    160	        )
-   161	
+   161
    162	    def route_matches(
    163	        self,
    164	        *,
@@ -8649,8 +8649,8 @@ scripts/cobbler_runtime/prewalk.py:1370:        qualified_execution_model=routes
    977	        qualified_execution_model=execution_model,
    978	        qualified_execution_effort=execution_effort,
    979	    )
-   980	
-   981	
+   980
+   981
    982	def _qualification_phase_routes(
    983	    data: Mapping[str, Any],
    984	    *,
@@ -8688,8 +8688,8 @@ scripts/cobbler_runtime/prewalk.py:1370:        qualified_execution_model=routes
   1016	            )
   1017	        routes[role] = (model, str(effort))
   1018	    return routes
-  1019	
-  1020	
+  1019
+  1020
   1021	def load_prewalk_capability_evidence(
   1022	    path: Path,
   1023	    *,
@@ -8741,7 +8741,7 @@ exec
     35	- `checkpoint.json`: the exact run/session identity, `first_meaningful_edit` or `task_complete`,
     36	  TODO item, changed repository-relative paths, summary, and validation attempted.
     37	- `session.json`: the exact safe worker-session identity captured or assigned by the supervisor.
-    38	
+    38
     39	The guide prompt states both artifact shapes literally, with one filled example each (#260). A
     40	guide that has not read `prewalk.py` still has everything it needs, because a semantically correct
     41	artifact in another dialect fails the transition and terminalizes the run *after* the guide turn
@@ -8751,7 +8751,7 @@ exec
     45	string is not coerced into a `{command, exit_code}` record, because that would invent an exit code
     46	the guide never observed — and it never touches identity, schema version, `PW-##` ordering, or the
     47	literal `ready_for_execution_model: true` assertion.
-    48	
+    48
     49	Live qualification records the route it **observed**, not the route it requested (#258). The
     50	canary derives `route_change` from provider evidence: when a host names the model it actually
     51	resumed with, that name must match the requested execution model or qualification fails with
@@ -8762,14 +8762,14 @@ exec
     56	— the artifact records `route_change_evidence: unobserved` and an empty `observed_execution_route`
     57	instead of claiming behavioural proof. No host publishes the reasoning level it actually used, so
     58	observed effort is always null rather than copied from the request.
-    59	
+    59
     60	The model-free transition validator requires a clean registered start, unchanged branch/origin/
     61	protected refs, a real source/test/product-documentation edit tied to the checkpoint, no forbidden
     62	surface, and no `Close` commit. Runtime-only, plan-only, execution-log-only, empty, mismatched, or
     63	out-of-worktree changes fail closed. A tiny atomic task may finish after the guide only when every
     64	TODO item is complete and the checkpoint explicitly says `task_complete`; a zero guide exit alone
     65	never means completion.
-    66	
+    66
     67	The version-3 private native-worker state records requested and actual mode, both phase routes,
     68	capability and instruction-fidelity evidence, packet digest/count, status history, attempts,
     69	session/worktree continuity, transition proof, bounded diagnostics, and fallback. Version-2
@@ -8835,8 +8835,8 @@ exec
    500	    )
    501	    result.execution_spec(guide.session_id or "prewalk-session-preview")
    502	    return result
-   503	
-   504	
+   503
+   504
    505	def _qualification_cache_root(
    506	    *, cache_root: Path | None = None, env: dict[str, str] | None = None
    507	) -> Path:
@@ -8857,8 +8857,8 @@ exec
    522	            else Path(values.get("HOME", "~")).expanduser() / ".cache"
    523	        )
    524	    return root.resolve() / "elves" / "prewalk"
-   525	
-   526	
+   525
+   526
    527	def prewalk_qualification_cache_path(
    528	    capabilities: PrewalkCapabilities,
    529	    *,
@@ -8868,7 +8868,7 @@ exec
    533	    env: dict[str, str] | None = None,
    534	) -> Path:
    535	    """Return the private cache key for one installed build and execution route.
-   536	
+   536
    537	    The key carries the execution route only, matching what the canary proves
    538	    (``PrewalkCapabilities.route_matches``): one guide model orienting before a
    539	    proven execution route does not need its own canary, so switching guides or
@@ -8887,8 +8887,8 @@ exec
    552	    return _qualification_cache_root(cache_root=cache_root, env=env) / (
    553	        f"{capabilities.host}-{digest}.json"
    554	    )
-   555	
-   556	
+   555
+   556
    557	def _terminate_canary_process(child: subprocess.Popen[bytes]) -> None:
    558	    try:
    559	        os.killpg(child.pid, signal.SIGTERM)
@@ -8901,8 +8901,8 @@ exec
    566	            os.killpg(child.pid, signal.SIGKILL)
    567	        except ProcessLookupError:
    568	            pass
-   569	
-   570	
+   569
+   570
    750	                    deltas.append(delta)
    751	        elif event_type in {"message_end", "message_start", "turn_end"}:
    752	            append_message(event.get("message"))
@@ -8914,8 +8914,8 @@ exec
    758	    if deltas:
    759	        texts.append("".join(deltas))
    760	    return "\n".join(texts)
-   761	
-   762	
+   761
+   762
    763	def _write_qualification_artifact(path: Path, payload: dict[str, Any]) -> None:
    764	    try:
    765	        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -8927,8 +8927,8 @@ exec
    771	            "Unable to persist private prewalk qualification evidence",
    772	            path=str(path),
    773	        ) from exc
-   774	
-   775	
+   774
+   775
    776	def _load_cached_qualification(
    777	    *,
    778	    host: str,
@@ -8938,8 +8938,8 @@ exec
    782	        host,
    783	        behavioral_evidence=path,
    784	    )
-   785	
-   786	
+   785
+   786
    787	@contextmanager
    788	def _capture_qualification_failure(diagnostics: list[str]) -> Any:
    789	    """Convert unexpected canary failures into persisted attempt evidence."""
