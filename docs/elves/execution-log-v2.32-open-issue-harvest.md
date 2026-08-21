@@ -152,3 +152,24 @@ Proof: `tests.test_native_worker_prewalk` → 60 OK. Impact path across eight pr
 modules → 252 OK.
 
 B4 acceptance B4-A1..B4-A5 met.
+
+---
+
+## B5 — Observed-usage wiring (#243): not attempted (2026-08-20)
+
+Stopped at the feasibility check rather than landing a half wiring, as the plan's B5 caution
+anticipated. Two blockers, both design decisions rather than plumbing:
+
+1. No source to aggregate. `usage_ledger` has exactly one consumer today (`cobbler_agents.py`),
+   and the full-run `EVENT_TYPES` vocabulary has no usage event. A full run persists
+   `events.jsonl` and a redacted follow log; neither carries per-transport token counts. Wiring
+   reconcile and close first requires choosing a persistence point — a new event type inside the
+   fail-closed event schema, or a separate usage sidecar.
+2. Two of the three extractors do not exist. Only the Grok typed-stream parser
+   (`_GROK_STREAM_USAGE_KEYS`) reads usage. The claude stream-json and codex `turn.completed`
+   shapes named in the issue have no reader here, so their mapping would be invented.
+
+Recorded on the issue: https://github.com/aigorahub/elves/issues/243#issuecomment-5364155864
+#246 skip also recorded: https://github.com/aigorahub/elves/issues/246#issuecomment-5364155937
+
+Version bumped to 2.32.0 (`SKILL.md`, `CHANGELOG.md`).

@@ -86,18 +86,18 @@ Target release: **2.32.0**.
 
 ## Current position
 
-- **Phase:** executing
-- **Active batch:** B3
-- **Next action:** `_section_at` digest-interior skip in `learnings_ledger.py`
+- **Phase:** reconciling → reviewing
+- **Active batch:** none (B0–B4 complete, B5 skipped)
+- **Next action:** open the PR, get a Fugu review, run the independent terminal review
 - **Blockers:** none
-- **PR:** open after B3
+- **PR:** opening now
 
 ---
 
 ## Stop Gate
 
 - **Stop allowed right now:** no
-- **Reason:** B0–B2 complete; B3–B5 remain; no PR yet
+- **Reason:** B0–B4 complete, B5 skipped with a reason; terminal review and readiness remain
 - **continuation_guard.stop_allowed:** false
 
 ---
@@ -129,13 +129,13 @@ Target release: **2.32.0**.
 | B0 | Reconcile the issue ledger against merged PR #241 | complete |
 | B1 | Prewalk artifact contracts + lenient bounds (#260) | complete |
 | B2 | Terminal-flip events re-read (#242 residual) | complete |
-| B3 | Learnings-ledger digest-interior guard (#249 closer) | pending |
-| B4 | Observed effective route (#258) | pending |
-| B5 | Observed-usage wiring (#243) | pending |
+| B3 | Learnings-ledger digest-interior guard (#249 closer) | complete |
+| B4 | Observed effective route (#258) | complete |
+| B5 | Observed-usage wiring (#243) | skipped — see issue comment |
 
 ---
 
 ## Compaction recovery next action
 
-Read this file → session JSON → plan B3 acceptance → make `_section_at` skip digest-interior
-lines in `scripts/cobbler_runtime/learnings_ledger.py`.
+Read this file → session JSON → terminal readiness: full `verify_repo --ci`, Fugu review,
+independent terminal review, fix blockers, Elves Report, landable PR. Do not merge.

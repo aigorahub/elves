@@ -161,31 +161,31 @@
       "acceptance": [
         {
           "criterion": "the native-worker close path passes observed `usage=` to `append_calibration_record` when the transport reported usage.",
-          "evidence": "",
+          "evidence": "Not attempted. #243 needs a persistence-point decision (the full-run EVENT_TYPES vocabulary has no usage event and usage_ledger has one consumer, the CLI) plus two transport extractors that do not exist in the repo. Recorded on the issue: https://github.com/aigorahub/elves/issues/243#issuecomment-5364155864",
           "id": "B5-A1",
           "met": false
         },
         {
           "criterion": "full-run reconcile populates the `usage_observed` session block with no manual CLI step.",
-          "evidence": "",
+          "evidence": "Not attempted. #243 needs a persistence-point decision (the full-run EVENT_TYPES vocabulary has no usage event and usage_ledger has one consumer, the CLI) plus two transport extractors that do not exist in the repo. Recorded on the issue: https://github.com/aigorahub/elves/issues/243#issuecomment-5364155864",
           "id": "B5-A2",
           "met": false
         },
         {
           "criterion": "the Elves Report flow renders the usage panel when usage was observed and omits it cleanly when it was not.",
-          "evidence": "",
+          "evidence": "Not attempted. #243 needs a persistence-point decision (the full-run EVENT_TYPES vocabulary has no usage event and usage_ledger has one consumer, the CLI) plus two transport extractors that do not exist in the repo. Recorded on the issue: https://github.com/aigorahub/elves/issues/243#issuecomment-5364155864",
           "id": "B5-A3",
           "met": false
         },
         {
           "criterion": "the `unobserved` literal, cache-read exclusion, and advisory-only rules remain test-pinned and green.",
-          "evidence": "",
+          "evidence": "Not attempted. #243 needs a persistence-point decision (the full-run EVENT_TYPES vocabulary has no usage event and usage_ledger has one consumer, the CLI) plus two transport extractors that do not exist in the repo. Recorded on the issue: https://github.com/aigorahub/elves/issues/243#issuecomment-5364155864",
           "id": "B5-A4",
           "met": false
         }
       ],
       "id": "B5",
-      "status": "pending"
+      "status": "skipped"
     }
   ],
   "branch": "feat/v2.32-open-issue-harvest",
@@ -207,9 +207,9 @@
   "master_acceptance": [
     {
       "criterion": "Every one of the ten open issues has a recorded verdict \u2014 fixed here, closed as already fixed, or skipped with a concrete reason \u2014 and the run report names each.",
-      "evidence": "",
+      "evidence": "All ten issues have a recorded verdict. Fixed here: #260 (B1), #242 residual (B2), #249 closer (B3), #258 (B4). Closed as already fixed: #244, #245, #247, #248. Skipped with a reason posted on the issue: #243, #246, and #249 items 1 and 3.",
       "id": "M-A1",
-      "met": false
+      "met": true
     },
     {
       "criterion": "`python3 scripts/verify_repo.py --ci` is green at the final tip.",
