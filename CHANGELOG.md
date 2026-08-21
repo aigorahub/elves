@@ -4,6 +4,20 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+### Fixed
+- **Prewalk guide prompt states its artifact contracts** (`scripts/cobbler_runtime/prewalk.py`,
+  `references/prewalk.md`) — `guide_prompt()` told the guide to mirror its TODO "using the Elves
+  prewalk TODO schema" and never stated that schema, while the transition validator enforced exact
+  `PW-##` ordering, four exact field names, RFC3339 timestamps, `{command, exit_code}` validation
+  records, a literal `ready_for_execution_model: true`, and an unstated 500-character summary cap.
+  One live run hit three of those in sequence, each after a full paid guide turn; the third
+  terminalized a 44-minute successful execution phase over prose length alone. The prompt now
+  carries a filled example of both artifacts plus the rules, and those examples are test-pinned
+  against the validators they describe. Two bounds are normalized instead of fatal: an over-long
+  `summary` is truncated, and an absent or null `validation_attempted` becomes an empty list.
+  Identity, schema version, `PW-##` ordering, and the readiness assertion stay fail-closed, and a
+  prose validation string is still never coerced into a command record. (#260)
+
 ## [2.31.0] - 2026-08-16
 
 ### Added

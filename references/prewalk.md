@@ -36,6 +36,16 @@ The guide mirrors its native TODO mechanism into private JSON under
   TODO item, changed repository-relative paths, summary, and validation attempted.
 - `session.json`: the exact safe worker-session identity captured or assigned by the supervisor.
 
+The guide prompt states both artifact shapes literally, with one filled example each (#260). A
+guide that has not read `prewalk.py` still has everything it needs, because a semantically correct
+artifact in another dialect fails the transition and terminalizes the run *after* the guide turn
+has already been paid for. Two bounds are normalized rather than enforced: a `summary` longer than
+500 characters is truncated, and an absent or null `validation_attempted` becomes an empty list.
+Everything else stays fail-closed. Leniency never fabricates evidence — a prose `validation`
+string is not coerced into a `{command, exit_code}` record, because that would invent an exit code
+the guide never observed — and it never touches identity, schema version, `PW-##` ordering, or the
+literal `ready_for_execution_model: true` assertion.
+
 The model-free transition validator requires a clean registered start, unchanged branch/origin/
 protected refs, a real source/test/product-documentation edit tied to the checkpoint, no forbidden
 surface, and no `Close` commit. Runtime-only, plan-only, execution-log-only, empty, mismatched, or

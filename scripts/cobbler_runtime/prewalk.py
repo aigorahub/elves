@@ -38,6 +38,8 @@ PREWALK_DEFAULT_TODO_LIMIT = 10
 PREWALK_MIN_TODO_LIMIT = 5
 PREWALK_MAX_TODO_LIMIT = 12
 PREWALK_CONTINUATION_INPUT = "Continue."
+PREWALK_SUMMARY_MAX_CHARS = 500
+PREWALK_MAX_VALIDATION_ATTEMPTS = 20
 PREWALK_CAPABILITY_ARTIFACT_MAX_BYTES = 64 * 1024
 PREWALK_RUNTIME_ARTIFACT_MAX_BYTES = 256 * 1024
 PREWALK_PACKET_MAX_BYTES = 4 * 1024 * 1024
@@ -329,6 +331,22 @@ def _required_text(value: object, *, path: str, code: str, max_chars: int = 2_00
     return value.strip()
 
 
+def _normalized_summary(value: object, *, path: str, code: str) -> str:
+    """Require a real summary, but bound its length instead of terminalizing.
+
+    aigorahub/elves#260: a fully successful 44-minute execution phase was rejected
+    as ``prewalk_checkpoint_invalid`` because its summary ran past an unstated cap.
+    Prose length is presentation, not identity and not evidence, so normalize it.
+    An empty or non-string summary still fails: that is a missing field, not a long one.
+    """
+    if not isinstance(value, str) or not value.strip():
+        raise ValidationIssue(code, "Required prewalk text is missing or unbounded", path=path)
+    text = value.strip()
+    if len(text) <= PREWALK_SUMMARY_MAX_CHARS:
+        return text
+    return text[: PREWALK_SUMMARY_MAX_CHARS - 1].rstrip() + "…"
+
+
 def _rfc3339(value: object, *, path: str, code: str) -> str:
     text = _required_text(value, path=path, code=code, max_chars=64)
     try:
@@ -450,9 +468,14 @@ def validate_checkpoint_artifact(
     ]
     if len(set(normalized_paths)) != len(normalized_paths):
         raise ValidationIssue(code, "Checkpoint changed_paths must be unique", path="changed_paths")
-    _required_text(data.get("summary"), path="summary", code=code, max_chars=500)
+    summary = _normalized_summary(data.get("summary"), path="summary", code=code)
+    # aigorahub/elves#260: an absent or null list means "no validation was run" and is
+    # honest on its own. Coercing a prose `validation` string into a command record
+    # would invent an exit code the guide never observed, so malformed entries stay fatal.
     attempts = data.get("validation_attempted")
-    if not isinstance(attempts, list) or len(attempts) > 20:
+    if attempts is None:
+        attempts = []
+    if not isinstance(attempts, list) or len(attempts) > PREWALK_MAX_VALIDATION_ATTEMPTS:
         raise ValidationIssue(code, "validation_attempted must be a bounded list", path="validation_attempted")
     normalized_attempts: list[dict[str, Any]] = []
     for index, raw in enumerate(attempts):
@@ -476,6 +499,7 @@ def validate_checkpoint_artifact(
         raise ValidationIssue(code, "Task-complete checkpoint requires every TODO item complete", path="kind")
     result = dict(data)
     result["changed_paths"] = normalized_paths
+    result["summary"] = summary
     result["validation_attempted"] = normalized_attempts
     return result
 
@@ -691,14 +715,70 @@ after orientation and do not produce a read-only plan.
 
 Before editing, create at most {limit} concrete TODO items. Every item needs an observable
 acceptance condition and its own validation step. Use the host TODO mechanism when available and
-mirror the list to `{paths.todo}` using the Elves prewalk TODO schema. Read the exact session id
-from `{paths.session_identity}` before writing the TODO or checkpoint.
+mirror the list to `{paths.todo}`. Read the exact session id from `{paths.session_identity}`
+(JSON field `session_id`) before writing the TODO or checkpoint.
+
+Both artifacts below are validated exactly as written. A semantically correct artifact in any
+other dialect fails the transition and ends the run, so copy these shapes literally.
+
+`{paths.todo}`:
+
+{{
+  "schema_version": {PREWALK_SCHEMA_VERSION},
+  "run_id": "{run_id}",
+  "session_id": "<the session_id read from the identity file>",
+  "created_at": "2026-01-31T14:05:00Z",
+  "updated_at": "2026-01-31T14:05:00Z",
+  "items": [
+    {{
+      "id": "PW-01",
+      "description": "What this item changes",
+      "acceptance": "The observable condition that proves it",
+      "validation": "The exact command or check that demonstrates it",
+      "status": "in_progress"
+    }}
+  ]
+}}
+
+TODO rules: ids are `PW-01`, `PW-02`, … zero-padded to two digits, unique, and in that exact
+order with no gaps. Every item carries all four of `description`, `acceptance`, `validation`,
+and `status`. `status` is exactly one of `pending`, `in_progress`, `complete`. At most one item
+may be `in_progress`. `created_at` and `updated_at` are RFC3339 with an explicit timezone. Every
+item is required to be non-empty; there is no optional field.
+
+`{paths.checkpoint}`:
+
+{{
+  "schema_version": {PREWALK_SCHEMA_VERSION},
+  "run_id": "{run_id}",
+  "session_id": "<the same session_id>",
+  "kind": "first_meaningful_edit",
+  "todo_id": "PW-01",
+  "changed_paths": ["src/example.py"],
+  "summary": "One or two sentences on what changed and why.",
+  "validation_attempted": [
+    {{"command": "python3 -m unittest tests.test_example", "exit_code": 1}}
+  ],
+  "ready_for_execution_model": true,
+  "created_at": "2026-01-31T14:05:00Z"
+}}
+
+Checkpoint rules: `kind` is exactly `first_meaningful_edit` or `task_complete`. `todo_id` names an
+existing TODO item, and for `first_meaningful_edit` that item may not still be `pending`.
+`changed_paths` is a non-empty list of unique repository-relative paths you actually changed, and
+at least one must be a real task edit rather than runtime or staging memory. `validation_attempted`
+is a list of `{{"command": "<string>", "exit_code": <integer>}}` objects — a plain sentence is not
+accepted there; use an empty list if you ran nothing. `ready_for_execution_model` must be the
+literal `true`. `created_at` is RFC3339 with an explicit timezone. `summary` is bounded at
+{PREWALK_SUMMARY_MAX_CHARS} characters; a longer one is truncated rather than rejected, so keep
+the substance in the first sentence.
 
 Then make the first meaningful task edit. It may be a deliberately failing test when the TODO says
 so. Update that TODO item to in_progress or complete, write the first_meaningful_edit checkpoint to
 `{paths.checkpoint}`, and end this guide turn immediately. Do not create a Close commit and do not
 claim task completion unless every TODO item is truly complete. If the whole task is atomic, write
-a task_complete checkpoint instead.
+a task_complete checkpoint instead; a `task_complete` checkpoint requires every TODO item to be
+`complete`.
 
 On the later exact-session continuation, complete the remaining TODO items and their validations,
 update the same TODO artifact, replace the checkpoint with an explicit task_complete checkpoint,

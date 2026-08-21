@@ -41,37 +41,37 @@
       "acceptance": [
         {
           "criterion": "`guide_prompt()` output states the `PW-##` id rule, the four TODO item field names, the `created_at`/`updated_at` requirement, and the single-`in_progress` rule.",
-          "evidence": "",
+          "evidence": "guide_prompt() now embeds a filled todo.json example plus the PW-## ordering, four field names, RFC3339 created_at/updated_at, and single-in_progress rules; pinned by test_prompt_states_both_artifact_contracts.",
           "id": "B1-A1",
-          "met": false
+          "met": true
         },
         {
           "criterion": "`guide_prompt()` output states the checkpoint fields including `validation_attempted` as `{command, exit_code}` objects, literal `ready_for_execution_model: true`, `created_at`, and the summary length bound.",
-          "evidence": "",
+          "evidence": "Same prompt states the checkpoint shape: kind, todo_id, changed_paths, summary bound (500), validation_attempted as {command, exit_code}, literal ready_for_execution_model true, RFC3339 created_at. Both examples are parsed out of the prompt and run through the real validators in the same test.",
           "id": "B1-A2",
-          "met": false
+          "met": true
         },
         {
           "criterion": "a checkpoint with a >500-character `summary` validates, and the normalized result carries a summary within the bound.",
-          "evidence": "",
+          "evidence": "_normalized_summary truncates past PREWALK_SUMMARY_MAX_CHARS; test_checkpoint_truncates_long_summary_instead_of_terminalizing asserts <= cap and that an empty summary still raises.",
           "id": "B1-A3",
-          "met": false
+          "met": true
         },
         {
           "criterion": "a checkpoint with no `validation_attempted` key validates to an empty list; a checkpoint whose `validation_attempted` contains a non-object or a non-integer `exit_code` still raises `prewalk_checkpoint_invalid`.",
-          "evidence": "",
+          "evidence": "Absent/null validation_attempted normalizes to []; prose string, list-of-strings, non-integer exit_code, and empty command all still raise prewalk_checkpoint_invalid. test_checkpoint_absent_validation_attempted_normalizes_to_empty.",
           "id": "B1-A4",
-          "met": false
+          "met": true
         },
         {
           "criterion": "existing strictness is unchanged \u2014 wrong `schema_version`, mismatched run/session id, out-of-order `PW-##`, two `in_progress` items, and a missing `ready_for_execution_model` each still raise.",
-          "evidence": "",
+          "evidence": "test_checkpoint_identity_and_readiness_stay_strict pins schema_version, run_id, session_id, kind, todo_id, ready_for_execution_model, and naive created_at as fatal; pre-existing TODO strictness tests unchanged and green.",
           "id": "B1-A5",
-          "met": false
+          "met": true
         }
       ],
       "id": "B1",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "acceptance": [

@@ -55,3 +55,27 @@ comment naming the implementing location:
 Issue URLs: https://github.com/aigorahub/elves/issues/244, /245, /247, /248.
 
 B0 acceptance B0-A1..B0-A5 met.
+
+---
+
+## B1 — Prewalk artifact contracts and lenient prose bounds (#260, 2026-08-20)
+
+`guide_prompt()` now states both artifact shapes with a filled example each, plus the rules the
+validators actually enforce. The test parses the two JSON blocks straight out of the rendered
+prompt and runs them through `validate_todo_artifact` and `validate_checkpoint_artifact`, so the
+documented example cannot drift from the contract it documents.
+
+Two bounds normalized rather than enforced:
+- `summary` past 500 characters truncates (`_normalized_summary`) instead of raising.
+- Absent or null `validation_attempted` becomes `[]`.
+
+Held strict on purpose: identity fields, schema version, `PW-##` ordering, single `in_progress`,
+`ready_for_execution_model: true`, RFC3339 with timezone, and every malformed
+`validation_attempted` entry. A prose `validation` string is not coerced into a command record —
+that would invent an exit code the guide never observed.
+
+Proof: `python3 -m unittest tests.test_native_worker_prewalk` → 55 tests OK. Impact path
+(`test_native_worker_hardening`, `test_omp_main_driver`, `test_host_profiles`,
+`test_check_repo_consistency`, `test_installed_bundle_smoke`) → 159 tests OK.
+
+B1 acceptance B1-A1..B1-A5 met.

@@ -24,6 +24,7 @@ if str(SCRIPTS) not in sys.path:
 from cobbler_runtime.prewalk import (  # noqa: E402
     GROK_PREWALK_QUALIFICATION_ARTIFACT_TYPE,
     PREWALK_CONTINUATION_INPUT,
+    PREWALK_SUMMARY_MAX_CHARS,
     advertised_prewalk_capabilities,
     experimental_prewalk_capabilities,
     fixture_prewalk_capabilities,
@@ -179,6 +180,81 @@ class PrewalkArtifactTests(unittest.TestCase):
             )
         self.assertEqual(caught.exception.code, "prewalk_checkpoint_invalid")
 
+    def test_checkpoint_truncates_long_summary_instead_of_terminalizing(self) -> None:
+        # aigorahub/elves#260: a fully successful execution phase was terminalized
+        # over prose length alone. Length is presentation, not identity or evidence.
+        todo = validate_todo_artifact(_todo(), run_id="run-1", session_id="session-1")
+        long_summary = _checkpoint()
+        long_summary["summary"] = "x" * 4_000
+        normalized = validate_checkpoint_artifact(
+            long_summary, run_id="run-1", session_id="session-1", todo=todo
+        )
+        self.assertLessEqual(len(normalized["summary"]), PREWALK_SUMMARY_MAX_CHARS)
+        self.assertTrue(normalized["summary"].endswith("…"))
+        empty = _checkpoint()
+        empty["summary"] = "   "
+        with self.assertRaises(ValidationIssue) as caught:
+            validate_checkpoint_artifact(
+                empty, run_id="run-1", session_id="session-1", todo=todo
+            )
+        self.assertEqual(caught.exception.code, "prewalk_checkpoint_invalid")
+
+    def test_checkpoint_absent_validation_attempted_normalizes_to_empty(self) -> None:
+        # Absent means "no validation was run" and is honest on its own. A prose
+        # string is never coerced into a command record: that would invent an exit code.
+        todo = validate_todo_artifact(_todo(), run_id="run-1", session_id="session-1")
+        for override in ({}, {"validation_attempted": None}):
+            with self.subTest(override=override):
+                data = _checkpoint()
+                data.pop("validation_attempted")
+                data.update(override)
+                normalized = validate_checkpoint_artifact(
+                    data, run_id="run-1", session_id="session-1", todo=todo
+                )
+                self.assertEqual(normalized["validation_attempted"], [])
+        malformed_values: list[object] = [
+            "ran the tests",
+            ["ran the tests"],
+            [{"command": "x", "exit_code": "0"}],
+            [{"command": "", "exit_code": 0}],
+        ]
+        for malformed in malformed_values:
+            with self.subTest(malformed=malformed):
+                data = _checkpoint()
+                data["validation_attempted"] = malformed
+                with self.assertRaises(ValidationIssue) as caught:
+                    validate_checkpoint_artifact(
+                        data, run_id="run-1", session_id="session-1", todo=todo
+                    )
+                self.assertEqual(caught.exception.code, "prewalk_checkpoint_invalid")
+
+    def test_checkpoint_identity_and_readiness_stay_strict(self) -> None:
+        # The #260 leniency covers prose bounds only. Identity, schema, and the
+        # explicit readiness assertion must still fail closed.
+        todo = validate_todo_artifact(_todo(), run_id="run-1", session_id="session-1")
+        mutations: list[dict[str, object]] = []
+        for key, value in (
+            ("schema_version", 2),
+            ("run_id", "other-run"),
+            ("session_id", "other-session"),
+            ("kind", "some_other_kind"),
+            ("todo_id", "PW-09"),
+            ("ready_for_execution_model", "true"),
+            ("created_at", "2026-01-31T14:05:00"),
+        ):
+            data = _checkpoint()
+            data[key] = value
+            mutations.append(data)
+        missing_readiness = _checkpoint()
+        missing_readiness.pop("ready_for_execution_model")
+        mutations.append(missing_readiness)
+        for data in mutations:
+            with self.subTest(data=data), self.assertRaises(ValidationIssue) as caught:
+                validate_checkpoint_artifact(
+                    data, run_id="run-1", session_id="session-1", todo=todo
+                )
+            self.assertEqual(caught.exception.code, "prewalk_checkpoint_invalid")
+
     def test_artifact_loader_rejects_paths_outside_runtime_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -215,6 +291,59 @@ class PrewalkArtifactTests(unittest.TestCase):
         self.assertIn(paths.checkpoint, text)
         self.assertIn("sent exactly once", text)
         self.assertIn("only `Continue.`", text)
+
+    def test_prompt_states_both_artifact_contracts(self) -> None:
+        # aigorahub/elves#260: the prompt used to say "the Elves prewalk TODO schema"
+        # without stating it. A guide that has not read prewalk.py cannot comply, and
+        # each miss costs a full guide turn before the transition rejects it.
+        paths = prewalk_paths(REPO_ROOT, "prompt-run")
+        text = guide_prompt(run_id="prompt-run", paths=paths, todo_limit=10)
+        for todo_rule in (
+            '"id": "PW-01"',
+            '"description"',
+            '"acceptance"',
+            '"validation"',
+            '"status"',
+            "created_at",
+            "updated_at",
+            "At most one item",
+            "pending",
+            "in_progress",
+            "complete",
+        ):
+            with self.subTest(rule=todo_rule):
+                self.assertIn(todo_rule, text)
+        for checkpoint_rule in (
+            "first_meaningful_edit",
+            "task_complete",
+            "todo_id",
+            "changed_paths",
+            '"summary"',
+            "validation_attempted",
+            '"exit_code"',
+            "ready_for_execution_model",
+            str(PREWALK_SUMMARY_MAX_CHARS),
+            "RFC3339",
+        ):
+            with self.subTest(rule=checkpoint_rule):
+                self.assertIn(checkpoint_rule, text)
+        # The stated example must itself satisfy the validators it describes.
+        blocks = [
+            json.loads(block)
+            for block in re.findall(r"(?ms)^\{$.*?^\}$", text)
+        ]
+        self.assertEqual(len(blocks), 2, "expected exactly one TODO and one checkpoint example")
+        example_todo, example_checkpoint = blocks
+        example_todo["session_id"] = "session-1"
+        example_todo["run_id"] = "run-1"
+        todo = validate_todo_artifact(
+            example_todo, run_id="run-1", session_id="session-1"
+        )
+        example_checkpoint["session_id"] = "session-1"
+        example_checkpoint["run_id"] = "run-1"
+        validate_checkpoint_artifact(
+            example_checkpoint, run_id="run-1", session_id="session-1", todo=todo
+        )
 
 
 class MeaningfulEditTests(unittest.TestCase):
