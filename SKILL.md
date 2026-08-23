@@ -103,12 +103,15 @@ opt-in for the current PR.
 2. Read every review surface.
 3. **Fugu review of the current PR diff, routed through Elves.** Run the Elves provider shortcut —
    `/fugu review <scope>` in Claude Code, `$elves fugu review <scope>` in Codex, Grok Build, or Oh
-   My Pi — and state the one-line `Fugu route: …` first. **Never invent a raw Fugu call:** no direct
-   `codex-fugu` or `claude-fugu` invocation, no improvised API request, and no hand-built
-   `run_fugu.sh` command line that bypasses the shortcut. Scope the review to this PR's diff against
-   the default branch. **Skip this step only when Fugu is not installed** (`codex-fugu` is not on
-   `PATH`); record the skip and its reason, and continue. Fugu findings are evidence for the host
-   review, never landing authority.
+   My Pi — and state the one-line `Fugu route: …` first. The shortcut resolves `scripts/run_fugu.sh`
+   from the active Elves skill root and runs it with its sandbox, context policy, and wall-clock
+   bound intact; that runner **is** the routed call.
+   **Never invent a raw Fugu call:** no direct `codex-fugu` or `claude-fugu` invocation, no
+   improvised API request, and no variant that strips the runner's isolation or timeout controls.
+   Scope the review to this PR's diff against the default branch.
+   **Skip this step only when Fugu is not installed** (`codex-fugu` is not on `PATH`); record the
+   skip and its reason, and continue. Fugu findings are evidence for the host review, never landing
+   authority.
 4. Host review: independent review of `git diff <default-branch>...HEAD`.
 5. Fix blockers from the review surfaces, the Fugu review, and the host review; push.
 6. Update the docs the change touches, and **bump the version when the repository versions**

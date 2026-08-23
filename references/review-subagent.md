@@ -448,16 +448,17 @@ Ceremony order:
 2. Read every review surface.
 3. **Fugu review of the current PR diff, routed through Elves.** Use the Elves provider shortcut:
    `/fugu review <scope>` in Claude Code, or `$elves fugu review <scope>` in Codex, Grok Build, and
-   Oh My Pi. State the one-line `Fugu route: …` before launch.
+   Oh My Pi. State the one-line `Fugu route: …` before launch. The shortcut resolves
+   `scripts/run_fugu.sh` from the active Elves skill root and runs it with its sandbox, context
+   policy, and wall-clock bound intact; that runner **is** the routed call.
    **Hosts must not invent a raw Fugu call** — no direct `codex-fugu` or `claude-fugu` invocation,
-   no improvised API request, and no
-   hand-built `run_fugu.sh` command line around the shortcut. Scope it to this PR's diff against the
-   default branch. **Skip only when Fugu is not installed** (`codex-fugu` is not on `PATH`); record
-   the skip and its reason and continue. The Fugu report is read-only evidence for the host review;
-   it never grants landing authority and never merges.
-4. Host review of `git diff <default-branch>...HEAD`, in the Final Readiness Review shape, with extra
-   attention to the live PR feedback queue and to whether a regular merge commit is safe now. The
-   host reviewer adjudicates every Fugu finding: accept, fix, or reject with a reason.
+   no improvised API request, and no variant that strips the runner's isolation or timeout controls.
+   Scope it to this PR's diff against the default branch.
+   **Skip only when Fugu is not installed** (`codex-fugu` is not on `PATH`); record the skip and its
+   reason and continue. The Fugu report is read-only evidence for the host review; it never grants
+   landing authority and never merges.
+4. Host review of `git diff <default-branch>...HEAD`, in the Final Readiness Review shape described
+   above. The host reviewer adjudicates every Fugu finding: accept, fix, or reject with a reason.
 5. Fix blockers from all three sources (review surfaces, Fugu, host review); push.
 6. Update the docs the change touches, and **bump the version when the repository versions**. Elves
    itself versions, so an Elves PR bumps `SKILL.md` metadata, `AGENTS.md`, the `CHANGELOG.md` release

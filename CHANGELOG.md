@@ -20,7 +20,11 @@ All notable changes to the Elves skill are documented here.
   landing authority. The version bump stays conditional on the target repository having a version
   scheme; Elves itself versions, so an Elves landing bumps `SKILL.md`, `AGENTS.md`, `CHANGELOG.md`,
   and the pinned version narration. The new steps are pinned in the reviewed-PR landing consistency
-  corpus, and `references/e2e-chat-to-land.md` joins that corpus.
+  corpus, and `references/e2e-chat-to-land.md` joins that corpus. A ceremony-order guard
+  (`tests/test_check_repo_consistency.py`) asserts the sequence on all five restating blocks — the
+  four surfaces above, counting both kickoff blocks — with every anchor required to be unique in its
+  file and every offset taken from position zero, so the ordering assertions are the real guard
+  rather than an artifact of a chained search window.
 
 ## [2.32.0] - 2026-08-21
 
