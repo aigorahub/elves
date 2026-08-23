@@ -4,6 +4,28 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.33.0] - 2026-08-23
+
+### Added
+- **Reviewed PR landing runs a Fugu review before the host review** (`SKILL.md`,
+  `references/review-subagent.md`, `references/e2e-chat-to-land.md`,
+  `references/kickoff-prompt-template.md`, `scripts/consistency_policy.py`) — the `/land-pr` and
+  `\land-pr` ceremony now has an explicit ordered sequence: resolve the PR, read every review
+  surface, run a Fugu review of the current PR diff, host review, fix blockers, update docs and bump
+  the version, then the existing merge gates. The Fugu step is **routed through Elves**
+  (`/fugu review <scope>` in Claude Code, `$elves fugu review <scope>` in Codex, Grok Build, and Oh
+  My Pi); hosts must not invent a raw `codex-fugu` / `claude-fugu` call, an improvised API request,
+  or a hand-built `run_fugu.sh` command line. The step is skipped only when Fugu is not installed,
+  and the skip is recorded. Fugu output is read-only evidence for the host review and never carries
+  landing authority. The version bump stays conditional on the target repository having a version
+  scheme; Elves itself versions, so an Elves landing bumps `SKILL.md`, `AGENTS.md`, `CHANGELOG.md`,
+  and the pinned version narration. The new steps are pinned in the reviewed-PR landing consistency
+  corpus, and `references/e2e-chat-to-land.md` joins that corpus. A ceremony-order guard
+  (`tests/test_check_repo_consistency.py`) asserts the sequence on all five restating blocks — the
+  four surfaces above, counting both kickoff blocks — with every anchor required to be unique in its
+  file and every offset taken from position zero, so the ordering assertions are the real guard
+  rather than an artifact of a chained search window.
+
 ## [2.32.0] - 2026-08-21
 
 ### Fixed

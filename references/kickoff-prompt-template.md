@@ -260,10 +260,14 @@ set a merge-on-green preference or asked for the reviewed-PR landing command; in
 perform a regular merge commit (never a squash).
 
 If the user asks for the reviewed-PR landing command, or types `\land-pr` or `/land-pr`, treat that
-as a one-off merge opt-in for the current PR: get a fresh subagent review of
-`git diff <default-branch>...HEAD`, read every PR comment and check, fix blockers, run sensible
-tests, wait for asynchronous review/CI updates, re-read the feedback queue, and then use
-`gh pr merge --merge` only when everything is green. Never squash.
+as a one-off merge opt-in for the current PR, and run the ceremony in order: resolve the PR and read
+every review surface; run a **Fugu review of the current PR diff routed through Elves**
+(`/fugu review <scope>` in Claude Code, `$elves fugu review <scope>` in Codex, Grok Build, and Oh My
+Pi — **never invent a raw Fugu call**, and skip only when Fugu is not installed); get a fresh
+subagent host review of `git diff <default-branch>...HEAD`; fix blockers; update the docs the change
+touches and bump the version when the repository versions (Elves itself versions, an unversioned
+repository skips the bump); run sensible tests; wait for asynchronous review/CI updates; re-read the
+feedback queue; and then use `gh pr merge --merge` only when everything is green. Never squash.
 
 **Check in with `ra:`**
 You don't have to disappear completely. If you want to give context or change priorities during
@@ -366,10 +370,12 @@ Elves E2E: chat-to-land (merge when green).
 4. Labor completeness: verify each bounded return, or verify the whole trusted full-run once at
    wake/exit; re-drive gaps (budget 3) or host-complete / hard-stop. Never accept partial labor.
 5. Final Readiness Gate on the tip. Elves Report for substantial runs.
-6. **Reviewed PR landing (explicit merge opt-in):** fresh cumulative review of
-   `git diff <default-branch>...HEAD`, every PR comment/check, fix blockers, re-poll async review/CI,
-   then `gh pr merge --merge` only when not draft, checks green, no blocking review, clean worktree.
-   Never squash or rebase.
+6. **Reviewed PR landing (explicit merge opt-in):** read every PR comment/check; run an
+   Elves-routed Fugu review of the PR diff (`/fugu review <scope>` or `$elves fugu review <scope>` —
+   never a raw Fugu call; skip only when Fugu is not installed); fresh cumulative host review of
+   `git diff <default-branch>...HEAD`; fix blockers; update docs and bump the version when the
+   repository versions; re-poll async review/CI; then `gh pr merge --merge` only when not draft,
+   checks green, no blocking review, clean worktree. Never squash or rebase.
 
 **Continuation:** Prefer `/goal` (Codex) or host long-run continuation once staging is ready.
 Authority remains Stop Gate until Readiness; then landing rules above.

@@ -160,6 +160,112 @@ class ConsistencyPhraseTests(unittest.TestCase):
         agents = self.consistency.AGENTS_POINTER_PHRASES["AGENTS.md"]
         self.assertTrue(any("land-pr" in p for p in agents))
 
+    def test_reviewed_pr_landing_pins_elves_routed_fugu_review_step(self) -> None:
+        # The landing ceremony runs a Fugu review before the host review, and every
+        # restating surface must route it through Elves rather than a raw Fugu call.
+        for label in (
+            "SKILL.md",
+            "references/review-subagent.md",
+            "references/e2e-chat-to-land.md",
+            "references/kickoff-prompt-template.md",
+        ):
+            with self.subTest(label=label):
+                phrases = self.consistency.REVIEWED_PR_LANDING_PHRASES[label]
+                self.assertTrue(
+                    any("Fugu review of the current PR diff" in p for p in phrases),
+                    "landing ceremony must pin the Fugu review step",
+                )
+                self.assertIn("$elves fugu review", phrases)
+                self.assertTrue(
+                    any("invent a raw Fugu call" in p for p in phrases),
+                    "landing ceremony must forbid a raw Fugu call",
+                )
+
+    def test_reviewed_pr_landing_pins_conditional_version_bump(self) -> None:
+        # Docs and version updates land before the merge gates. The bump stays
+        # conditional: only repositories that already version get one.
+        for label in (
+            "SKILL.md",
+            "references/review-subagent.md",
+            "references/e2e-chat-to-land.md",
+            "references/kickoff-prompt-template.md",
+        ):
+            with self.subTest(label=label):
+                self.assertIn(
+                    "bump the version when the repository versions",
+                    self.consistency.REVIEWED_PR_LANDING_PHRASES[label],
+                )
+
+    # Every restating surface that spells the ceremony out in order, with anchors
+    # that are unique inside their file. Order: Fugu review -> host review ->
+    # fix blockers -> docs/version bump -> merge gates.
+    REVIEWED_PR_LANDING_ORDER_ANCHORS = {
+        "SKILL.md": (
+            "Fugu review of the current PR diff, routed through Elves",
+            "Host review",
+            "Fix blockers",
+            "bump the version when the repository versions",
+            "gh pr merge --merge",
+        ),
+        "references/review-subagent.md": (
+            "Fugu review of the current PR diff, routed through Elves",
+            "Host review",
+            "Fix blockers from all three sources",
+            "bump the version when the repository versions",
+            "gh pr merge --merge",
+        ),
+        "references/e2e-chat-to-land.md": (
+            "Fugu review of the current PR diff, routed through Elves",
+            "Host review",
+            "Fix blockers; push.",
+            "bump the version when the repository versions",
+            "gh pr merge --merge",
+        ),
+        # The kickoff template carries two ceremony blocks: the `\land-pr` prose
+        # paragraph and the chat-to-land step 6. Both are checked.
+        "references/kickoff-prompt-template.md (land-pr prose)": (
+            "Fugu review of the current PR diff routed through Elves",
+            "subagent host review of",
+            "fix blockers; update the docs",
+            "bump the version when the repository versions",
+            "feedback queue; and then use `gh pr merge --merge`",
+        ),
+        "references/kickoff-prompt-template.md (chat-to-land step 6)": (
+            "Elves-routed Fugu review of the PR diff",
+            "fresh cumulative host review of",
+            "fix blockers; update docs and bump the version",
+            "repository versions; re-poll async review/CI",
+            "re-poll async review/CI; then `gh pr merge --merge`",
+        ),
+    }
+
+    def test_reviewed_pr_landing_ceremony_order_holds_on_every_restating_surface(self) -> None:
+        for label, anchors in self.REVIEWED_PR_LANDING_ORDER_ANCHORS.items():
+            path = label.split(" (")[0]
+            with self.subTest(label=label):
+                text = (REPO_ROOT / path).read_text(encoding="utf-8")
+                # Each anchor must be unique in the file, otherwise a search could
+                # silently land on unrelated prose and the order check would mean
+                # nothing. Offsets are taken from 0 so the ordering assertions
+                # below are the real guard rather than an artifact of a chained
+                # search window.
+                offsets = []
+                for anchor in anchors:
+                    self.assertEqual(
+                        text.count(anchor),
+                        1,
+                        f"{path}: ceremony anchor is not unique: {anchor!r}",
+                    )
+                    offsets.append(text.index(anchor))
+                for earlier, later, before, after in zip(
+                    offsets, offsets[1:], anchors, anchors[1:]
+                ):
+                    self.assertLess(
+                        earlier,
+                        later,
+                        f"{path}: {before!r} must precede {after!r}",
+                    )
+
     def test_single_kickoff_corpus_covers_primary_user_and_agent_surfaces(self) -> None:
         # README links to the contracts instead of restating them (plan B5);
         # version narration lives only in CHANGELOG.md.

@@ -79,8 +79,35 @@ Execution route
 Readiness Gate (landable PR)
     │
     ├─ chat-to-work: STOP here (PR open, green, reviewed; user merges)
-    └─ chat-to-land: reviewed-PR landing (tests, PR comments, cumulative review, merge commit)
+    └─ chat-to-land: reviewed-PR landing
+         resolve PR → read review surfaces → Elves-routed Fugu review → host review
+         → fix blockers → docs + conditional version bump → wait for checks → merge commit
+         → worktree teardown
 ```
+
+## Reviewed-PR landing ceremony (chat-to-land tail)
+
+The landing ceremony is the same ordered sequence for chat-to-land and for an explicit
+`\land-pr` / `/land-pr`. Canonical text: `SKILL.md` **Reviewed PR Landing Command** and
+[`review-subagent.md`](review-subagent.md).
+
+1. Resolve branch, PR, base, draft state, checks.
+2. Read every review surface.
+3. **Fugu review of the current PR diff, routed through Elves** — `/fugu review <scope>` in Claude
+   Code, `$elves fugu review <scope>` in Codex, Grok Build, and Oh My Pi. The shortcut resolves
+   `scripts/run_fugu.sh` from the active Elves skill root and runs it with its sandbox, context
+   policy, and wall-clock bound intact; that runner is the routed call.
+   **Hosts must not invent a raw Fugu call**: no direct `codex-fugu` or `claude-fugu` invocation,
+   no improvised API request, and no variant that strips the runner's isolation or timeout controls.
+   **Skip only when Fugu is not installed**; record the skip.
+   Fugu output is evidence, never landing authority.
+4. Host review of `git diff <default-branch>...HEAD`, adjudicating every Fugu finding.
+5. Fix blockers; push.
+6. Update the docs the change touches, and bump the version when the repository versions. Elves
+   itself versions. A repository with no version scheme skips the bump.
+7. Wait for asynchronous reviewers and checks; re-read comments before deciding green.
+8. `gh pr merge --merge` once every gate is clean; never squash or rebase.
+9. Post-merge worktree teardown for the run's own recorded worktree.
 
 ## Run Control fields
 
