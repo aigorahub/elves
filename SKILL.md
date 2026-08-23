@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Grok Build, Oh My Pi (omp), Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.32.0"
+  version: "2.33.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -84,7 +84,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.32.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.33.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
@@ -101,12 +101,24 @@ opt-in for the current PR.
 
 1. Resolve branch, PR, base, draft state, checks.
 2. Read every review surface.
-3. Independent review of `git diff <default-branch>...HEAD`.
-4. Fix blockers, push, wait for async reviewers/checks.
-5. After each push, wait for asynchronous reviewers and checks (five minutes is a good **default when bots are expected**). Re-read comments before deciding green.
-6. Merge only when not draft, worktree clean, required checks green, no requested changes, and final
+3. **Fugu review of the current PR diff, routed through Elves.** Run the Elves provider shortcut —
+   `/fugu review <scope>` in Claude Code, `$elves fugu review <scope>` in Codex, Grok Build, or Oh
+   My Pi — and state the one-line `Fugu route: …` first. **Never invent a raw Fugu call:** no direct
+   `codex-fugu` or `claude-fugu` invocation, no improvised API request, and no hand-built
+   `run_fugu.sh` command line that bypasses the shortcut. Scope the review to this PR's diff against
+   the default branch. **Skip this step only when Fugu is not installed** (`codex-fugu` is not on
+   `PATH`); record the skip and its reason, and continue. Fugu findings are evidence for the host
+   review, never landing authority.
+4. Host review: independent review of `git diff <default-branch>...HEAD`.
+5. Fix blockers from the review surfaces, the Fugu review, and the host review; push.
+6. Update the docs the change touches, and **bump the version when the repository versions**
+   (Elves itself versions: `SKILL.md` metadata, `AGENTS.md`, the `CHANGELOG.md` release heading, and
+   the pinned version narration). Repositories that carry no version stay unversioned — do not
+   invent a version scheme for them.
+7. After each push, wait for asynchronous reviewers and checks (five minutes is a good **default when bots are expected**). Re-read comments before deciding green.
+8. Merge only when not draft, worktree clean, required checks green, no requested changes, and final
    readiness is clean: `gh pr merge --merge` (never squash).
-7. Post-merge teardown: reclaim the run's own recorded worktree (`worktree_path` in
+9. Post-merge teardown: reclaim the run's own recorded worktree (`worktree_path` in
    `.elves-session.json`) with `./scripts/preflight.sh --gc-worktrees --path <worktree_path>` —
    report first, add `--apply` to remove. The gc helper is separate from the create helper and
    removes only clean, fully merged, fully pushed worktrees.

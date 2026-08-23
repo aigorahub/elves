@@ -442,6 +442,31 @@ the live PR feedback queue and whether a regular merge commit is safe now.
 
 The shorthand aliases `\land-pr` and `/land-pr` are explicit reviewed-PR landing commands too.
 
+Ceremony order:
+
+1. Resolve branch, PR, base, draft state, checks.
+2. Read every review surface.
+3. **Fugu review of the current PR diff, routed through Elves.** Use the Elves provider shortcut:
+   `/fugu review <scope>` in Claude Code, or `$elves fugu review <scope>` in Codex, Grok Build, and
+   Oh My Pi. State the one-line `Fugu route: …` before launch.
+   **Hosts must not invent a raw Fugu call** — no direct `codex-fugu` or `claude-fugu` invocation,
+   no improvised API request, and no
+   hand-built `run_fugu.sh` command line around the shortcut. Scope it to this PR's diff against the
+   default branch. **Skip only when Fugu is not installed** (`codex-fugu` is not on `PATH`); record
+   the skip and its reason and continue. The Fugu report is read-only evidence for the host review;
+   it never grants landing authority and never merges.
+4. Host review of `git diff <default-branch>...HEAD`, in the Final Readiness Review shape, with extra
+   attention to the live PR feedback queue and to whether a regular merge commit is safe now. The
+   host reviewer adjudicates every Fugu finding: accept, fix, or reject with a reason.
+5. Fix blockers from all three sources (review surfaces, Fugu, host review); push.
+6. Update the docs the change touches, and **bump the version when the repository versions**. Elves
+   itself versions, so an Elves PR bumps `SKILL.md` metadata, `AGENTS.md`, the `CHANGELOG.md` release
+   heading, and the pinned version narration. A repository with no version scheme skips the bump; do
+   not invent one.
+7. Wait for asynchronous reviewers and checks after each push, then re-read comments before deciding
+   green.
+8. Merge, then tear down the run's own recorded worktree.
+
 The coordinator may merge only after the review is clean, the PR is not draft, required checks are
 green, no unresolved requested changes remain, and comments/checks have been polled after the final
 push. Use `gh pr merge --merge`; never squash or rebase for this command.

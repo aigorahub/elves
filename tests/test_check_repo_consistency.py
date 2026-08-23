@@ -160,6 +160,57 @@ class ConsistencyPhraseTests(unittest.TestCase):
         agents = self.consistency.AGENTS_POINTER_PHRASES["AGENTS.md"]
         self.assertTrue(any("land-pr" in p for p in agents))
 
+    def test_reviewed_pr_landing_pins_elves_routed_fugu_review_step(self) -> None:
+        # The landing ceremony runs a Fugu review before the host review, and every
+        # restating surface must route it through Elves rather than a raw Fugu call.
+        for label in (
+            "SKILL.md",
+            "references/review-subagent.md",
+            "references/e2e-chat-to-land.md",
+            "references/kickoff-prompt-template.md",
+        ):
+            with self.subTest(label=label):
+                phrases = self.consistency.REVIEWED_PR_LANDING_PHRASES[label]
+                self.assertTrue(
+                    any("Fugu review of the current PR diff" in p for p in phrases),
+                    "landing ceremony must pin the Fugu review step",
+                )
+                self.assertIn("$elves fugu review", phrases)
+                self.assertTrue(
+                    any("invent a raw Fugu call" in p for p in phrases),
+                    "landing ceremony must forbid a raw Fugu call",
+                )
+
+    def test_reviewed_pr_landing_pins_conditional_version_bump(self) -> None:
+        # Docs and version updates land before the merge gates. The bump stays
+        # conditional: only repositories that already version get one.
+        for label in (
+            "SKILL.md",
+            "references/review-subagent.md",
+            "references/e2e-chat-to-land.md",
+            "references/kickoff-prompt-template.md",
+        ):
+            with self.subTest(label=label):
+                self.assertIn(
+                    "bump the version when the repository versions",
+                    self.consistency.REVIEWED_PR_LANDING_PHRASES[label],
+                )
+
+    def test_reviewed_pr_landing_ceremony_order_holds_on_canonical_surfaces(self) -> None:
+        # Fugu review -> host review -> fix blockers -> docs/version -> merge gates.
+        for label in ("SKILL.md", "references/review-subagent.md"):
+            with self.subTest(label=label):
+                text = (REPO_ROOT / label).read_text(encoding="utf-8")
+                fugu = text.index("Fugu review of the current PR diff, routed through Elves")
+                host = text.index("Host review", fugu)
+                blockers = text.index("Fix blockers", host)
+                version = text.index("bump the version when the repository versions", blockers)
+                merge = text.index("gh pr merge --merge", version)
+                self.assertLess(fugu, host)
+                self.assertLess(host, blockers)
+                self.assertLess(blockers, version)
+                self.assertLess(version, merge)
+
     def test_single_kickoff_corpus_covers_primary_user_and_agent_surfaces(self) -> None:
         # README links to the contracts instead of restating them (plan B5);
         # version narration lives only in CHANGELOG.md.
