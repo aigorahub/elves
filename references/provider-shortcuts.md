@@ -58,7 +58,10 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
   the Sakana grant, and a Codex shell policy that does not forward that grant to model-run commands.
   Because macOS forbids nested `sandbox-exec`, Codex's documented externally-sandboxed mode is used
   only after the outer boundary is active. Linux omits procfs so model-directed commands cannot
-  inspect the credential-bearing parent. Regular and deep calls use ephemeral one-shot sessions.
+  inspect the credential-bearing parent. The Linux lane supplies only a synthetic
+  `/proc/self/exe` symlink to the qualified, narrowly mounted real Codex binary so Codex can resolve
+  its own executable and configuration; no process directories or environments are mounted.
+  Regular and deep calls use ephemeral one-shot sessions.
   Ultra uses a resumable session confined to the lane: it captures the exact `thread.started` id
   and reserves part of the hard wall limit for a no-more-tools synthesis turn on that exact id when
   exploration does not finish first. It never uses ambiguous `--last` state; raw events, the

@@ -2251,17 +2251,32 @@ def wrap_argv_with_sandbox(
     lane: IsolatedLane,
     *,
     mount_proc: bool = True,
+    proc_self_exe: Path | None = None,
 ) -> list[str]:
     """Prefix argv with sandbox backend when configured.
 
     Credential-bearing processes may set ``mount_proc=False`` so their
     model-directed descendants cannot inspect the parent environment through a
-    fresh procfs. The default remains enabled for existing supervised routes
-    that require process discovery inside the namespace.
+    fresh procfs. A qualified ``proc_self_exe`` (or Fugu's existing trusted
+    ``CODEX_FUGU_REAL_CODEX`` lane value) creates only a synthetic
+    ``/proc/self/exe`` link for runtimes that require ``current_exe()``. The
+    default remains enabled for existing supervised routes that require process
+    discovery inside the namespace.
     """
     cmd = list(argv)
     if not cmd:
         raise ValidationIssue("empty_command", "empty command")
+    requested_proc_self_exe = proc_self_exe
+    if requested_proc_self_exe is None:
+        existing_fugu_target = lane.env.get("CODEX_FUGU_REAL_CODEX")
+        if existing_fugu_target:
+            requested_proc_self_exe = Path(existing_fugu_target)
+    if requested_proc_self_exe is not None and mount_proc:
+        raise ValidationIssue(
+            "isolation_proc_self_exe_conflicts_with_proc",
+            "A synthetic /proc/self/exe cannot be combined with a procfs mount",
+            path=str(requested_proc_self_exe),
+        )
     literal_executable = _literal_command_executable(cmd[0], lane)
     qualified_executable = _resolve_command_executable(cmd[0], lane)
     cmd[0] = str(qualified_executable)
@@ -2330,6 +2345,25 @@ def wrap_argv_with_sandbox(
             for root in _bwrap_user_executable_roots(child, lane):
                 if root not in executable_roots:
                     executable_roots.append(root)
+        qualified_proc_self_exe: Path | None = None
+        if requested_proc_self_exe is not None:
+            qualified_proc_self_exe = _resolve_command_executable(
+                str(requested_proc_self_exe), lane
+            )
+            for root in _bwrap_user_executable_roots(qualified_proc_self_exe, lane):
+                if root not in executable_roots:
+                    executable_roots.append(root)
+        proc_args = ["--proc", "/proc"] if mount_proc else []
+        if qualified_proc_self_exe is not None:
+            proc_args = [
+                "--dir",
+                "/proc",
+                "--dir",
+                "/proc/self",
+                "--symlink",
+                str(qualified_proc_self_exe),
+                "/proc/self/exe",
+            ]
         return [
             lane.sandbox_executable,
             "--die-with-parent",
@@ -2371,7 +2405,7 @@ def wrap_argv_with_sandbox(
             ),
             "--dev",
             "/dev",
-            *(["--proc", "/proc"] if mount_proc else []),
+            *proc_args,
             "--chdir",
             str(lane.snapshot),
             *cmd,

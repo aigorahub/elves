@@ -79,8 +79,9 @@ assume `./scripts` belongs to the target repository and do not execute mappings 
   prove recursive containment. Qualified writes return a mode-aware audited inert handoff that is
   never applied automatically. Live writable-state bounds tolerate benign temporary-tree
   disappearance races while failing closed on other audit errors. Read-only macOS cleanup is
-  best-effort and non-authoritative. No Linux procfs is mounted; Codex external-sandbox mode runs
-  inside the mandatory outer boundary. Profiles remain `fugu/high`, `fugu/xhigh` for `--deep`, and
+  best-effort and non-authoritative. No Linux procfs is mounted; only a synthetic `/proc/self/exe`
+  link to the qualified real Codex binary is exposed. Codex external-sandbox mode runs inside the
+  mandatory outer boundary. Profiles remain `fugu/high`, `fugu/xhigh` for `--deep`, and
   `fugu-ultra-v1.1/high` for `--ultra`, and `fugu-ultra-v1.1/max` for `--max` (60-minute default
   wall budget, one narrow high-stakes gate); Ultra uses exact-session staged synthesis and bounded incremental
   event parsing through a host-owned pipe, pins final output to a no-follow descriptor, and runs a

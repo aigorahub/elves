@@ -287,7 +287,8 @@ required capability, then execute it without an extra confirmation prompt:
   kernel-isolated snapshot and exports a bounded, mode-aware audited inert handoff for host
   inspection; it never edits the checkout or applies the handoff.
   The required outer filesystem sandbox remains the read/write authority, and the Linux boundary
-  omits procfs so model-directed commands cannot inspect the credential-bearing parent environment.
+  omits procfs so model-directed commands cannot inspect the credential-bearing parent environment;
+  it exposes only a synthetic `/proc/self/exe` link to the qualified real Codex binary.
   Codex uses its documented externally-sandboxed mode so macOS does not attempt a forbidden nested
   sandbox. Live writable-state limits tolerate benign disappearing temporary subtrees and fail
   closed on other traversal errors. macOS read-only cleanup is best-effort and non-authoritative;
