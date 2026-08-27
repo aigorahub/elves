@@ -48,14 +48,14 @@ available to model-directed commands.
 
 **Acceptance criteria:**
 
-- [ ] B1-A1: A no-proc bwrap lane exposes `/proc/self/exe` as a symlink resolving to the exact
+- [x] B1-A1: A no-proc bwrap lane exposes `/proc/self/exe` as a symlink resolving to the exact
   qualified Codex executable, and construction fails closed for an invalid target or a request
   that also mounts procfs.
-- [ ] B1-A2: The resulting bwrap argv contains no `--proc /proc`, and live sandbox proof shows
+- [x] B1-A2: The resulting bwrap argv contains no `--proc /proc`, and live sandbox proof shows
   `/proc/<pid>/environ` is unavailable, including for the credential-bearing parent namespace.
-- [ ] B1-A3: Focused Fugu/isolation tests and the repository's relevant regression gate pass without
+- [x] B1-A3: Focused Fugu/isolation tests and the repository's relevant regression gate pass without
   weakening existing coverage.
-- [ ] B1-A4: `$elves fugu --preflight review` succeeds and a tiny official `$elves fugu review`
+- [x] B1-A4: `$elves fugu --preflight review` succeeds and a tiny official `$elves fugu review`
   reaches Codex/model execution inside the sandbox rather than exiting on self-executable or config
   discovery.
 
@@ -81,11 +81,11 @@ requested official shortcut smokes.
 
 ## Master Acceptance
 
-- [ ] M-A1: Official Codex starts in the Fugu Linux lane with its executable/config discoverable
+- [x] M-A1: Official Codex starts in the Fugu Linux lane with its executable/config discoverable
   and without a procfs mount.
-- [ ] M-A2: Automated and live evidence demonstrate that parent process environments and
+- [x] M-A2: Automated and live evidence demonstrate that parent process environments and
   `SAKANA_API_KEY` are not exposed through `/proc`.
-- [ ] M-A3: The feature branch contains only the planned fix, tests, and directly affected docs and
+- [x] M-A3: The feature branch contains only the planned fix, tests, and directly affected docs and
   remains unmerged for operator review.
 
 ## Non-Negotiables
