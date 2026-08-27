@@ -56,7 +56,7 @@
     },
     {
       "criterion": "The feature branch contains only the planned fix, tests, and directly affected docs and remains unmerged for operator review.",
-      "evidence": "git diff origin/main...HEAD contains only the plan, isolation fix, tests, and directly affected Fugu docs; branch remains unmerged.",
+      "evidence": "git diff origin/main...HEAD contains only the plan, isolation fix, tests, and directly affected Fugu docs and release note; branch remains unmerged.",
       "id": "M-A3",
       "met": true
     }

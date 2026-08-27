@@ -718,8 +718,10 @@ python3 ~/.grok/skills/elves/scripts/install_doctor.py --startup</code></pre>
             handoff automatically. Live writable-state limits tolerate benign disappearing
             temporary subtrees and fail closed on other audit errors. macOS read-only cleanup is
             best-effort and never proof of recursive containment. The
-            Linux boundary omits procfs, and Codex's externally-sandboxed mode runs only inside
-            Elves' mandatory outer boundary. Fugu uses regular
+            Linux boundary omits procfs; it provides only a synthetic
+            <code>/proc/self/exe</code> link to the qualified, narrowly mounted Codex executable,
+            so Codex can discover itself without exposing parent process environments. Codex's
+            externally-sandboxed mode runs only inside Elves' mandatory outer boundary. Fugu uses regular
             <code>fugu/high</code> when the host chooses plain,
             <code>fugu/xhigh</code> with
             <code>--deep</code>, <code>fugu-ultra-v1.1/high</code> with
