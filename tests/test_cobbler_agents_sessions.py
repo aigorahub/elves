@@ -1028,7 +1028,7 @@ class SessionCommandBuilderTests(unittest.TestCase):
                     adapter=adapter,
                     profile=adapter,
                     executable="tool" if adapter == "custom-cli" else None,
-                    requested_model="example-model",
+                    requested_model=("fugu" if adapter == "codex-fugu" else "example-model"),
                 )
                 joined = " ".join(inv.argv)
                 for token in forbidden_substrings:
@@ -1046,7 +1046,7 @@ class SessionCommandBuilderTests(unittest.TestCase):
                     profile=adapter,
                     session_id=session_id,
                     executable="tool" if adapter == "custom-cli" else None,
-                    requested_model="example-model",
+                    requested_model=("fugu" if adapter == "codex-fugu" else "example-model"),
                     cwd="/verified/worktree",
                 )
                 joined = " ".join(inv.argv)
@@ -1082,10 +1082,10 @@ class SessionCommandBuilderTests(unittest.TestCase):
                 adapter=adapter,
                 profile=adapter,
                 session_id="preserve-me-uuid",
-                requested_model="model-x",
+                requested_model=("fugu" if adapter == "codex-fugu" else "model-x"),
             )
             self.assertIn("preserve-me-uuid", inv.argv)
-            self.assertIn("model-x", inv.argv)
+            self.assertIn("fugu" if adapter == "codex-fugu" else "model-x", inv.argv)
 
     def test_provider_allocated_create_ids_are_not_fabricated(self) -> None:
         for adapter in ("opencode-cli", "antigravity-cli"):

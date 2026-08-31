@@ -4,6 +4,24 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.34.0] - 2026-08-31
+
+### Added
+
+* **Fugu Cyber has an access-gated security review route.** `run_fugu.sh --cyber review <scope>`
+  selects `fugu-cyber/xhigh` in read-only mode. The runner checks the exact installed catalog
+  entry and API support before launch. Catalog visibility does not count as live account access.
+
+### Changed
+
+* **Fugu is limited to planning and read-only review.** The runner rejects `--write`. Cobbler
+  setup and runtime routing reject Fugu implementation routes. The built-in adapter now resolves
+  the `codex-fugu` executable instead of standard Codex.
+* **Plain regular Fugu is the default.** Elves can select Cyber only for explicit security intent
+  after live account access succeeds. Ultra and Max now require an explicit user selection.
+* **Reviewed PR landing no longer implies paid Fugu consent.** The Fugu step now needs current
+  session consent and one recorded unresolved high-impact review question.
+
 ## [2.33.0] - 2026-08-23
 
 ### Added

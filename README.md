@@ -8,7 +8,7 @@ Oh My Pi (omp) driver plans and reviews; a subscription-native (or optional exte
 implements; durable run files let the work survive context compaction. You write the plan and own
 the merge decision. The agent does the middle.
 
-**Current release: v2.33.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.34.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 **New to Elves?** Use the [practical user guide](https://aigorahub.github.io/elves/) — especially
@@ -81,32 +81,25 @@ accepts `xhigh` and `max` and passes those levels unchanged to `omp --thinking`.
 ### Optional provider shortcuts
 
 Focused provider tasks do not require a full Elves run. Claude Code gets
-`/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] <task>` and
-`/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] review <scope>`,
+`/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] [--include PATH] <planning-task>` and
+`/fugu [--deep|--cyber|--ultra|--max] [--max-wait SECONDS] [--preflight] review <scope>`,
 `/manus <topic>`, `/grok <instructions>`, `/devin <instructions>`, and `/omp <instructions>`;
-Codex uses the equivalent `$elves fugu|manus|grok|devin|omp …` forms or natural language. Plain Fugu follows the requested
-analysis, design, investigation, or other task; `fugu review` keeps the read-only P0-P3 review
+Codex uses the equivalent `$elves fugu|manus|grok|devin|omp …` forms or natural language. Plain Fugu supports planning and analysis. `fugu review` keeps the read-only P0-P3 review
 contract. Both receive a bounded snapshot of policy-admitted tracked and non-ignored untracked
 files. `--include` records an exact host-selected path but cannot override exclusions for ignored
 trees, credentials, operational state, executable agent configuration, unsafe links/file types, or
 repository escapes; the exact path must actually be admitted and copied, and gitignored includes
 fail closed before the provider launches (use `--preflight` to check). Both `.env.*` and
-`*.env` dotenv-name families plus host-owned internal namespaces are always excluded. General tasks
-remain read-only unless the user independently authorizes implementation and the host selects
-`--write`; that route additionally requires qualified recursive Linux bwrap PID-namespace
-containment and is unavailable on macOS today. A qualified write exports a mode-aware audited inert
-handoff that is never applied automatically. Live writable-state bounds tolerate benign temporary
-subtree disappearance and fail closed on other audit errors. macOS read-only cleanup is best-effort,
+`*.env` dotenv-name families plus host-owned internal namespaces are always excluded. Fugu is limited to planning and read-only review. The runner rejects `--write`. macOS read-only cleanup is best-effort,
 not proof of recursive descendant absence.
-Profiles remain regular `fugu/high`, `fugu/xhigh` with `--deep`, `fugu-ultra-v1.1/high` with
+Profiles remain regular `fugu/high`, `fugu/xhigh` with `--deep`, `fugu-cyber/xhigh` with `--cyber`, `fugu-ultra-v1.1/high` with
 `--ultra`, and `fugu-ultra-v1.1/max` with `--max` for one narrow high-stakes gate on a 60-minute
-default wall budget. Prefer plain first (first paid call is plain unless the user set a flag); use
+default wall budget. Plain regular Fugu is the default. The host may select Cyber only for explicit security review or threat-model intent after a successful Cyber call in the current session. Only a user-explicit Cyber request may establish that proof. Otherwise, it uses regular Fugu. The user must explicitly select Ultra or Max. Use
 `--max-wait` before automatic `--deep`; if any `--include`, run `--preflight` first; prefer
-`--ultra` when a written report must survive exploration; redirect to a log (never `| tail`).
+redirect to a log (never `| tail`).
 **Host Fugu routing:** when the user says “use Fugu” without an explicit
-profile flag, the host agent chooses general vs review, plain / deep / ultra / max
-(profile locks model + effort; no free model slug), write mode, and optional `--include` paths
-before launch, states a short `Fugu route: …` line, and prefers the cheapest matching lane;
+profile flag, the host agent uses plain by default. It may select deep for regular Fugu xhigh work, or Cyber for explicit security intent. It must not select Ultra or Max without an explicit user flag. It chooses planning vs review and optional `--include` paths
+before launch, and states a short `Fugu route: …` line;
 explicit flags always win. The isolation snapshot is always on; the host only adds exact admitted
 context via `--include`. See `references/provider-shortcuts.md`
 (**Host routing when the user says "use Fugu"**) and `references/fugu-calling-guide.md`.

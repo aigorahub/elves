@@ -515,10 +515,10 @@ REVIEWED_PR_LANDING_PHRASES = {
         "/land-pr",
         "gh pr merge --merge",
         "default when bots are expected",
-        "Fugu review of the current PR diff, routed through Elves",
+        "Fugu review of the current PR diff, when needed and authorized",
         "$elves fugu review",
         "Never invent a raw Fugu call",
-        "Skip this step only when Fugu is not installed",
+        "A landing request alone does not authorize a paid Fugu call",
         "bump the version when the repository versions",
     ],
     "references/review-subagent.md": [
@@ -527,20 +527,20 @@ REVIEWED_PR_LANDING_PHRASES = {
         "/land-pr",
         "gh pr merge --merge",
         "one-off merge opt-in",
-        "Fugu review of the current PR diff, routed through Elves",
+        "Fugu review of the current PR diff, when needed and authorized",
         "$elves fugu review",
         "Hosts must not invent a raw Fugu call",
-        "Skip only when Fugu is not installed",
+        "A landing request alone does not authorize Fugu",
         "bump the version when the repository versions",
     ],
     "references/e2e-chat-to-land.md": [
         "\\land-pr",
         "/land-pr",
         "gh pr merge --merge",
-        "Fugu review of the current PR diff, routed through Elves",
+        "Fugu review of the current PR diff, when needed and authorized",
         "$elves fugu review",
         "Hosts must not invent a raw Fugu call",
-        "Skip only when Fugu is not installed",
+        "A landing request alone does not authorize Fugu",
         "bump the version when the repository versions",
     ],
     "references/survival-guide-template.md": [
@@ -554,7 +554,7 @@ REVIEWED_PR_LANDING_PHRASES = {
         "\\land-pr",
         "/land-pr",
         "gh pr merge --merge",
-        "Fugu review of the current PR diff routed through Elves",
+        "Fugu review of the current PR diff only when needed and authorized",
         "$elves fugu review",
         "never invent a raw Fugu call",
         "bump the version when the repository versions",
@@ -1350,8 +1350,8 @@ CLAUDE_ALIAS_SKILL_PHRASES = {
     "aliases/claude/fugu/SKILL.md": [
         CLAUDE_ALIAS_MARKER,
         "name: fugu",
-        "/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] <task>",
-        "/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] review <scope>",
+        "/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] [--include PATH] <planning-task>",
+        "/fugu [--deep|--cyber|--ultra|--max] [--max-wait SECONDS] [--preflight] review <scope>",
         "Provider shortcut protocols",
         "run_fugu.sh",
         "codex-fugu",
@@ -1359,7 +1359,7 @@ CLAUDE_ALIAS_SKILL_PHRASES = {
         "fugu-ultra-v1.1",
         "read-only",
         "non-ignored",
-        "audited handoff",
+        "runner rejects `--write`",
     ],
     "aliases/claude/manus/SKILL.md": [
         CLAUDE_ALIAS_MARKER,
@@ -2233,7 +2233,7 @@ if isinstance(PUBLIC_API_SURFACE_SNAPSHOT_PHRASES, dict) and 'SKILL.md' in PUBLI
     PUBLIC_API_SURFACE_SNAPSHOT_PHRASES['SKILL.md'] = ['Public API surface snapshots are optional regression evidence.', 'Use existing structured sources before inventing scanners', 'If no credible source exists, record `unavailable` with the reason instead of fabricating', 'A missing snapshot source is not blocking unless `required: true` was explicitly set in the survival guide.', '`required: true` is valid only when explicitly set by the user or project survival guide.', 'Do not infer required mode from project type, provider config, framework choice, or the presence of API files.', 'Snapshot artifacts are run artifacts, not product docs', 'Temporary snapshot artifacts should not remain in final product PR diffs unless the user explicitly', 'Record shapes and field names, not secrets, bearer tokens, cookies, customer payloads, or production sample data.', 'A snapshot proves public surface shape only; it is not a substitute for tests, E2E checks, review, or the human-owned constitution.', 'public API surface delta when configured']
 if isinstance(REVIEWED_PR_LANDING_PHRASES, dict) and 'SKILL.md' in REVIEWED_PR_LANDING_PHRASES:
     REVIEWED_PR_LANDING_PHRASES = dict(REVIEWED_PR_LANDING_PHRASES)
-    REVIEWED_PR_LANDING_PHRASES['SKILL.md'] = ['## Reviewed PR Landing Command', 'gh pr merge --merge', '\\land-pr', '/land-pr', 'default when bots are expected', 'Fugu review of the current PR diff, routed through Elves', '$elves fugu review', 'Never invent a raw Fugu call', 'Skip this step only when Fugu is not installed', 'bump the version when the repository versions']
+    REVIEWED_PR_LANDING_PHRASES['SKILL.md'] = ['## Reviewed PR Landing Command', 'gh pr merge --merge', '\\land-pr', '/land-pr', 'default when bots are expected', 'Fugu review of the current PR diff, when needed and authorized', '$elves fugu review', 'Never invent a raw Fugu call', 'A landing request alone does not authorize a paid Fugu call', 'bump the version when the repository versions']
 if isinstance(RISK_TIER_PHRASES, dict) and 'SKILL.md' in RISK_TIER_PHRASES:
     RISK_TIER_PHRASES = dict(RISK_TIER_PHRASES)
     RISK_TIER_PHRASES['SKILL.md'] = ['Thin safety kernel', 'validate once, verify changes, attest final', 'low | standard | high', 'trusted | untrusted', 'touched surfaces', 'risk checkpoints', 'terminal readiness', 'exact HEAD', 'impact-selected']
@@ -2313,42 +2313,48 @@ ADAPTIVE_WORKER_ROUTING_PHRASES = {
 # only Fugu coverage used to be the Claude alias phrase group. A model rename could
 # therefore land everywhere except one page and still pass: that is exactly how
 # `guide/index.html` kept saying `fugu-ultra/high` after every other surface moved
-# to `fugu-ultra-v1.1/high`. Pin all three profiles per surface, in that surface's
+# to `fugu-ultra-v1.1/high`. Pin all five profiles per surface, in that surface's
 # own markup, so the next rename has to be complete.
 FUGU_SHORTCUT_PROFILE_PHRASES = {
     "SKILL.md": [
         "`fugu/high`",
         "`fugu/xhigh`",
+        "`fugu-cyber/xhigh`",
         "`fugu-ultra-v1.1/high`",
         "`fugu-ultra-v1.1/max`",
     ],
     "AGENTS.md": [
         "`fugu/high`",
         "`fugu/xhigh`",
+        "`fugu-cyber/xhigh`",
         "`fugu-ultra-v1.1/high`",
         "`fugu-ultra-v1.1/max`",
     ],
     "README.md": [
         "`fugu/high`",
         "`fugu/xhigh`",
+        "`fugu-cyber/xhigh`",
         "`fugu-ultra-v1.1/high`",
         "`fugu-ultra-v1.1/max`",
     ],
     "guide/index.html": [
         "<code>fugu/high</code>",
         "<code>fugu/xhigh</code>",
+        "<code>fugu-cyber/xhigh</code>",
         "<code>fugu-ultra-v1.1/high</code>",
         "<code>fugu-ultra-v1.1/max</code>",
     ],
     "references/provider-shortcuts.md": [
         "`fugu` / `high`",
         "`fugu` / `xhigh`",
+        "`fugu-cyber` / `xhigh`",
         "`fugu-ultra-v1.1` / `high`",
         "`fugu-ultra-v1.1` / `max`",
     ],
     "aliases/claude/fugu/SKILL.md": [
         "`fugu/high`",
         "`fugu/xhigh`",
+        "`fugu-cyber/xhigh`",
         "`fugu-ultra-v1.1/high`",
         "`fugu-ultra-v1.1/max`",
     ],
@@ -2361,24 +2367,24 @@ FUGU_SHORTCUT_PROFILE_PHRASES = {
 # (The alias surface's grammar is pinned with the alias phrase group.)
 FUGU_INVOCATION_GRAMMAR_PHRASES = {
     "SKILL.md": [
-        "`/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] <task>`",
-        "`/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] review <scope>`",
+        "`/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] [--include PATH] <planning-task>`",
+        "`/fugu [--deep|--cyber|--ultra|--max] [--max-wait SECONDS] [--preflight] review <scope>`",
     ],
     "AGENTS.md": [
-        "`$elves fugu [--deep\\|--ultra\\|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] <task>`",
-        "`$elves fugu [--deep\\|--ultra\\|--max] [--max-wait SECONDS] [--preflight] review <scope>`",
+        "`$elves fugu [--deep\\|--ultra\\|--max] [--max-wait SECONDS] [--preflight] [--include PATH] <planning-task>`",
+        "`$elves fugu [--deep\\|--cyber\\|--ultra\\|--max] [--max-wait SECONDS] [--preflight] review <scope>`",
     ],
     "README.md": [
-        "`/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] <task>`",
-        "`/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] review <scope>`",
+        "`/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] [--include PATH] <planning-task>`",
+        "`/fugu [--deep|--cyber|--ultra|--max] [--max-wait SECONDS] [--preflight] review <scope>`",
     ],
     "guide/index.html": [
-        "<code>/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] &lt;task&gt;</code>",
-        "<code>/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] review &lt;scope&gt;</code>",
+        "<code>/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] [--include PATH] &lt;planning-task&gt;</code>",
+        "<code>/fugu [--deep|--cyber|--ultra|--max] [--max-wait SECONDS] [--preflight] review &lt;scope&gt;</code>",
     ],
     "references/provider-shortcuts.md": [
-        "`/fugu [--deep\\|--ultra\\|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] <task>`",
-        "`/fugu [--deep\\|--ultra\\|--max] [--max-wait SECONDS] [--preflight] review <scope>`",
+        "`/fugu [--deep\\|--ultra\\|--max] [--max-wait SECONDS] [--preflight] [--include PATH] <planning-task>`",
+        "`/fugu [--deep\\|--cyber\\|--ultra\\|--max] [--max-wait SECONDS] [--preflight] review <scope>`",
     ],
 }
 
@@ -2394,8 +2400,9 @@ FUGU_HOST_ROUTING_PHRASES = {
         'Host routing when the user says "use Fugu"',
         "isolation snapshot is always on",
         "explicit user flags always win",
-        "locks model + effort",
-        "cheapest",
+        "Use plain regular Fugu by default",
+        "successful Cyber call in the current session",
+        "must explicitly select `--ultra` or `--max`",
     ],
     "AGENTS.md": [
         "Host Fugu routing",
@@ -2403,8 +2410,9 @@ FUGU_HOST_ROUTING_PHRASES = {
         'Host routing when the user says "use Fugu"',
         "isolation snapshot is always on",
         "explicit user flags always win",
-        "locks model + effort",
-        "cheapest",
+        "Plain regular Fugu is the default",
+        "successful Cyber call in the current",
+        "must explicitly select `--ultra`",
     ],
     "README.md": [
         "Host Fugu routing",
@@ -2412,36 +2420,40 @@ FUGU_HOST_ROUTING_PHRASES = {
         'Host routing when the user says "use Fugu"',
         "isolation snapshot is always on",
         "explicit flags always win",
-        "locks model + effort",
-        "cheapest",
+        "Plain regular Fugu is the default",
+        "successful Cyber call in the current session",
+        "must explicitly select Ultra or Max",
     ],
     "guide/index.html": [
         "Fugu route:",
         'Host routing when the user says "use Fugu"',
         "isolation snapshot is always on",
         "flags always win",
-        "locks model + effort",
-        "cheapest",
+        "Plain regular Fugu is the default",
+        "successful Cyber call in the current session",
+        "must explicitly select Ultra or Max",
     ],
     "references/provider-shortcuts.md": [
         'Host routing when the user says "use Fugu"',
         "does not score complexity",
         "isolation snapshot is not optional",
-        "locks model + effort",
-        "cheapest matching lane",
+        "plain `fugu/high` by default",
+        "successful Cyber call in the current session",
+        "must explicitly select `--ultra` or `--max`",
         "Explicit user flags",
         "always win",
         "runner flag",
-        "host-routed",
+        "select `--cyber` only",
     ],
     "aliases/claude/fugu/SKILL.md": [
         "Host Fugu routing",
         "Fugu route:",
         'Host routing when the user says "use Fugu"',
         "isolation snapshot is always on",
-        "explicit user flags always win",
-        "locks model + effort",
-        "cheapest",
+        "Explicit user flags always win",
+        "bare `fugu/high` by default",
+        "successful Cyber call in the current session",
+        "must explicitly select `--ultra` or `--max`",
     ],
 }
 

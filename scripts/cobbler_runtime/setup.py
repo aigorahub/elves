@@ -169,16 +169,25 @@ PROFILE_RECIPES: dict[str, dict[str, Any]] = {
             "Pin model via requested_model (e.g. google/gemini-2.5-flash)."
         ),
     },
-    "codex-fugu": {"adapter": "codex-fugu"},
+    "codex-fugu": {
+        "adapter": "codex-fugu",
+        "notes": "Sakana Fugu for planning and read-only review only",
+        "plan_review_only": True,
+        "implement_blocked": True,
+    },
     "codex-fugu-planning": {
         "adapter": "codex-fugu",
-        "notes": "High-quality Codex for planning/review (set requested_model in TOML if desired)",
+        "notes": "Regular fugu/high for planning and read-only review",
         "tier": "planning",
+        "plan_review_only": True,
+        "implement_blocked": True,
     },
     "codex-fugu-labor": {
         "adapter": "codex-fugu",
-        "notes": "Volume Codex for implement labor (cheaper/faster model via requested_model)",
-        "tier": "labor",
+        "notes": "Deprecated Fugu labor profile. Fugu is limited to planning and read-only review.",
+        "tier": "planning",
+        "plan_review_only": True,
+        "implement_blocked": True,
     },
     "gemini-cli": {
         "adapter": "gemini-cli",
@@ -424,8 +433,8 @@ def recommend_routes(inventory: Sequence[ToolInventoryItem]) -> list[str]:
         )
     if "codex-fugu" in present:
         recs.append(
-            "codex-fugu present: use codex-fugu-planning vs codex-fugu-labor for plan/review vs "
-            "implement volume; MCP OAuth warnings are not inference failures."
+            "codex-fugu present: use it only for planning or read-only review; "
+            "MCP OAuth warnings are not inference failures."
         )
     if "gemini-cli" in present or "antigravity-cli" in present:
         recs.append(
@@ -573,7 +582,11 @@ def render_models_toml(
         if notes:
             safe = str(notes).replace('"', "'")
             lines.append(f'notes = "{safe}"')
-        if recipe and recipe.get("tier") in {"planning", "labor"}:
+        if (
+            recipe
+            and recipe.get("tier") in {"planning", "labor"}
+            and adapter != "codex-fugu"
+        ):
             lines.append(
                 '# requested_model = "…"  # optional: pin high-quality vs labor model for this tier'
             )
@@ -836,10 +849,21 @@ def run_setup(
                 }
             )
 
-    # Warn when plan_review_only profile is used for implement.
+    # Reject profiles that cannot perform implementation work.
     implement_profile = prefs.roles.get("implement", NATIVE_PROFILE_NAME)
     impl_recipe = PROFILE_RECIPES.get(implement_profile) or {}
-    if impl_recipe.get("plan_review_only"):
+    if impl_recipe.get("implement_blocked"):
+        result.ok = False
+        result.issues.append(
+            {
+                "code": "implement_profile_blocked",
+                "message": (
+                    f"Implement role uses profile `{implement_profile}`, which is limited "
+                    "to planning and read-only review."
+                ),
+            }
+        )
+    elif impl_recipe.get("plan_review_only"):
         result.warnings.append(
             f"Implement role uses plan/review-only profile `{implement_profile}` — "
             "usually not cost-effective for bulk implement; prefer host-native or labor tier."

@@ -93,13 +93,13 @@ The landing ceremony is the same ordered sequence for chat-to-land and for an ex
 
 1. Resolve branch, PR, base, draft state, checks.
 2. Read every review surface.
-3. **Fugu review of the current PR diff, routed through Elves** — `/fugu review <scope>` in Claude
+3. **Fugu review of the current PR diff, when needed and authorized.** Run it only when the user authorized paid Fugu use in the current session and the host records one unresolved high-impact security, correctness, or design question. A landing request alone does not authorize Fugu. When both gates pass, use `/fugu review <scope>` in Claude
    Code, `$elves fugu review <scope>` in Codex, Grok Build, and Oh My Pi. The shortcut resolves
    `scripts/run_fugu.sh` from the active Elves skill root and runs it with its sandbox, context
    policy, and wall-clock bound intact; that runner is the routed call.
    **Hosts must not invent a raw Fugu call**: no direct `codex-fugu` or `claude-fugu` invocation,
    no improvised API request, and no variant that strips the runner's isolation or timeout controls.
-   **Skip only when Fugu is not installed**; record the skip.
+   Otherwise, record the skip and its reason.
    Fugu output is evidence, never landing authority.
 4. Host review of `git diff <default-branch>...HEAD`, adjudicating every Fugu finding.
 5. Fix blockers; push.

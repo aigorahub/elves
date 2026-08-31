@@ -135,7 +135,7 @@ _BUILTIN: dict[str, StubAdapter] = {
     ),
     "codex-fugu": StubAdapter(
         name="codex-fugu",
-        executable_hint="codex",
+        executable_hint="codex-fugu",
         supports_persistent_sessions=True,
         supports_isolated_write=False,
     ),
@@ -244,6 +244,8 @@ _RESERVED_CONTROL_FLAGS: dict[str, frozenset[str]] = {
             "-m",
             "--cd",
             "-C",
+            "--config",
+            "-c",
             "--dangerously-bypass-approvals-and-sandbox",
             "-",
         }
@@ -283,7 +285,7 @@ _RESERVED_CONTROL_FLAGS: dict[str, frozenset[str]] = {
             "--dangerously-skip-permissions",
             "--conversation",
             "--continue",
-            "-c",
+            "--config",
             "--project",
             "--new-project",
             "--agent",
@@ -298,7 +300,7 @@ _RESERVED_CONTROL_FLAGS: dict[str, frozenset[str]] = {
             "--model",
             "-s",
             "--session",
-            "-c",
+            "--config",
             "--continue",
             "--fork",
             "--agent",
@@ -436,6 +438,44 @@ def resolve_adapter_name(name: str, *, executable: str | None = None) -> str:
         path=f"adapters.{name}",
         hint=f"Built-in adapters: {', '.join(BUILTIN_ADAPTER_NAMES)}",
     )
+
+
+def _validate_fugu_launch_controls(
+    name: str,
+    *,
+    executable: str | None,
+    requested_model: str | None,
+    extra_args: Sequence[str],
+) -> None:
+    executable_name = Path(executable).name if executable else ""
+    if name != "codex-fugu":
+        if executable_name == "codex-fugu":
+            raise ValidationIssue(
+                "reserved_fugu_executable",
+                "The codex-fugu executable is reserved for the codex-fugu adapter",
+                path=f"adapters.{name}.executable",
+            )
+        return
+    if executable and executable_name != "codex-fugu":
+        raise ValidationIssue(
+            "invalid_fugu_executable",
+            "The codex-fugu adapter must use the codex-fugu executable",
+            path="adapters.codex-fugu.executable",
+        )
+    if requested_model not in {None, "", "fugu"}:
+        raise ValidationIssue(
+            "invalid_fugu_model_override",
+            "Cobbler Fugu profiles are pinned to regular fugu/high",
+            path="adapters.codex-fugu.requested_model",
+            hint="Use the audited provider shortcut for an explicit non-default Fugu profile",
+        )
+    if extra_args:
+        raise ValidationIssue(
+            "invalid_fugu_extra_args",
+            "Cobbler Fugu profiles do not accept extra arguments",
+            path="adapters.codex-fugu.extra_args",
+            hint="Use the audited provider shortcut for explicit Fugu controls",
+        )
 
 
 def adapter_contract_pair(name: str) -> tuple[str, str]:
@@ -659,8 +699,14 @@ def build_readonly_invocation(
     """
     name = resolve_adapter_name(adapter, executable=executable)
     meta = _BUILTIN.get(name, _BUILTIN["custom-cli"])
-    exe = resolve_executable_for_launch(executable or meta.executable_hint)
     extras = tuple(extra_args)
+    _validate_fugu_launch_controls(
+        name,
+        executable=executable,
+        requested_model=requested_model,
+        extra_args=extras,
+    )
+    exe = resolve_executable_for_launch(executable or meta.executable_hint)
     validate_extra_args(name, extras)
     exact_session = (
         assert_exact_session_id(session_id, adapter=name) if session_id else None
@@ -781,11 +827,11 @@ def build_readonly_invocation(
             "read-only",
             "--cd",
             work_cwd,
+            "--model",
+            "fugu",
+            "--config",
+            'model_reasoning_effort="high"',
         ]
-        if requested_model:
-            argv_list.extend(["--model", requested_model])
-        # Benign extras before the final stdin sentinel so '-' remains last.
-        argv_list.extend(extras)
         argv_list.append("-")
         return AdapterInvocation(
             adapter="codex-fugu",
@@ -1759,8 +1805,14 @@ def build_session_create_invocation(
 ) -> AdapterInvocation:
     name = adapter.strip().lower()
     meta = _BUILTIN.get(name, _BUILTIN["custom-cli"])
-    exe = resolve_executable_for_launch(executable or meta.executable_hint)
     extras = tuple(extra_args)
+    _validate_fugu_launch_controls(
+        name,
+        executable=executable,
+        requested_model=requested_model,
+        extra_args=extras,
+    )
+    exe = resolve_executable_for_launch(executable or meta.executable_hint)
     if name == "host-native":
         raise ValidationIssue(
             "host_native_no_external_session",
@@ -1804,10 +1856,15 @@ def build_session_create_invocation(
         assert_no_ambiguous_session_flags(inv.argv)
         return inv
     if name == "codex-fugu":
-        argv = [exe or "codex", "exec", "--json"]
-        if requested_model:
-            argv.extend(["--model", requested_model])
-        argv.extend(extras)
+        argv = [
+            exe or "codex-fugu",
+            "exec",
+            "--json",
+            "--model",
+            "fugu",
+            "--config",
+            'model_reasoning_effort="high"',
+        ]
         inv = AdapterInvocation(
             adapter="codex-fugu",
             executable=argv[0],
@@ -1977,8 +2034,14 @@ def build_session_resume_invocation(
     sid = assert_exact_session_id(session_id, adapter=adapter)
     name = adapter.strip().lower()
     meta = _BUILTIN.get(name, _BUILTIN["custom-cli"])
-    exe = resolve_executable_for_launch(executable or meta.executable_hint)
     extras = tuple(extra_args)
+    _validate_fugu_launch_controls(
+        name,
+        executable=executable,
+        requested_model=requested_model,
+        extra_args=extras,
+    )
+    exe = resolve_executable_for_launch(executable or meta.executable_hint)
     if name == "host-native":
         raise ValidationIssue(
             "host_native_no_external_session",
@@ -2021,11 +2084,17 @@ def build_session_resume_invocation(
         assert_no_ambiguous_session_flags(inv.argv)
         return inv
     if name == "codex-fugu":
-        argv = [exe or "codex", "exec", "resume", "--json"]
-        if requested_model:
-            argv.extend(["--model", requested_model])
+        argv = [
+            exe or "codex-fugu",
+            "exec",
+            "resume",
+            "--json",
+            "--model",
+            "fugu",
+            "--config",
+            'model_reasoning_effort="high"',
+        ]
         argv.append(sid)
-        argv.extend(extras)
         inv = AdapterInvocation(
             adapter="codex-fugu",
             executable=argv[0],

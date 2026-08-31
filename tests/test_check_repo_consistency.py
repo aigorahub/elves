@@ -52,10 +52,10 @@ class ConsistencyPhraseTests(unittest.TestCase):
                 "references/provider-shortcuts.md",
             ],
         )
-        # Every surface pins all three profiles, so a partial rename cannot pass.
+        # Every surface pins all five profiles, so a partial rename cannot pass.
         for label, phrases in group.items():
             with self.subTest(surface=label):
-                self.assertEqual(len(phrases), 4, phrases)
+                self.assertEqual(len(phrases), 5, phrases)
                 self.assertTrue(
                     any("ultra-v1.1" in phrase for phrase in phrases), phrases
                 )
@@ -66,6 +66,7 @@ class ConsistencyPhraseTests(unittest.TestCase):
         group = self.consistency.FUGU_SHORTCUT_PROFILE_PHRASES
         stale_guide = (
             "<code>fugu/high</code> <code>fugu/xhigh</code> "
+            "<code>fugu-cyber/xhigh</code> "
             "<code>fugu-ultra/high</code> <code>fugu-ultra-v1.1/max</code>"
         )
         texts = {label: " ".join(phrases) for label, phrases in group.items()}
@@ -201,21 +202,21 @@ class ConsistencyPhraseTests(unittest.TestCase):
     # fix blockers -> docs/version bump -> merge gates.
     REVIEWED_PR_LANDING_ORDER_ANCHORS = {
         "SKILL.md": (
-            "Fugu review of the current PR diff, routed through Elves",
+            "Fugu review of the current PR diff, when needed and authorized",
             "Host review",
             "Fix blockers",
             "bump the version when the repository versions",
             "gh pr merge --merge",
         ),
         "references/review-subagent.md": (
-            "Fugu review of the current PR diff, routed through Elves",
+            "Fugu review of the current PR diff, when needed and authorized",
             "Host review",
             "Fix blockers from all three sources",
             "bump the version when the repository versions",
             "gh pr merge --merge",
         ),
         "references/e2e-chat-to-land.md": (
-            "Fugu review of the current PR diff, routed through Elves",
+            "Fugu review of the current PR diff, when needed and authorized",
             "Host review",
             "Fix blockers; push.",
             "bump the version when the repository versions",
@@ -224,14 +225,14 @@ class ConsistencyPhraseTests(unittest.TestCase):
         # The kickoff template carries two ceremony blocks: the `\land-pr` prose
         # paragraph and the chat-to-land step 6. Both are checked.
         "references/kickoff-prompt-template.md (land-pr prose)": (
-            "Fugu review of the current PR diff routed through Elves",
+            "Fugu review of the current PR diff only when needed and authorized",
             "subagent host review of",
             "fix blockers; update the docs",
             "bump the version when the repository versions",
             "feedback queue; and then use `gh pr merge --merge`",
         ),
         "references/kickoff-prompt-template.md (chat-to-land step 6)": (
-            "Elves-routed Fugu review of the PR diff",
+            "Elves-routed Fugu review only when",
             "fresh cumulative host review of",
             "fix blockers; update docs and bump the version",
             "repository versions; re-poll async review/CI",

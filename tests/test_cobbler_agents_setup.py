@@ -137,6 +137,8 @@ class TomlGenerationTests(unittest.TestCase):
         self.assertIn("antigravity-cli", PROFILE_RECIPES)
         self.assertIn("antigravity-labor", PROFILE_RECIPES)
         self.assertTrue(PROFILE_RECIPES["gemini-cli"].get("plan_review_only"))
+        self.assertTrue(PROFILE_RECIPES["codex-fugu"].get("plan_review_only"))
+        self.assertTrue(PROFILE_RECIPES["codex-fugu"].get("implement_blocked"))
         self.assertTrue(PROFILE_RECIPES["antigravity-cli"].get("plan_review_only"))
         self.assertFalse(PROFILE_RECIPES["antigravity-labor"].get("plan_review_only"))
         self.assertEqual(PROFILE_RECIPES["antigravity-labor"].get("adapter"), "antigravity-cli")
@@ -211,6 +213,21 @@ class SetupScenarioTests(unittest.TestCase):
             self.assertFalse(result.ok)
             self.assertTrue(
                 any(i.get("code") == "required_route_unavailable" for i in result.issues)
+            )
+
+    def test_fugu_implement_route_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".gitignore").write_text(".elves/\n", encoding="utf-8")
+            result = run_setup(
+                root,
+                preferences=preferences_from_flags(implement="codex-fugu"),
+                write_toml=False,
+                fake_presence={"codex-fugu": True},
+            )
+            self.assertFalse(result.ok)
+            self.assertTrue(
+                any(i.get("code") == "implement_profile_blocked" for i in result.issues)
             )
 
     def test_auth_unknown_and_no_model_list(self) -> None:

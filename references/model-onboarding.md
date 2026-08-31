@@ -127,7 +127,7 @@ Guide. Env var **names** only.
 | Purpose | Default | Typical optional routes |
 | --- | --- | --- |
 | Planning / design | host-native | `claude-code-planning`, `codex-fugu-planning`, Gemini CLI, Antigravity CLI |
-| Implementation (labor) | host-native | `claude-code-labor`, `codex-fugu-labor`, grok-build, devin-cli |
+| Implementation (labor) | host-native | `claude-code-labor`, grok-build, devin-cli |
 | Independent review | host-native | planning-tier Claude/Codex, Gemini CLI, Antigravity CLI, OpenRouter, Muse |
 | Lightweight review | host-native | labor-tier Claude/Codex, Gemini CLI |
 | Scout / discovery | host-native | Gemini CLI, Antigravity CLI, OpenRouter, Muse |
@@ -138,17 +138,15 @@ Guide. Env var **names** only.
 `host-native` means the **current supported host** (Claude Code, Codex, Grok Build, or Oh My Pi) owns that
 work — not Antigravity, Gemini CLI, or another optional tool.
 
-### Within-family model tiers (Claude and Codex)
+### Model tiers
 
-You can use a **stronger model for planning/review** and a **cheaper/faster model for implement
-labor** without switching product families:
+Claude can use separate planning and labor profiles. Fugu is limited to planning and review:
 
 | Profile | Adapter | Typical use |
 | --- | --- | --- |
 | `claude-code-planning` | claude-code | Plan + independent review |
 | `claude-code-labor` | claude-code | Batch implement volume |
 | `codex-fugu-planning` | codex-fugu | Plan + independent review |
-| `codex-fugu-labor` | codex-fugu | Batch implement volume |
 
 After `onboard apply`, edit ignored `.elves/models.toml` and set `requested_model` on each tier
 profile to the model ids **your** Claude/Codex install supports. Elves does not ship prestige
@@ -175,7 +173,7 @@ profile = "claude-code-planning"
 profile = "claude-code-labor"
 ```
 
-Same pattern with `codex-fugu-planning` / `codex-fugu-labor`.
+Use `codex-fugu-planning` only for planning and read-only review. Use a write-qualified host-native or other implementation route for labor.
 
 Sakana now publishes Claude Code-compatible Fugu endpoints and a `claude-fugu` launcher in
 addition to `codex-fugu`, so the same subscription can back either host family. Point Claude Code

@@ -107,20 +107,20 @@ review uses an external high model.
 ## Recipe: Sakana / codex-fugu only (experimental)
 
 - planning/review: `codex-fugu` or `codex-fugu-planning`
-- implement: `host-native` or labor tier `codex-fugu-labor`
+- implement: `host-native`; Fugu implementation routes are blocked
 - Treat MCP OAuth warnings as optional-tool health, not inference failure
 
-## Recipe: Codex high-plan / labor-implement
+## Recipe: Fugu planning with host-native implementation
 
 ```bash
 python3 scripts/cobbler_agents.py onboard apply --json \
   --planning codex-fugu-planning \
   --review codex-fugu-planning \
-  --implement codex-fugu-labor \
+  --implement host-native \
   --force
 ```
 
-Pin `requested_model` per tier in ignored `models.toml`. Prefer host-native validate/synthesize.
+The Fugu planning profile is pinned to regular `fugu/high`. Prefer host-native implementation, validation, and synthesis.
 
 ## Recipe: Google Gemini CLI / Antigravity CLI (plan/review; optional labor)
 

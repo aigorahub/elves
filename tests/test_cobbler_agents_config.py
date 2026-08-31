@@ -150,6 +150,64 @@ class ConfigResolutionTests(unittest.TestCase):
         self.assertEqual(route.profile, "codex-fugu")
         self.assertEqual(route.source, ConfigSource.LOCAL_MODELS_TOML)
 
+    def test_fugu_cannot_resolve_as_implementation_route(self) -> None:
+        optional = config_mod.resolve_config(
+            models_toml={
+                "roles": {
+                    "implement": {"profile": "codex-fugu", "required": False},
+                }
+            }
+        )
+        self.assertTrue(optional.ok)
+        self.assertEqual(optional.roles["implement"].profile, "host-native")
+        self.assertTrue(any("cannot use Fugu" in item for item in optional.warnings))
+
+        required = config_mod.resolve_config(
+            survival_guide={
+                "model_routing": {
+                    "phases": {
+                        "implement": {"profile": "codex-fugu", "required": True},
+                    }
+                }
+            }
+        )
+        self.assertFalse(required.ok)
+        self.assertTrue(
+            any(issue.code == "fugu_implement_route_blocked" for issue in required.issues)
+        )
+
+    def test_fugu_profile_controls_fail_closed(self) -> None:
+        resolved = config_mod.resolve_config(
+            models_toml={
+                "profiles": {
+                    "wrong-launcher": {
+                        "adapter": "codex-fugu",
+                        "executable": "codex",
+                    },
+                    "premium-model": {
+                        "adapter": "codex-fugu",
+                        "executable": "codex-fugu",
+                        "requested_model": "fugu-ultra-v1.1",
+                    },
+                    "extra-controls": {
+                        "adapter": "codex-fugu",
+                        "executable": "codex-fugu",
+                        "extra_args": ["-c", 'model_reasoning_effort="max"'],
+                    },
+                    "disguised-fugu": {
+                        "adapter": "custom-cli",
+                        "executable": "codex-fugu",
+                    },
+                }
+            }
+        )
+        self.assertFalse(resolved.ok)
+        codes = {issue.code for issue in resolved.issues}
+        self.assertIn("invalid_fugu_executable", codes)
+        self.assertIn("invalid_fugu_model_override", codes)
+        self.assertIn("invalid_fugu_extra_args", codes)
+        self.assertIn("reserved_fugu_executable", codes)
+
     def test_deterministic_fallback_order_preserved(self) -> None:
         resolved = config_mod.resolve_config(
             models_toml={
@@ -493,7 +551,7 @@ class FinalHostAuditConfigTests(unittest.TestCase):
                 "profiles": {
                     "my-claude": {"adapter": "claude-code", "executable": "claude"},
                     "my-grok": {"adapter": "grok-build", "executable": "grok"},
-                    "my-fugu": {"adapter": "codex-fugu", "executable": "codex"},
+                    "my-fugu": {"adapter": "codex-fugu", "executable": "codex-fugu"},
                     "my-custom": {"adapter": "custom-cli", "executable": "/bin/wrap"},
                     "bad-claude": {
                         "adapter": "claude-code",

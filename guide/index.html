@@ -512,7 +512,7 @@
     <div class="masthead-inner">
       <div class="brand-row">
         <a class="wordmark" href="https://github.com/aigorahub/elves">Elves</a>
-        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.33.0 source and releases on GitHub</a>
+        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.34.0 source and releases on GitHub</a>
       </div>
       <h1>Using Elves</h1>
       <p class="intro">Plan with the main agent, hand implementation to a separate worker, then
@@ -689,8 +689,8 @@ python3 ~/.grok/skills/elves/scripts/install_doctor.py --startup</code></pre>
       <section id="shortcuts">
         <h2>Use a focused provider shortcut</h2>
         <p>A full run is unnecessary when you only want one specialist task. Claude Code installs
-          <code>/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] &lt;task&gt;</code>,
-          <code>/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] review &lt;scope&gt;</code>,
+          <code>/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] [--include PATH] &lt;planning-task&gt;</code>,
+          <code>/fugu [--deep|--cyber|--ultra|--max] [--max-wait SECONDS] [--preflight] review &lt;scope&gt;</code>,
           <code>/manus &lt;topic&gt;</code>,
           <code>/grok &lt;instructions&gt;</code>, <code>/devin &lt;instructions&gt;</code>, and
           <code>/omp &lt;instructions&gt;</code>.
@@ -710,30 +710,27 @@ python3 ~/.grok/skills/elves/scripts/install_doctor.py --startup</code></pre>
             Both <code>.env.*</code> and
             <code>*.env</code> dotenv-name families plus host-owned internal namespaces are always
             excluded.
-            General tasks are read-only unless the user separately authorizes implementation and
-            the host selects <code>--write</code>. That route also requires qualified recursive
-            Linux bwrap PID-namespace containment and is unavailable on macOS today. A qualified
-            write edits only the disposable kernel-isolated snapshot, then exports a bounded,
-            mode-aware audited handoff for inspection; it never changes the checkout or applies the
-            handoff automatically. Live writable-state limits tolerate benign disappearing
-            temporary subtrees and fail closed on other audit errors. macOS read-only cleanup is
+            Fugu is limited to planning and read-only review. The runner rejects
+            <code>--write</code>. macOS read-only cleanup is
             best-effort and never proof of recursive containment. The
             Linux boundary omits procfs, and Codex's externally-sandboxed mode runs only inside
             Elves' mandatory outer boundary. Fugu uses regular
             <code>fugu/high</code> when the host chooses plain,
             <code>fugu/xhigh</code> with
-            <code>--deep</code>, <code>fugu-ultra-v1.1/high</code> with
+            <code>--deep</code>, <code>fugu-cyber/xhigh</code> with
+            <code>--cyber</code>, <code>fugu-ultra-v1.1/high</code> with
             <code>--ultra</code>, or <code>fugu-ultra-v1.1/max</code> with <code>--max</code> for
-            one narrow high-stakes gate on a 60-minute budget. Prefer plain first (first paid call
-            is plain unless you set a flag); use
+            one narrow high-stakes gate on a 60-minute budget. Plain regular Fugu is the default.
+            The host may select Cyber only for explicit security review or threat-model intent
+            after a successful Cyber call in the current session. Only a user-explicit Cyber
+            request may establish that proof. Otherwise, it uses regular Fugu.
+            The user must explicitly select Ultra or Max. Use
             <code>--max-wait</code> before automatic <code>--deep</code>; if any
-            <code>--include</code>, run <code>--preflight</code> first; prefer
-            <code>--ultra</code> when a written report must survive exploration; redirect to a log
+            <code>--include</code>, run <code>--preflight</code> first; redirect to a log
             (never <code>| tail</code>).
-            When you say “use Fugu” without a profile flag, the host agent routes first
-            (general vs review, profile that locks model + effort, write mode, optional
-            <code>--include</code>), states a short <code>Fugu route: …</code> line, and prefers
-            the cheapest matching lane; explicit flags always win.
+            When you say “use Fugu” without a profile flag, the host uses plain Fugu by default.
+            It may select Cyber for explicit security intent. It states a short
+            <code>Fugu route: …</code> line. Explicit flags always win.
             The isolation snapshot is always on. See
             <code>references/provider-shortcuts.md</code>
             (<strong>Host routing when the user says "use Fugu"</strong>) and

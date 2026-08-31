@@ -1722,7 +1722,7 @@ class AdapterBuilderTests(unittest.TestCase):
                     profile=adapter,
                     packet_path=packet,
                     prompt_path=prompt,
-                    requested_model="example-model",
+                    requested_model=("fugu" if adapter == "codex-fugu" else "example-model"),
                 )
                 self.assertTrue(inv.read_only)
                 self.assertIsInstance(inv.argv, tuple)
@@ -1763,7 +1763,7 @@ class AdapterBuilderTests(unittest.TestCase):
                         packet_path=packet,
                         prompt_path=prompt,
                         executable=executable,
-                        requested_model="example-model",
+                        requested_model=("fugu" if adapter == "codex-fugu" else "example-model"),
                     )
                     argv_text = " ".join(inv.argv)
                     for token in self.PERMISSION_BYPASS_TOKENS:
@@ -1783,10 +1783,13 @@ class AdapterBuilderTests(unittest.TestCase):
                         self.assertNotIn("--packet", inv.argv)
                         self.assertNotIn("--readonly", inv.argv)
                     if adapter == "codex-fugu":
+                        self.assertEqual(inv.executable, "codex-fugu")
                         self.assertIn("exec", inv.argv)
                         self.assertIn("--json", inv.argv)
                         self.assertIn("--sandbox", inv.argv)
                         self.assertIn("read-only", inv.argv)
+                        self.assertIn("fugu", inv.argv)
+                        self.assertIn('model_reasoning_effort="high"', inv.argv)
                         self.assertIn("-", inv.argv)
                         self.assertNotIn("--packet", inv.argv)
 
@@ -1817,7 +1820,7 @@ class AdapterBuilderTests(unittest.TestCase):
                     profile=adapter,
                     packet_path=packet,
                     prompt_path=prompt,
-                    requested_model="m",
+                    requested_model=("fugu" if adapter == "codex-fugu" else "m"),
                     repo_root=Path(tmp),
                     task="task",
                     role="architect",
@@ -1830,6 +1833,38 @@ class AdapterBuilderTests(unittest.TestCase):
                                 base in family or token in family,
                                 f"{adapter}: unexpected flag {token}; fixture has {sorted(family)[:20]}...",
                             )
+
+    def test_fugu_adapter_rejects_launcher_and_profile_overrides(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            packet = Path(tmp) / "packet.json"
+            prompt = Path(tmp) / "prompt.txt"
+            packet.write_text("{}", encoding="utf-8")
+            prompt.write_text("task", encoding="utf-8")
+            base = {
+                "profile": "codex-fugu",
+                "packet_path": packet,
+                "prompt_path": prompt,
+            }
+            with self.assertRaises(ValidationIssue):
+                build_readonly_invocation(
+                    adapter="codex-fugu", executable="codex", **base
+                )
+            with self.assertRaises(ValidationIssue):
+                build_readonly_invocation(
+                    adapter="codex-fugu",
+                    requested_model="fugu-ultra-v1.1",
+                    **base,
+                )
+            with self.assertRaises(ValidationIssue):
+                build_readonly_invocation(
+                    adapter="codex-fugu",
+                    extra_args=("-c", 'model_reasoning_effort="max"'),
+                    **base,
+                )
+            with self.assertRaises(ValidationIssue):
+                build_readonly_invocation(
+                    adapter="custom-cli", executable="codex-fugu", **base
+                )
 
     def test_google_cli_readonly_uses_print_flags_not_bare_stdin(self) -> None:
         """Gemini / Antigravity dogfood: headless -p/--print, no session create."""

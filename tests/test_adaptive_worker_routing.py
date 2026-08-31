@@ -1080,7 +1080,7 @@ class NativeWorkerGrammarTests(unittest.TestCase):
         resumed = build_session_resume_invocation(
             adapter="codex-fugu", profile="codex-fugu", session_id="exact-123", cwd=str(REPO_ROOT)
         )
-        self.assertEqual(resumed.argv[:3], ("codex", "exec", "resume"))
+        self.assertEqual(resumed.argv[:3], ("codex-fugu", "exec", "resume"))
         self.assertNotIn("--cwd", resumed.argv)
         self.assertEqual(resumed.cwd, str(REPO_ROOT))
 

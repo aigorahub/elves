@@ -35,7 +35,7 @@ from .toml_compat import loads as load_toml_text
 
 # Purposes the user assigns tools to. Core map to setup role slots.
 # Google subscription CLIs are plan/review-oriented (usually not cost-effective for bulk implement).
-# Claude/Codex support planning vs labor profile tiers within the same family.
+# Claude supports planning and labor tiers. Fugu is planning and review only.
 PURPOSE_CATALOG: tuple[dict[str, Any], ...] = (
     {
         "id": "planning",
@@ -60,19 +60,17 @@ PURPOSE_CATALOG: tuple[dict[str, Any], ...] = (
         "role_slot": "implement",
         "label": "Implementation (labor)",
         "description": (
-            "Writing code for a batch — prefer host-native, labor-tier Claude/Codex, or Grok; "
+            "Writing code for a batch — prefer host-native, labor-tier Claude, or Grok; "
             "optional experimental antigravity-labor (Gemini Flash-class) is not Lane A"
         ),
         "default_route": "host-native",
         "suggested_routes": (
             "host-native",
             "claude-code-labor",
-            "codex-fugu-labor",
             "grok-build",
             "devin-cli",
             "omp-cli",
             "claude-code",
-            "codex-fugu",
             "antigravity-labor",
             "opencode-labor",
         ),
@@ -109,7 +107,7 @@ PURPOSE_CATALOG: tuple[dict[str, Any], ...] = (
         "suggested_routes": (
             "host-native",
             "claude-code-labor",
-            "codex-fugu-labor",
+            "codex-fugu-planning",
             "claude-code",
             "codex-fugu",
             "gemini-cli",
@@ -196,9 +194,9 @@ ROUTE_HELP: dict[str, str] = {
         "host captures session UUID from NDJSON; exact --resume only; "
         "run-scoped --profile isolation"
     ),
-    "codex-fugu": "Codex/Fugu CLI (default model for the install)",
-    "codex-fugu-planning": "Codex high-quality tier for plan/review (pin requested_model in TOML)",
-    "codex-fugu-labor": "Codex labor tier for implement volume (pin requested_model in TOML)",
+    "codex-fugu": "Regular fugu/high for planning and read-only review",
+    "codex-fugu-planning": "Regular fugu/high for planning and read-only review",
+    "codex-fugu-labor": "Deprecated and blocked for implementation",
     "gemini-cli": (
         "Google Gemini CLI (API key) — plan/review/scout; pin latest Gemini model; "
         "headless needs --skip-trust; not bulk implement"
@@ -538,8 +536,8 @@ def build_onboarding_packet(
         "Update anytime: re-run onboarding or `onboard apply` with new flags "
         "(partial apply merges into existing models.toml roles).",
         "Claude Code: /setup-cobbler or natural language. Codex: $elves setup-cobbler / natural language.",
-        "Tier split: high-quality Claude/Codex for plan+review, labor model for implement "
-        "(claude-code-planning / claude-code-labor, codex-fugu-planning / codex-fugu-labor).",
+        "Claude can split planning and labor tiers. Fugu stays on regular fugu/high for planning "
+        "and read-only review.",
         "Google Gemini CLI / Antigravity CLI: good for plan/review; usually not for bulk implement.",
         "openrouter / meta-muse / alphaevolve are interview hints only for bare apply — "
         "configure a custom-cli wrapper (or math Survival Guide for AlphaEvolve) first.",
