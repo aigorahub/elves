@@ -20,8 +20,8 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
 
 - **Fugu:** requires the official `codex-fugu` launcher and its configured Sakana credentials.
   Provider selection and task type are separate. Plain `/fugu <task>` (or `$elves fugu <task>`)
-  performs a general task and returns the requested analysis, design, investigation, or other
-  deliverable without forcing P0-P3 findings or a clean-review verdict. The `review` subcommand
+  performs a planning or analysis task without forcing P0-P3 findings or a clean-review verdict.
+  The `review` subcommand
   selects the opinionated read-only review: host-generated branch/base/diff evidence, actionable
   P0-P3 findings with exact locations, and exactly `No actionable findings` when clean.
 
@@ -67,7 +67,7 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
 
   | Shortcut | Model / effort | Default wall limit | Use |
   |---|---|---:|---|
-  | plain profile (host may choose after routing) | `fugu` / `high` | 10 minutes | routine general task or explicit review |
+  | plain profile (host may choose after routing) | `fugu` / `high` | 10 minutes | routine planning or explicit review |
   | `--deep` | `fugu` / `xhigh` | 20 minutes | harder planning, analysis, or review |
   | `--cyber` | `fugu-cyber` / `xhigh` | 20 minutes | read-only security review or threat model |
   | `--ultra` | `fugu-ultra-v1.1` / `high` | 30 minutes total; at most 20 minutes exploring by default | compact high-stakes task with a reserved synthesis phase |
@@ -226,9 +226,9 @@ State one short `Fugu route: …` line before every launch.
 
 ```text
 Fugu route: host-native only (no launch) — inventory/triage
-Fugu route: general plain, no include, wall 10m
-Fugu route: general plain --max-wait 900, no include
-Fugu route: general plain --preflight --include NOTE.md (launch only if admitted)
+Fugu route: planning plain, no include, wall 10m
+Fugu route: planning plain --max-wait 900, no include
+Fugu route: planning plain --preflight --include NOTE.md (launch only if admitted)
 Fugu route: review main...HEAD plain, paths: scripts/foo.py tests/test_foo.py
 Fugu route: review main...HEAD --deep (only after plain failed on this tip)
 Fugu route: security review main...HEAD --cyber
@@ -256,17 +256,14 @@ Wall limits are hard walls (not stream idle timeouts). While a launch runs:
   not assume chat cancel reaps the lane. Confirm with process listing if needed.
 - On exit 2 with `isolation_requested_path_*`, fix the path or drop `--include`, then preflight
   again. Do not retry the same include.
-- On exit 124 / wall timeout: first read salvage from the log; then narrow the task or raise
-  `--max-wait` deliberately. If the work was a written report that died empty on plain/deep,
-  re-place once on `--ultra` with a ranked, budget-aware prompt (see
-  `references/fugu-calling-guide.md`).
+- On exit 124 / wall timeout: first read salvage from the log. Then narrow the task or raise
+  `--max-wait`. Use `--ultra` only if the user explicitly selected Ultra.
 - **Cleanup.** Isolation lanes are removed on normal exit. Keep `fugu.log`. Delete inspected
-  write handoffs under `/tmp/elves-fugu-handoff-*` when finished. After a hard kill, remove only
-  owned leftover `elves-iso-*` temp dirs with no live process. Details:
+  legacy write handoffs under `/tmp/elves-fugu-handoff-*` if an older runner left them. After a
+  hard kill, remove only owned leftover `elves-iso-*` temp dirs with no live process. Details:
   `references/fugu-calling-guide.md` sections 7–8.
 
-After settlement, report Fugu's answer (or salvage) and the route used. Never auto-apply a write
-handoff.
+After settlement, report Fugu's answer or salvage and the route used.
 
 - **Manus:** requires `MANUS_API_KEY`. The ordinary form creates one private `manus-1.6-max` task
   through `https://api.manus.ai/v2/task.create` with `x-manus-api-key`, explicitly empty

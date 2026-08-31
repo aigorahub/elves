@@ -15,6 +15,7 @@ import time
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from unittest import mock
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -23,6 +24,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 from cobbler_runtime.isolation import detect_fs_sandbox_backend  # noqa: E402
+from cobbler_runtime import fugu as fugu_mod  # noqa: E402
 
 
 HAS_FS_SANDBOX = detect_fs_sandbox_backend() is not None
@@ -1130,12 +1132,104 @@ class LocalCliRunnerTests(unittest.TestCase):
             )
 
         self.assertEqual(missing.returncode, 2)
-        self.assertIn("safe owned model catalog", missing.stderr)
+        self.assertIn("Fugu Cyber model catalog is missing", missing.stderr)
         self.assertEqual(valid.returncode, 0, valid.stderr)
         self.assertIn("model/effort: fugu-cyber/xhigh", valid.stdout)
         self.assertIn("does not prove account access", valid.stderr)
         self.assertEqual(task_mode.returncode, 2)
         self.assertIn("only available for read-only review mode", task_mode.stderr)
+
+    def test_fugu_cyber_preflight_rejects_unsafe_catalog_files(self) -> None:
+        catalog_body = json.dumps(
+            {
+                "models": [
+                    {
+                        "slug": "fugu-cyber",
+                        "supported_in_api": True,
+                        "supported_reasoning_levels": [{"effort": "xhigh"}],
+                    }
+                ]
+            }
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_capture_fake(bin_dir)
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            codex_home = root / "codexhome"
+            codex_home.mkdir()
+            catalog = codex_home / "fugu.json"
+            catalog.write_text(catalog_body, encoding="utf-8")
+            catalog.chmod(0o666)
+            env = {
+                "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                "SAKANA_API_KEY": "test-sakana-key",
+                "CODEX_HOME": str(codex_home),
+            }
+            writable = run_script(
+                "run_fugu.sh", "--cyber", "--preflight", "review", "auth",
+                env=env, cwd=repo,
+            )
+            catalog.unlink()
+            target = codex_home / "catalog-target.json"
+            target.write_text(catalog_body, encoding="utf-8")
+            catalog.symlink_to(target)
+            linked = run_script(
+                "run_fugu.sh", "--cyber", "--preflight", "review", "auth",
+                env=env, cwd=repo,
+            )
+
+        self.assertEqual(writable.returncode, 2)
+        self.assertIn("not a safe owned regular file", writable.stderr)
+        self.assertEqual(linked.returncode, 2)
+        self.assertIn("not a safe readable file", linked.stderr)
+
+    def test_fugu_catalog_read_fails_closed_on_path_replacement(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            catalog = root / "fugu.json"
+            replacement = root / "replacement.json"
+            original_body = b'{"models":[{"slug":"fugu-cyber"}]}'
+            catalog.write_bytes(original_body)
+            replacement.write_bytes(b'{"models":[]}')
+            real_open = os.open
+            replaced = False
+
+            def replace_path_after_open(path, flags, mode=0o777, *, dir_fd=None):
+                nonlocal replaced
+                descriptor = real_open(path, flags, mode, dir_fd=dir_fd)
+                if Path(path) == catalog and not replaced:
+                    os.replace(replacement, catalog)
+                    replaced = True
+                return descriptor
+
+            with mock.patch.object(fugu_mod.os, "open", replace_path_after_open):
+                with self.assertRaises(SystemExit) as raised:
+                    fugu_mod._read_owned_regular(
+                        catalog,
+                        max_bytes=1024,
+                        label="test catalog",
+                    )
+
+        self.assertTrue(replaced)
+        self.assertEqual(raised.exception.code, 2)
+
+    def test_fugu_help_limits_cyber_to_review_and_omits_write(self) -> None:
+        result = run_script("run_fugu.sh", "--help")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        usage_lines = [
+            line.strip()
+            for line in result.stdout.splitlines()
+            if "run_fugu.sh" in line
+        ]
+        self.assertEqual(len(usage_lines), 2)
+        self.assertNotIn("--cyber", usage_lines[0])
+        self.assertIn("--cyber", usage_lines[1])
+        self.assertNotIn("--write", result.stdout)
+        self.assertNotIn("write eligibility", result.stdout)
 
     def test_fugu_python_backend_rejects_shell_policy_bypass(self) -> None:
         backend = SCRIPTS / "cobbler_runtime" / "fugu.py"

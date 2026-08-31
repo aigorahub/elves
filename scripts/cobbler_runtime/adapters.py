@@ -456,10 +456,10 @@ def _validate_fugu_launch_controls(
                 path=f"adapters.{name}.executable",
             )
         return
-    if executable and executable_name != "codex-fugu":
+    if executable and executable != "codex-fugu":
         raise ValidationIssue(
             "invalid_fugu_executable",
-            "The codex-fugu adapter must use the codex-fugu executable",
+            "The codex-fugu adapter does not accept executable overrides",
             path="adapters.codex-fugu.executable",
         )
     if requested_model not in {None, "", "fugu"}:

@@ -688,11 +688,11 @@ def resolve_config(
         for profile_name, profile in resolved.profiles.items():
             executable_name = Path(profile.executable).name if profile.executable else ""
             if profile.adapter == "codex-fugu":
-                if executable_name != "codex-fugu":
+                if profile.executable != "codex-fugu":
                     resolved.issues.append(
                         ValidationIssue(
                             "invalid_fugu_executable",
-                            f"Fugu profile `{profile_name}` must use the codex-fugu executable",
+                            f"Fugu profile `{profile_name}` cannot override codex-fugu",
                             path=f"profiles.{profile_name}.executable",
                         )
                     )

@@ -1849,6 +1849,14 @@ class AdapterBuilderTests(unittest.TestCase):
                 build_readonly_invocation(
                     adapter="codex-fugu", executable="codex", **base
                 )
+            alias_target = Path(tmp) / "launcher"
+            alias_target.write_text("#!/bin/sh\n", encoding="utf-8")
+            alias_path = Path(tmp) / "codex-fugu"
+            alias_path.symlink_to(alias_target)
+            with self.assertRaises(ValidationIssue):
+                build_readonly_invocation(
+                    adapter="codex-fugu", executable=str(alias_path), **base
+                )
             with self.assertRaises(ValidationIssue):
                 build_readonly_invocation(
                     adapter="codex-fugu",

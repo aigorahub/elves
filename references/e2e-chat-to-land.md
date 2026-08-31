@@ -80,7 +80,9 @@ Readiness Gate (landable PR)
     │
     ├─ chat-to-work: STOP here (PR open, green, reviewed; user merges)
     └─ chat-to-land: reviewed-PR landing
-         resolve PR → read review surfaces → Elves-routed Fugu review → host review
+         resolve PR → read review surfaces → conditional Elves-routed Fugu review
+         (current-session consent plus one unresolved high-impact question; otherwise record skip)
+         → host review
          → fix blockers → docs + conditional version bump → wait for checks → merge commit
          → worktree teardown
 ```

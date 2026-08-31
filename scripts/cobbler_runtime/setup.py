@@ -325,6 +325,18 @@ def profile_is_apply_blocked(profile: str) -> bool:
     return bool(recipe.get("apply_blocked"))
 
 
+def profile_is_fugu_route(
+    profile: str,
+    existing_profiles: Mapping[str, Mapping[str, Any]] | None = None,
+) -> bool:
+    body = dict((existing_profiles or {}).get(profile) or {})
+    recipe = PROFILE_RECIPES.get(profile) or {}
+    adapter = str(body.get("adapter") or recipe.get("adapter") or profile)
+    executable = body.get("executable") or recipe.get("executable")
+    executable_name = Path(str(executable)).name if executable else ""
+    return adapter == "codex-fugu" or executable_name == "codex-fugu"
+
+
 def resolve_recipe_executable(profile: str) -> str | None:
     """Pick executable from recipe, preferring PATH-present fallbacks."""
     recipe = PROFILE_RECIPES.get(profile) or {}
@@ -852,7 +864,10 @@ def run_setup(
     # Reject profiles that cannot perform implementation work.
     implement_profile = prefs.roles.get("implement", NATIVE_PROFILE_NAME)
     impl_recipe = PROFILE_RECIPES.get(implement_profile) or {}
-    if impl_recipe.get("implement_blocked"):
+    if impl_recipe.get("implement_blocked") or profile_is_fugu_route(
+        implement_profile,
+        existing_profiles,
+    ):
         result.ok = False
         result.issues.append(
             {

@@ -184,6 +184,10 @@ class ConfigResolutionTests(unittest.TestCase):
                         "adapter": "codex-fugu",
                         "executable": "codex",
                     },
+                    "same-name-launcher-path": {
+                        "adapter": "codex-fugu",
+                        "executable": "/tmp/codex-fugu",
+                    },
                     "premium-model": {
                         "adapter": "codex-fugu",
                         "executable": "codex-fugu",

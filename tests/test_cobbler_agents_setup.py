@@ -230,6 +230,27 @@ class SetupScenarioTests(unittest.TestCase):
                 any(i.get("code") == "implement_profile_blocked" for i in result.issues)
             )
 
+    def test_custom_fugu_alias_cannot_be_an_implement_route(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".gitignore").write_text(".elves/\n", encoding="utf-8")
+            result = run_setup(
+                root,
+                preferences=preferences_from_flags(implement="security-reviewer"),
+                write_toml=False,
+                fake_presence={"codex-fugu": True},
+                existing_profiles={
+                    "security-reviewer": {
+                        "adapter": "codex-fugu",
+                        "executable": "codex-fugu",
+                    }
+                },
+            )
+            self.assertFalse(result.ok)
+            self.assertTrue(
+                any(i.get("code") == "implement_profile_blocked" for i in result.issues)
+            )
+
     def test_auth_unknown_and_no_model_list(self) -> None:
         items = inventory_tools(
             fake_presence={"claude-code": True},

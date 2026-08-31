@@ -62,7 +62,7 @@ Either way, do not pipe. The redirect is what lets the launcher's own salvage pa
 a partial report into the file when a run times out or dies, which a `tail` at the end of
 the pipeline would still be holding when the process is killed.
 
-## 2. Profile choice is about the report, not about depth
+## 2. Profiles have different completion behavior
 
 The five profiles split into two structurally different execution shapes, and the split is
 not the one the names suggest.
@@ -97,10 +97,6 @@ The host must not select `--ultra` or `--max` without an explicit user request.
 This does not cancel economy routing in `provider-shortcuts.md`. Use host-native checks first.
 Do not use Fugu when no unresolved planning or review question remains.
 
-Upgrading `--deep` to `--ultra` is not "spending more" in the way it looks. A `--deep` run
-that times out spends its whole budget and returns nothing, which is the most expensive
-possible outcome.
-
 ## 3. Raise the wall deliberately, and separately from the profile
 
 `--max-wait SECONDS` (or `SAKANA_FUGU_MAX_WAIT_SECONDS`) caps the hard wall clock for a
@@ -112,7 +108,7 @@ Note what the wall covers: exploration, the reserved synthesis phase, and cleanu
 true wall-clock bound, not an idle timeout, so a run that keeps emitting heartbeats is still
 bounded (see the "Wall limits here are wall limits" note in `provider-shortcuts.md`).
 
-Use `--preflight` to validate launcher, profile, wall, write eligibility, and `--include`
+Use `--preflight` to validate launcher, profile, wall, read-only policy, and `--include`
 paths and print the launch plan without calling the provider. Cheap way to confirm the call
 is shaped the way you meant before spending a budget on it.
 
@@ -229,10 +225,10 @@ Isolation lanes are disposable and normally removed on exit. Host hygiene still 
     # Narrow question, longer clock only
     run_fugu.sh --max-wait 900 "<one specific question>" > fugu.log 2>&1
 
-    # Review that must produce a report (ranked scope, exclusions, output shape)
+    # User-explicit Ultra review (ranked scope, exclusions, output shape)
     run_fugu.sh --ultra review "<ranked scope…>" > fugu.log 2>&1
 
-    # Confirm the call shape without spending a budget
+    # Confirm the user-selected call shape without spending a budget
     run_fugu.sh --ultra --preflight --include NOTE.md review "<scope>"
 
     # After any non-zero exit: search salvage before relaunching

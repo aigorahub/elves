@@ -7,8 +7,8 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 usage() {
   cat <<'EOF'
 Usage:
-  run_fugu.sh [--deep|--cyber|--ultra|--max] [--max-wait SECONDS] [--preflight]
-              [--include PATH]... [--write] [--] <task...>
+  run_fugu.sh [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight]
+              [--include PATH]... [--] <task...>
   run_fugu.sh [--deep|--cyber|--ultra|--max] [--max-wait SECONDS] [--preflight]
               [--include PATH]... review [scope...]
 
@@ -23,9 +23,8 @@ Profiles:
 Modes:
   task      The default. Follow the requested task without a review-only rubric.
   review    Read-only change review with ordered P0-P3 findings and exact locations.
-  --write   Unsupported. Fugu is limited to planning and read-only review.
   --preflight
-            Validate launcher, profile, wall, write eligibility, and --include
+            Validate launcher, profile, wall, read-only policy, and --include
             paths, then print a launch plan and exit without calling the provider.
   --max-wait SECONDS
             Cap the hard wall clock for this launch (also via

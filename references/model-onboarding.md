@@ -148,9 +148,9 @@ Claude can use separate planning and labor profiles. Fugu is limited to planning
 | `claude-code-labor` | claude-code | Batch implement volume |
 | `codex-fugu-planning` | codex-fugu | Plan + independent review |
 
-After `onboard apply`, edit ignored `.elves/models.toml` and set `requested_model` on each tier
-profile to the model ids **your** Claude/Codex install supports. Elves does not ship prestige
-model ids as public defaults.
+After `onboard apply`, edit ignored `.elves/models.toml` to set `requested_model` only on Claude
+profiles. Leave Fugu `requested_model` unset. Cobbler pins Fugu to regular `fugu/high` and rejects
+other model values. Elves does not ship prestige model ids as public defaults.
 
 Example shape (machine-local only):
 
