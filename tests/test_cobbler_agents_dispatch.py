@@ -2605,6 +2605,14 @@ class RemediationBlockerTests(unittest.TestCase):
         self.assertEqual(session_id_for_attempt(spec, primary), "fugu-thread")
         self.assertIsNone(session_id_for_attempt(spec, fallback))
         self.assertEqual(session_id_for_attempt(spec, explicit), "claude-session")
+        for ambiguous in ("latest", "continue", "--resume"):
+            with self.subTest(ambiguous=ambiguous), self.assertRaises(
+                ValidationIssue
+            ):
+                session_id_for_attempt(
+                    replace(spec, session_id=ambiguous),
+                    primary,
+                )
 
 
 

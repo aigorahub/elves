@@ -24,6 +24,7 @@ from typing import Any, Mapping, Sequence
 from .adapters import (
     ADAPTER_CONTRACT_PAIRS,
     AdapterInvocation,
+    assert_exact_session_id,
     build_readonly_invocation,
     default_decoder_for_adapter,
     validate_adapter_contract_pair,
@@ -57,10 +58,16 @@ def session_id_for_attempt(
 ) -> str | None:
     """Use lane continuity only on its original provider adapter."""
     if attempt.session_id is not None:
-        return attempt.session_id
-    if attempt.adapter == spec.adapter:
-        return spec.session_id
-    return None
+        selected = attempt.session_id
+    elif attempt.adapter == spec.adapter:
+        selected = spec.session_id
+    else:
+        selected = None
+    return (
+        assert_exact_session_id(selected, adapter=attempt.adapter)
+        if selected is not None
+        else None
+    )
 
 
 @dataclass(frozen=True)
