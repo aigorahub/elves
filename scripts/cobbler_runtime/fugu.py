@@ -163,21 +163,27 @@ def _validate_profile() -> None:
     except (UnicodeError, ValueError):
         _fail("Fugu Cyber model catalog is invalid.")
     models = data.get("models") if isinstance(data, dict) else None
-    entry = next(
-        (
-            item
-            for item in models or ()
-            if isinstance(item, dict) and item.get("slug") == "fugu-cyber"
-        ),
-        None,
-    )
-    levels = entry.get("supported_reasoning_levels") if isinstance(entry, dict) else None
-    efforts = {
-        item.get("effort")
-        for item in levels or ()
-        if isinstance(item, dict) and isinstance(item.get("effort"), str)
-    }
-    if not isinstance(entry, dict) or entry.get("supported_in_api") is not True or "xhigh" not in efforts:
+    available = False
+    for entry in models or ():
+        if not isinstance(entry, dict):
+            continue
+        slug = entry.get("slug") or entry.get("id")
+        if not isinstance(slug, str) or slug.strip().casefold() != "fugu-cyber":
+            continue
+        levels = entry.get("supported_reasoning_levels")
+        efforts = {
+            effort.strip().casefold()
+            for item in levels or ()
+            if isinstance(
+                effort := item.get("effort") if isinstance(item, dict) else item,
+                str,
+            )
+            and effort.strip()
+        }
+        if entry.get("supported_in_api") is True and "xhigh" in efforts:
+            available = True
+            break
+    if not available:
         _fail("installed catalog does not offer fugu-cyber/xhigh through the API.")
     print(
         "Fugu Cyber catalog: available. Catalog availability does not prove account access.",

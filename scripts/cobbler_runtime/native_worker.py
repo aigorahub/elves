@@ -1797,6 +1797,17 @@ def _run_worker_phase(
             child_input.flush()
             child_input.seek(0)
             os.chmod(log_path, 0o600)
+            phase_model = (
+                phase_state.get("model")
+                if isinstance(phase_state, dict)
+                else state.get("requested_model")
+            )
+            reject_fugu_implementation_route(
+                str(state.get("host") or ""),
+                str(effective_argv[0]) if effective_argv else None,
+                requested_model=str(phase_model) if phase_model else None,
+                environment=env,
+            )
             child = subprocess.Popen(
                 effective_argv,
                 cwd=str(worktree),

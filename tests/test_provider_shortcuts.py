@@ -1127,6 +1127,24 @@ class LocalCliRunnerTests(unittest.TestCase):
                 "run_fugu.sh", "--cyber", "--preflight", "review", "auth boundary",
                 env=env, cwd=repo,
             )
+            (codex_home / "fugu.json").write_text(
+                json.dumps(
+                    {
+                        "models": [
+                            {
+                                "id": " FUGU-CYBER ",
+                                "supported_in_api": True,
+                                "supported_reasoning_levels": [" XHIGH "],
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            canonical_shape = run_script(
+                "run_fugu.sh", "--cyber", "--preflight", "review", "auth boundary",
+                env=env, cwd=repo,
+            )
             task_mode = run_script(
                 "run_fugu.sh", "--cyber", "plan security work", env=env, cwd=repo
             )
@@ -1136,6 +1154,8 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertEqual(valid.returncode, 0, valid.stderr)
         self.assertIn("model/effort: fugu-cyber/xhigh", valid.stdout)
         self.assertIn("does not prove account access", valid.stderr)
+        self.assertEqual(canonical_shape.returncode, 0, canonical_shape.stderr)
+        self.assertIn("model/effort: fugu-cyber/xhigh", canonical_shape.stdout)
         self.assertEqual(task_mode.returncode, 2)
         self.assertIn("only available for read-only review mode", task_mode.stderr)
 

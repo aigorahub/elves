@@ -305,6 +305,44 @@ class SupervisorRobustnessTests(unittest.TestCase):
                 "fugu_implementation_route_blocked",
             )
 
+    def test_prewalk_phase_revalidates_persisted_argv_before_launch(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            state_path, log_path = native_worker.native_worker_paths(
+                tmp, "persisted-prewalk-fugu"
+            )
+            state = {
+                "run_id": "persisted-prewalk-fugu",
+                "host": "fixture",
+                "mode": "prewalk",
+                "worktree": str(tmp),
+                "prewalk": {
+                    "model": "fixture-model",
+                    "paths": {
+                        "todo": str(tmp / "todo.json"),
+                        "checkpoint": str(tmp / "checkpoint.json"),
+                        "session_identity": str(tmp / "session.json"),
+                    },
+                },
+                "execution": {"model": "fixture-model"},
+            }
+            native_worker._write_private_json(state_path, state)
+            with self.assertRaises(ValidationIssue) as caught:
+                native_worker._run_worker_phase(
+                    state_path=state_path,
+                    log_path=log_path,
+                    state=state,
+                    phase="prewalk",
+                    argv=("codex-fugu",),
+                    input_text="packet body\n",
+                    child_env={},
+                    expected_session_id=None,
+                )
+            self.assertEqual(
+                caught.exception.code,
+                "fugu_implementation_route_blocked",
+            )
+
     def test_hung_git_timeout_writes_terminal_failed_state(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             tmp = Path(raw)
