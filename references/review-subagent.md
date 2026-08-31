@@ -446,7 +446,7 @@ Ceremony order:
 
 1. Resolve branch, PR, base, draft state, checks.
 2. Read every review surface.
-3. **Fugu review of the current PR diff, routed through Elves.** Use the Elves provider shortcut:
+3. **Fugu review of the current PR diff, when needed and authorized.** Run Fugu only when the user authorized paid Fugu use in the current session and the host records one unresolved high-impact security, correctness, or design question after reading the native review surfaces. A landing request alone does not authorize Fugu. When both gates pass, use the Elves provider shortcut:
    `/fugu review <scope>` in Claude Code, or `$elves fugu review <scope>` in Codex, Grok Build, and
    Oh My Pi. State the one-line `Fugu route: …` before launch. The shortcut resolves
    `scripts/run_fugu.sh` from the active Elves skill root and runs it with its sandbox, context
@@ -454,8 +454,7 @@ Ceremony order:
    **Hosts must not invent a raw Fugu call** — no direct `codex-fugu` or `claude-fugu` invocation,
    no improvised API request, and no variant that strips the runner's isolation or timeout controls.
    Scope it to this PR's diff against the default branch.
-   **Skip only when Fugu is not installed** (`codex-fugu` is not on `PATH`); record the skip and its
-   reason and continue. The Fugu report is read-only evidence for the host review; it never grants
+   Otherwise, record the skipped Fugu review and its reason. The Fugu report is read-only evidence for the host review; it never grants
    landing authority and never merges.
 4. Host review of `git diff <default-branch>...HEAD`, in the Final Readiness Review shape described
    above. The host reviewer adjudicates every Fugu finding: accept, fix, or reject with a reason.

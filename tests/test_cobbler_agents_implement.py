@@ -154,6 +154,31 @@ def _pid_is_executable(pid: int) -> bool:
 
 
 class BuildLaunchArgvTests(unittest.TestCase):
+    def test_fugu_launchers_are_blocked_for_every_implement_adapter(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            packet = Path(tmp) / "batch-1.md"
+            packet.write_text("# packet\n", encoding="utf-8")
+            for adapter, executable in (
+                ("opencode-cli", "codex-fugu"),
+                ("grok-build", "Claude-Fugu"),
+                ("devin-cli", "/tmp/CODEX-FUGU"),
+                ("omp-cli", "claude-fugu"),
+                ("codex-fugu", "grok"),
+            ):
+                with self.subTest(adapter=adapter, executable=executable):
+                    with self.assertRaises(ValidationIssue) as raised:
+                        build_launch_argv(
+                            session_id=TEST_GROK_SESSION,
+                            packet=packet,
+                            cwd=tmp,
+                            adapter=adapter,
+                            executable=executable,
+                        )
+                    self.assertEqual(
+                        raised.exception.code,
+                        "fugu_implementation_route_blocked",
+                    )
+
     def test_resume_argv_defaults(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             packet = Path(tmp) / "batch-1.md"
@@ -398,6 +423,21 @@ class HumanizeGrokFailureTests(unittest.TestCase):
 
 
 class PrepareImplementTests(unittest.TestCase):
+    def test_prepare_rejects_fugu_implementation_route_before_state_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with self.assertRaises(ValidationIssue) as raised:
+                prepare_implement(
+                    root,
+                    adapter="devin-cli",
+                    executable="Claude-Fugu",
+                )
+            self.assertEqual(
+                raised.exception.code,
+                "fugu_implementation_route_blocked",
+            )
+            self.assertFalse(state_path(root).exists())
+
     def test_regular_default_model_defers_to_live_catalog(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             payload = prepare_implement(Path(tmp), session_id="composer-default")

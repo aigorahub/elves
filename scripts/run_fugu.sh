@@ -8,13 +8,14 @@ usage() {
   cat <<'EOF'
 Usage:
   run_fugu.sh [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight]
-              [--include PATH]... [--write] [--] <task...>
-  run_fugu.sh [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight]
+              [--include PATH]... [--] <task...>
+  run_fugu.sh [--deep|--cyber|--ultra|--max] [--max-wait SECONDS] [--preflight]
               [--include PATH]... review [scope...]
 
 Profiles:
   default   fugu at high effort (10m wall) — prefer this first
   --deep    fugu at xhigh effort (20m wall)
+  --cyber   fugu-cyber at xhigh effort for read-only security review (20m)
   --ultra   fugu-ultra-v1.1 at high effort with exact-session synthesis (30m)
   --max     fugu-ultra-v1.1 at max effort with exact-session synthesis and a
             long wall budget (60m), for one narrow high-stakes gate
@@ -22,11 +23,8 @@ Profiles:
 Modes:
   task      The default. Follow the requested task without a review-only rubric.
   review    Read-only change review with ordered P0-P3 findings and exact locations.
-  --write   Allow a general task to edit only its disposable snapshot and export an
-            audited handoff on qualified Linux bwrap hosts. It is unavailable on
-            macOS. The handoff is never applied automatically.
   --preflight
-            Validate launcher, profile, wall, write eligibility, and --include
+            Validate launcher, profile, wall, read-only policy, and --include
             paths, then print a launch plan and exit without calling the provider.
   --max-wait SECONDS
             Cap the hard wall clock for this launch (also via
@@ -55,6 +53,14 @@ while [ "$#" -gt 0 ]; do
         exit 2
       fi
       PROFILE="deep"
+      shift
+      ;;
+    --cyber)
+      if [ "$PROFILE" != "routine" ]; then
+        echo "Error: choose only one Fugu profile." >&2
+        exit 2
+      fi
+      PROFILE="cyber"
       shift
       ;;
     --max)
@@ -124,8 +130,13 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-if [ "$MODE" = "review" ] && [ "$WRITE_MODE" = "1" ]; then
-  echo "Error: Fugu review mode is always read-only; remove --write." >&2
+if [ "$WRITE_MODE" = "1" ]; then
+  echo "Error: Fugu is limited to planning and read-only review; remove --write." >&2
+  exit 2
+fi
+
+if [ "$PROFILE" = "cyber" ] && [ "$MODE" != "review" ]; then
+  echo "Error: --cyber is only available for read-only review mode." >&2
   exit 2
 fi
 
@@ -147,6 +158,11 @@ case "$PROFILE" in
     ;;
   deep)
     MODEL="fugu"
+    EFFORT="xhigh"
+    DEFAULT_MAX_WAIT="1200"
+    ;;
+  cyber)
+    MODEL="fugu-cyber"
     EFFORT="xhigh"
     DEFAULT_MAX_WAIT="1200"
     ;;

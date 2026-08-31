@@ -5,8 +5,8 @@ not change the native-first worker default, the supported-host policy, or landin
 
 | Intent | Claude Code | Codex / natural language | Runner |
 |---|---|---|---|
-| General Fugu task | `/fugu [--deep\|--ultra\|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] <task>` | `$elves fugu [--deep\|--ultra\|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] <task>` | `run_fugu.sh` |
-| Fugu repository review | `/fugu [--deep\|--ultra\|--max] [--max-wait SECONDS] [--preflight] review <scope>` | `$elves fugu [--deep\|--ultra\|--max] [--max-wait SECONDS] [--preflight] review <scope>` | `run_fugu.sh` |
+| Fugu planning task | `/fugu [--deep\|--ultra\|--max] [--max-wait SECONDS] [--preflight] [--include PATH] <planning-task>` | `$elves fugu [--deep\|--ultra\|--max] [--max-wait SECONDS] [--preflight] [--include PATH] <planning-task>` | `run_fugu.sh` |
+| Fugu repository review | `/fugu [--deep\|--cyber\|--ultra\|--max] [--max-wait SECONDS] [--preflight] review <scope>` | `$elves fugu [--deep\|--cyber\|--ultra\|--max] [--max-wait SECONDS] [--preflight] review <scope>` | `run_fugu.sh` |
 | Manus web research | `/manus [--wide\|--fanout] …` | `$elves manus [--wide\|--fanout] …` | `run_manus.sh` |
 | Grok Build headless task | `/grok <instructions>` | `$elves grok <instructions>` | `run_grok.sh` |
 | Devin remote task | `/devin <instructions>` | `$elves devin <instructions>` | `run_devin.sh` |
@@ -20,8 +20,8 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
 
 - **Fugu:** requires the official `codex-fugu` launcher and its configured Sakana credentials.
   Provider selection and task type are separate. Plain `/fugu <task>` (or `$elves fugu <task>`)
-  performs a general task and returns the requested analysis, design, investigation, or other
-  deliverable without forcing P0-P3 findings or a clean-review verdict. The `review` subcommand
+  performs a planning or analysis task without forcing P0-P3 findings or a clean-review verdict.
+  The `review` subcommand
   selects the opinionated read-only review: host-generated branch/base/diff evidence, actionable
   P0-P3 findings with exact locations, and exactly `No actionable findings` when clean.
 
@@ -39,19 +39,8 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
   a file in the snapshot therefore does not itself spend model context. Relevance belongs to the
   host/Fugu task; admissibility remains the safety kernel's decision.
 
-  General tasks are read-only by default. `--write` is valid only for a general task and requires
-  independent implementation authority from the surrounding user request. It is enabled only when
-  the qualified outer boundary is Linux bwrap with a PID namespace that proves recursive teardown;
-  it fails before provider launch on macOS and any platform without that boundary. A qualified
-  write changes the outer boundary from read-only to writable for the disposable snapshot only.
-  After successful PID-namespace teardown, the host compares a pre-task digest-and-mode baseline
-  with a second no-follow audit. Credential-bearing, protected/ignored/instruction, symlink,
-  hard-link, special,
-  unsafe-directory, unsafe-mode, over-count, or oversized output fails closed. Mode-only changes
-  and new executable files are represented in the manifest; exported file bodies stay private at
-  mode 0600 or owner-executable 0700. Accepted changed regular files and deletion records enter a
-  fresh inert `/tmp/elves-fugu-handoff-*` bundle with a JSON manifest (at most 2,000 changed files
-  and 64 MiB). The host checkout is never edited, and the handoff is never applied automatically.
+  Every Fugu task is read-only. Fugu is limited to planning and review. The runner rejects
+  `--write` before provider launch.
 
   Every mode requires Elves' qualified kernel filesystem sandbox (`sandbox-exec` on macOS or
   `bwrap` on Linux), isolated HOME/CODEX_HOME, an environment containing only runtime names plus
@@ -68,26 +57,28 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
   XDG writable state; defaults allow at most 20,000 additional filesystem entries, 256 MiB
   aggregate growth, and 64 MiB per file before the provider is terminated and the result rejected.
   After every provider phase settles, the monitor joins and a final descriptor-safe audit runs
-  before any output or handoff is accepted.
+  before any output is accepted.
   Traversal tolerates only benign ENOENT/rename races from disappearing temporary generations;
   permissions, ownership, unsupported types, and other audit failures remain fail-closed, and links
   are never followed. Every profile closes input, disables launcher notices/updates, and has a hard
-  wall-clock limit. Linux writable mode uses authoritative PID-namespace teardown. macOS read-only
+  wall-clock limit. macOS read-only
   mode uses best-effort native-bound cleanup of observed processes; polling cannot prove recursive
-  absence and is never handoff authority. If a writable boundary cannot be proven, the shortcut
-  fails before provider launch. The supported profiles are:
+  absence and is never process-containment authority. The supported profiles are:
 
   | Shortcut | Model / effort | Default wall limit | Use |
   |---|---|---:|---|
-  | plain profile (host may choose after routing) | `fugu` / `high` | 10 minutes | routine general task or explicit review |
-  | `--deep` | `fugu` / `xhigh` | 20 minutes | harder analysis, implementation, or review |
+  | plain profile (host may choose after routing) | `fugu` / `high` | 10 minutes | routine planning or explicit review |
+  | `--deep` | `fugu` / `xhigh` | 20 minutes | harder planning, analysis, or review |
+  | `--cyber` | `fugu-cyber` / `xhigh` | 20 minutes | read-only security review or threat model |
   | `--ultra` | `fugu-ultra-v1.1` / `high` | 30 minutes total; at most 20 minutes exploring by default | compact high-stakes task with a reserved synthesis phase |
   | `--max` | `fugu-ultra-v1.1` / `max` | 60 minutes total; at most 20 minutes exploring by default | one narrow, high-stakes gate worth the deepest reasoning tier |
 
-  This table is the **runner flag → model/effort map**, not a claim that every bare invocation
-  must stay on plain. Flagless `/fugu` / `$elves fugu` / natural-language "use Fugu" is
-  **host-routed**: the host chooses task mode, profile (locks model + effort), write mode, and
-  `--include` context before launch, preferring the cheapest matching lane. See **Host routing
+  This table is the **runner flag → model/effort map**. Plain regular Fugu is the default for a
+  flagless call. The host may select `--cyber` only when the user asks for a security review or
+  threat model after a successful Cyber call in the current session. Only a user-explicit
+  `--cyber` request may establish that proof. A catalog entry does not prove account access.
+  Otherwise, use regular Fugu. The user must explicitly select `--ultra` or `--max`. The host chooses task mode,
+  profile, and `--include` context before launch. See **Host routing
   when the user says "use Fugu"** below. The runner does not score complexity; it only executes
   the selected profile.
 
@@ -153,19 +144,17 @@ shortcut or states the same unambiguous intent. Never invent top-level slash com
   Fugu models reach it only after a manual update.
 ### Host routing when the user says "use Fugu"
 
-Natural language such as "use Fugu", "ask Fugu", or `/fugu <task>` **without** an explicit
-profile flag is **not** a request to always run bare `fugu/high`. The host agent (Claude Code or
-Codex) must choose the lane before launch, then invoke `run_fugu.sh` with the matching flags.
-Flagless `/fugu` is **host-routed**. The **runner flag** table above is the model map only:
-`run_fugu.sh` itself **does not score complexity**; it only executes the profile the host selects.
-Prefer the **cheapest matching lane**. **Explicit user flags** (`--deep`, `--ultra`, `--max`,
-or plain) **always win**: never upgrade or downgrade them.
+Natural language such as "use Fugu", "ask Fugu", or `/fugu <task>` without a profile flag uses
+plain `fugu/high` by default. The host may select `--deep` when regular Fugu needs xhigh effort.
+The host may select `--cyber` only for explicit security review or threat-model intent after a
+successful Cyber call in the current session. Only a user-explicit `--cyber` request may establish
+that proof. Otherwise, use regular Fugu. The user
+must explicitly select `--ultra` or `--max`. Never upgrade to Ultra or Max from task complexity.
 
 **Always-true isolation facts.** Every successful Fugu launch uses a disposable
 kernel-isolated Git-enumerated snapshot. That **isolation snapshot is not optional** and is not a
-second product the host can skip. What the host *does* choose is (1) whether Fugu is the right
-provider at all, (2) task mode, (3) profile which **locks model + effort** plus wall budget,
-(4) write mode, and (5) extra context via `--include`.
+second product the host can skip. What the host chooses is whether Fugu is needed, planning or
+review mode, the allowed profile, and extra context via `--include`.
 
 State one short `Fugu route: …` line before every launch.
 
@@ -173,28 +162,30 @@ State one short `Fugu route: …` line before every launch.
 
 1. **Should Fugu run at all?** Host-native first for inventory, greps, CHANGELOG/TODO triage, ticket
    classification, and anything the driver can finish with `rg`/`git`/`gh` in under about a minute.
-   Explicit "use Fugu" authorizes paid usage when the remaining question needs high-reasoning on a
-   snapshot (design tradeoff, security review, hard correctness gate). It does **not** authorize
+   Explicit "use Fugu" authorizes paid usage only when the host records a remaining planning or
+   review question that needs high reasoning on a snapshot. It does **not** authorize
    merge or protected-ref work. If the user named Fugu for a broad inventory, do the first pass
    host-native and reserve Fugu for contested rows only (state that in the route line). Do not invent
    an unprompted paid Fugu launch from this section alone.
 
-2. **Task mode.** Default **general** (analysis, design, investigation, implement-plan). Use
+2. **Task mode.** Default to planning or analysis. Use
    `review <scope>` only when the user asked for a review/audit/PR-diff with the P0-P3 contract.
    Scope narrowly (paths, PR, or "current changes"). Never unbounded whole-repo tours when the ask
    is focused.
 
-3. **Profile (first paid call is plain unless the user set a flag).** Profiles are mutually
+3. **Profile.** Profiles are mutually
    exclusive; never pass two. Choose by **deliverable shape**, not by "how hard it sounds."
 
    | Signals | Choose | Model / effort | Default wall | On wall timeout |
    |---|---|---|---:|---|
    | Default for almost everything; first paid call; narrow Q&A that finishes inside the wall | plain (no flag) | `fugu` / `high` | 10m | killed; **nothing returned** |
-   | After plain failed or returned a thin answer; multi-module design; security where xhigh is required; still expected to finish inside the wall | `--deep` | `fugu` / `xhigh` | 20m | killed; **nothing returned** |
-   | Written report or audit that must survive heavy exploration (reserved synthesis on the same session) | `--ultra` | `fugu-ultra-v1.1` / `high` | 30m | synthesis phase still runs |
-   | One already-tight decision worth up to ~60 minutes | `--max` | `fugu-ultra-v1.1` / `max` | 60m | synthesis phase still runs |
+   | After plain failed or returned a thin answer; multi-module planning that needs xhigh effort | `--deep` | `fugu` / `xhigh` | 20m | killed; **nothing returned** |
+   | Explicit security review or threat model | `--cyber` | `fugu-cyber` / `xhigh` | 20m | killed; **nothing returned** |
+   | User explicitly asks for Ultra | `--ultra` | `fugu-ultra-v1.1` / `high` | 30m | synthesis phase still runs |
+   | User explicitly asks for Max | `--max` | `fugu-ultra-v1.1` / `max` | 60m | synthesis phase still runs |
 
-   **Hard rules.** Explicit user flags always win. Do not pick `--deep` for backlog triage, issue
+   **Hard rules.** Explicit user flags always win. Only the host-selected Cyber exception may
+   change the plain default. Do not pick `--deep` for backlog triage, issue
    classification, or CHANGELOG archaeology. Do not pick `--ultra`/`--max` for greps, renames, or
    single-file Q&A. Do not pick `--max` for broad multi-goal work; split the work. Prefer a
    **second plain call** over one broad deep call. Prefer plain + `--max-wait SECONDS` over
@@ -207,10 +198,7 @@ State one short `Fugu route: …` line before every launch.
    slug: the profile table is the map; Ultra/max resolve `fugu-ultra-v1.1` from the installed
    catalog (never silent `fugu-ultra-v1.0`).
 
-4. **Write mode.** Default **read-only**. Pass `--write` only when (a) the user independently
-   authorized implementation, (b) task is general (not review), and (c) platform is qualified Linux
-   bwrap with a PID namespace. On macOS, omit `--write` and say so in one line if the user asked for
-   Fugu edits ("Fugu write unavailable on macOS; use host-native implement or a Linux write lane").
+4. **Write mode.** Fugu is limited to planning and read-only review. The runner rejects `--write`.
 
 5. **Context and `--include`.** The default admitted snapshot already has policy-admitted tracked
    files and safe non-ignored untracked files. The runner does not paste file bodies into the
@@ -238,13 +226,13 @@ State one short `Fugu route: …` line before every launch.
 
 ```text
 Fugu route: host-native only (no launch) — inventory/triage
-Fugu route: general plain, no include, wall 10m
-Fugu route: general plain --max-wait 900, no include
-Fugu route: general plain --preflight --include NOTE.md (launch only if admitted)
+Fugu route: planning plain, no include, wall 10m
+Fugu route: planning plain --max-wait 900, no include
+Fugu route: planning plain --preflight --include NOTE.md (launch only if admitted)
 Fugu route: review main...HEAD plain, paths: scripts/foo.py tests/test_foo.py
 Fugu route: review main...HEAD --deep (only after plain failed on this tip)
-Fugu route: review main...HEAD --ultra (report must return; ranked scope in task string)
-Fugu route: general --ultra, one decision: <question>
+Fugu route: security review main...HEAD --cyber
+Fugu route: review main...HEAD --ultra (user selected Ultra)
 ```
 
 #### Wait, poll, capture, cancel, salvage, and cleanup (operational)
@@ -268,17 +256,14 @@ Wall limits are hard walls (not stream idle timeouts). While a launch runs:
   not assume chat cancel reaps the lane. Confirm with process listing if needed.
 - On exit 2 with `isolation_requested_path_*`, fix the path or drop `--include`, then preflight
   again. Do not retry the same include.
-- On exit 124 / wall timeout: first read salvage from the log; then narrow the task or raise
-  `--max-wait` deliberately. If the work was a written report that died empty on plain/deep,
-  re-place once on `--ultra` with a ranked, budget-aware prompt (see
-  `references/fugu-calling-guide.md`).
+- On exit 124 / wall timeout: first read salvage from the log. Then narrow the task or raise
+  `--max-wait`. Use `--ultra` only if the user explicitly selected Ultra.
 - **Cleanup.** Isolation lanes are removed on normal exit. Keep `fugu.log`. Delete inspected
-  write handoffs under `/tmp/elves-fugu-handoff-*` when finished. After a hard kill, remove only
-  owned leftover `elves-iso-*` temp dirs with no live process. Details:
+  legacy write handoffs under `/tmp/elves-fugu-handoff-*` if an older runner left them. After a
+  hard kill, remove only owned leftover `elves-iso-*` temp dirs with no live process. Details:
   `references/fugu-calling-guide.md` sections 7–8.
 
-After settlement, report Fugu's answer (or salvage) and the route used. Never auto-apply a write
-handoff.
+After settlement, report Fugu's answer or salvage and the route used.
 
 - **Manus:** requires `MANUS_API_KEY`. The ordinary form creates one private `manus-1.6-max` task
   through `https://api.manus.ai/v2/task.create` with `x-manus-api-key`, explicitly empty

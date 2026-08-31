@@ -1,5 +1,5 @@
 ---
-version: "2.33.0"
+version: "2.34.0"
 ---
 
 # Elves: Codex repository adapter
@@ -45,7 +45,7 @@ Skill Memory) apply to all four hosts unchanged. See the guide's "v2.24 run tool
 | Cobbler | `$elves cobbler: <task>` or "Ask the Cobbler…" |
 | Cobbler Mode | `$elves cobbler-mode` or natural "Cobbler Mode: on/off" |
 | Setup | `$elves setup-cobbler` / `$elves setup-council` |
-| Provider shortcut | `$elves fugu [--deep\|--ultra\|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] <task>` / `$elves fugu [--deep\|--ultra\|--max] [--max-wait SECONDS] [--preflight] review <scope>`, `$elves manus [--wide\|--fanout] …`, `$elves grok <instructions>`, `$elves devin <instructions>`, or `$elves omp <instructions>` |
+| Provider shortcut | `$elves fugu [--deep\|--ultra\|--max] [--max-wait SECONDS] [--preflight] [--include PATH] <planning-task>` / `$elves fugu [--deep\|--cyber\|--ultra\|--max] [--max-wait SECONDS] [--preflight] review <scope>`, `$elves manus [--wide\|--fanout] …`, `$elves grok <instructions>`, `$elves devin <instructions>`, or `$elves omp <instructions>` |
 | Land PR | natural language; `\land-pr` / `/land-pr` when the host maps them |
 
 ### Provider subprocess capabilities map
@@ -54,15 +54,18 @@ For explicit provider-shortcut intent, follow SKILL.md **Provider shortcut proto
 `references/provider-shortcuts.md`. Resolve helpers from the active installed skill root; do not
 assume `./scripts` belongs to the target repository and do not execute mappings blindly:
 
-- General Fugu task → `run_fugu.sh [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] <task>`; explicit
-  review → `run_fugu.sh [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] review <scope>`. General output follows the task instead
+- Fugu planning task → `run_fugu.sh [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] [--include PATH] <planning-task>`; explicit
+  review → `run_fugu.sh [--deep|--cyber|--ultra|--max] [--max-wait SECONDS] [--preflight] review <scope>`. Planning output follows the task instead
   of a forced review rubric; review retains read-only base/change evidence and ordered findings.
   **Host Fugu routing:** natural “use Fugu” without an explicit profile flag is host-routed. Before
-  launch, choose general vs `review <scope>`, plain / `--deep` / `--ultra` / `--max`
-  (profile locks model + effort; no free model slug), read-only vs qualified `--write`, and
+  launch, choose planning vs `review <scope>`, plain / `--deep` / `--cyber` / `--ultra` / `--max`
+  (profile locks model + effort; no free model slug), and
   optional `--include` paths; state one short `Fugu route: …` line; prefer the cheapest matching
-  lane; explicit user flags always win. First paid call is plain unless the user set a flag.
-  Prefer `--ultra` when a written report must return after heavy exploration. Host-native first for
+  lane; explicit user flags always win. Plain regular Fugu is the default. The host may select
+  `--cyber` only for explicit security review intent after a successful Cyber call in the current
+  session. Only a user-explicit `--cyber` request may establish that proof. Otherwise, use regular
+  Fugu. The user must explicitly select `--ultra`
+  or `--max`. Host-native first for
   inventory/triage/greps; prefer `--max-wait` over automatic `--deep`; if any `--include`, run
   `--preflight` first (never gitignored paths); redirect to a log (never `| tail`); chat cancel does
   not stop the provider; harvest `Fugu partial salvage` from the log on timeout/crash before
@@ -70,18 +73,15 @@ assume `./scripts` belongs to the target repository and do not execute mappings 
   context via `--include`, not a separate “minimal snapshot” mode. Full table:
   `references/provider-shortcuts.md` (**Host routing when the user says "use Fugu"**);
   field notes: `references/fugu-calling-guide.md`.
-  Both receive a bounded policy-admitted tracked plus non-ignored-untracked snapshot. The host may
+  All profiles receive a bounded policy-admitted tracked plus non-ignored-untracked snapshot. The host may
   select exact context, but the safety kernel rejects ignored/credential/operational/configuration
   paths (including both `.env.*` and `*.env` variants and reserved internal namespaces), unsafe
   file types, links, modes, races, and repository escapes. Exact includes must be admitted or fail.
-  `--write` also requires independent user implementation authority and a qualified recursive
-  Linux bwrap PID-namespace boundary; it is unavailable on macOS, whose process polling cannot
-  prove recursive containment. Qualified writes return a mode-aware audited inert handoff that is
-  never applied automatically. Live writable-state bounds tolerate benign temporary-tree
-  disappearance races while failing closed on other audit errors. Read-only macOS cleanup is
+  Fugu is limited to planning and read-only review. `--write` is rejected. Read-only macOS cleanup is
   best-effort and non-authoritative. No Linux procfs is mounted; Codex external-sandbox mode runs
-  inside the mandatory outer boundary. Profiles remain `fugu/high`, `fugu/xhigh` for `--deep`, and
-  `fugu-ultra-v1.1/high` for `--ultra`, and `fugu-ultra-v1.1/max` for `--max` (60-minute default
+  inside the mandatory outer boundary. Profiles remain `fugu/high`, `fugu/xhigh` for `--deep`,
+  `fugu-cyber/xhigh` for `--cyber`, `fugu-ultra-v1.1/high` for `--ultra`, and
+  `fugu-ultra-v1.1/max` for `--max` (60-minute default
   wall budget, one narrow high-stakes gate); Ultra uses exact-session staged synthesis and bounded incremental
   event parsing through a host-owned pipe, pins final output to a no-follow descriptor, and runs a
   final descriptor-safe writable-state audit after settlement.

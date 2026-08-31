@@ -2181,6 +2181,49 @@ class FullRunReportValidationTests(unittest.TestCase):
 
 
 class FullRunGrokArgvTests(unittest.TestCase):
+    def test_full_run_rejects_fugu_routes_at_prepare_and_argv_boundaries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with self.assertRaises(ValidationIssue) as prepared:
+                prepare_full_run(
+                    root,
+                    session_id="fugu-block",
+                    branch="feat/fugu-block",
+                    start_head="0" * 40,
+                    worktree=root,
+                    packet_path=root / "missing.md",
+                    adapter="devin-cli",
+                    executable="CODEX-FUGU",
+                )
+            self.assertEqual(
+                prepared.exception.code,
+                "fugu_implementation_route_blocked",
+            )
+
+            persisted = mock.Mock(
+                adapter="grok-build",
+                executable="Claude-Fugu",
+                model="auto",
+            )
+            with self.assertRaises(ValidationIssue) as argv:
+                build_full_run_argv(persisted)
+            self.assertEqual(
+                argv.exception.code,
+                "fugu_implementation_route_blocked",
+            )
+
+            fixture = mock.Mock(
+                adapter="fixture",
+                executable="Claude-Fugu",
+                model="fixture",
+            )
+            with self.assertRaises(ValidationIssue) as fixture_argv:
+                build_full_run_argv(fixture)
+            self.assertEqual(
+                fixture_argv.exception.code,
+                "fugu_implementation_route_blocked",
+            )
+
     def test_cancelled_terminal_stream_is_a_typed_failure(self) -> None:
         session_id = "11111111-1111-1111-1111-111111111111"
         cancelled = full_run_module.classify_grok_terminal_records(

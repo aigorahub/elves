@@ -15,6 +15,7 @@ import time
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from unittest import mock
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -23,6 +24,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 from cobbler_runtime.isolation import detect_fs_sandbox_backend  # noqa: E402
+from cobbler_runtime import fugu as fugu_mod  # noqa: E402
 
 
 HAS_FS_SANDBOX = detect_fs_sandbox_backend() is not None
@@ -666,40 +668,15 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertNotIn("AttributeError", result.stderr)
         self.assertNotIn("Traceback", result.stderr)
 
-    @unittest.skipUnless(
-        HAS_FS_SANDBOX and sys.platform.startswith("linux"),
-        "qualified writable Linux bwrap sandbox unavailable",
-    )
-    def test_fugu_authorized_write_exports_audited_handoff_without_host_mutation(self) -> None:
+    def test_fugu_write_is_rejected_before_provider_launch(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
-            temp_root = root / "tmp"
-            temp_root.mkdir()
             bin_dir = root / "bin"
             bin_dir.mkdir()
             self.make_fugu_capture_fake(bin_dir)
-            self.make_fake(bin_dir, "codex")
             repo = root / "repo"
             repo.mkdir()
             subprocess.run(["git", "init", "-q", str(repo)], check=True)
-            (repo / "source.txt").write_text("host source\n", encoding="utf-8")
-            subprocess.run(["git", "-C", str(repo), "add", "source.txt"], check=True)
-            subprocess.run(
-                [
-                    "git",
-                    "-C",
-                    str(repo),
-                    "-c",
-                    "user.name=Test",
-                    "-c",
-                    "user.email=test@example.com",
-                    "commit",
-                    "-q",
-                    "-m",
-                    "source",
-                ],
-                check=True,
-            )
             result = run_script(
                 "run_fugu.sh",
                 "--write",
@@ -707,45 +684,13 @@ class LocalCliRunnerTests(unittest.TestCase):
                 env={
                     "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
                     "SAKANA_API_KEY": "test-sakana-key",
-                    "TMPDIR": str(temp_root),
                 },
                 cwd=repo,
             )
-            handoff_line = next(
-                line
-                for line in result.stderr.splitlines()
-                if line.startswith("Fugu isolated-write handoff: ")
-            )
-            handoff = Path(
-                handoff_line.removeprefix("Fugu isolated-write handoff: ").split(
-                    " (", 1
-                )[0]
-            )
-            manifest = json.loads(
-                (handoff / "manifest.json").read_text(encoding="utf-8")
-            )
 
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("snapshot-write=<allowed>", result.stdout)
-            self.assertIn("not automatically applied", handoff_line)
-            self.assertEqual(manifest["kind"], "elves-fugu-isolated-write-handoff")
-            self.assertFalse(manifest["automatically_applied"])
-            self.assertEqual(manifest["metadata"]["mode"], "task")
-            self.assertEqual(
-                [(item["path"], item["status"]) for item in manifest["changes"]],
-                [("fugu-write-attempt", "added")],
-            )
-            self.assertEqual(
-                (handoff / "files" / "fugu-write-attempt").read_text(
-                    encoding="utf-8"
-                ),
-                "forbidden\n",
-            )
-            self.assertFalse((repo / "fugu-write-attempt").exists())
-            self.assertEqual(
-                (repo / "source.txt").read_text(encoding="utf-8"), "host source\n"
-            )
-            shutil.rmtree(handoff)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("limited to planning and read-only review", result.stderr)
+        self.assertNotIn("arg=<", result.stdout)
 
     @unittest.skipUnless(
         sys.platform == "darwin" and HAS_FS_SANDBOX,
@@ -871,7 +816,7 @@ class LocalCliRunnerTests(unittest.TestCase):
             )
 
         self.assertEqual(result.returncode, 2, result.stderr)
-        self.assertIn("qualified recursive process containment", result.stderr)
+        self.assertIn("limited to planning and read-only review", result.stderr)
         self.assertNotIn("provider-launched", result.stdout)
         self.assertNotIn("Fugu isolated-write handoff:", result.stderr)
 
@@ -1089,7 +1034,7 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertEqual(missing_task.returncode, 2)
         self.assertIn("a general Fugu task is required", missing_task.stderr)
         self.assertEqual(review_write.returncode, 2)
-        self.assertIn("review mode is always read-only", review_write.stderr)
+        self.assertIn("limited to planning and read-only review", review_write.stderr)
         self.assertEqual(forbidden_context.returncode, 2)
         self.assertIn("isolation_requested_path_forbidden", forbidden_context.stderr)
         self.assertIn("Hint:", forbidden_context.stderr)
@@ -1144,8 +1089,217 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertEqual(bad_wait.returncode, 2)
         self.assertIn("wall budget must be numeric", bad_wait.stderr)
 
+    def test_fugu_cyber_preflight_requires_exact_supported_catalog_entry(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_capture_fake(bin_dir)
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            codex_home = root / "codexhome"
+            codex_home.mkdir()
+            env = {
+                "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                "SAKANA_API_KEY": "test-sakana-key",
+                "CODEX_HOME": str(codex_home),
+            }
+            missing = run_script(
+                "run_fugu.sh", "--cyber", "--preflight", "review", "auth boundary",
+                env=env, cwd=repo,
+            )
+            (codex_home / "fugu.json").write_text(
+                json.dumps(
+                    {
+                        "models": [
+                            {
+                                "slug": "fugu-cyber",
+                                "supported_in_api": True,
+                                "supported_reasoning_levels": [{"effort": "xhigh"}],
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            valid = run_script(
+                "run_fugu.sh", "--cyber", "--preflight", "review", "auth boundary",
+                env=env, cwd=repo,
+            )
+            (codex_home / "fugu.json").write_text(
+                json.dumps(
+                    {
+                        "models": [
+                            {
+                                "id": " FUGU-CYBER ",
+                                "supported_in_api": True,
+                                "supported_reasoning_levels": [" XHIGH "],
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            canonical_shape = run_script(
+                "run_fugu.sh", "--cyber", "--preflight", "review", "auth boundary",
+                env=env, cwd=repo,
+            )
+            task_mode = run_script(
+                "run_fugu.sh", "--cyber", "plan security work", env=env, cwd=repo
+            )
+
+        self.assertEqual(missing.returncode, 2)
+        self.assertIn("Fugu Cyber model catalog is missing", missing.stderr)
+        self.assertEqual(valid.returncode, 0, valid.stderr)
+        self.assertIn("model/effort: fugu-cyber/xhigh", valid.stdout)
+        self.assertIn("does not prove account access", valid.stderr)
+        self.assertEqual(canonical_shape.returncode, 0, canonical_shape.stderr)
+        self.assertIn("model/effort: fugu-cyber/xhigh", canonical_shape.stdout)
+        self.assertEqual(task_mode.returncode, 2)
+        self.assertIn("only available for read-only review mode", task_mode.stderr)
+
+    def test_fugu_cyber_preflight_rejects_unsafe_catalog_files(self) -> None:
+        catalog_body = json.dumps(
+            {
+                "models": [
+                    {
+                        "slug": "fugu-cyber",
+                        "supported_in_api": True,
+                        "supported_reasoning_levels": [{"effort": "xhigh"}],
+                    }
+                ]
+            }
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_capture_fake(bin_dir)
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            codex_home = root / "codexhome"
+            codex_home.mkdir()
+            catalog = codex_home / "fugu.json"
+            catalog.write_text(catalog_body, encoding="utf-8")
+            catalog.chmod(0o666)
+            env = {
+                "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                "SAKANA_API_KEY": "test-sakana-key",
+                "CODEX_HOME": str(codex_home),
+            }
+            writable = run_script(
+                "run_fugu.sh", "--cyber", "--preflight", "review", "auth",
+                env=env, cwd=repo,
+            )
+            catalog.unlink()
+            target = codex_home / "catalog-target.json"
+            target.write_text(catalog_body, encoding="utf-8")
+            catalog.symlink_to(target)
+            linked = run_script(
+                "run_fugu.sh", "--cyber", "--preflight", "review", "auth",
+                env=env, cwd=repo,
+            )
+
+        self.assertEqual(writable.returncode, 2)
+        self.assertIn("not a safe owned regular file", writable.stderr)
+        self.assertEqual(linked.returncode, 2)
+        self.assertIn("not a safe readable file", linked.stderr)
+
+    def test_fugu_catalog_read_fails_closed_on_path_replacement(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            catalog = root / "fugu.json"
+            replacement = root / "replacement.json"
+            original_body = b'{"models":[{"slug":"fugu-cyber"}]}'
+            catalog.write_bytes(original_body)
+            replacement.write_bytes(b'{"models":[]}')
+            real_open = os.open
+            replaced = False
+
+            def replace_path_after_open(path, flags, mode=0o777, *, dir_fd=None):
+                nonlocal replaced
+                descriptor = real_open(path, flags, mode, dir_fd=dir_fd)
+                if Path(path) == catalog and not replaced:
+                    os.replace(replacement, catalog)
+                    replaced = True
+                return descriptor
+
+            with mock.patch.object(fugu_mod.os, "open", replace_path_after_open):
+                with self.assertRaises(SystemExit) as raised:
+                    fugu_mod._read_owned_regular(
+                        catalog,
+                        max_bytes=1024,
+                        label="test catalog",
+                    )
+
+        self.assertTrue(replaced)
+        self.assertEqual(raised.exception.code, 2)
+
+    def test_fugu_help_limits_cyber_to_review_and_omits_write(self) -> None:
+        result = run_script("run_fugu.sh", "--help")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        usage_lines = [
+            line.strip()
+            for line in result.stdout.splitlines()
+            if "run_fugu.sh" in line
+        ]
+        self.assertEqual(len(usage_lines), 2)
+        self.assertNotIn("--cyber", usage_lines[0])
+        self.assertIn("--cyber", usage_lines[1])
+        self.assertNotIn("--write", result.stdout)
+        self.assertNotIn("write eligibility", result.stdout)
+
+    def test_fugu_python_backend_rejects_shell_policy_bypass(self) -> None:
+        backend = SCRIPTS / "cobbler_runtime" / "fugu.py"
+        common = [
+            sys.executable,
+            str(backend),
+            "60",
+            "1",
+            str(REPO_ROOT),
+        ]
+        write = subprocess.run(
+            [
+                *common,
+                "fugu",
+                "high",
+                "task",
+                "1",
+                "implement",
+                "2026-08-31",
+                str(SCRIPTS),
+                "routine",
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        premium = subprocess.run(
+            [
+                *common,
+                "fugu-ultra-v1.1",
+                "max",
+                "review",
+                "0",
+                "review",
+                "2026-08-31",
+                str(SCRIPTS),
+                "routine",
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(write.returncode, 2)
+        self.assertIn("limited to planning and read-only review", write.stderr)
+        self.assertEqual(premium.returncode, 2)
+        self.assertIn("does not match its fixed model", premium.stderr)
+
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
-    def test_fugu_profiles_select_regular_deep_or_ultra_high(self) -> None:
+    def test_fugu_profiles_select_regular_cyber_or_ultra(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             bin_dir = root / "bin"
@@ -1157,12 +1311,29 @@ class LocalCliRunnerTests(unittest.TestCase):
             subprocess.run(["git", "init", "-q", str(repo)], check=True)
             codex_home = root / "codexhome"
             codex_home.mkdir()
+            (codex_home / "fugu.json").write_text(
+                json.dumps(
+                    {
+                        "models": [
+                            {
+                                "slug": "fugu-cyber",
+                                "supported_in_api": True,
+                                "supported_reasoning_levels": [{"effort": "xhigh"}],
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
             env = {
                 "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
                 "SAKANA_API_KEY": "test-sakana-key",
                 "CODEX_HOME": str(codex_home),
             }
             deep = run_script("run_fugu.sh", "--deep", "review parser", env=env, cwd=repo)
+            cyber = run_script(
+                "run_fugu.sh", "--cyber", "review", "parser", env=env, cwd=repo
+            )
             ultra = run_script("run_fugu.sh", "--ultra", "review parser", env=env, cwd=repo)
             maxed = run_script("run_fugu.sh", "--max", "review parser", env=env, cwd=repo)
             both = run_script(
@@ -1172,6 +1343,10 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertEqual(deep.returncode, 0, deep.stderr)
         self.assertIn("arg=<--model>\narg=<fugu>", deep.stdout)
         self.assertIn('arg=<model_reasoning_effort="xhigh">', deep.stdout)
+        self.assertEqual(cyber.returncode, 0, cyber.stderr)
+        self.assertIn("arg=<--model>\narg=<fugu-cyber>", cyber.stdout)
+        self.assertIn('arg=<model_reasoning_effort="xhigh">', cyber.stdout)
+        self.assertNotIn("Fugu Ultra exploration phase", cyber.stderr)
         self.assertEqual(ultra.returncode, 0, ultra.stderr)
         self.assertIn("arg=<--model>\narg=<fugu-ultra-v1.1>", ultra.stdout)
         self.assertIn('arg=<model_reasoning_effort="high">', ultra.stdout)

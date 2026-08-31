@@ -261,9 +261,10 @@ perform a regular merge commit (never a squash).
 
 If the user asks for the reviewed-PR landing command, or types `\land-pr` or `/land-pr`, treat that
 as a one-off merge opt-in for the current PR, and run the ceremony in order: resolve the PR and read
-every review surface; run a **Fugu review of the current PR diff routed through Elves**
-(`/fugu review <scope>` in Claude Code, `$elves fugu review <scope>` in Codex, Grok Build, and Oh My
-Pi — **never invent a raw Fugu call**, and skip only when Fugu is not installed); get a fresh
+every review surface; run a **Fugu review of the current PR diff only when needed and authorized**
+(the user authorized paid Fugu use in this session and one unresolved high-impact review question
+remains; use `/fugu review <scope>` or `$elves fugu review <scope>`, and never invent a raw Fugu call;
+otherwise record the skip and its reason); get a fresh
 subagent host review of `git diff <default-branch>...HEAD`; fix blockers; update the docs the change
 touches and bump the version when the repository versions (Elves itself versions, an unversioned
 repository skips the bump); run sensible tests; wait for asynchronous review/CI updates; re-read the
@@ -371,8 +372,9 @@ Elves E2E: chat-to-land (merge when green).
    wake/exit; re-drive gaps (budget 3) or host-complete / hard-stop. Never accept partial labor.
 5. Final Readiness Gate on the tip. Elves Report for substantial runs.
 6. **Reviewed PR landing (explicit merge opt-in):** read every PR comment/check; run an
-   Elves-routed Fugu review of the PR diff (`/fugu review <scope>` or `$elves fugu review <scope>` —
-   never a raw Fugu call; skip only when Fugu is not installed); fresh cumulative host review of
+   Elves-routed Fugu review only when the user authorized paid Fugu use in this session and one
+   unresolved high-impact review question remains (`/fugu review <scope>` or `$elves fugu review
+   <scope>`; never a raw Fugu call; otherwise record the skip and its reason); fresh cumulative host review of
    `git diff <default-branch>...HEAD`; fix blockers; update docs and bump the version when the
    repository versions; re-poll async review/CI; then `gh pr merge --merge` only when not draft,
    checks green, no blocking review, clean worktree. Never squash or rebase.

@@ -248,6 +248,101 @@ class SupervisorRobustnessTests(unittest.TestCase):
         native_worker._write_private_json(state_path, state)
         return state_path
 
+    def test_launch_revalidates_caller_constructed_spec(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            packet = tmp / "packet.md"
+            packet.write_text("packet body\n", encoding="utf-8")
+            spec = native_worker.NativeWorkerSpec(
+                host="fixture",
+                profile="fixture",
+                effort="low",
+                model_policy="exact",
+                requested_model="fixture-model",
+                separate_session=True,
+                cwd=str(tmp),
+                argv=("claude-fugu",),
+                stdin_packet=True,
+                session_id_source="stream",
+            )
+            with self.assertRaises(ValidationIssue) as caught:
+                native_worker.launch_native_worker(
+                    repo_root=tmp,
+                    run_id="blocked-fugu",
+                    spec=spec,
+                    packet=packet,
+                    cli_path=REPO_ROOT / "scripts" / "cobbler_agents.py",
+                )
+            self.assertEqual(
+                caught.exception.code,
+                "fugu_implementation_route_blocked",
+            )
+
+    def test_single_phase_supervisor_revalidates_persisted_argv(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            packet = tmp / "packet.md"
+            packet.write_text("packet body\n", encoding="utf-8")
+            state = {
+                "run_id": "persisted-fugu",
+                "host": "fixture",
+                "worktree": str(tmp),
+                "argv": ["claude-fugu"],
+                "requested_model": "fixture-model",
+            }
+            state_path = self._state_file(tmp, state)
+            _, log_path = native_worker.native_worker_paths(tmp, "persisted-fugu")
+            with self.assertRaises(ValidationIssue) as caught:
+                native_worker._supervise_single_phase(
+                    state_path=state_path,
+                    log_path=log_path,
+                    state=state,
+                    packet=packet,
+                    child_env={},
+                )
+            self.assertEqual(
+                caught.exception.code,
+                "fugu_implementation_route_blocked",
+            )
+
+    def test_prewalk_phase_revalidates_persisted_argv_before_launch(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            state_path, log_path = native_worker.native_worker_paths(
+                tmp, "persisted-prewalk-fugu"
+            )
+            state = {
+                "run_id": "persisted-prewalk-fugu",
+                "host": "fixture",
+                "mode": "prewalk",
+                "worktree": str(tmp),
+                "prewalk": {
+                    "model": "fixture-model",
+                    "paths": {
+                        "todo": str(tmp / "todo.json"),
+                        "checkpoint": str(tmp / "checkpoint.json"),
+                        "session_identity": str(tmp / "session.json"),
+                    },
+                },
+                "execution": {"model": "fixture-model"},
+            }
+            native_worker._write_private_json(state_path, state)
+            with self.assertRaises(ValidationIssue) as caught:
+                native_worker._run_worker_phase(
+                    state_path=state_path,
+                    log_path=log_path,
+                    state=state,
+                    phase="prewalk",
+                    argv=("codex-fugu",),
+                    input_text="packet body\n",
+                    child_env={},
+                    expected_session_id=None,
+                )
+            self.assertEqual(
+                caught.exception.code,
+                "fugu_implementation_route_blocked",
+            )
+
     def test_hung_git_timeout_writes_terminal_failed_state(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             tmp = Path(raw)

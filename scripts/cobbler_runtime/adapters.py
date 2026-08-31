@@ -9,10 +9,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Protocol, Sequence
+from urllib.parse import urlsplit
 
 from .context import ROLE_REPORT_SCHEMA_FIELDS
 from .executables import resolve_executable, resolve_executable_for_launch
@@ -135,7 +137,7 @@ _BUILTIN: dict[str, StubAdapter] = {
     ),
     "codex-fugu": StubAdapter(
         name="codex-fugu",
-        executable_hint="codex",
+        executable_hint="codex-fugu",
         supports_persistent_sessions=True,
         supports_isolated_write=False,
     ),
@@ -244,6 +246,8 @@ _RESERVED_CONTROL_FLAGS: dict[str, frozenset[str]] = {
             "-m",
             "--cd",
             "-C",
+            "--config",
+            "-c",
             "--dangerously-bypass-approvals-and-sandbox",
             "-",
         }
@@ -283,7 +287,7 @@ _RESERVED_CONTROL_FLAGS: dict[str, frozenset[str]] = {
             "--dangerously-skip-permissions",
             "--conversation",
             "--continue",
-            "-c",
+            "--config",
             "--project",
             "--new-project",
             "--agent",
@@ -298,6 +302,7 @@ _RESERVED_CONTROL_FLAGS: dict[str, frozenset[str]] = {
             "--model",
             "-s",
             "--session",
+            "--config",
             "-c",
             "--continue",
             "--fork",
@@ -356,6 +361,77 @@ _RESERVED_CONTROL_FLAGS: dict[str, frozenset[str]] = {
     ),
     "custom-cli": frozenset(),
 }
+
+FUGU_EXECUTABLE_NAMES: frozenset[str] = frozenset(
+    {"codex-fugu", "claude-fugu"}
+)
+
+
+def is_fugu_executable(executable: str | None) -> bool:
+    return (
+        bool(executable)
+        and Path(str(executable)).name.casefold() in FUGU_EXECUTABLE_NAMES
+    )
+
+
+def is_fugu_model(requested_model: str | None) -> bool:
+    if not requested_model:
+        return False
+    token = str(requested_model).strip().casefold().rsplit("/", 1)[-1]
+    return token == "fugu" or token.startswith(("fugu-", "fugu["))
+
+
+def is_fugu_profile_route(
+    *,
+    adapter: str | None,
+    executable: str | None,
+    requested_model: str | None = None,
+) -> bool:
+    return (
+        is_fugu_executable(adapter)
+        or is_fugu_executable(executable)
+        or is_fugu_model(requested_model)
+    )
+
+
+def _uses_sakana_claude_endpoint(
+    adapter: str | None,
+    executable: str | None,
+    environment: Mapping[str, str] | None,
+) -> bool:
+    adapter_name = str(adapter or "").strip().casefold()
+    executable_name = Path(str(executable or "")).name.casefold()
+    if adapter_name not in {"claude", "claude-code"} and executable_name not in {
+        "claude",
+        "claude-code",
+    }:
+        return False
+    endpoint = str((environment or {}).get("ANTHROPIC_BASE_URL") or "").strip()
+    try:
+        hostname = (urlsplit(endpoint).hostname or "").casefold().rstrip(".")
+        return hostname == "api.sakana.ai"
+    except ValueError:
+        return False
+
+
+def reject_fugu_implementation_route(
+    adapter: str | None,
+    executable: str | None,
+    *,
+    requested_model: str | None = None,
+    environment: Mapping[str, str] | None = None,
+) -> None:
+    if is_fugu_profile_route(
+        adapter=adapter,
+        executable=executable,
+        requested_model=requested_model,
+    ) or _uses_sakana_claude_endpoint(adapter, executable, environment):
+        raise ValidationIssue(
+            "fugu_implementation_route_blocked",
+            "Fugu launchers are limited to planning and read-only review",
+            path="implement.executable",
+            hint="Use host-native or another write-qualified implementation route",
+        )
 
 ALLOWED_INPUT_CONTRACTS: frozenset[str] = frozenset(
     {
@@ -436,6 +512,43 @@ def resolve_adapter_name(name: str, *, executable: str | None = None) -> str:
         path=f"adapters.{name}",
         hint=f"Built-in adapters: {', '.join(BUILTIN_ADAPTER_NAMES)}",
     )
+
+
+def _validate_fugu_launch_controls(
+    name: str,
+    *,
+    executable: str | None,
+    requested_model: str | None,
+    extra_args: Sequence[str],
+) -> None:
+    if name != "codex-fugu":
+        if is_fugu_executable(executable):
+            raise ValidationIssue(
+                "reserved_fugu_executable",
+                "Fugu launchers are reserved for the audited codex-fugu adapter",
+                path=f"adapters.{name}.executable",
+            )
+        return
+    if executable and executable != "codex-fugu":
+        raise ValidationIssue(
+            "invalid_fugu_executable",
+            "The codex-fugu adapter does not accept executable overrides",
+            path="adapters.codex-fugu.executable",
+        )
+    if requested_model not in {None, "", "fugu"}:
+        raise ValidationIssue(
+            "invalid_fugu_model_override",
+            "Cobbler Fugu profiles are pinned to regular fugu/high",
+            path="adapters.codex-fugu.requested_model",
+            hint="Use the audited provider shortcut for an explicit non-default Fugu profile",
+        )
+    if extra_args:
+        raise ValidationIssue(
+            "invalid_fugu_extra_args",
+            "Cobbler Fugu profiles do not accept extra arguments",
+            path="adapters.codex-fugu.extra_args",
+            hint="Use the audited provider shortcut for explicit Fugu controls",
+        )
 
 
 def adapter_contract_pair(name: str) -> tuple[str, str]:
@@ -659,8 +772,14 @@ def build_readonly_invocation(
     """
     name = resolve_adapter_name(adapter, executable=executable)
     meta = _BUILTIN.get(name, _BUILTIN["custom-cli"])
-    exe = resolve_executable_for_launch(executable or meta.executable_hint)
     extras = tuple(extra_args)
+    _validate_fugu_launch_controls(
+        name,
+        executable=executable,
+        requested_model=requested_model,
+        extra_args=extras,
+    )
+    exe = resolve_executable_for_launch(executable or meta.executable_hint)
     validate_extra_args(name, extras)
     exact_session = (
         assert_exact_session_id(session_id, adapter=name) if session_id else None
@@ -708,8 +827,11 @@ def build_readonly_invocation(
             "json",
             "--permission-mode",
             "plan",
-            "--no-session-persistence",
         ]
+        if exact_session:
+            argv_list.extend(["--resume", exact_session])
+        else:
+            argv_list.append("--no-session-persistence")
         if requested_model:
             argv_list.extend(["--model", requested_model])
         # Benign extras only — reserved already validated.
@@ -729,6 +851,7 @@ def build_readonly_invocation(
             input_mode="stdin",
             decoder="claude-json",
             cwd=work_cwd,
+            session_id=exact_session,
         )
 
     if name == "grok-build":
@@ -781,12 +904,15 @@ def build_readonly_invocation(
             "read-only",
             "--cd",
             work_cwd,
+            "--model",
+            "fugu",
+            "--config",
+            'model_reasoning_effort="high"',
         ]
-        if requested_model:
-            argv_list.extend(["--model", requested_model])
-        # Benign extras before the final stdin sentinel so '-' remains last.
-        argv_list.extend(extras)
-        argv_list.append("-")
+        if exact_session:
+            argv_list.extend(["resume", exact_session, "-"])
+        else:
+            argv_list.append("-")
         return AdapterInvocation(
             adapter="codex-fugu",
             executable=exe,
@@ -799,6 +925,7 @@ def build_readonly_invocation(
             input_mode="stdin",
             decoder="codex-jsonl",
             cwd=work_cwd,
+            session_id=exact_session,
         )
 
     if name == "opencode-cli":
@@ -1367,6 +1494,7 @@ def decode_codex_jsonl(
     messages: list[str] = []
     actual: str | None = None
     source: str | None = None
+    session_ids: set[str] = set()
     for line in lines:
         try:
             event = json.loads(line)
@@ -1377,6 +1505,14 @@ def decode_codex_jsonl(
             ) from exc
         if not isinstance(event, dict):
             continue
+        if event.get("type") == "thread.started" and isinstance(
+            event.get("thread_id"), str
+        ):
+            session_ids.add(
+                assert_exact_session_id(
+                    str(event["thread_id"]), adapter="codex-fugu"
+                )
+            )
         # Capture model from machine event fields only (not message content).
         for key in ("model", "actual_model"):
             if isinstance(event.get(key), str) and event[key].strip():
@@ -1399,11 +1535,17 @@ def decode_codex_jsonl(
             "malformed_output",
             "Codex JSONL stream contained no agent message text",
         )
+    if len(session_ids) > 1:
+        raise ValidationIssue(
+            "session_identity_conflict",
+            "Codex JSONL stream reported conflicting thread identities",
+        )
     report = _report_from_text_blob(messages[-1], expected_role=expected_role)
     return TransportDecodeResult(
         role_report=report,
         actual_model=actual,
         model_evidence_source=source,
+        session_id=next(iter(session_ids), None),
         transport_notes=("codex-jsonl",),
     )
 
@@ -1759,8 +1901,14 @@ def build_session_create_invocation(
 ) -> AdapterInvocation:
     name = adapter.strip().lower()
     meta = _BUILTIN.get(name, _BUILTIN["custom-cli"])
-    exe = resolve_executable_for_launch(executable or meta.executable_hint)
     extras = tuple(extra_args)
+    _validate_fugu_launch_controls(
+        name,
+        executable=executable,
+        requested_model=requested_model,
+        extra_args=extras,
+    )
+    exe = resolve_executable_for_launch(executable or meta.executable_hint)
     if name == "host-native":
         raise ValidationIssue(
             "host_native_no_external_session",
@@ -1770,7 +1918,14 @@ def build_session_create_invocation(
         import uuid as _uuid  # noqa: PLC0415
 
         sid = str(_uuid.uuid4())
-        argv = [exe or "claude", "--print", "--output-format", "json"]
+        argv = [
+            exe or "claude",
+            "--print",
+            "--output-format",
+            "json",
+            "--permission-mode",
+            "plan",
+        ]
         if requested_model:
             argv.extend(["--model", requested_model])
         argv.extend(["--session-id", sid])
@@ -1804,10 +1959,17 @@ def build_session_create_invocation(
         assert_no_ambiguous_session_flags(inv.argv)
         return inv
     if name == "codex-fugu":
-        argv = [exe or "codex", "exec", "--json"]
-        if requested_model:
-            argv.extend(["--model", requested_model])
-        argv.extend(extras)
+        argv = [
+            exe or "codex-fugu",
+            "exec",
+            "--json",
+            "--sandbox",
+            "read-only",
+            "--model",
+            "fugu",
+            "--config",
+            'model_reasoning_effort="high"',
+        ]
         inv = AdapterInvocation(
             adapter="codex-fugu",
             executable=argv[0],
@@ -1977,15 +2139,30 @@ def build_session_resume_invocation(
     sid = assert_exact_session_id(session_id, adapter=adapter)
     name = adapter.strip().lower()
     meta = _BUILTIN.get(name, _BUILTIN["custom-cli"])
-    exe = resolve_executable_for_launch(executable or meta.executable_hint)
     extras = tuple(extra_args)
+    _validate_fugu_launch_controls(
+        name,
+        executable=executable,
+        requested_model=requested_model,
+        extra_args=extras,
+    )
+    exe = resolve_executable_for_launch(executable or meta.executable_hint)
     if name == "host-native":
         raise ValidationIssue(
             "host_native_no_external_session",
             "host-native does not resume external provider sessions",
         )
     if name == "claude-code":
-        argv = [exe or "claude", "--print", "--output-format", "json", "--resume", sid]
+        argv = [
+            exe or "claude",
+            "--print",
+            "--output-format",
+            "json",
+            "--permission-mode",
+            "plan",
+            "--resume",
+            sid,
+        ]
         if requested_model:
             argv.extend(["--model", requested_model])
         argv.extend(extras)
@@ -2021,11 +2198,19 @@ def build_session_resume_invocation(
         assert_no_ambiguous_session_flags(inv.argv)
         return inv
     if name == "codex-fugu":
-        argv = [exe or "codex", "exec", "resume", "--json"]
-        if requested_model:
-            argv.extend(["--model", requested_model])
-        argv.append(sid)
-        argv.extend(extras)
+        argv = [
+            exe or "codex-fugu",
+            "exec",
+            "--json",
+            "--sandbox",
+            "read-only",
+            "--model",
+            "fugu",
+            "--config",
+            'model_reasoning_effort="high"',
+            "resume",
+            sid,
+        ]
         inv = AdapterInvocation(
             adapter="codex-fugu",
             executable=argv[0],
@@ -2249,10 +2434,49 @@ def build_write_resume_invocation(
     requested_model: str | None = None,
     use_headless_worktree_resume: bool = False,
 ) -> AdapterInvocation:
-    if adapter != "grok-build":
+    name = adapter.strip().lower()
+    reject_fugu_implementation_route(
+        name,
+        executable,
+        requested_model=requested_model,
+        environment=os.environ,
+    )
+    if not cwd or not str(cwd).strip():
+        raise ValidationIssue(
+            "write_cwd_required",
+            "Write resume requires verified worker CWD/worktree path",
+        )
+    if name == "claude-code":
+        sid = assert_exact_session_id(session_id, adapter=name)
+        exe = resolve_executable_for_launch(executable or "claude")
+        argv = [
+            exe,
+            "--safe-mode",
+            "--print",
+            "--output-format",
+            "json",
+            "--permission-mode",
+            "auto",
+            "--resume",
+            sid,
+        ]
+        if requested_model:
+            argv.extend(["--model", requested_model])
+        return AdapterInvocation(
+            adapter=name,
+            executable=exe,
+            argv=tuple(argv),
+            read_only=False,
+            tool_scope="workspace-write",
+            sandbox_scope="safe-mode",
+            notes="qualified exact Claude write resume from verified worktree CWD",
+            session_id=sid,
+            cwd=cwd,
+        )
+    if name != "grok-build":
         return build_session_resume_invocation(
-            adapter=adapter,
-            profile=adapter,
+            adapter=name,
+            profile=name,
             session_id=session_id,
             executable=executable,
             requested_model=requested_model,
@@ -2267,11 +2491,6 @@ def build_write_resume_invocation(
                 f"(version={version or 'unknown'})"
             ),
             hint="Resume exact child id from the registered worktree CWD only",
-        )
-    if not cwd or not str(cwd).strip():
-        raise ValidationIssue(
-            "write_cwd_required",
-            "Write resume requires verified worker CWD/worktree path",
         )
     inv = build_session_resume_invocation(
         adapter="grok-build",

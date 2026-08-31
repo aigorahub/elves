@@ -24,6 +24,7 @@ from typing import Any, Mapping, Sequence
 from .adapters import (
     ADAPTER_CONTRACT_PAIRS,
     AdapterInvocation,
+    assert_exact_session_id,
     build_readonly_invocation,
     default_decoder_for_adapter,
     validate_adapter_contract_pair,
@@ -50,6 +51,23 @@ PROCESS_GROUP_SETTLE_SECONDS = 0.25
 POST_CONTAINMENT_DRAIN_SECONDS = 2.0
 DESCENDANT_POLL_SECONDS = 0.5
 DESCENDANT_VERIFY_ATTEMPTS = 24
+
+
+def session_id_for_attempt(
+    spec: LaneSpec, attempt: EffectiveAttempt
+) -> str | None:
+    """Use lane continuity only on its original provider adapter."""
+    if attempt.session_id is not None:
+        selected = attempt.session_id
+    elif attempt.adapter == spec.adapter:
+        selected = spec.session_id
+    else:
+        selected = None
+    return (
+        assert_exact_session_id(selected, adapter=attempt.adapter)
+        if selected is not None
+        else None
+    )
 
 
 @dataclass(frozen=True)
@@ -965,6 +983,7 @@ def prepare_external_launch(
                 output_contract=attempt_output_contract,
             )
 
+        attempt_session = session_id_for_attempt(spec, attempt)
         if command_override is not None and attempt_index == 0:
             command = list(command_override)
             invocation = AdapterInvocation(
@@ -978,9 +997,9 @@ def prepare_external_launch(
                 if attempt.adapter != "custom-cli"
                 else "custom-json-envelope",
                 cwd=str(launch_repo),
+                session_id=attempt_session,
             )
         else:
-            attempt_session = attempt.session_id or spec.session_id
             invocation = build_readonly_invocation(
                 adapter=attempt.adapter,
                 profile=attempt.profile,

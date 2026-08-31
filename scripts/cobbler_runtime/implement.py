@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .acceptance import normalize_batch_id
+from .adapters import reject_fugu_implementation_route
 from .context import collect_secret_env_values, redact_text
 from .executables import resolve_executable_for_launch
 from .isolation import _managed_implement_env
@@ -943,6 +944,11 @@ def prepare_implement(
     adapter_name = (adapter or "grok-build").strip().lower() or "grok-build"
     if adapter_name in {"opencode", "opencode-labor"}:
         adapter_name = "opencode-cli"
+    reject_fugu_implementation_route(
+        adapter_name,
+        executable,
+        requested_model=model,
+    )
     is_opencode = adapter_name == "opencode-cli"
     is_devin = adapter_name == "devin-cli"
     is_omp = adapter_name == "omp-cli"
@@ -1561,6 +1567,11 @@ def build_launch_argv(
         )
     cwd_path = Path(cwd).expanduser().resolve()
     adapter_name = (adapter or "grok-build").strip().lower()
+    reject_fugu_implementation_route(
+        adapter_name,
+        executable,
+        requested_model=model,
+    )
     sid = (session_id or "").strip()
     if sid.lower() in AMBIGUOUS_SESSION_TOKENS:
         raise ValidationIssue(

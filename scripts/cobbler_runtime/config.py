@@ -16,7 +16,12 @@ import json
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from .adapters import default_profiles, get_adapter
+from .adapters import (
+    default_profiles,
+    get_adapter,
+    is_fugu_executable,
+    is_fugu_profile_route,
+)
 from .dispatch import LaneSpec
 from .context import validate_credential_grant_names
 from .schema import (
@@ -685,6 +690,42 @@ def resolve_config(
             for role_name, route in layer_roles.items():
                 roles[role_name] = _merge_route(roles.get(role_name), route)
 
+        for profile_name, profile in resolved.profiles.items():
+            if profile.adapter == "codex-fugu":
+                if profile.executable not in {None, "codex-fugu"}:
+                    resolved.issues.append(
+                        ValidationIssue(
+                            "invalid_fugu_executable",
+                            f"Fugu profile `{profile_name}` cannot override codex-fugu",
+                            path=f"profiles.{profile_name}.executable",
+                        )
+                    )
+                if profile.requested_model not in {None, "", "fugu"}:
+                    resolved.issues.append(
+                        ValidationIssue(
+                            "invalid_fugu_model_override",
+                            f"Fugu profile `{profile_name}` is pinned to regular fugu/high",
+                            path=f"profiles.{profile_name}.requested_model",
+                        )
+                    )
+                if profile.extra_args:
+                    resolved.issues.append(
+                        ValidationIssue(
+                            "invalid_fugu_extra_args",
+                            f"Fugu profile `{profile_name}` cannot set extra_args",
+                            path=f"profiles.{profile_name}.extra_args",
+                        )
+                    )
+            elif is_fugu_executable(profile.executable):
+                resolved.issues.append(
+                    ValidationIssue(
+                        "reserved_fugu_executable",
+                        f"Profile `{profile_name}` cannot use codex-fugu as `{profile.adapter}`",
+                        path=f"profiles.{profile_name}.executable",
+                        hint="Use the codex-fugu adapter for planning or review",
+                    )
+                )
+
         if not resolved.external_routing_enabled:
             # Disabled external routing: every role resolves host-native; no launches.
             for role in DEFAULT_ROLES:
@@ -731,6 +772,35 @@ def resolve_config(
                         )
                     continue
 
+            profile = resolved.profiles[profile_name]
+            if role_name == RoleName.IMPLEMENT.value and (
+                is_fugu_profile_route(
+                    adapter=profile.adapter,
+                    executable=profile.executable,
+                    requested_model=profile.requested_model,
+                )
+            ):
+                issue = ValidationIssue(
+                    "fugu_implement_route_blocked",
+                    f"Role `{role_name}` cannot use Fugu profile `{profile_name}`",
+                    path=f"roles.{role_name}.profile",
+                    hint="Use Fugu for planning or review, and select a write-qualified implementation profile",
+                )
+                if route.required:
+                    resolved.issues.append(issue)
+                else:
+                    resolved.warnings.append(issue.message)
+                    roles[role_name] = RoleRoute(
+                        role=route.role,
+                        profile=NATIVE_PROFILE_NAME,
+                        required=False,
+                        fallback_chain=(),
+                        source=route.source,
+                        session_mode=route.session_mode,
+                        notes=f"Fell back to host-native: {issue.message}",
+                    )
+                continue
+
             # Validate fallback chain profiles.
             cleaned_fallback: list[FallbackEntry] = []
             for entry in route.fallback_chain:
@@ -752,6 +822,33 @@ def resolve_config(
                     continue
                 if entry.profile not in resolved.profiles:
                     resolved.profiles[entry.profile] = default_profiles()[entry.profile]
+                if (
+                    role_name == RoleName.IMPLEMENT.value
+                    and (
+                        is_fugu_profile_route(
+                            adapter=resolved.profiles[entry.profile].adapter,
+                            executable=resolved.profiles[entry.profile].executable,
+                            requested_model=resolved.profiles[
+                                entry.profile
+                            ].requested_model,
+                        )
+                    )
+                ):
+                    msg = (
+                        f"Role `{role_name}` fallback cannot use Fugu profile "
+                        f"`{entry.profile}`"
+                    )
+                    if route.required:
+                        resolved.issues.append(
+                            ValidationIssue(
+                                "fugu_implement_fallback_blocked",
+                                msg,
+                                path=f"roles.{role_name}.fallback_chain",
+                            )
+                        )
+                    else:
+                        resolved.warnings.append(msg)
+                    continue
                 cleaned_fallback.append(entry)
             if cleaned_fallback != list(route.fallback_chain):
                 roles[role_name] = RoleRoute(

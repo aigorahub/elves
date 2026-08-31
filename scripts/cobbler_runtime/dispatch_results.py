@@ -24,6 +24,19 @@ from .dispatch_models import AttemptResult, LaneResult, LaneSpec
 from .schema import EffectiveAttempt, ValidationIssue
 
 
+def require_exact_session_identity(
+    *, expected: str | None, observed: str | None
+) -> None:
+    """Require transport proof for an invocation that requested one exact session."""
+    if expected is None:
+        return
+    if observed != expected:
+        raise ValidationIssue(
+            "session_identity_mismatch",
+            "Provider transport did not confirm the requested exact session identity",
+        )
+
+
 def summarize(
     text: str,
     *,
@@ -174,6 +187,10 @@ def assemble_external_result(
             expected_role=spec.role,
             requested_model=attempt.requested_model,
             require_model=attempt.requested_model is not None,
+        )
+        require_exact_session_identity(
+            expected=invocation.session_id,
+            observed=decoded.session_id,
         )
         report = redact_structure(
             decoded.role_report, exact_values=exact_secret_values

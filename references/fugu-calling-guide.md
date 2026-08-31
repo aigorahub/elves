@@ -9,14 +9,16 @@ Written from two real review runs on a 2,600-line refactor diff: one that burned
 budget and returned no findings, and one that returned an ordered P0-P3 report with two
 genuine regressions. The difference was entirely in how the call was placed. Cross-checked
 against 2026 Claude Code / Codex agent practice (scope the task, goal + constraints +
-done-when, separate research from implementation, verify before acting) and public Fugu
+done-when, separate research from action, verify before acting) and public Fugu
 operator notes (Ultra is slow; do not max everything).
 
 ## The one-line version
 
-Do not pipe a Fugu run through `tail`. Prefer plain for work that finishes inside the wall.
-When the run **must** produce a written answer after heavy exploration, use a profile that
-reserves synthesis (`--ultra` / `--max`). Tell the model its budget is finite.
+Do not pipe a Fugu run through `tail`. Use plain regular Fugu by default. Use Cyber for an
+explicit security review only after a successful Cyber call in the current session. Only a
+user-explicit Cyber request may establish that proof. A catalog entry does not prove access. Use
+Ultra or Max only when the user selects it. Tell the model its
+budget is finite.
 
 ## 1. Capture the output raw, never through `tail`
 
@@ -60,15 +62,16 @@ Either way, do not pipe. The redirect is what lets the launcher's own salvage pa
 a partial report into the file when a run times out or dies, which a `tail` at the end of
 the pipeline would still be holding when the process is killed.
 
-## 2. Profile choice is about the report, not about depth
+## 2. Profiles have different completion behavior
 
-The four profiles split into two structurally different execution shapes, and the split is
+The five profiles split into two structurally different execution shapes, and the split is
 not the one the names suggest.
 
 | Profile | Model / effort | Default wall | On timeout |
 |---|---|---|---|
 | plain | `fugu` / high | 600s | killed, **nothing returned** |
 | `--deep` | `fugu` / xhigh | 1200s | killed, **nothing returned** |
+| `--cyber` | `fugu-cyber` / xhigh | 1200s | killed, **nothing returned** |
 | `--ultra` | `fugu-ultra-v1.1` / high | 1800s | synthesis phase still runs |
 | `--max` | `fugu-ultra-v1.1` / max | 3600s | synthesis phase still runs |
 
@@ -87,19 +90,12 @@ When exploration ends, the **same session** is re-prompted with tools forbidden 
 write its output. That reservation is why an ultra run returns findings even when it used
 every second of exploration it was given.
 
-**So: choose by whether the run must produce a written deliverable, not by how hard the
-problem is.** A narrow question that fits the wall: plain first (or plain + `--max-wait`).
-A review or audit that ends in a ranked report after heavy reading: `--ultra`, with a
-tight prompt. Plain or `--deep` are for work that will comfortably finish inside its wall,
-where being killed at the boundary means the task was mis-scoped anyway.
+Use plain for a flagless call. The host may select `--cyber` for an explicit security review only
+after a successful Cyber call in the current session. Otherwise, use regular Fugu.
+The host must not select `--ultra` or `--max` without an explicit user request.
 
-This does not cancel economy routing in `provider-shortcuts.md`: still host-native first,
-still first paid call plain for finishable work, still no open-ended `--max`. The synthesis
-rule only upgrades when the **report itself** is the product and plain/deep would die empty.
-
-Upgrading `--deep` to `--ultra` is not "spending more" in the way it looks. A `--deep` run
-that times out spends its whole budget and returns nothing, which is the most expensive
-possible outcome.
+This does not cancel economy routing in `provider-shortcuts.md`. Use host-native checks first.
+Do not use Fugu when no unresolved planning or review question remains.
 
 ## 3. Raise the wall deliberately, and separately from the profile
 
@@ -112,7 +108,7 @@ Note what the wall covers: exploration, the reserved synthesis phase, and cleanu
 true wall-clock bound, not an idle timeout, so a run that keeps emitting heartbeats is still
 bounded (see the "Wall limits here are wall limits" note in `provider-shortcuts.md`).
 
-Use `--preflight` to validate launcher, profile, wall, write eligibility, and `--include`
+Use `--preflight` to validate launcher, profile, wall, read-only policy, and `--include`
 paths and print the launch plan without calling the provider. Cheap way to confirm the call
 is shaped the way you meant before spending a budget on it.
 
@@ -198,8 +194,8 @@ Rules for the host agent:
    against the tree.
 3. **Second call must be narrower.** Feed salvage into the next prompt as "already examined /
    do not re-explore" rather than replaying the whole backlog.
-4. **Prefer `--ultra` when a written report must survive exploration.** Plain/deep still
-   salvage stream text when present, but they do not run a reserved synthesis turn.
+4. Plain, deep, and Cyber can salvage stream text when present. They do not run a reserved
+   synthesis turn.
 5. **Empty salvage** means the provider never emitted usable text (early kill, hung before
    first message). Narrow scope or raise `--max-wait`; do not silent-upgrade to `--max`.
 
@@ -214,15 +210,11 @@ Isolation lanes are disposable and normally removed on exit. Host hygiene still 
    process group (or the observed `codex-fugu` tree). Confirm with `pgrep -fl 'codex-fugu|run_fugu'`.
 2. **Logs.** Keep the redirect file (`fugu.log`). It is the only durable record of salvage and
    diagnostics after the lane is destroyed.
-3. **Write handoffs.** Qualified `--write` may print
-   `Fugu isolated-write handoff: /tmp/elves-fugu-handoff-…`. That bundle is inert and never
-   auto-applied. Inspect it, then delete the directory when done so `/tmp` does not accumulate
-   audited copies.
-4. **Orphan isolation dirs.** If a hard kill interrupted cleanup, look for leftover
+3. **Orphan isolation dirs.** If a hard kill interrupted cleanup, look for leftover
    `elves-iso-*` under the system temp root used for the run and remove only those you own
    after confirming no live process still uses them.
-5. **Preflight residue.** `--preflight` does not launch the provider and leaves no lane.
-6. **Do not re-run the same broken include.** Exit 2 with `isolation_requested_path_*` needs a
+4. **Preflight residue.** `--preflight` does not launch the provider and leaves no lane.
+5. **Do not re-run the same broken include.** Exit 2 with `isolation_requested_path_*` needs a
    path fix first; retrying burns nothing only if you stay on `--preflight`.
 
 ## Quick reference
@@ -233,10 +225,10 @@ Isolation lanes are disposable and normally removed on exit. Host hygiene still 
     # Narrow question, longer clock only
     run_fugu.sh --max-wait 900 "<one specific question>" > fugu.log 2>&1
 
-    # Review that must produce a report (ranked scope, exclusions, output shape)
+    # User-explicit Ultra review (ranked scope, exclusions, output shape)
     run_fugu.sh --ultra review "<ranked scope…>" > fugu.log 2>&1
 
-    # Confirm the call shape without spending a budget
+    # Confirm the user-selected call shape without spending a budget
     run_fugu.sh --ultra --preflight --include NOTE.md review "<scope>"
 
     # After any non-zero exit: search salvage before relaunching

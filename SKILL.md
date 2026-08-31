@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Grok Build, Oh My Pi (omp), Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.33.0"
+  version: "2.34.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -84,7 +84,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.33.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.34.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
@@ -101,7 +101,7 @@ opt-in for the current PR.
 
 1. Resolve branch, PR, base, draft state, checks.
 2. Read every review surface.
-3. **Fugu review of the current PR diff, routed through Elves.** Run the Elves provider shortcut —
+3. **Fugu review of the current PR diff, when needed and authorized.** Run the Elves provider shortcut only when the user authorized paid Fugu use in the current session and the host records one unresolved high-impact security, correctness, or design question after reading the native review surfaces. A landing request alone does not authorize a paid Fugu call. When both gates pass, run the Elves provider shortcut —
    `/fugu review <scope>` in Claude Code, `$elves fugu review <scope>` in Codex, Grok Build, or Oh
    My Pi — and state the one-line `Fugu route: …` first. The shortcut resolves `scripts/run_fugu.sh`
    from the active Elves skill root and runs it with its sandbox, context policy, and wall-clock
@@ -109,8 +109,7 @@ opt-in for the current PR.
    **Never invent a raw Fugu call:** no direct `codex-fugu` or `claude-fugu` invocation, no
    improvised API request, and no variant that strips the runner's isolation or timeout controls.
    Scope the review to this PR's diff against the default branch.
-   **Skip this step only when Fugu is not installed** (`codex-fugu` is not on `PATH`); record the
-   skip and its reason, and continue. Fugu findings are evidence for the host review, never landing
+   Otherwise, record the skipped Fugu review and its reason. Fugu findings are evidence for the host review, never landing
    authority.
 4. Host review: independent review of `git diff <default-branch>...HEAD`.
 5. Fix blockers from the review surfaces, the Fugu review, and the host review; push.
@@ -253,19 +252,16 @@ When an explicit request matches one of these provider tags, resolve the runner 
 Elves skill root**, keep the target repository as the working directory, validate its arguments and
 required capability, then execute it without an extra confirmation prompt:
 
-- `/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] [--write] [--include PATH] <task>` or “use Fugu …” →
-  `scripts/run_fugu.sh [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] <task>` for a bounded general `codex-fugu` task whose
-  output follows the request rather than a forced review rubric.
-  `/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] review <scope>`, `$elves fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] review
+- `/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] [--include PATH] <planning-task>` or “use Fugu …” →
+  `scripts/run_fugu.sh [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] <planning-task>` for a bounded planning or analysis task.
+  `/fugu [--deep|--cyber|--ultra|--max] [--max-wait SECONDS] [--preflight] review <scope>`, `$elves fugu [--deep|--cyber|--ultra|--max] [--max-wait SECONDS] [--preflight] review
   <scope>`, or “do a Fugu review …” selects the explicit read-only review contract.
   **Host Fugu routing:** when the user says “use Fugu” (or plain `/fugu` / `$elves fugu`) without
   an explicit profile flag, the host agent must choose the lane before launch: general vs
-  `review <scope>`, plain / `--deep` / `--ultra` / `--max` (profile locks model + effort; never
-  invent a free model slug), read-only vs qualified `--write`, and optional exact `--include`
+  `review <scope>`, plain / `--deep` / `--cyber` / `--ultra` / `--max` (profile locks model + effort; never
+  invent a free model slug), and optional exact `--include`
   paths. State one short `Fugu route: …` line, then invoke the runner. Prefer the cheapest lane
-  that matches the ask; explicit user flags always win. **First paid call is plain** unless the
-  user set a flag. Prefer `--ultra` when a written report must survive exploration (reserved
-  synthesis); plain/deep die empty on wall timeout. Host-native first for inventory/triage/greps.
+  that matches the ask; explicit user flags always win. Use plain regular Fugu by default. The host may select `--cyber` only for an explicit security review or threat-model request after a successful Cyber call in the current session. Only a user-explicit `--cyber` request may establish that proof. A catalog entry is not proof. Otherwise, use regular Fugu. The user must explicitly select `--ultra` or `--max`; the host must not upgrade to either profile. Plain and deep die empty on wall timeout. Host-native first for inventory, triage, and greps.
   Prefer `--max-wait` over automatic `--deep`. **If any `--include`, run `--preflight` first**
   (never gitignored paths). Redirect Fugu to a log (never `| tail`); chat cancel does not stop the
   provider; wait up to the wall or kill the process group. On timeout/crash, harvest any
@@ -280,19 +276,14 @@ required capability, then execute it without an extra confirmation prompt:
   safety policy rejects ignored, both `.env.*` and `*.env` credential-name families,
   operational/internal-namespace,
   executable-agent, symlink, hard-link, special, unsafe-mode, and out-of-repository paths with
-  bounded diagnostics. General tasks are read-only unless the surrounding request independently
-  authorizes implementation and the host passes `--write`. That route additionally requires a
-  qualified recursive Linux bwrap PID-namespace boundary, so it fails before provider launch on
-  macOS and any other platform without one. A qualified write may edit only the disposable
-  kernel-isolated snapshot and exports a bounded, mode-aware audited inert handoff for host
-  inspection; it never edits the checkout or applies the handoff.
+  bounded diagnostics. Fugu is limited to planning and read-only review. `--write` is rejected.
   The required outer filesystem sandbox remains the read/write authority, and the Linux boundary
   omits procfs so model-directed commands cannot inspect the credential-bearing parent environment.
   Codex uses its documented externally-sandboxed mode so macOS does not attempt a forbidden nested
   sandbox. Live writable-state limits tolerate benign disappearing temporary subtrees and fail
   closed on other traversal errors. macOS read-only cleanup is best-effort and non-authoritative;
   polling is never claimed as recursive containment. The default runner profile is regular
-  `fugu/high` when the host intentionally selects plain; `--deep` selects `fugu/xhigh`, and
+  `fugu/high` when the host intentionally selects plain; `--deep` selects `fugu/xhigh`; `--cyber` selects `fugu-cyber/xhigh` for read-only security review after an exact installed-catalog check; and
   `--ultra` selects `fugu-ultra-v1.1/high`, resolved against the installed catalog so a legacy
   bundle publishing only the `fugu-ultra` alias still launches and `fugu-ultra-v1.0` is never
   substituted. `--max` selects `fugu-ultra-v1.1/max` with a 60-minute default wall budget for one

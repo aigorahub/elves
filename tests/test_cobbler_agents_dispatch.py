@@ -81,6 +81,7 @@ def _write_fake_lane_script(
     omit_metadata: bool = False,
     metadata_model: str | None = None,
     body_actual_model: str | None = None,
+    session_id: str | None = None,
     spawn_descendant: bool = False,
     descendant_marker: Path | None = None,
 ) -> Path:
@@ -112,6 +113,8 @@ def _write_fake_lane_script(
             "actual_model": meta_model,
             "role_report": report,
         }
+        if session_id is not None:
+            envelope["session_id"] = session_id
         envelope_expr = repr(envelope)
 
     lines = [
@@ -715,6 +718,45 @@ class QuorumPolicyTests(unittest.TestCase):
 
 
 class ParallelDispatchTests(unittest.TestCase):
+    def test_command_override_must_confirm_requested_exact_session(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            missing = _write_fake_lane_script(
+                root / "missing-session.py",
+                role="architect",
+                actual_model="fixture-model",
+            )
+            matching = _write_fake_lane_script(
+                root / "matching-session.py",
+                role="architect",
+                actual_model="fixture-model",
+                session_id="exact-session",
+            )
+            base = {
+                "lane_id": "architect",
+                "role": "architect",
+                "adapter": "custom-cli",
+                "profile": "fixture",
+                "requested_model": "fixture-model",
+                "session_id": "exact-session",
+            }
+            rejected = run_council_sync(
+                [LaneSpec(**base, command_override=(sys.executable, str(missing)))],
+                repo_root=root,
+                task="verify session identity",
+                parent_env={"PATH": os.environ.get("PATH", "/usr/bin")},
+            )
+            accepted = run_council_sync(
+                [LaneSpec(**base, command_override=(sys.executable, str(matching)))],
+                repo_root=root,
+                task="verify session identity",
+                parent_env={"PATH": os.environ.get("PATH", "/usr/bin")},
+            )
+
+        self.assertFalse(rejected.lane_results[0].ok)
+        self.assertIn("exact session identity", rejected.lane_results[0].error or "")
+        self.assertTrue(accepted.lane_results[0].ok, accepted.lane_results[0].error)
+
     def test_three_lanes_have_overlapping_execution_spans(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1722,7 +1764,7 @@ class AdapterBuilderTests(unittest.TestCase):
                     profile=adapter,
                     packet_path=packet,
                     prompt_path=prompt,
-                    requested_model="example-model",
+                    requested_model=("fugu" if adapter == "codex-fugu" else "example-model"),
                 )
                 self.assertTrue(inv.read_only)
                 self.assertIsInstance(inv.argv, tuple)
@@ -1763,7 +1805,7 @@ class AdapterBuilderTests(unittest.TestCase):
                         packet_path=packet,
                         prompt_path=prompt,
                         executable=executable,
-                        requested_model="example-model",
+                        requested_model=("fugu" if adapter == "codex-fugu" else "example-model"),
                     )
                     argv_text = " ".join(inv.argv)
                     for token in self.PERMISSION_BYPASS_TOKENS:
@@ -1783,12 +1825,47 @@ class AdapterBuilderTests(unittest.TestCase):
                         self.assertNotIn("--packet", inv.argv)
                         self.assertNotIn("--readonly", inv.argv)
                     if adapter == "codex-fugu":
+                        self.assertEqual(inv.executable, "codex-fugu")
                         self.assertIn("exec", inv.argv)
                         self.assertIn("--json", inv.argv)
                         self.assertIn("--sandbox", inv.argv)
                         self.assertIn("read-only", inv.argv)
+                        self.assertIn("fugu", inv.argv)
+                        self.assertIn('model_reasoning_effort="high"', inv.argv)
                         self.assertIn("-", inv.argv)
                         self.assertNotIn("--packet", inv.argv)
+
+    def test_readonly_exact_session_builders_resume_the_requested_session(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            packet = Path(tmp) / "packet.json"
+            prompt = Path(tmp) / "prompt.txt"
+            packet.write_text("{}", encoding="utf-8")
+            prompt.write_text("review", encoding="utf-8")
+            session_id = "exact-session-123"
+
+            claude = build_readonly_invocation(
+                adapter="claude-code",
+                profile="claude-code",
+                packet_path=packet,
+                prompt_path=prompt,
+                session_id=session_id,
+            )
+            self.assertEqual(claude.session_id, session_id)
+            self.assertIn("--resume", claude.argv)
+            self.assertEqual(claude.argv[claude.argv.index("--resume") + 1], session_id)
+            self.assertNotIn("--no-session-persistence", claude.argv)
+
+            fugu = build_readonly_invocation(
+                adapter="codex-fugu",
+                profile="codex-fugu",
+                packet_path=packet,
+                prompt_path=prompt,
+                session_id=session_id,
+                repo_root=Path(tmp),
+            )
+            self.assertEqual(fugu.session_id, session_id)
+            self.assertEqual(fugu.argv[-3:], ("resume", session_id, "-"))
+            self.assertLess(fugu.argv.index("--sandbox"), fugu.argv.index("resume"))
 
     def test_generated_argv_flags_subset_of_captured_help_fixtures(self) -> None:
         """Compare builders to independent captured --help flag lists, not builder constants."""
@@ -1817,7 +1894,7 @@ class AdapterBuilderTests(unittest.TestCase):
                     profile=adapter,
                     packet_path=packet,
                     prompt_path=prompt,
-                    requested_model="m",
+                    requested_model=("fugu" if adapter == "codex-fugu" else "m"),
                     repo_root=Path(tmp),
                     task="task",
                     role="architect",
@@ -1830,6 +1907,54 @@ class AdapterBuilderTests(unittest.TestCase):
                                 base in family or token in family,
                                 f"{adapter}: unexpected flag {token}; fixture has {sorted(family)[:20]}...",
                             )
+
+    def test_fugu_adapter_rejects_launcher_and_profile_overrides(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            packet = Path(tmp) / "packet.json"
+            prompt = Path(tmp) / "prompt.txt"
+            packet.write_text("{}", encoding="utf-8")
+            prompt.write_text("task", encoding="utf-8")
+            base = {
+                "profile": "codex-fugu",
+                "packet_path": packet,
+                "prompt_path": prompt,
+            }
+            with self.assertRaises(ValidationIssue):
+                build_readonly_invocation(
+                    adapter="codex-fugu", executable="codex", **base
+                )
+            alias_target = Path(tmp) / "launcher"
+            alias_target.write_text("#!/bin/sh\n", encoding="utf-8")
+            alias_path = Path(tmp) / "codex-fugu"
+            alias_path.symlink_to(alias_target)
+            with self.assertRaises(ValidationIssue):
+                build_readonly_invocation(
+                    adapter="codex-fugu", executable=str(alias_path), **base
+                )
+            with self.assertRaises(ValidationIssue):
+                build_readonly_invocation(
+                    adapter="codex-fugu",
+                    requested_model="fugu-ultra-v1.1",
+                    **base,
+                )
+            with self.assertRaises(ValidationIssue):
+                build_readonly_invocation(
+                    adapter="codex-fugu",
+                    extra_args=("-c", 'model_reasoning_effort="max"'),
+                    **base,
+                )
+            with self.assertRaises(ValidationIssue):
+                build_readonly_invocation(
+                    adapter="custom-cli", executable="codex-fugu", **base
+                )
+            with self.assertRaises(ValidationIssue):
+                build_readonly_invocation(
+                    adapter="claude-code", executable="claude-fugu", **base
+                )
+            with self.assertRaises(ValidationIssue):
+                build_readonly_invocation(
+                    adapter="custom-cli", executable="CODEX-FUGU", **base
+                )
 
     def test_google_cli_readonly_uses_print_flags_not_bare_stdin(self) -> None:
         """Gemini / Antigravity dogfood: headless -p/--print, no session create."""
@@ -2183,6 +2308,9 @@ class RemediationBlockerTests(unittest.TestCase):
         with self.assertRaises(ValidationIssue) as ctx:
             validate_extra_args("grok-build", ["--permission-mode", "bypassPermissions"])
         self.assertEqual(ctx.exception.code, "unsafe_extra_args")
+        with self.assertRaises(ValidationIssue) as opencode:
+            validate_extra_args("opencode-cli", ["-c"])
+        self.assertEqual(opencode.exception.code, "unsafe_extra_args")
 
     def test_path_escape_lane_id_contained(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -2418,7 +2546,7 @@ class RemediationBlockerTests(unittest.TestCase):
 
         codex = "\n".join(
             [
-                json.dumps({"type": "thread.started"}),
+                json.dumps({"type": "thread.started", "thread_id": "thread-123"}),
                 json.dumps(
                     {
                         "type": "item.completed",
@@ -2431,6 +2559,60 @@ class RemediationBlockerTests(unittest.TestCase):
             codex, decoder="codex-jsonl", expected_role="architect", require_model=False
         )
         self.assertEqual(decoded_c.role_report["verdict"], "pass")
+        self.assertEqual(decoded_c.session_id, "thread-123")
+
+    def test_exact_session_identity_requires_matching_transport_proof(self) -> None:
+        from cobbler_runtime.dispatch_results import require_exact_session_identity
+
+        require_exact_session_identity(expected=None, observed=None)
+        require_exact_session_identity(expected="same", observed="same")
+        for observed in (None, "different"):
+            with self.subTest(observed=observed), self.assertRaises(
+                ValidationIssue
+            ) as caught:
+                require_exact_session_identity(
+                    expected="requested",
+                    observed=observed,
+                )
+            self.assertEqual(caught.exception.code, "session_identity_mismatch")
+
+    def test_lane_session_identity_does_not_cross_provider_fallbacks(self) -> None:
+        from cobbler_runtime.dispatch_external import session_id_for_attempt
+
+        spec = LaneSpec(
+            lane_id="review",
+            role="reviewer",
+            adapter="codex-fugu",
+            profile="codex-fugu",
+            session_id="fugu-thread",
+        )
+        primary = EffectiveAttempt(
+            profile="codex-fugu",
+            adapter="codex-fugu",
+            reason="primary",
+        )
+        fallback = EffectiveAttempt(
+            profile="claude-code",
+            adapter="claude-code",
+            reason="fallback",
+        )
+        explicit = EffectiveAttempt(
+            profile="claude-code",
+            adapter="claude-code",
+            reason="fallback",
+            session_id="claude-session",
+        )
+        self.assertEqual(session_id_for_attempt(spec, primary), "fugu-thread")
+        self.assertIsNone(session_id_for_attempt(spec, fallback))
+        self.assertEqual(session_id_for_attempt(spec, explicit), "claude-session")
+        for ambiguous in ("latest", "continue", "--resume"):
+            with self.subTest(ambiguous=ambiguous), self.assertRaises(
+                ValidationIssue
+            ):
+                session_id_for_attempt(
+                    replace(spec, session_id=ambiguous),
+                    primary,
+                )
 
 
 

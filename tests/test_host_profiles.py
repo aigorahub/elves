@@ -45,6 +45,36 @@ def _standalone_repo(root: Path) -> Path:
 class NativeArgvByteIdentityTests(unittest.TestCase):
     """B2-A1: codex/claude/fixture argv stays byte-identical through the registry."""
 
+    def test_native_claude_worker_rejects_sakana_endpoint_and_fugu_model(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _standalone_repo(Path(tmp))
+            with mock.patch.dict(
+                os.environ,
+                {"ANTHROPIC_BASE_URL": "https://api.sakana.ai"},
+            ):
+                with self.assertRaises(ValidationIssue) as endpoint:
+                    build_native_worker_spec(
+                        host="claude",
+                        worktree=repo,
+                        effort="high",
+                        requested_model="current-model",
+                    )
+            self.assertEqual(
+                endpoint.exception.code,
+                "fugu_implementation_route_blocked",
+            )
+            with self.assertRaises(ValidationIssue) as model:
+                build_native_worker_spec(
+                    host="claude",
+                    worktree=repo,
+                    effort="high",
+                    requested_model="fugu[1m]",
+                )
+            self.assertEqual(
+                model.exception.code,
+                "fugu_implementation_route_blocked",
+            )
+
     def test_codex_create_and_resume_argv_exact_shapes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = _standalone_repo(Path(tmp))

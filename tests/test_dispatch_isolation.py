@@ -415,7 +415,7 @@ class BuiltInAdapterIsolationTests(unittest.TestCase):
             attempt = EffectiveAttempt(
                 profile="codex-fugu",
                 adapter="codex-fugu",
-                executable="codex",
+                executable="codex-fugu",
                 requested_model=None,
                 extra_args=(),
                 input_contract="stdin",
@@ -444,7 +444,7 @@ class BuiltInAdapterIsolationTests(unittest.TestCase):
             packet_path.write_text("{}")
             prompt_path.write_text("task")
             tool_bin = root / "tool-bin"
-            _write_tool_stub(tool_bin / "codex")
+            _write_tool_stub(tool_bin / "codex-fugu")
             scrub = scrub_environment(
                 {"PATH": f"{tool_bin}{os.pathsep}{os.environ.get('PATH', '/bin')}"}
             )

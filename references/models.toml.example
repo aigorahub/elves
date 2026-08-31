@@ -19,7 +19,7 @@
 # - Built-in adapters: claude-code, grok-build, codex-fugu, gemini-cli,
 #   antigravity-cli, opencode-cli, custom-cli, host-native
 # - Optional tier profiles: claude-code-planning / claude-code-labor,
-#   codex-fugu-planning / codex-fugu-labor (set requested_model per tier locally)
+#   codex-fugu-planning for planning and read-only review only
 # - Google gemini-cli / antigravity-cli: prefer planning/review, not bulk implement
 #
 # Python 3.11+ uses stdlib tomllib. Python 3.10 uses the bundled strict
