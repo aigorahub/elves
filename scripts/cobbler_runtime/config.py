@@ -16,7 +16,7 @@ import json
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from .adapters import default_profiles, get_adapter
+from .adapters import default_profiles, get_adapter, is_fugu_executable
 from .dispatch import LaneSpec
 from .context import validate_credential_grant_names
 from .schema import (
@@ -686,9 +686,8 @@ def resolve_config(
                 roles[role_name] = _merge_route(roles.get(role_name), route)
 
         for profile_name, profile in resolved.profiles.items():
-            executable_name = Path(profile.executable).name if profile.executable else ""
             if profile.adapter == "codex-fugu":
-                if profile.executable != "codex-fugu":
+                if profile.executable not in {None, "codex-fugu"}:
                     resolved.issues.append(
                         ValidationIssue(
                             "invalid_fugu_executable",
@@ -712,7 +711,7 @@ def resolve_config(
                             path=f"profiles.{profile_name}.extra_args",
                         )
                     )
-            elif executable_name == "codex-fugu":
+            elif is_fugu_executable(profile.executable):
                 resolved.issues.append(
                     ValidationIssue(
                         "reserved_fugu_executable",
@@ -771,7 +770,7 @@ def resolve_config(
             profile = resolved.profiles[profile_name]
             if role_name == RoleName.IMPLEMENT.value and (
                 profile.adapter == "codex-fugu"
-                or (profile.executable and Path(profile.executable).name == "codex-fugu")
+                or is_fugu_executable(profile.executable)
             ):
                 issue = ValidationIssue(
                     "fugu_implement_route_blocked",
@@ -819,10 +818,8 @@ def resolve_config(
                     role_name == RoleName.IMPLEMENT.value
                     and (
                         resolved.profiles[entry.profile].adapter == "codex-fugu"
-                        or (
+                        or is_fugu_executable(
                             resolved.profiles[entry.profile].executable
-                            and Path(resolved.profiles[entry.profile].executable).name
-                            == "codex-fugu"
                         )
                     )
                 ):

@@ -128,8 +128,8 @@ Guide. Env var **names** only.
 | --- | --- | --- |
 | Planning / design | host-native | `claude-code-planning`, `codex-fugu-planning`, Gemini CLI, Antigravity CLI |
 | Implementation (labor) | host-native | `claude-code-labor`, grok-build, devin-cli |
-| Independent review | host-native | planning-tier Claude/Codex, Gemini CLI, Antigravity CLI, OpenRouter, Muse |
-| Lightweight review | host-native | labor-tier Claude/Codex, Gemini CLI |
+| Independent review | host-native | `claude-code-planning`, `codex-fugu-planning`, Gemini CLI, Antigravity CLI, OpenRouter, Muse |
+| Lightweight review | host-native | `claude-code-labor`, `codex-fugu-planning`, Gemini CLI |
 | Scout / discovery | host-native | Gemini CLI, Antigravity CLI, OpenRouter, Muse |
 | Validation ownership | host-native | host-native only preferred |
 | Synthesis | host-native | host-native only preferred |
@@ -242,7 +242,7 @@ Support for them as the primary runtime is not our focus. As **optional lenses**
 verify live). If you use them and hit a wall, **prefer a PR**.
 
 **Cost guidance:** usually **not** cost-effective as the main overnight implement engine. Prefer
-host-native or labor-tier Claude/Codex (or optional Grok implement) for bulk batch coding; use
+host-native, `claude-code-labor`, or optional Grok for bulk batch coding; use
 Gemini/Antigravity as independent plan/review lenses when you already pay for the subscription.
 
 ## Host agent protocol

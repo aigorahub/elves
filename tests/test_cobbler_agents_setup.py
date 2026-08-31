@@ -251,6 +251,26 @@ class SetupScenarioTests(unittest.TestCase):
                 any(i.get("code") == "implement_profile_blocked" for i in result.issues)
             )
 
+            claude_alias = run_setup(
+                root,
+                preferences=preferences_from_flags(implement="claude-security"),
+                write_toml=False,
+                fake_presence={"claude-code": True},
+                existing_profiles={
+                    "claude-security": {
+                        "adapter": "claude-code",
+                        "executable": "claude-fugu",
+                    }
+                },
+            )
+            self.assertFalse(claude_alias.ok)
+            self.assertTrue(
+                any(
+                    i.get("code") == "implement_profile_blocked"
+                    for i in claude_alias.issues
+                )
+            )
+
     def test_auth_unknown_and_no_model_list(self) -> None:
         items = inventory_tools(
             fake_presence={"claude-code": True},

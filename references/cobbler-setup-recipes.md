@@ -419,7 +419,7 @@ Claude Code/Codex main driver — or document honest failures.
 ## Recipe: all three subscription CLIs (experimental mix)
 
 - planning: independent mix of host + claude-code + codex-fugu (read-only council)
-- implement: grok-build child under one writer lease **or** labor-tier Claude/Codex
+- implement: grok-build child under one writer lease, `claude-code-labor`, or host-native
 - review: fresh host + claude-code + codex-fugu (+ optional Gemini/Antigravity); **exclude** the
   implementer from independent quorum
 - validate/synthesize/document owner: host coordinator

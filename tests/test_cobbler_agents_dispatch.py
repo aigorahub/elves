@@ -1873,6 +1873,10 @@ class AdapterBuilderTests(unittest.TestCase):
                 build_readonly_invocation(
                     adapter="custom-cli", executable="codex-fugu", **base
                 )
+            with self.assertRaises(ValidationIssue):
+                build_readonly_invocation(
+                    adapter="claude-code", executable="claude-fugu", **base
+                )
 
     def test_google_cli_readonly_uses_print_flags_not_bare_stdin(self) -> None:
         """Gemini / Antigravity dogfood: headless -p/--print, no session create."""
@@ -2226,6 +2230,9 @@ class RemediationBlockerTests(unittest.TestCase):
         with self.assertRaises(ValidationIssue) as ctx:
             validate_extra_args("grok-build", ["--permission-mode", "bypassPermissions"])
         self.assertEqual(ctx.exception.code, "unsafe_extra_args")
+        with self.assertRaises(ValidationIssue) as opencode:
+            validate_extra_args("opencode-cli", ["-c"])
+        self.assertEqual(opencode.exception.code, "unsafe_extra_args")
 
     def test_path_escape_lane_id_contained(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

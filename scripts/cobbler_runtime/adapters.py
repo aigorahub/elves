@@ -301,6 +301,7 @@ _RESERVED_CONTROL_FLAGS: dict[str, frozenset[str]] = {
             "-s",
             "--session",
             "--config",
+            "-c",
             "--continue",
             "--fork",
             "--agent",
@@ -358,6 +359,14 @@ _RESERVED_CONTROL_FLAGS: dict[str, frozenset[str]] = {
     ),
     "custom-cli": frozenset(),
 }
+
+FUGU_EXECUTABLE_NAMES: frozenset[str] = frozenset(
+    {"codex-fugu", "claude-fugu"}
+)
+
+
+def is_fugu_executable(executable: str | None) -> bool:
+    return bool(executable) and Path(str(executable)).name in FUGU_EXECUTABLE_NAMES
 
 ALLOWED_INPUT_CONTRACTS: frozenset[str] = frozenset(
     {
@@ -447,12 +456,11 @@ def _validate_fugu_launch_controls(
     requested_model: str | None,
     extra_args: Sequence[str],
 ) -> None:
-    executable_name = Path(executable).name if executable else ""
     if name != "codex-fugu":
-        if executable_name == "codex-fugu":
+        if is_fugu_executable(executable):
             raise ValidationIssue(
                 "reserved_fugu_executable",
-                "The codex-fugu executable is reserved for the codex-fugu adapter",
+                "Fugu launchers are reserved for the audited codex-fugu adapter",
                 path=f"adapters.{name}.executable",
             )
         return

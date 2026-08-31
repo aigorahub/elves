@@ -176,6 +176,36 @@ class ConfigResolutionTests(unittest.TestCase):
             any(issue.code == "fugu_implement_route_blocked" for issue in required.issues)
         )
 
+        claude_launcher = config_mod.resolve_config(
+            models_toml={
+                "profiles": {
+                    "claude-security": {
+                        "adapter": "claude-code",
+                        "executable": "claude-fugu",
+                    },
+                },
+                "roles": {
+                    "implement": {
+                        "profile": "claude-security",
+                        "fallback_chain": [
+                            {
+                                "profile": "claude-security",
+                                "reason": "security alias",
+                            }
+                        ],
+                    },
+                },
+            }
+        )
+        self.assertEqual(claude_launcher.roles["implement"].profile, "host-native")
+        self.assertEqual(claude_launcher.roles["implement"].fallback_chain, ())
+        self.assertTrue(
+            any(
+                issue.code == "reserved_fugu_executable"
+                for issue in claude_launcher.issues
+            )
+        )
+
     def test_fugu_profile_controls_fail_closed(self) -> None:
         resolved = config_mod.resolve_config(
             models_toml={
@@ -202,6 +232,10 @@ class ConfigResolutionTests(unittest.TestCase):
                         "adapter": "custom-cli",
                         "executable": "codex-fugu",
                     },
+                    "claude-fugu-alias": {
+                        "adapter": "claude-code",
+                        "executable": "claude-fugu",
+                    },
                 }
             }
         )
@@ -211,6 +245,20 @@ class ConfigResolutionTests(unittest.TestCase):
         self.assertIn("invalid_fugu_model_override", codes)
         self.assertIn("invalid_fugu_extra_args", codes)
         self.assertIn("reserved_fugu_executable", codes)
+
+        inherited = config_mod.resolve_config(
+            models_toml={
+                "profiles": {
+                    "review-fugu": {
+                        "adapter": "codex-fugu",
+                    }
+                },
+                "roles": {
+                    "review": {"profile": "review-fugu"},
+                },
+            }
+        )
+        self.assertTrue(inherited.ok, inherited.issues)
 
     def test_deterministic_fallback_order_preserved(self) -> None:
         resolved = config_mod.resolve_config(
