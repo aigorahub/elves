@@ -366,7 +366,23 @@ FUGU_EXECUTABLE_NAMES: frozenset[str] = frozenset(
 
 
 def is_fugu_executable(executable: str | None) -> bool:
-    return bool(executable) and Path(str(executable)).name in FUGU_EXECUTABLE_NAMES
+    return (
+        bool(executable)
+        and Path(str(executable)).name.casefold() in FUGU_EXECUTABLE_NAMES
+    )
+
+
+def reject_fugu_implementation_route(
+    adapter: str | None,
+    executable: str | None,
+) -> None:
+    if is_fugu_executable(adapter) or is_fugu_executable(executable):
+        raise ValidationIssue(
+            "fugu_implementation_route_blocked",
+            "Fugu launchers are limited to planning and read-only review",
+            path="implement.executable",
+            hint="Use host-native or another write-qualified implementation route",
+        )
 
 ALLOWED_INPUT_CONTRACTS: frozenset[str] = frozenset(
     {

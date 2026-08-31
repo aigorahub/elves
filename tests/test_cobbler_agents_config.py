@@ -236,6 +236,10 @@ class ConfigResolutionTests(unittest.TestCase):
                         "adapter": "claude-code",
                         "executable": "claude-fugu",
                     },
+                    "case-variant-fugu-alias": {
+                        "adapter": "custom-cli",
+                        "executable": "Claude-Fugu",
+                    },
                 }
             }
         )

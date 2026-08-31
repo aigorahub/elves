@@ -259,7 +259,7 @@ class SetupScenarioTests(unittest.TestCase):
                 existing_profiles={
                     "claude-security": {
                         "adapter": "claude-code",
-                        "executable": "claude-fugu",
+                        "executable": "Claude-Fugu",
                     }
                 },
             )

@@ -45,6 +45,7 @@ from .acceptance import (
     parse_markdown_acceptance_rows,
     validate_contract_mapping,
 )
+from .adapters import reject_fugu_implementation_route
 from .context import redact_text, validate_credential_grant_names
 from .delegated_git import (
     DelegatedGitContract,
@@ -3809,6 +3810,8 @@ def prepare_full_run(
         pass
 
     adapter_name = (adapter or "grok-build").strip().lower()
+    if adapter_name != "fixture":
+        reject_fugu_implementation_route(adapter_name, executable)
     # Single default authority for worker effort: an explicit request wins,
     # otherwise the normalized adapter name picks the default. Explicitness is
     # persisted so a flagless resume keeps the originally requested value.
@@ -4220,6 +4223,8 @@ def save_state(repo_root: Path, state: FullRunState) -> Path:
 
 def build_full_run_argv(state: FullRunState) -> list[str]:
     """Adapter-aware argv. Fixture mode uses explicit python + script + packet."""
+    if state.adapter != "fixture":
+        reject_fugu_implementation_route(state.adapter, state.executable)
     launch_packet = (
         state.goal_prompt_path
         if state.goal_mode_behaviorally_verified and state.goal_prompt_path
@@ -4913,6 +4918,8 @@ def launch_full_run(
         # Build argv only after Grok auth selection has resolved and bound the
         # exact executable. The supervisor receives that same path plus the
         # identity it must recheck immediately before provider spawn.
+        if state.adapter != "fixture":
+            reject_fugu_implementation_route(state.adapter, state.executable)
         provider_argv = build_full_run_argv(state)
         if resume and state.adapter != "fixture":
             try:

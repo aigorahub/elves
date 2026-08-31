@@ -1877,6 +1877,10 @@ class AdapterBuilderTests(unittest.TestCase):
                 build_readonly_invocation(
                     adapter="claude-code", executable="claude-fugu", **base
                 )
+            with self.assertRaises(ValidationIssue):
+                build_readonly_invocation(
+                    adapter="custom-cli", executable="CODEX-FUGU", **base
+                )
 
     def test_google_cli_readonly_uses_print_flags_not_bare_stdin(self) -> None:
         """Gemini / Antigravity dogfood: headless -p/--print, no session create."""
