@@ -408,7 +408,8 @@ def _uses_sakana_claude_endpoint(
         return False
     endpoint = str((environment or {}).get("ANTHROPIC_BASE_URL") or "").strip()
     try:
-        return urlsplit(endpoint).hostname == "api.sakana.ai"
+        hostname = (urlsplit(endpoint).hostname or "").casefold().rstrip(".")
+        return hostname == "api.sakana.ai"
     except ValueError:
         return False
 
@@ -2161,7 +2162,6 @@ def build_session_resume_invocation(
         argv = [
             exe or "codex-fugu",
             "exec",
-            "resume",
             "--json",
             "--sandbox",
             "read-only",
@@ -2169,8 +2169,9 @@ def build_session_resume_invocation(
             "fugu",
             "--config",
             'model_reasoning_effort="high"',
+            "resume",
+            sid,
         ]
-        argv.append(sid)
         inv = AdapterInvocation(
             adapter="codex-fugu",
             executable=argv[0],

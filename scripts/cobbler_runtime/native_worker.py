@@ -2041,6 +2041,12 @@ def launch_native_worker(
         ]
     )
     launch_spec = prewalk_spec.guide if prewalk_spec else spec
+    reject_fugu_implementation_route(
+        launch_spec.host,
+        launch_spec.argv[0] if launch_spec.argv else None,
+        requested_model=launch_spec.requested_model,
+        environment=os.environ,
+    )
     worktree = Path(launch_spec.cwd).resolve()
     if prewalk_spec and not _worktree_clean(worktree):
         raise ValidationIssue(
@@ -2063,6 +2069,7 @@ def launch_native_worker(
         "host": launch_spec.host,
         "worktree": launch_spec.cwd,
         "argv": list(launch_spec.argv),
+        "requested_model": launch_spec.requested_model,
         "session_id": launch_spec.session_id,
         "session_id_source": launch_spec.session_id_source,
         "pid": None,
@@ -2214,12 +2221,19 @@ def _supervise_single_phase(
     child_env: dict[str, str],
 ) -> int:
     packet_text = packet.read_text(encoding="utf-8")
+    argv = tuple(state["argv"])
+    reject_fugu_implementation_route(
+        str(state.get("host") or ""),
+        str(argv[0]) if argv else None,
+        requested_model=str(state.get("requested_model") or "") or None,
+        environment=child_env,
+    )
     result = _run_worker_phase(
         state_path=state_path,
         log_path=log_path,
         state=state,
         phase="execution",
-        argv=tuple(state["argv"]),
+        argv=argv,
         input_text=packet_text,
         child_env=child_env,
         expected_session_id=state.get("session_id"),
@@ -2646,6 +2660,8 @@ def supervise_native_worker(*, repo_root: Path, run_id: str, packet: Path) -> in
         phase_model = state["execution"].get("model")
     if phase_model is None and isinstance(state.get("prewalk"), dict):
         phase_model = state["prewalk"].get("model")
+    if phase_model is None:
+        phase_model = state.get("requested_model")
     child_env = _native_worker_child_env(
         host=str(state.get("host") or ""),
         worktree=worktree,

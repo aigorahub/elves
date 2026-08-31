@@ -893,7 +893,13 @@ class GrokLineageTests(unittest.TestCase):
 
 
 class WriteResumeCliTests(unittest.TestCase):
-    def _invoke(self, root: Path, *extra: str) -> subprocess.CompletedProcess[str]:
+    def _invoke(
+        self,
+        root: Path,
+        *extra: str,
+        adapter: str = "grok-build",
+        model: str = "grok-model",
+    ) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [
                 sys.executable,
@@ -906,9 +912,9 @@ class WriteResumeCliTests(unittest.TestCase):
                 "--session-id",
                 "22222222-2222-2222-2222-222222222222",
                 "--adapter",
-                "grok-build",
+                adapter,
                 "--model",
-                "grok-model",
+                model,
                 "--cwd",
                 str(root),
                 "--worktree",
@@ -924,6 +930,36 @@ class WriteResumeCliTests(unittest.TestCase):
             text=True,
             check=False,
         )
+
+    def test_write_resume_uses_guarded_builder(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            registry = SessionRegistry(root)
+            registry.create(
+                session_id="22222222-2222-2222-2222-222222222222",
+                harness="codex-fugu",
+                profile="codex-fugu",
+                role="implement",
+                actual_model="fugu",
+                parent_id="parent-1",
+                cwd=str(root),
+                worktree=str(root),
+                source_head="a" * 40,
+            )
+            registry.activate("22222222-2222-2222-2222-222222222222")
+            result = self._invoke(
+                root,
+                "--profile",
+                "codex-fugu",
+                adapter="codex-fugu",
+                model="fugu",
+            )
+            self.assertNotEqual(result.returncode, 0, result.stdout)
+            payload = json.loads(result.stdout)
+            self.assertEqual(
+                payload["issues"][0]["code"],
+                "fugu_implementation_route_blocked",
+            )
 
     def test_write_resume_requires_observed_profile(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1059,6 +1095,8 @@ class SessionCommandBuilderTests(unittest.TestCase):
                 if adapter == "codex-fugu":
                     sandbox = inv.argv.index("--sandbox")
                     self.assertEqual(inv.argv[sandbox + 1], "read-only")
+                    self.assertLess(sandbox, inv.argv.index("resume"))
+                    self.assertEqual(inv.argv[-2:], ("resume", session_id))
                 # Bare --resume without id is forbidden; exact --resume <id> is required.
                 assert_no_ambiguous_session_flags(inv.argv)
                 # Ensure we never emit continue/last patterns from the corpus.

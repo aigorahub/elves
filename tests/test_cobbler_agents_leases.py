@@ -2367,22 +2367,27 @@ class GrokWriteProfileTests(unittest.TestCase):
                     raised.exception.code,
                     "fugu_implementation_route_blocked",
                 )
-        with mock.patch.dict(
-            os.environ,
-            {"ANTHROPIC_BASE_URL": "https://api.sakana.ai"},
+        for base_url in (
+            "https://api.sakana.ai",
+            "https://api.sakana.ai./v1",
+            "https://API.SAKANA.AI:443/v1",
         ):
-            with self.assertRaises(ValidationIssue) as endpoint:
-                build_write_resume_invocation(
-                    adapter="claude-code",
-                    session_id="exact-session",
-                    cwd="/verified/worktree",
-                    executable="claude",
-                    requested_model="current-model",
+            with self.subTest(base_url=base_url), mock.patch.dict(
+                os.environ,
+                {"ANTHROPIC_BASE_URL": base_url},
+            ):
+                with self.assertRaises(ValidationIssue) as endpoint:
+                    build_write_resume_invocation(
+                        adapter="claude-code",
+                        session_id="exact-session",
+                        cwd="/verified/worktree",
+                        executable="claude",
+                        requested_model="current-model",
+                    )
+                self.assertEqual(
+                    endpoint.exception.code,
+                    "fugu_implementation_route_blocked",
                 )
-        self.assertEqual(
-            endpoint.exception.code,
-            "fugu_implementation_route_blocked",
-        )
 
     def test_headless_worktree_resume_forbidden(self) -> None:
         profile = grok_write_profile("0.2.93")

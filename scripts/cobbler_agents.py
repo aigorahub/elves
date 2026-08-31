@@ -1534,14 +1534,23 @@ def cmd_session(args: argparse.Namespace) -> int:
             model = observed_model or model
             cwd = observed_cwd or cwd
         try:
-            inv = build_session_resume_invocation(
-                adapter=adapter,
-                profile=profile,
-                session_id=args.session_id,
-                executable=args.executable,
-                requested_model=model,
-                cwd=cwd,
-            )
+            if args.require_write:
+                inv = build_write_resume_invocation(
+                    adapter=adapter,
+                    session_id=args.session_id,
+                    cwd=cwd or "",
+                    executable=args.executable,
+                    requested_model=model,
+                )
+            else:
+                inv = build_session_resume_invocation(
+                    adapter=adapter,
+                    profile=profile,
+                    session_id=args.session_id,
+                    executable=args.executable,
+                    requested_model=model,
+                    cwd=cwd,
+                )
         except ValidationIssue as issue:
             payload = {"ok": False, "issues": [issue.to_dict()]}
             if args.json:
