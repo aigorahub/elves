@@ -81,6 +81,7 @@ def _write_fake_lane_script(
     omit_metadata: bool = False,
     metadata_model: str | None = None,
     body_actual_model: str | None = None,
+    session_id: str | None = None,
     spawn_descendant: bool = False,
     descendant_marker: Path | None = None,
 ) -> Path:
@@ -112,6 +113,8 @@ def _write_fake_lane_script(
             "actual_model": meta_model,
             "role_report": report,
         }
+        if session_id is not None:
+            envelope["session_id"] = session_id
         envelope_expr = repr(envelope)
 
     lines = [
@@ -715,6 +718,45 @@ class QuorumPolicyTests(unittest.TestCase):
 
 
 class ParallelDispatchTests(unittest.TestCase):
+    def test_command_override_must_confirm_requested_exact_session(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            missing = _write_fake_lane_script(
+                root / "missing-session.py",
+                role="architect",
+                actual_model="fixture-model",
+            )
+            matching = _write_fake_lane_script(
+                root / "matching-session.py",
+                role="architect",
+                actual_model="fixture-model",
+                session_id="exact-session",
+            )
+            base = {
+                "lane_id": "architect",
+                "role": "architect",
+                "adapter": "custom-cli",
+                "profile": "fixture",
+                "requested_model": "fixture-model",
+                "session_id": "exact-session",
+            }
+            rejected = run_council_sync(
+                [LaneSpec(**base, command_override=(sys.executable, str(missing)))],
+                repo_root=root,
+                task="verify session identity",
+                parent_env={"PATH": os.environ.get("PATH", "/usr/bin")},
+            )
+            accepted = run_council_sync(
+                [LaneSpec(**base, command_override=(sys.executable, str(matching)))],
+                repo_root=root,
+                task="verify session identity",
+                parent_env={"PATH": os.environ.get("PATH", "/usr/bin")},
+            )
+
+        self.assertFalse(rejected.lane_results[0].ok)
+        self.assertIn("exact session identity", rejected.lane_results[0].error or "")
+        self.assertTrue(accepted.lane_results[0].ok, accepted.lane_results[0].error)
+
     def test_three_lanes_have_overlapping_execution_spans(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

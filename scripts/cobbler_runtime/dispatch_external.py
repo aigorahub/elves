@@ -976,6 +976,7 @@ def prepare_external_launch(
                 output_contract=attempt_output_contract,
             )
 
+        attempt_session = session_id_for_attempt(spec, attempt)
         if command_override is not None and attempt_index == 0:
             command = list(command_override)
             invocation = AdapterInvocation(
@@ -989,9 +990,9 @@ def prepare_external_launch(
                 if attempt.adapter != "custom-cli"
                 else "custom-json-envelope",
                 cwd=str(launch_repo),
+                session_id=attempt_session,
             )
         else:
-            attempt_session = session_id_for_attempt(spec, attempt)
             invocation = build_readonly_invocation(
                 adapter=attempt.adapter,
                 profile=attempt.profile,

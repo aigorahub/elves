@@ -2422,6 +2422,23 @@ class GrokWriteProfileTests(unittest.TestCase):
                 version="0.2.93",
             )
 
+    def test_claude_write_resume_uses_qualified_write_posture(self) -> None:
+        inv = build_write_resume_invocation(
+            adapter="claude-code",
+            session_id="exact-claude-session",
+            cwd="/verified/worktree",
+            requested_model="claude-model",
+        )
+        self.assertFalse(inv.read_only)
+        self.assertIn("--safe-mode", inv.argv)
+        self.assertEqual(
+            inv.argv[inv.argv.index("--permission-mode") + 1],
+            "auto",
+        )
+        self.assertNotIn("plan", inv.argv)
+        self.assertEqual(inv.session_id, "exact-claude-session")
+        self.assertEqual(inv.cwd, "/verified/worktree")
+
     def test_workspace_sandbox_not_commit_capable(self) -> None:
         profile = workspace_sandbox_write_profile()
         self.assertFalse(profile.qualified)

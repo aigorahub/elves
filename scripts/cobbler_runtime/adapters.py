@@ -2434,16 +2434,49 @@ def build_write_resume_invocation(
     requested_model: str | None = None,
     use_headless_worktree_resume: bool = False,
 ) -> AdapterInvocation:
+    name = adapter.strip().lower()
     reject_fugu_implementation_route(
-        adapter,
+        name,
         executable,
         requested_model=requested_model,
         environment=os.environ,
     )
-    if adapter != "grok-build":
+    if not cwd or not str(cwd).strip():
+        raise ValidationIssue(
+            "write_cwd_required",
+            "Write resume requires verified worker CWD/worktree path",
+        )
+    if name == "claude-code":
+        sid = assert_exact_session_id(session_id, adapter=name)
+        exe = resolve_executable_for_launch(executable or "claude")
+        argv = [
+            exe,
+            "--safe-mode",
+            "--print",
+            "--output-format",
+            "json",
+            "--permission-mode",
+            "auto",
+            "--resume",
+            sid,
+        ]
+        if requested_model:
+            argv.extend(["--model", requested_model])
+        return AdapterInvocation(
+            adapter=name,
+            executable=exe,
+            argv=tuple(argv),
+            read_only=False,
+            tool_scope="workspace-write",
+            sandbox_scope="safe-mode",
+            notes="qualified exact Claude write resume from verified worktree CWD",
+            session_id=sid,
+            cwd=cwd,
+        )
+    if name != "grok-build":
         return build_session_resume_invocation(
-            adapter=adapter,
-            profile=adapter,
+            adapter=name,
+            profile=name,
             session_id=session_id,
             executable=executable,
             requested_model=requested_model,
@@ -2458,11 +2491,6 @@ def build_write_resume_invocation(
                 f"(version={version or 'unknown'})"
             ),
             hint="Resume exact child id from the registered worktree CWD only",
-        )
-    if not cwd or not str(cwd).strip():
-        raise ValidationIssue(
-            "write_cwd_required",
-            "Write resume requires verified worker CWD/worktree path",
         )
     inv = build_session_resume_invocation(
         adapter="grok-build",
