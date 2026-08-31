@@ -827,8 +827,11 @@ def build_readonly_invocation(
             "json",
             "--permission-mode",
             "plan",
-            "--no-session-persistence",
         ]
+        if exact_session:
+            argv_list.extend(["--resume", exact_session])
+        else:
+            argv_list.append("--no-session-persistence")
         if requested_model:
             argv_list.extend(["--model", requested_model])
         # Benign extras only — reserved already validated.
@@ -848,6 +851,7 @@ def build_readonly_invocation(
             input_mode="stdin",
             decoder="claude-json",
             cwd=work_cwd,
+            session_id=exact_session,
         )
 
     if name == "grok-build":
@@ -905,7 +909,10 @@ def build_readonly_invocation(
             "--config",
             'model_reasoning_effort="high"',
         ]
-        argv_list.append("-")
+        if exact_session:
+            argv_list.extend(["resume", exact_session, "-"])
+        else:
+            argv_list.append("-")
         return AdapterInvocation(
             adapter="codex-fugu",
             executable=exe,
@@ -918,6 +925,7 @@ def build_readonly_invocation(
             input_mode="stdin",
             decoder="codex-jsonl",
             cwd=work_cwd,
+            session_id=exact_session,
         )
 
     if name == "opencode-cli":

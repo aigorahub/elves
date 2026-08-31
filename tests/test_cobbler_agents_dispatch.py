@@ -1793,6 +1793,38 @@ class AdapterBuilderTests(unittest.TestCase):
                         self.assertIn("-", inv.argv)
                         self.assertNotIn("--packet", inv.argv)
 
+    def test_readonly_exact_session_builders_resume_the_requested_session(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            packet = Path(tmp) / "packet.json"
+            prompt = Path(tmp) / "prompt.txt"
+            packet.write_text("{}", encoding="utf-8")
+            prompt.write_text("review", encoding="utf-8")
+            session_id = "exact-session-123"
+
+            claude = build_readonly_invocation(
+                adapter="claude-code",
+                profile="claude-code",
+                packet_path=packet,
+                prompt_path=prompt,
+                session_id=session_id,
+            )
+            self.assertEqual(claude.session_id, session_id)
+            self.assertIn("--resume", claude.argv)
+            self.assertEqual(claude.argv[claude.argv.index("--resume") + 1], session_id)
+            self.assertNotIn("--no-session-persistence", claude.argv)
+
+            fugu = build_readonly_invocation(
+                adapter="codex-fugu",
+                profile="codex-fugu",
+                packet_path=packet,
+                prompt_path=prompt,
+                session_id=session_id,
+                repo_root=Path(tmp),
+            )
+            self.assertEqual(fugu.session_id, session_id)
+            self.assertEqual(fugu.argv[-3:], ("resume", session_id, "-"))
+            self.assertLess(fugu.argv.index("--sandbox"), fugu.argv.index("resume"))
+
     def test_generated_argv_flags_subset_of_captured_help_fixtures(self) -> None:
         """Compare builders to independent captured --help flag lists, not builder constants."""
         fixtures = REPO_ROOT / "tests" / "fixtures"
