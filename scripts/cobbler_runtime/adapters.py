@@ -1494,6 +1494,7 @@ def decode_codex_jsonl(
     messages: list[str] = []
     actual: str | None = None
     source: str | None = None
+    session_ids: set[str] = set()
     for line in lines:
         try:
             event = json.loads(line)
@@ -1504,6 +1505,14 @@ def decode_codex_jsonl(
             ) from exc
         if not isinstance(event, dict):
             continue
+        if event.get("type") == "thread.started" and isinstance(
+            event.get("thread_id"), str
+        ):
+            session_ids.add(
+                assert_exact_session_id(
+                    str(event["thread_id"]), adapter="codex-fugu"
+                )
+            )
         # Capture model from machine event fields only (not message content).
         for key in ("model", "actual_model"):
             if isinstance(event.get(key), str) and event[key].strip():
@@ -1526,11 +1535,17 @@ def decode_codex_jsonl(
             "malformed_output",
             "Codex JSONL stream contained no agent message text",
         )
+    if len(session_ids) > 1:
+        raise ValidationIssue(
+            "session_identity_conflict",
+            "Codex JSONL stream reported conflicting thread identities",
+        )
     report = _report_from_text_blob(messages[-1], expected_role=expected_role)
     return TransportDecodeResult(
         role_report=report,
         actual_model=actual,
         model_evidence_source=source,
+        session_id=next(iter(session_ids), None),
         transport_notes=("codex-jsonl",),
     )
 
@@ -1903,7 +1918,14 @@ def build_session_create_invocation(
         import uuid as _uuid  # noqa: PLC0415
 
         sid = str(_uuid.uuid4())
-        argv = [exe or "claude", "--print", "--output-format", "json"]
+        argv = [
+            exe or "claude",
+            "--print",
+            "--output-format",
+            "json",
+            "--permission-mode",
+            "plan",
+        ]
         if requested_model:
             argv.extend(["--model", requested_model])
         argv.extend(["--session-id", sid])
@@ -2131,7 +2153,16 @@ def build_session_resume_invocation(
             "host-native does not resume external provider sessions",
         )
     if name == "claude-code":
-        argv = [exe or "claude", "--print", "--output-format", "json", "--resume", sid]
+        argv = [
+            exe or "claude",
+            "--print",
+            "--output-format",
+            "json",
+            "--permission-mode",
+            "plan",
+            "--resume",
+            sid,
+        ]
         if requested_model:
             argv.extend(["--model", requested_model])
         argv.extend(extras)

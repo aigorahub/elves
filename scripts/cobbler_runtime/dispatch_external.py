@@ -52,6 +52,17 @@ DESCENDANT_POLL_SECONDS = 0.5
 DESCENDANT_VERIFY_ATTEMPTS = 24
 
 
+def session_id_for_attempt(
+    spec: LaneSpec, attempt: EffectiveAttempt
+) -> str | None:
+    """Use lane continuity only on its original provider adapter."""
+    if attempt.session_id is not None:
+        return attempt.session_id
+    if attempt.adapter == spec.adapter:
+        return spec.session_id
+    return None
+
+
 @dataclass(frozen=True)
 class _ProcessRecord:
     pid: int
@@ -980,7 +991,7 @@ def prepare_external_launch(
                 cwd=str(launch_repo),
             )
         else:
-            attempt_session = attempt.session_id or spec.session_id
+            attempt_session = session_id_for_attempt(spec, attempt)
             invocation = build_readonly_invocation(
                 adapter=attempt.adapter,
                 profile=attempt.profile,

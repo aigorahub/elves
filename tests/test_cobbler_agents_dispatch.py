@@ -2504,7 +2504,7 @@ class RemediationBlockerTests(unittest.TestCase):
 
         codex = "\n".join(
             [
-                json.dumps({"type": "thread.started"}),
+                json.dumps({"type": "thread.started", "thread_id": "thread-123"}),
                 json.dumps(
                     {
                         "type": "item.completed",
@@ -2517,6 +2517,52 @@ class RemediationBlockerTests(unittest.TestCase):
             codex, decoder="codex-jsonl", expected_role="architect", require_model=False
         )
         self.assertEqual(decoded_c.role_report["verdict"], "pass")
+        self.assertEqual(decoded_c.session_id, "thread-123")
+
+    def test_exact_session_identity_requires_matching_transport_proof(self) -> None:
+        from cobbler_runtime.dispatch_results import require_exact_session_identity
+
+        require_exact_session_identity(expected=None, observed=None)
+        require_exact_session_identity(expected="same", observed="same")
+        for observed in (None, "different"):
+            with self.subTest(observed=observed), self.assertRaises(
+                ValidationIssue
+            ) as caught:
+                require_exact_session_identity(
+                    expected="requested",
+                    observed=observed,
+                )
+            self.assertEqual(caught.exception.code, "session_identity_mismatch")
+
+    def test_lane_session_identity_does_not_cross_provider_fallbacks(self) -> None:
+        from cobbler_runtime.dispatch_external import session_id_for_attempt
+
+        spec = LaneSpec(
+            lane_id="review",
+            role="reviewer",
+            adapter="codex-fugu",
+            profile="codex-fugu",
+            session_id="fugu-thread",
+        )
+        primary = EffectiveAttempt(
+            profile="codex-fugu",
+            adapter="codex-fugu",
+            reason="primary",
+        )
+        fallback = EffectiveAttempt(
+            profile="claude-code",
+            adapter="claude-code",
+            reason="fallback",
+        )
+        explicit = EffectiveAttempt(
+            profile="claude-code",
+            adapter="claude-code",
+            reason="fallback",
+            session_id="claude-session",
+        )
+        self.assertEqual(session_id_for_attempt(spec, primary), "fugu-thread")
+        self.assertIsNone(session_id_for_attempt(spec, fallback))
+        self.assertEqual(session_id_for_attempt(spec, explicit), "claude-session")
 
 
 

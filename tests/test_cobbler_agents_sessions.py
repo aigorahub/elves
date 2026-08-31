@@ -1073,6 +1073,12 @@ class SessionCommandBuilderTests(unittest.TestCase):
                 if adapter == "codex-fugu":
                     sandbox = inv.argv.index("--sandbox")
                     self.assertEqual(inv.argv[sandbox + 1], "read-only")
+                if adapter == "claude-code":
+                    self.assertIn("--permission-mode", inv.argv)
+                    self.assertEqual(
+                        inv.argv[inv.argv.index("--permission-mode") + 1],
+                        "plan",
+                    )
                 assert_no_ambiguous_session_flags(inv.argv)
             with self.subTest(adapter=adapter, op="resume"):
                 session_id = (
@@ -1097,6 +1103,12 @@ class SessionCommandBuilderTests(unittest.TestCase):
                     self.assertEqual(inv.argv[sandbox + 1], "read-only")
                     self.assertLess(sandbox, inv.argv.index("resume"))
                     self.assertEqual(inv.argv[-2:], ("resume", session_id))
+                if adapter == "claude-code":
+                    self.assertIn("--permission-mode", inv.argv)
+                    self.assertEqual(
+                        inv.argv[inv.argv.index("--permission-mode") + 1],
+                        "plan",
+                    )
                 # Bare --resume without id is forbidden; exact --resume <id> is required.
                 assert_no_ambiguous_session_flags(inv.argv)
                 # Ensure we never emit continue/last patterns from the corpus.
