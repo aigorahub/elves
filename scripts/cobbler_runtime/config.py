@@ -16,7 +16,12 @@ import json
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from .adapters import default_profiles, get_adapter, is_fugu_executable
+from .adapters import (
+    default_profiles,
+    get_adapter,
+    is_fugu_executable,
+    is_fugu_profile_route,
+)
 from .dispatch import LaneSpec
 from .context import validate_credential_grant_names
 from .schema import (
@@ -769,8 +774,11 @@ def resolve_config(
 
             profile = resolved.profiles[profile_name]
             if role_name == RoleName.IMPLEMENT.value and (
-                profile.adapter == "codex-fugu"
-                or is_fugu_executable(profile.executable)
+                is_fugu_profile_route(
+                    adapter=profile.adapter,
+                    executable=profile.executable,
+                    requested_model=profile.requested_model,
+                )
             ):
                 issue = ValidationIssue(
                     "fugu_implement_route_blocked",
@@ -817,9 +825,12 @@ def resolve_config(
                 if (
                     role_name == RoleName.IMPLEMENT.value
                     and (
-                        resolved.profiles[entry.profile].adapter == "codex-fugu"
-                        or is_fugu_executable(
-                            resolved.profiles[entry.profile].executable
+                        is_fugu_profile_route(
+                            adapter=resolved.profiles[entry.profile].adapter,
+                            executable=resolved.profiles[entry.profile].executable,
+                            requested_model=resolved.profiles[
+                                entry.profile
+                            ].requested_model,
                         )
                     )
                 ):

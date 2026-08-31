@@ -2348,6 +2348,42 @@ class LeaseStorageContainmentTests(unittest.TestCase):
 
 
 class GrokWriteProfileTests(unittest.TestCase):
+    def test_write_resume_rejects_fugu_adapter_and_model(self) -> None:
+        for adapter, executable, model in (
+            ("CoDeX-FuGu", None, None),
+            ("claude-code", "Claude-Fugu", None),
+            ("claude-code", "claude", "fugu[1m]"),
+        ):
+            with self.subTest(adapter=adapter, executable=executable, model=model):
+                with self.assertRaises(ValidationIssue) as raised:
+                    build_write_resume_invocation(
+                        adapter=adapter,
+                        session_id="exact-session",
+                        cwd="/verified/worktree",
+                        executable=executable,
+                        requested_model=model,
+                    )
+                self.assertEqual(
+                    raised.exception.code,
+                    "fugu_implementation_route_blocked",
+                )
+        with mock.patch.dict(
+            os.environ,
+            {"ANTHROPIC_BASE_URL": "https://api.sakana.ai"},
+        ):
+            with self.assertRaises(ValidationIssue) as endpoint:
+                build_write_resume_invocation(
+                    adapter="claude-code",
+                    session_id="exact-session",
+                    cwd="/verified/worktree",
+                    executable="claude",
+                    requested_model="current-model",
+                )
+        self.assertEqual(
+            endpoint.exception.code,
+            "fugu_implementation_route_blocked",
+        )
+
     def test_headless_worktree_resume_forbidden(self) -> None:
         profile = grok_write_profile("0.2.93")
         self.assertTrue(profile.forbid_headless_worktree_resume)
@@ -2388,6 +2424,24 @@ class GrokWriteProfileTests(unittest.TestCase):
 
 
 class UnqualifiedWriteTests(unittest.TestCase):
+    def test_writer_lease_rejects_fugu_before_qualification(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with self.assertRaises(ValidationIssue) as raised:
+                LeaseStore(root).prepare(
+                    lease_id="fugu-lease",
+                    host_checkout=root / "host",
+                    worker_checkout=root / "worker",
+                    session_id="session",
+                    base_head="0" * 40,
+                    adapter="CLAUDE-FUGU",
+                    profile="claude-fugu",
+                )
+            self.assertEqual(
+                raised.exception.code,
+                "fugu_implementation_route_blocked",
+            )
+
     def test_unqualified_profile_refused(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

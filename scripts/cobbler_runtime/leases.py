@@ -23,6 +23,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from .adapters import reject_fugu_implementation_route
 from .context import redact_structure, redact_text
 from .schema import ELVES_SESSION_BASENAME, ValidationIssue
 from .storage import (
@@ -1044,6 +1045,14 @@ class LeaseStore:
         credential_grant_context_digest: str | None = None,
     ) -> WriterLease:
         """Create the sole live lease after worker preflight and profile checks."""
+        reject_fugu_implementation_route(
+            adapter,
+            profile,
+            requested_model=(
+                str((qualification_evidence or {}).get("model") or "") or None
+            ),
+            environment=os.environ,
+        )
         host_path = Path(host_checkout).resolve()
         worker_path = Path(worker_checkout).resolve()
         if host_path == worker_path:

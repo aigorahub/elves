@@ -1034,6 +1034,9 @@ class SessionCommandBuilderTests(unittest.TestCase):
                 for token in forbidden_substrings:
                     self.assertNotIn(token, inv.argv)
                     self.assertNotIn(token, joined)
+                if adapter == "codex-fugu":
+                    sandbox = inv.argv.index("--sandbox")
+                    self.assertEqual(inv.argv[sandbox + 1], "read-only")
                 assert_no_ambiguous_session_flags(inv.argv)
             with self.subTest(adapter=adapter, op="resume"):
                 session_id = (
@@ -1053,6 +1056,9 @@ class SessionCommandBuilderTests(unittest.TestCase):
                 self.assertIn(session_id, joined)
                 for token in forbidden_substrings:
                     self.assertNotIn(token, inv.argv)
+                if adapter == "codex-fugu":
+                    sandbox = inv.argv.index("--sandbox")
+                    self.assertEqual(inv.argv[sandbox + 1], "read-only")
                 # Bare --resume without id is forbidden; exact --resume <id> is required.
                 assert_no_ambiguous_session_flags(inv.argv)
                 # Ensure we never emit continue/last patterns from the corpus.

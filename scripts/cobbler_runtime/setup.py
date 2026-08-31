@@ -19,7 +19,7 @@ from typing import Any, Mapping, Sequence  # Any used by PROFILE_RECIPES
 
 from .context import SECRET_VALUE_PATTERNS as _SHARED_SECRET_VALUE_PATTERNS
 
-from .adapters import default_profiles, is_fugu_executable
+from .adapters import default_profiles, is_fugu_profile_route
 from .capabilities import doctor_inventory
 from .config import models_toml_is_local_only, resolve_config
 from .executables import resolve_executable
@@ -333,8 +333,12 @@ def profile_is_fugu_route(
     recipe = PROFILE_RECIPES.get(profile) or {}
     adapter = str(body.get("adapter") or recipe.get("adapter") or profile)
     executable = body.get("executable") or recipe.get("executable")
-    return adapter == "codex-fugu" or is_fugu_executable(
-        str(executable) if executable else None
+    return is_fugu_profile_route(
+        adapter=adapter,
+        executable=str(executable) if executable else None,
+        requested_model=(
+            str(body.get("requested_model") or body.get("model") or "") or None
+        ),
     )
 
 

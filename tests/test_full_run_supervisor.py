@@ -2203,11 +2203,24 @@ class FullRunGrokArgvTests(unittest.TestCase):
             persisted = mock.Mock(
                 adapter="grok-build",
                 executable="Claude-Fugu",
+                model="auto",
             )
             with self.assertRaises(ValidationIssue) as argv:
                 build_full_run_argv(persisted)
             self.assertEqual(
                 argv.exception.code,
+                "fugu_implementation_route_blocked",
+            )
+
+            fixture = mock.Mock(
+                adapter="fixture",
+                executable="Claude-Fugu",
+                model="fixture",
+            )
+            with self.assertRaises(ValidationIssue) as fixture_argv:
+                build_full_run_argv(fixture)
+            self.assertEqual(
+                fixture_argv.exception.code,
                 "fugu_implementation_route_blocked",
             )
 

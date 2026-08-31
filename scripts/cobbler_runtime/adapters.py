@@ -9,10 +9,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Protocol, Sequence
+from urllib.parse import urlsplit
 
 from .context import ROLE_REPORT_SCHEMA_FIELDS
 from .executables import resolve_executable, resolve_executable_for_launch
@@ -372,11 +374,57 @@ def is_fugu_executable(executable: str | None) -> bool:
     )
 
 
+def is_fugu_model(requested_model: str | None) -> bool:
+    if not requested_model:
+        return False
+    token = str(requested_model).strip().casefold().rsplit("/", 1)[-1]
+    return token == "fugu" or token.startswith(("fugu-", "fugu["))
+
+
+def is_fugu_profile_route(
+    *,
+    adapter: str | None,
+    executable: str | None,
+    requested_model: str | None = None,
+) -> bool:
+    return (
+        is_fugu_executable(adapter)
+        or is_fugu_executable(executable)
+        or is_fugu_model(requested_model)
+    )
+
+
+def _uses_sakana_claude_endpoint(
+    adapter: str | None,
+    executable: str | None,
+    environment: Mapping[str, str] | None,
+) -> bool:
+    adapter_name = str(adapter or "").strip().casefold()
+    executable_name = Path(str(executable or "")).name.casefold()
+    if adapter_name not in {"claude", "claude-code"} and executable_name not in {
+        "claude",
+        "claude-code",
+    }:
+        return False
+    endpoint = str((environment or {}).get("ANTHROPIC_BASE_URL") or "").strip()
+    try:
+        return urlsplit(endpoint).hostname == "api.sakana.ai"
+    except ValueError:
+        return False
+
+
 def reject_fugu_implementation_route(
     adapter: str | None,
     executable: str | None,
+    *,
+    requested_model: str | None = None,
+    environment: Mapping[str, str] | None = None,
 ) -> None:
-    if is_fugu_executable(adapter) or is_fugu_executable(executable):
+    if is_fugu_profile_route(
+        adapter=adapter,
+        executable=executable,
+        requested_model=requested_model,
+    ) or _uses_sakana_claude_endpoint(adapter, executable, environment):
         raise ValidationIssue(
             "fugu_implementation_route_blocked",
             "Fugu launchers are limited to planning and read-only review",
@@ -1884,6 +1932,8 @@ def build_session_create_invocation(
             exe or "codex-fugu",
             "exec",
             "--json",
+            "--sandbox",
+            "read-only",
             "--model",
             "fugu",
             "--config",
@@ -2113,6 +2163,8 @@ def build_session_resume_invocation(
             "exec",
             "resume",
             "--json",
+            "--sandbox",
+            "read-only",
             "--model",
             "fugu",
             "--config",
@@ -2342,6 +2394,12 @@ def build_write_resume_invocation(
     requested_model: str | None = None,
     use_headless_worktree_resume: bool = False,
 ) -> AdapterInvocation:
+    reject_fugu_implementation_route(
+        adapter,
+        executable,
+        requested_model=requested_model,
+        environment=os.environ,
+    )
     if adapter != "grok-build":
         return build_session_resume_invocation(
             adapter=adapter,

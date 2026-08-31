@@ -271,6 +271,27 @@ class SetupScenarioTests(unittest.TestCase):
                 )
             )
 
+            sakana_model = run_setup(
+                root,
+                preferences=preferences_from_flags(implement="sakana-labor"),
+                write_toml=False,
+                fake_presence={"claude-code": True},
+                existing_profiles={
+                    "sakana-labor": {
+                        "adapter": "claude-code",
+                        "executable": "claude",
+                        "requested_model": "fugu[1m]",
+                    }
+                },
+            )
+            self.assertFalse(sakana_model.ok)
+            self.assertTrue(
+                any(
+                    i.get("code") == "implement_profile_blocked"
+                    for i in sakana_model.issues
+                )
+            )
+
     def test_auth_unknown_and_no_model_list(self) -> None:
         items = inventory_tools(
             fake_presence={"claude-code": True},

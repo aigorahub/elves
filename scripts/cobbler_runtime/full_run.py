@@ -3811,7 +3811,11 @@ def prepare_full_run(
 
     adapter_name = (adapter or "grok-build").strip().lower()
     if adapter_name != "fixture":
-        reject_fugu_implementation_route(adapter_name, executable)
+        reject_fugu_implementation_route(
+            adapter_name,
+            executable,
+            requested_model=model,
+        )
     # Single default authority for worker effort: an explicit request wins,
     # otherwise the normalized adapter name picks the default. Explicitness is
     # persisted so a flagless resume keeps the originally requested value.
@@ -4223,14 +4227,22 @@ def save_state(repo_root: Path, state: FullRunState) -> Path:
 
 def build_full_run_argv(state: FullRunState) -> list[str]:
     """Adapter-aware argv. Fixture mode uses explicit python + script + packet."""
-    if state.adapter != "fixture":
-        reject_fugu_implementation_route(state.adapter, state.executable)
+    reject_fugu_implementation_route(
+        state.adapter,
+        state.executable,
+        requested_model=state.model,
+    )
     launch_packet = (
         state.goal_prompt_path
         if state.goal_mode_behaviorally_verified and state.goal_prompt_path
         else state.staged_packet_path or state.packet_path
     )
     if state.adapter == "fixture":
+        if Path(state.executable).resolve() != Path(sys.executable).resolve():
+            raise ValidationIssue(
+                "fixture_executable_invalid",
+                "Persisted fixture state must use the current Python executable",
+            )
         if not state.fixture_script:
             raise ValidationIssue(
                 "fixture_script_required",
@@ -4918,8 +4930,12 @@ def launch_full_run(
         # Build argv only after Grok auth selection has resolved and bound the
         # exact executable. The supervisor receives that same path plus the
         # identity it must recheck immediately before provider spawn.
-        if state.adapter != "fixture":
-            reject_fugu_implementation_route(state.adapter, state.executable)
+        reject_fugu_implementation_route(
+            state.adapter,
+            state.executable,
+            requested_model=state.model,
+            environment=launch_env,
+        )
         provider_argv = build_full_run_argv(state)
         if resume and state.adapter != "fixture":
             try:

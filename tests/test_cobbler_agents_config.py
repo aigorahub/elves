@@ -206,6 +206,27 @@ class ConfigResolutionTests(unittest.TestCase):
             )
         )
 
+        sakana_model = config_mod.resolve_config(
+            models_toml={
+                "profiles": {
+                    "sakana-labor": {
+                        "adapter": "claude-code",
+                        "executable": "claude",
+                        "requested_model": "fugu[1m]",
+                        "env_grants": [
+                            "ANTHROPIC_BASE_URL",
+                            "ANTHROPIC_AUTH_TOKEN",
+                        ],
+                    },
+                },
+                "roles": {
+                    "implement": {"profile": "sakana-labor"},
+                },
+            }
+        )
+        self.assertTrue(sakana_model.ok, sakana_model.issues)
+        self.assertEqual(sakana_model.roles["implement"].profile, "host-native")
+
     def test_fugu_profile_controls_fail_closed(self) -> None:
         resolved = config_mod.resolve_config(
             models_toml={

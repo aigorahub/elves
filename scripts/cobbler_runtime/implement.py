@@ -944,7 +944,11 @@ def prepare_implement(
     adapter_name = (adapter or "grok-build").strip().lower() or "grok-build"
     if adapter_name in {"opencode", "opencode-labor"}:
         adapter_name = "opencode-cli"
-    reject_fugu_implementation_route(adapter_name, executable)
+    reject_fugu_implementation_route(
+        adapter_name,
+        executable,
+        requested_model=model,
+    )
     is_opencode = adapter_name == "opencode-cli"
     is_devin = adapter_name == "devin-cli"
     is_omp = adapter_name == "omp-cli"
@@ -1563,7 +1567,11 @@ def build_launch_argv(
         )
     cwd_path = Path(cwd).expanduser().resolve()
     adapter_name = (adapter or "grok-build").strip().lower()
-    reject_fugu_implementation_route(adapter_name, executable)
+    reject_fugu_implementation_route(
+        adapter_name,
+        executable,
+        requested_model=model,
+    )
     sid = (session_id or "").strip()
     if sid.lower() in AMBIGUOUS_SESSION_TOKENS:
         raise ValidationIssue(

@@ -28,6 +28,7 @@ from urllib.request import (
     build_opener,
 )
 
+from .adapters import reject_fugu_implementation_route
 from .full_run import (
     _git_branch,
     _git_head,
@@ -355,6 +356,12 @@ def build_native_worker_spec(
     watcher_command: str | None = None,
     fixture_script: Path | None = None,
 ) -> NativeWorkerSpec:
+    reject_fugu_implementation_route(
+        host,
+        None,
+        requested_model=requested_model,
+        environment=os.environ,
+    )
     host_profile = resolve_host_profile(host)
     effort_token = effort.strip().lower()
     if not requested_model or not requested_model.strip():
@@ -1506,6 +1513,12 @@ def _native_worker_child_env(
 ) -> dict[str, str]:
     """Project provider auth while removing ambient Git/network credentials."""
     parent = dict(os.environ)
+    reject_fugu_implementation_route(
+        host,
+        None,
+        requested_model=requested_model,
+        environment=parent,
+    )
     provider_secret_names = _registry_provider_secret_names(host)
     forbidden_exact = {
         "GH_TOKEN",
