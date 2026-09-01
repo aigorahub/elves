@@ -146,7 +146,7 @@ clear provider-isolation check before a paid provider launch.
 - [x] B2-A8: Provider documentation states that all five Windows shortcut runners execute inside
   WSL2. Fugu, Grok, and OMP need the local kernel sandbox. Manus and Devin perform remote work
   without `dispatch_external.py` or a local repository sandbox.
-- [ ] B2-A9: Version metadata, CHANGELOG, consistency checks, focused tests, and the full
+- [x] B2-A9: Version metadata, CHANGELOG, consistency checks, focused tests, and the full
   repository verifier pass at version 2.35.0.
 
 **Docs likely touched:** README, guide, operations guide, provider shortcuts, SKILL, AGENTS, and
@@ -170,11 +170,11 @@ tests, guide checks, release checks, and `scripts/verify_repo.py`.
 
 ## Master acceptance
 
-- [ ] M-A1: No review result can be successful when it contains zero independent review reports.
-- [ ] M-A2: A Windows user has one supported WSL2 setup path with an exact no-distribution
+- [x] M-A1: No review result can be successful when it contains zero independent review reports.
+- [x] M-A2: A Windows user has one supported WSL2 setup path with an exact no-distribution
   recovery command and provider-isolation readiness evidence.
-- [ ] M-A3: Native Win32 remains fail-closed and is not described as a supported execution path.
-- [ ] M-A4: All focused tests and the full repository verification pass at the exact branch tip.
+- [x] M-A3: Native Win32 remains fail-closed and is not described as a supported execution path.
+- [x] M-A4: All focused tests and the full repository verification pass at the exact branch tip.
 
 ## Non-negotiables
 

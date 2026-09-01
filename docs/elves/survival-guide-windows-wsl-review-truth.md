@@ -44,11 +44,11 @@
 
 ## Stop Gate
 
-- **Planned batches remaining:** 1
-- **Stop allowed right now:** no
-- **Why:** the exact-tip terminal verifier and close evidence remain
-- **Next required action:** commit and push B2 implementation, then run the terminal verifier
-- **continuation_guard.stop_allowed:** false
+- **Planned batches remaining:** 0
+- **Stop allowed right now:** yes
+- **Why:** Master Acceptance is complete
+- **Next required action:** commit and push close evidence, then verify the close tip
+- **continuation_guard.stop_allowed:** true
 
 ## Effort Standard
 
@@ -73,11 +73,10 @@
 
 ## Current Phase
 
-- **Status:** verifying
+- **Status:** complete
 - **Active batch:** B2
-- **What was just finished:** B2 WSL2 checks, diagnostics, documentation, release metadata, and
-  focused verification
-- **Single next action:** commit and push B2 implementation, then run exact-tip verification
+- **What was just finished:** strict verifier passed at implementation tip `aa83041`
+- **Single next action:** commit and push close evidence, then run exact-tip verification
 
 ## Active Compute
 
@@ -85,9 +84,9 @@
 
 ## Next Exact Batch
 
-- **Batch:** B2
-- **Scope:** Windows through WSL2 checks, diagnostics, documentation, and release metadata
-- **Acceptance criteria:** B2-A1 through B2-A9
+- **Batch:** none
+- **Scope:** all planned work is complete
+- **Acceptance criteria:** B1-A1 through B2-A9 and M-A1 through M-A4 are met
 - **Risk:** standard
 
 ## Post-Checkpoint Control Loop

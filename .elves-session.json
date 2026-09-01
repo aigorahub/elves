@@ -88,44 +88,44 @@
         },
         {
           "criterion": "Version metadata, CHANGELOG, consistency checks, focused tests, and the full repository verifier pass at version 2.35.0.",
-          "evidence": "",
+          "evidence": "Strict CI verifier passed at implementation tip aa83041 for version 2.35.0 with 1,644 unit tests and installed smokes.",
           "id": "B2-A9",
-          "met": false
+          "met": true
         }
       ],
       "id": "B2",
-      "status": "pending"
+      "status": "complete"
     }
   ],
   "branch": "fix/windows-wsl-review-truth",
   "continuation_guard": {
-    "reason": "Windows through WSL2 implementation and terminal verification remain",
-    "stop_allowed": false
+    "reason": "Master Acceptance is complete",
+    "stop_allowed": true
   },
   "master_acceptance": [
     {
       "criterion": "No review result can be successful when it contains zero independent review reports.",
-      "evidence": "",
+      "evidence": "Quorum, CLI, and isolation-skip tests prove zero-report results are unavailable and not successful.",
       "id": "M-A1",
-      "met": false
+      "met": true
     },
     {
       "criterion": "A Windows user has one supported WSL2 setup path with an exact no-distribution recovery command and provider-isolation readiness evidence.",
-      "evidence": "",
+      "evidence": "Install doctor tests and README and guide setup flows prove WSL2 setup and provider readiness reporting.",
       "id": "M-A2",
-      "met": false
+      "met": true
     },
     {
       "criterion": "Native Win32 remains fail-closed and is not described as a supported execution path.",
-      "evidence": "",
+      "evidence": "Native Windows remains unsupported in doctor output and uses WSL2 and bwrap remediation.",
       "id": "M-A3",
-      "met": false
+      "met": true
     },
     {
       "criterion": "All focused tests and the full repository verification pass at the exact branch tip.",
-      "evidence": "",
+      "evidence": "174 focused tests passed, then strict CI verification passed at aa83041 with all 1,644 unit tests.",
       "id": "M-A4",
-      "met": false
+      "met": true
     }
   ],
   "plan_path": "docs/plans/windows-wsl-review-truth.md",

@@ -54,3 +54,12 @@
 - A first full verifier run passed all 1,644 unit tests but required the intentional API break
   approval for `cli:cobbler_agents council`. Added that release-scoped approval and passed the
   focused compatibility gate.
+
+## 2026-09-01: Terminal verification
+
+- Ran strict CI verification at implementation tip `aa83041` against `origin/main` for version
+  2.35.0.
+- Passed compile, shell, JSON, consistency, release, public API, Markdown link, secret-pattern,
+  installed-bundle, and cumulative diff gates.
+- Passed all 1,644 unit tests in 360.623 seconds.
+- The verifier returned `VERIFY OK`.
