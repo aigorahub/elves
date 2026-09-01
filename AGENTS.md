@@ -78,7 +78,8 @@ assume `./scripts` belongs to the target repository and do not execute mappings 
   paths (including both `.env.*` and `*.env` variants and reserved internal namespaces), unsafe
   file types, links, modes, races, and repository escapes. Exact includes must be admitted or fail.
   Fugu is limited to planning and read-only review. `--write` is rejected. Read-only macOS cleanup is
-  best-effort and non-authoritative. No Linux procfs is mounted; Codex external-sandbox mode runs
+  best-effort and non-authoritative. No Linux procfs is mounted; only a synthetic `/proc/self/exe`
+  link to the qualified real Codex binary is exposed. Codex external-sandbox mode runs
   inside the mandatory outer boundary. Profiles remain `fugu/high`, `fugu/xhigh` for `--deep`,
   `fugu-cyber/xhigh` for `--cyber`, `fugu-ultra-v1.1/high` for `--ultra`, and
   `fugu-ultra-v1.1/max` for `--max` (60-minute default
@@ -98,7 +99,8 @@ assume `./scripts` belongs to the target repository and do not execute mappings 
 - Devin task → `run_devin.sh <instructions>` (remote session, bounded wait, no default stored
   secret or knowledge grants; creation and polling share one hard wall-clock bound)
 - Oh My Pi task → `run_omp.sh <instructions>` (optional headless worker shortcut under other hosts;
-  never `opm`; omp is also a supported main driver via `~/.omp/agent/skills/elves`; run-scoped profile isolation)
+  never `opm`; omp is also a supported main driver via `~/.omp/agent/skills/elves`; run-scoped
+  profile isolation; Linux omits procfs and has no Codex `/proc/self/exe` view)
 
 Codex uses the `$elves` or natural-language forms above, not invented top-level `/fugu`, `/manus`,
 `/grok`, `/devin`, or `/omp` commands. Explicit invocation authorizes the provider call and any associated

@@ -27,11 +27,13 @@ When checking a route, pass `--host claude` from Claude Code, `--host codex` fro
 Grok as **optional worker** under Claude/Codex is unchanged. Native installs:
 `sync_installed_skills.py --apply --target claude|codex|grok|omp`.
 
-Provider shortcuts preserve the same route semantics and authority on both hosts; only Claude Code
-installs the four slash aliases. Codex must use the main skill surface. See
+Provider shortcuts preserve the same route semantics and authority on every host; only Claude Code
+installs the slash aliases. Codex, Grok Build, and Oh My Pi use `$elves` or natural language. See
 [`provider-shortcuts.md`](provider-shortcuts.md). This includes Manus roster modes: Claude's
 `/manus --wide|--fanout …` and Codex's `$elves manus --wide|--fanout …` reach the same runner,
-coverage contract, manifest, and resume behavior.
+coverage contract, manifest, and resume behavior. Linux isolation is the same on every host: Fugu
+omits procfs and exposes only a synthetic `/proc/self/exe` to the qualified real Codex binary;
+Grok and Oh My Pi omit procfs and have no `/proc` view.
 
 The successful trusted full-run terminal response emits the host-neutral
 `elves-worker-confidence-review-v1` context. Both hosts attach its `review_prompt_block` verbatim
