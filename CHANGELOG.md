@@ -4,6 +4,18 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.34.1] - 2026-09-01
+
+### Fixed
+
+* **Official Codex starts in Fugu's no-proc Linux sandbox**
+  (`scripts/cobbler_runtime/isolation.py`) — no procfs is mounted. The bwrap lane now exposes only
+  a synthetic `/proc/self/exe` symlink to the qualified, narrowly mounted real Codex executable,
+  allowing Codex to find itself and load configuration while parent `/proc/<pid>/environ` remains
+  unavailable. Construction fails closed if the target is invalid or combined with a procfs mount.
+  Claude, Codex, Grok Build, and Oh My Pi restatements describe the same Fugu boundary. Grok and
+  Oh My Pi Linux lanes still omit procfs and do not receive a Codex self-executable view. (#267)
+
 ## [2.34.0] - 2026-08-31
 
 ### Added
