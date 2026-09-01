@@ -244,7 +244,21 @@ Rules:
   Survival Guide. It counts successful independent reports (including a fresh host-native lane),
   tolerates individual optional lane failures while the count is met, and **blocks** after
   recovery/fallback when it is not met.
+- A required phase without an explicit `required_quorum` still requires at least one valid report.
+  Zero reports block the phase.
 - Required lane failures block even if optional peers succeeded.
+
+### Council command result contract
+
+The council command reports one aggregate `status` in JSON and human output:
+
+- `success`: one or more valid independent reports exist. The command exits 0.
+- `blocked`: a required lane, required quorum, or required phase failed. The command exits 1.
+- `unavailable`: no valid review report exists, but the phase is optional. The command exits 3.
+
+An unavailable council is not a successful or clean review. The host can perform the documented
+native fallback because this state is non-blocking. Argument parsing errors continue to use exit
+status 2.
 
 ### Lightweight review (utility, not a council vote)
 

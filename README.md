@@ -8,7 +8,7 @@ Oh My Pi (omp) driver plans and reviews; a subscription-native (or optional exte
 implements; durable run files let the work survive context compaction. You write the plan and own
 the merge decision. The agent does the middle.
 
-**Current release: v2.34.1**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.35.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 **New to Elves?** Use the [practical user guide](https://aigorahub.github.io/elves/) — especially
@@ -33,6 +33,56 @@ See the guide FAQ
 Prefer the agent paste in the guide if you already have a supported host open. Otherwise use the
 shell one-liners below (Python 3.10+). First-time install needs an explicit host target; `--target
 all` only updates hosts that already have an Elves skill root.
+
+### Windows through WSL2
+
+Elves supports Windows through [WSL2](https://learn.microsoft.com/windows/wsl/install). Native
+Win32 execution is not supported. Open PowerShell and check the installed distributions:
+
+```powershell
+wsl --status
+wsl --list --verbose
+```
+
+If no distribution is installed, install Ubuntu. If Ubuntu shows version 1, convert it to WSL2:
+
+```powershell
+wsl --install -d Ubuntu
+wsl --set-version Ubuntu 2
+wsl -d Ubuntu
+```
+
+Docker Desktop's internal WSL distributions do not count as an Elves host. The install doctor
+ignores them when it selects a distribution. It reports `wsl_probe_failed` instead of claiming
+that no distribution exists when either WSL query fails. Run `wsl --status` and
+`wsl --list --verbose` to correct that failure before you retry.
+
+Run the remaining commands inside Ubuntu. Install the Linux prerequisites. Then install Claude
+Code, Codex, Grok Build, or Oh My Pi inside the same WSL2 distribution and confirm that its command
+is on the Linux `PATH`.
+
+```bash
+sudo apt update
+sudo apt install -y git python3 bubblewrap
+
+# Set this to claude, codex, grok, or omp for the host installed inside WSL2.
+ELVES_TARGET=codex
+ELVES_TMP="$(mktemp -d)"
+git clone --depth 1 https://github.com/aigorahub/elves.git "$ELVES_TMP/elves"
+python3 "$ELVES_TMP/elves/scripts/sync_installed_skills.py" --apply --target "$ELVES_TARGET"
+case "$ELVES_TARGET" in
+  claude) ELVES_ROOT="$HOME/.claude/skills/elves" ;;
+  codex) ELVES_ROOT="$HOME/.codex/skills/elves" ;;
+  grok) ELVES_ROOT="$HOME/.grok/skills/elves" ;;
+  omp) ELVES_ROOT="$HOME/.omp/agent/skills/elves" ;;
+esac
+python3 "$ELVES_ROOT/scripts/install_doctor.py" --doctor
+rm -rf "$ELVES_TMP"
+```
+
+Fugu, Grok, and OMP local shortcuts require a qualified `/usr/bin/bwrap` probe. Manus and Devin
+perform remote work, but their Bash runners must still start inside WSL2. The doctor reports local
+shortcut sandbox readiness separately from external council process-boundary readiness.
 
 ### Install (Claude Code)
 

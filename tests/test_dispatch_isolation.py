@@ -1491,6 +1491,14 @@ class IsolationSnapshotRegressionTests(unittest.TestCase):
 
 
 class IsolationSandboxRegressionTests(unittest.TestCase):
+    def test_native_windows_sandbox_diagnostic_names_wsl2_and_bwrap(self) -> None:
+        message = isolation.filesystem_sandbox_unavailable_message(
+            platform_name="win32"
+        )
+        self.assertIn("native Windows", message)
+        self.assertIn("WSL2", message)
+        self.assertIn("/usr/bin/bwrap", message)
+
     @staticmethod
     def _host_evidence(role: str) -> dict[str, object]:
         return {

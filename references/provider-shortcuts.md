@@ -1,6 +1,6 @@
 # Provider shortcuts
 
-Elves ships four explicit convenience routes for focused provider tasks. They are optional and do
+Elves ships five explicit provider shortcuts for focused tasks. They are optional and do
 not change the native-first worker default, the supported-host policy, or landing authority.
 
 | Intent | Claude Code | Codex / natural language | Runner |
@@ -15,6 +15,19 @@ not change the native-first worker default, the supported-host policy, or landin
 Resolve each runner from the **active Elves skill root**, keep the target repository as the working
 directory, validate arguments, and execute only after the user explicitly invokes the matching
 shortcut or states the same unambiguous intent. Never invent top-level slash commands for Codex.
+
+## Windows platform contract
+
+All five provider shortcut runners are Bash programs. On Windows, run the host, Elves, and each
+shortcut inside WSL2. Native Win32 shortcut execution is not supported. Fugu, Grok, and OMP run
+local provider processes over an Elves repository snapshot. They require a qualified Linux
+`/usr/bin/bwrap` filesystem sandbox. Manus and Devin start remote provider work. Their shortcut
+runners do not use `dispatch_external.py` and do not place the repository in the shared local
+sandbox. Their Bash control programs still require WSL2 on Windows.
+
+The external council lanes under Cobbler use `dispatch_external.py`. On Linux and WSL2, those lanes
+remain unavailable when the recursive process-boundary gate cannot bind the child generation.
+A successful `bwrap` probe does not make that separate council boundary ready.
 
 ## Route contracts
 

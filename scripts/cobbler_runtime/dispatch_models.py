@@ -142,9 +142,18 @@ class CouncilResult:
     mutated_repo: bool = False
     successful_execution_ids: list[str] = field(default_factory=list)
 
+    @property
+    def status(self) -> str:
+        if self.blocked:
+            return "blocked"
+        if self.ok:
+            return "success"
+        return "unavailable"
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "run_id": self.run_id,
+            "status": self.status,
             "ok": self.ok,
             "council_verified": self.council_verified,
             "blocked": self.blocked,

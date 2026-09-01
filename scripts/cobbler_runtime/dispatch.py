@@ -107,8 +107,17 @@ def evaluate_quorum(
     if successful_count <= 0:
         council_verified = False
 
-    if phase_required and required_quorum is not None:
-        if successful_count < required_quorum or successful_count <= 0:
+    if phase_required and successful_count <= 0:
+        blocked = True
+        if required_quorum is None:
+            notes.append("Required phase produced no successful independent reports")
+        else:
+            notes.append(
+                f"required_quorum={required_quorum} unmet "
+                f"(successful_independent_reports={successful_count})"
+            )
+    elif phase_required and required_quorum is not None:
+        if successful_count < required_quorum:
             blocked = True
             notes.append(
                 f"required_quorum={required_quorum} unmet "
@@ -141,7 +150,7 @@ def evaluate_quorum(
             confidence = "low"
             notes.append("No successful independent reports")
 
-    ok = not blocked and (successful_count > 0 or not phase_required)
+    ok = not blocked and successful_count > 0
     if blocked:
         ok = False
         confidence = "blocked"

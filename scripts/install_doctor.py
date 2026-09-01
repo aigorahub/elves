@@ -15,7 +15,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import platform as host_platform
 import re
+import shutil
 import subprocess
 import sys
 import urllib.error
@@ -25,6 +27,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from cobbler_runtime.schema import ValidationIssue
+
 
 REPO = "aigorahub/elves"
 ACTIVE_ROOT = Path(__file__).resolve().parent.parent
@@ -33,18 +37,21 @@ HTTP_TIMEOUT_SECONDS = 5
 DEFAULT_CACHE_HOURS = 24
 STALE_RELEASE_REVALIDATION_HOURS = 1
 VERSION_RE = re.compile(r'^\s*version:\s*"([^"]+)"\s*$', re.MULTILINE)
+MANAGED_WSL_DISTRIBUTIONS = frozenset({"docker-desktop", "docker-desktop-data"})
 
 
 GLOBAL_INSTALLS = {
     "claude": Path.home() / ".claude" / "skills" / "elves",
     "codex": Path.home() / ".codex" / "skills" / "elves",
     "grok": Path.home() / ".grok" / "skills" / "elves",
+    "omp": Path.home() / ".omp" / "agent" / "skills" / "elves",
 }
 
 LOCAL_INSTALL_SUFFIXES = {
     "claude": Path(".claude") / "skills" / "elves",
     "codex": Path(".codex") / "skills" / "elves",
     "grok": Path(".grok") / "skills" / "elves",
+    "omp": Path(".omp") / "agent" / "skills" / "elves",
 }
 
 LEGACY_INSTALLS = {
@@ -159,7 +166,7 @@ def save_cache(payload: dict[str, Any]) -> None:
 
 
 def fetch_json_with_gh(endpoint: str) -> dict[str, Any] | list[Any] | None:
-    if not shutil_which("gh"):
+    if not shutil.which("gh"):
         return None
     result = subprocess.run(
         ["gh", "api", endpoint],
@@ -228,15 +235,6 @@ def fetch_latest_release(max_age_hours: int, minimum_version: str | None = None)
     }
     save_cache(payload)
     return payload
-
-
-def shutil_which(name: str) -> str | None:
-    paths = os.environ.get("PATH", "").split(os.pathsep)
-    for base in paths:
-        candidate = Path(base) / name
-        if candidate.exists() and os.access(candidate, os.X_OK):
-            return str(candidate)
-    return None
 
 
 def nearest_local_install(start: Path, suffix: Path) -> Path | None:
@@ -315,31 +313,433 @@ def discover_installs(cwd: Path) -> tuple[list[Install], Install]:
     return installs, active_install
 
 
+def _normalized_path_parts(path: Path) -> tuple[str, ...]:
+    return tuple(
+        part.casefold()
+        for part in re.split(r"[\\/]+", str(path))
+        if part not in {"", "."}
+    )
+
+
+def _path_has_suffix(path: Path, suffix: tuple[str, ...]) -> bool:
+    parts = _normalized_path_parts(path)
+    return len(parts) >= len(suffix) and parts[-len(suffix) :] == suffix
+
+
 def infer_platform(path: Path) -> str | None:
-    path_str = str(path)
-    if "/.claude/skills/elves" in path_str:
+    if _path_has_suffix(path, (".claude", "skills", "elves")):
         return "claude"
-    if "/.codex/skills/elves" in path_str or "/.agents/skills/elves" in path_str:
+    if _path_has_suffix(path, (".codex", "skills", "elves")) or _path_has_suffix(
+        path, (".agents", "skills", "elves")
+    ):
         return "codex"
-    if "/.grok/skills/elves" in path_str:
+    if _path_has_suffix(path, (".grok", "skills", "elves")):
         return "grok"
+    if _path_has_suffix(path, (".omp", "agent", "skills", "elves")):
+        return "omp"
     return None
 
 
 def infer_scope(path: Path) -> str:
     resolved = path.resolve()
-    path_str = str(resolved)
+    normalized = _normalized_path_parts(path)
     for global_path in GLOBAL_INSTALLS.values():
+        if normalized == _normalized_path_parts(global_path):
+            return "global"
         if global_path.exists() and resolved == global_path.resolve():
             return "global"
-    if (
-        "/.claude/skills/elves" in path_str
-        or "/.codex/skills/elves" in path_str
-        or "/.agents/skills/elves" in path_str
-        or "/.grok/skills/elves" in path_str
-    ):
+    if infer_platform(path) is not None:
         return "project-local"
     return "repo-checkout"
+
+
+def _decode_wsl_output(raw: bytes | str | None) -> str:
+    if raw is None:
+        return ""
+    if isinstance(raw, str):
+        return raw
+    if b"\x00" in raw:
+        try:
+            return raw.decode("utf-16-le")
+        except UnicodeError:
+            pass
+    return raw.decode("utf-8", errors="replace")
+
+
+def _parse_wsl_distribution_names(output: str) -> list[str]:
+    names: list[str] = []
+    for raw_line in output.splitlines():
+        name = raw_line.lstrip("\ufeff").strip()
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
+def _parse_wsl_distributions(
+    output: str,
+    names: list[str],
+) -> list[dict[str, Any]]:
+    distributions: list[dict[str, Any]] = []
+    unmatched = list(names)
+    for raw_line in output.splitlines():
+        line = raw_line.lstrip("\ufeff").strip()
+        is_default = line.startswith("*")
+        if is_default:
+            line = line[1:].lstrip()
+        for name in sorted(unmatched, key=len, reverse=True):
+            if not line.casefold().startswith(name.casefold()):
+                continue
+            remainder = line[len(name) :]
+            if remainder and not remainder[0].isspace():
+                continue
+            match = re.match(r"^\s+(?P<state>.+?)\s+(?P<version>[12])\s*$", remainder)
+            if match is None:
+                continue
+            distributions.append(
+                {
+                    "name": name,
+                    "state": match.group("state").strip().casefold(),
+                    "version": int(match.group("version")),
+                    "default": is_default,
+                    "managed": name.casefold() in MANAGED_WSL_DISTRIBUTIONS,
+                }
+            )
+            unmatched.remove(name)
+            break
+    distributions.extend(
+        {
+            "name": name,
+            "state": None,
+            "version": None,
+            "default": False,
+            "managed": name.casefold() in MANAGED_WSL_DISTRIBUTIONS,
+        }
+        for name in unmatched
+    )
+    return distributions
+
+
+def _powershell_argument(value: str) -> str:
+    if re.fullmatch(r"[A-Za-z0-9._-]+", value):
+        return value
+    return "'" + value.replace("'", "''") + "'"
+
+
+def _preferred_wsl_distribution(
+    distributions: list[dict[str, Any]],
+    *,
+    version: int,
+) -> dict[str, Any] | None:
+    candidates = [
+        item
+        for item in distributions
+        if not item["managed"] and item["version"] == version
+    ]
+    return next((item for item in candidates if item["default"]), None) or (
+        candidates[0] if candidates else None
+    )
+
+
+def _run_wsl_query(
+    wsl_runner: Any,
+    *,
+    mode: str,
+    label: str,
+) -> tuple[Any | None, str | None]:
+    try:
+        result = wsl_runner(
+            ["wsl.exe", "--list", mode],
+            capture_output=True,
+            check=False,
+            timeout=10,
+        )
+    except subprocess.TimeoutExpired:
+        return None, f"The WSL {label} query timed out."
+    except OSError:
+        return None, f"The WSL {label} query could not start."
+    except subprocess.SubprocessError:
+        return None, f"The WSL {label} query failed."
+    if getattr(result, "returncode", 1) != 0:
+        return (
+            result,
+            "The WSL "
+            f"{label} query exited with status {getattr(result, 'returncode', 'unknown')}.",
+        )
+    return result, None
+
+
+def _shortcut_capability(
+    *,
+    ready: bool,
+    backend: str | None = None,
+    reason: str | None = None,
+) -> dict[str, Any]:
+    return {
+        "ready": ready,
+        "backend": backend,
+        "providers": ["fugu", "grok", "omp"],
+        "reason": reason,
+    }
+
+
+def _external_council_capability(platform_name: str) -> dict[str, Any]:
+    if platform_name.startswith("linux"):
+        reason = (
+            "Linux asyncio launch cannot atomically bind the bwrap child to a "
+            "generation-safe process handle"
+        )
+    elif platform_name == "darwin":
+        reason = "Darwin has no qualified recursive external-process boundary"
+    elif platform_name == "win32":
+        reason = "Native Windows has no qualified Elves external-process boundary"
+    else:
+        reason = f"{platform_name} has no qualified Elves external-process boundary"
+    return {
+        "ready": False,
+        "reason_code": "isolation_recursive_containment_unavailable",
+        "reason": reason,
+    }
+
+
+def build_host_support(
+    *,
+    platform_name: str | None = None,
+    environ: dict[str, str] | None = None,
+    kernel_release: str | None = None,
+    wsl_runner: Any = subprocess.run,
+    sandbox_resolver: Any = None,
+    probe_sandbox: bool = True,
+) -> dict[str, Any]:
+    """Return host support and provider-boundary facts without changing the host."""
+    selected_platform = platform_name or sys.platform
+    selected_env = dict(os.environ if environ is None else environ)
+    selected_release = kernel_release or host_platform.release()
+    distro_name = selected_env.get("WSL_DISTRO_NAME") or None
+    release_lower = selected_release.casefold()
+    in_wsl = bool(distro_name) or "microsoft" in release_lower
+    external_council = _external_council_capability(selected_platform)
+
+    def unsupported_capabilities(reason: str) -> dict[str, Any]:
+        return {
+            "local_provider_shortcuts": _shortcut_capability(
+                ready=False,
+                reason=reason,
+            ),
+            "external_council": external_council,
+        }
+
+    def wsl_probe_failure(reason: str) -> dict[str, Any]:
+        return {
+            "status": "wsl_probe_failed",
+            "supported": False,
+            "summary": reason + " Native Win32 is not supported.",
+            "wsl": {
+                "distribution": None,
+                "version": None,
+                "distributions": [],
+            },
+            "remediation": "wsl --status; wsl --list --verbose",
+            "capabilities": unsupported_capabilities(
+                "Confirm a working WSL2 distribution before provider checks."
+            ),
+        }
+
+    def probe_shortcut_capability(*, expected_backend: str | None = None) -> dict[str, Any]:
+        if not probe_sandbox:
+            return _shortcut_capability(
+                ready=False,
+                reason="Sandbox probe was not requested.",
+            )
+        try:
+            resolver = sandbox_resolver
+            if resolver is None:
+                from cobbler_runtime.isolation import resolve_fs_sandbox_backend
+
+                resolver = resolve_fs_sandbox_backend
+            resolved_backend = resolver()
+            backend_name = getattr(resolved_backend, "name", None)
+        except (OSError, RuntimeError, ValidationIssue):
+            return _shortcut_capability(
+                ready=False,
+                reason="The filesystem-sandbox probe failed.",
+            )
+        ready = backend_name is not None and (
+            expected_backend is None or backend_name == expected_backend
+        )
+        return _shortcut_capability(
+            ready=ready,
+            backend=backend_name,
+            reason=(
+                None
+                if ready
+                else f"Qualified {expected_backend or 'filesystem sandbox'} is unavailable."
+            ),
+        )
+
+    if selected_platform == "win32":
+        quiet_result, probe_error = _run_wsl_query(
+            wsl_runner,
+            mode="--quiet",
+            label="distribution",
+        )
+        if probe_error is not None:
+            return wsl_probe_failure(probe_error)
+        assert quiet_result is not None
+
+        names = _parse_wsl_distribution_names(
+            _decode_wsl_output(getattr(quiet_result, "stdout", b""))
+        )
+        if not names:
+            return {
+                "status": "needs_wsl_distribution",
+                "supported": False,
+                "summary": "Native Win32 is not supported. Install an Ubuntu WSL2 distribution.",
+                "wsl": {
+                    "distribution": None,
+                    "version": None,
+                    "distributions": [],
+                },
+                "remediation": "wsl --install -d Ubuntu",
+                "capabilities": unsupported_capabilities(
+                    "Install and enter a WSL2 distribution before provider checks."
+                ),
+            }
+
+        verbose_result, probe_error = _run_wsl_query(
+            wsl_runner,
+            mode="--verbose",
+            label="version",
+        )
+        if probe_error is not None:
+            return wsl_probe_failure(probe_error)
+        assert verbose_result is not None
+
+        distributions = _parse_wsl_distributions(
+            _decode_wsl_output(getattr(verbose_result, "stdout", b"")),
+            names,
+        )
+        wsl2 = _preferred_wsl_distribution(distributions, version=2)
+        wsl1 = _preferred_wsl_distribution(distributions, version=1)
+        if wsl2 is not None:
+            distro = str(wsl2["name"])
+            return {
+                "status": "use_wsl2",
+                "supported": False,
+                "summary": f"Native Win32 is not supported. Run Elves inside WSL2 distribution {distro}.",
+                "wsl": {
+                    "distribution": distro,
+                    "version": 2,
+                    "distributions": distributions,
+                },
+                "remediation": f"wsl -d {_powershell_argument(distro)}",
+                "capabilities": unsupported_capabilities(
+                    "Enter the WSL2 distribution before provider checks."
+                ),
+            }
+        if wsl1 is not None:
+            distro = str(wsl1["name"])
+            return {
+                "status": "needs_wsl2_conversion",
+                "supported": False,
+                "summary": f"WSL1 distribution {distro} is not a supported Elves host.",
+                "wsl": {
+                    "distribution": distro,
+                    "version": 1,
+                    "distributions": distributions,
+                },
+                "remediation": f"wsl --set-version {_powershell_argument(distro)} 2",
+                "capabilities": unsupported_capabilities(
+                    "Convert the distribution to WSL2 before provider checks."
+                ),
+            }
+        usable_distributions = [item for item in distributions if not item["managed"]]
+        if usable_distributions:
+            return {
+                "status": "wsl_generation_unknown",
+                "supported": False,
+                "summary": "The installed WSL distribution version could not be confirmed.",
+                "wsl": {
+                    "distribution": None,
+                    "version": None,
+                    "distributions": distributions,
+                },
+                "remediation": "Run `wsl --list --verbose` and confirm VERSION 2.",
+                "capabilities": unsupported_capabilities(
+                    "Only a confirmed WSL2 distribution is supported."
+                ),
+            }
+        return {
+            "status": "needs_wsl_distribution",
+            "supported": False,
+            "summary": (
+                "Native Win32 is not supported. Install an Ubuntu WSL2 distribution. "
+                "Managed Docker Desktop distributions are not Elves hosts."
+            ),
+            "wsl": {
+                "distribution": None,
+                "version": None,
+                "distributions": distributions,
+            },
+            "remediation": "wsl --install -d Ubuntu",
+            "capabilities": unsupported_capabilities(
+                "Install and enter a WSL2 distribution before provider checks."
+            ),
+        }
+
+    if selected_platform.startswith("linux") and in_wsl:
+        if "wsl2" in release_lower or "microsoft-standard" in release_lower:
+            wsl_version = 2
+        elif "microsoft" in release_lower:
+            wsl_version = 1
+        else:
+            wsl_version = None
+        if wsl_version != 2:
+            status = (
+                "needs_wsl2_conversion"
+                if wsl_version == 1 and distro_name
+                else "wsl_generation_unknown"
+            )
+            remediation = (
+                f"wsl --set-version {_powershell_argument(distro_name)} 2"
+                if wsl_version == 1 and distro_name
+                else "Run `wsl --list --verbose` in Windows and confirm VERSION 2."
+            )
+            return {
+                "status": status,
+                "supported": False,
+                "summary": "This WSL environment is not confirmed as WSL2.",
+                "wsl": {"distribution": distro_name, "version": wsl_version},
+                "remediation": remediation,
+                "capabilities": unsupported_capabilities(
+                    "Only a confirmed WSL2 environment is supported."
+                ),
+            }
+
+        return {
+            "status": "supported",
+            "supported": True,
+            "summary": "Elves is running inside confirmed WSL2.",
+            "wsl": {"distribution": distro_name, "version": 2},
+            "remediation": None,
+            "capabilities": {
+                "local_provider_shortcuts": probe_shortcut_capability(
+                    expected_backend="bwrap"
+                ),
+                "external_council": external_council,
+            },
+        }
+
+    return {
+        "status": "supported",
+        "supported": True,
+        "summary": f"Elves is running on supported host platform {selected_platform}.",
+        "wsl": None,
+        "remediation": None,
+        "capabilities": {
+            "local_provider_shortcuts": probe_shortcut_capability(),
+            "external_council": external_council,
+        },
+    }
 
 
 def describe_install(install: Install) -> str:
@@ -411,8 +811,36 @@ def dedupe(items: list[str]) -> list[str]:
     return ordered
 
 
-def render_doctor(installs: list[Install], latest_release: dict[str, Any], notes: list[str]) -> str:
+def render_doctor(
+    installs: list[Install],
+    latest_release: dict[str, Any],
+    notes: list[str],
+    host_support: dict[str, Any] | None = None,
+) -> str:
     lines = ["Elves installation report"]
+    if host_support is not None:
+        lines.append("")
+        lines.append("Host support:")
+        lines.append(f"- Status: {host_support['status']}")
+        lines.append(f"- {host_support['summary']}")
+        remediation = host_support.get("remediation")
+        if remediation:
+            lines.append(f"- Next command: {remediation}")
+        capabilities = host_support.get("capabilities") or {}
+        shortcuts = capabilities.get("local_provider_shortcuts") or {}
+        council = capabilities.get("external_council") or {}
+        shortcut_state = "ready" if shortcuts.get("ready") else "unavailable"
+        backend = shortcuts.get("backend")
+        if backend:
+            shortcut_state += f" ({backend})"
+        lines.append(f"- Fugu, Grok, and OMP local sandbox: {shortcut_state}")
+        if shortcuts.get("reason"):
+            lines.append(f"  Reason: {shortcuts['reason']}")
+        council_state = "ready" if council.get("ready") else "unavailable"
+        lines.append(f"- External council process boundary: {council_state}")
+        if council.get("reason"):
+            lines.append(f"  Reason: {council['reason']}")
+
     lines.append("")
     lines.append("Installs:")
     for install in installs:
@@ -453,6 +881,15 @@ def main() -> int:
     installs, active_install = discover_installs(cwd)
     latest_release = fetch_latest_release(args.cache_hours, active_install.version)
     notes = build_recommendations(installs, active_install, latest_release)
+    host_support = build_host_support(probe_sandbox=not mode_startup)
+    if not host_support["supported"] and host_support.get("remediation"):
+        notes = dedupe(
+            [
+                *notes,
+                host_support["summary"],
+                f"Run `{host_support['remediation']}`.",
+            ]
+        )
 
     report = {
         "active_root": str(active_install.path),
@@ -468,6 +905,7 @@ def main() -> int:
             }
             for install in installs
         ],
+        "host_support": host_support,
         "recommendations": notes,
     }
 
@@ -480,7 +918,7 @@ def main() -> int:
             print(render_startup(notes))
         return 0
 
-    print(render_doctor(installs, latest_release, notes))
+    print(render_doctor(installs, latest_release, notes, host_support))
     return 0
 
 

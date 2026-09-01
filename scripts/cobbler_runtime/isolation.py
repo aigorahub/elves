@@ -21,6 +21,7 @@ import shlex
 import shutil
 import stat
 import subprocess
+import sys
 import tempfile
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, field
@@ -1677,6 +1678,24 @@ def _probe_fs_sandbox_backend(name: str, executable: Path) -> bool:
     return False
 
 
+def filesystem_sandbox_unavailable_message(
+    *,
+    platform_name: str | None = None,
+    required: bool = False,
+) -> str:
+    prefix = "Required " if required else ""
+    selected_platform = platform_name or sys.platform
+    if selected_platform == "win32":
+        return (
+            f"{prefix}filesystem sandbox backend not available on native Windows. "
+            "Run Elves inside WSL2 and install qualified /usr/bin/bwrap."
+        )
+    return (
+        f"{prefix}filesystem sandbox backend not available "
+        "(need sandbox-exec on macOS or bwrap on Linux)"
+    )
+
+
 def prepare_fs_sandbox(
     lane: IsolatedLane,
     *,
@@ -1694,8 +1713,7 @@ def prepare_fs_sandbox(
         if required:
             raise ValidationIssue(
                 "isolation_sandbox_unavailable",
-                "Required filesystem sandbox backend not available "
-                "(need sandbox-exec on macOS or bwrap on Linux)",
+                filesystem_sandbox_unavailable_message(required=True),
                 path=str(lane.root),
             )
         return None, None
