@@ -46,8 +46,8 @@
 
 - **Planned batches remaining:** 1
 - **Stop allowed right now:** no
-- **Why:** Windows through WSL2 implementation and terminal verification remain
-- **Next required action:** implement B2 platform checks, diagnostics, and documentation
+- **Why:** the exact-tip terminal verifier and close evidence remain
+- **Next required action:** commit and push B2 implementation, then run the terminal verifier
 - **continuation_guard.stop_allowed:** false
 
 ## Effort Standard
@@ -73,10 +73,11 @@
 
 ## Current Phase
 
-- **Status:** implementing
+- **Status:** verifying
 - **Active batch:** B2
-- **What was just finished:** B1 three-state council results and focused verification
-- **Single next action:** commit and push B1, then add B2 platform-probe tests
+- **What was just finished:** B2 WSL2 checks, diagnostics, documentation, release metadata, and
+  focused verification
+- **Single next action:** commit and push B2 implementation, then run exact-tip verification
 
 ## Active Compute
 

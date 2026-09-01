@@ -114,36 +114,36 @@ clear provider-isolation check before a paid provider launch.
 
 **Tasks:**
 
-- [ ] Add a bounded, testable Windows and WSL support report to the install doctor.
-- [ ] Give a native Windows user with no distribution the exact `wsl --install -d Ubuntu`
+- [x] Add a bounded, testable Windows and WSL support report to the install doctor.
+- [x] Give a native Windows user with no distribution the exact `wsl --install -d Ubuntu`
   recovery command.
-- [ ] Distinguish WSL1, WSL2, and unknown WSL generation. Give the exact WSL1 conversion command.
-- [ ] Report local shortcut filesystem-sandbox readiness separately from external council
+- [x] Distinguish WSL1, WSL2, and unknown WSL generation. Give the exact WSL1 conversion command.
+- [x] Report local shortcut filesystem-sandbox readiness separately from external council
   recursive process-boundary readiness.
-- [ ] Replace generic unsupported-platform sandbox text with Windows through WSL2 remediation.
-- [ ] Make install-path classification accept Windows separators and include OMP installations.
-- [ ] Add one Windows through WSL2 install path to the README and public guide.
-- [ ] State the platform contract and provider differences in detailed references.
-- [ ] Update Elves to version 2.35.0 and record the change.
+- [x] Replace generic unsupported-platform sandbox text with Windows through WSL2 remediation.
+- [x] Make install-path classification accept Windows separators and include OMP installations.
+- [x] Add one Windows through WSL2 install path to the README and public guide.
+- [x] State the platform contract and provider differences in detailed references.
+- [x] Update Elves to version 2.35.0 and record the change.
 
 **Acceptance criteria:**
 
-- [ ] B2-A1: On native Windows with no installed WSL distribution, doctor JSON and prose report
+- [x] B2-A1: On native Windows with no installed WSL distribution, doctor JSON and prose report
   `needs_wsl_distribution` and show `wsl --install -d Ubuntu`.
-- [ ] B2-A2: On native Windows with a WSL2 distribution, the doctor tells the user to run the
+- [x] B2-A2: On native Windows with a WSL2 distribution, the doctor tells the user to run the
   supported host and Elves inside that distribution. It does not claim native Win32 support.
-- [ ] B2-A3: WSL1 and an unknown WSL generation are not reported as supported. WSL1 reports
+- [x] B2-A3: WSL1 and an unknown WSL generation are not reported as supported. WSL1 reports
   `wsl --set-version <Distro> 2`. Only confirmed WSL2 is supported.
-- [ ] B2-A4: Inside WSL2, the doctor reports local shortcut `bwrap` readiness separately from the
+- [x] B2-A4: Inside WSL2, the doctor reports local shortcut `bwrap` readiness separately from the
   external council recursive process boundary. `bwrap` does not mark external council ready.
-- [ ] B2-A5: A native Windows or filesystem-sandbox failure names WSL2 and `bwrap` as the supported
+- [x] B2-A5: A native Windows or filesystem-sandbox failure names WSL2 and `bwrap` as the supported
   remediation. Existing recursive-containment errors remain unchanged.
-- [ ] B2-A6: Windows-style install paths classify correctly. OMP global and local installations
+- [x] B2-A6: Windows-style install paths classify correctly. OMP global and local installations
   are included. The public guide includes the OMP doctor command.
-- [ ] B2-A7: README and public guide take a Windows user from WSL status check through WSL2
+- [x] B2-A7: README and public guide take a Windows user from WSL status check through WSL2
   distribution setup, Linux package prerequisites, host installation inside WSL, Elves install,
   and doctor validation.
-- [ ] B2-A8: Provider documentation states that all five Windows shortcut runners execute inside
+- [x] B2-A8: Provider documentation states that all five Windows shortcut runners execute inside
   WSL2. Fugu, Grok, and OMP need the local kernel sandbox. Manus and Devin perform remote work
   without `dispatch_external.py` or a local repository sandbox.
 - [ ] B2-A9: Version metadata, CHANGELOG, consistency checks, focused tests, and the full

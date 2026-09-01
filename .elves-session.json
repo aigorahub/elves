@@ -40,51 +40,51 @@
       "acceptance": [
         {
           "criterion": "On native Windows with no installed WSL distribution, doctor JSON and prose report `needs_wsl_distribution` and show `wsl --install -d Ubuntu`.",
-          "evidence": "",
+          "evidence": "Install doctor human and JSON output tests passed for needs_wsl_distribution and wsl --install -d Ubuntu.",
           "id": "B2-A1",
-          "met": false
+          "met": true
         },
         {
           "criterion": "On native Windows with a WSL2 distribution, the doctor tells the user to run the supported host and Elves inside that distribution. It does not claim native Win32 support.",
-          "evidence": "",
+          "evidence": "Native Windows WSL2 distribution test passed with use_wsl2 and wsl -d Ubuntu remediation.",
           "id": "B2-A2",
-          "met": false
+          "met": true
         },
         {
           "criterion": "WSL1 and an unknown WSL generation are not reported as supported. WSL1 reports `wsl --set-version <Distro> 2`. Only confirmed WSL2 is supported.",
-          "evidence": "",
+          "evidence": "WSL1, unknown generation, current WSL2, and older microsoft-standard kernel tests passed.",
           "id": "B2-A3",
-          "met": false
+          "met": true
         },
         {
           "criterion": "Inside WSL2, the doctor reports local shortcut `bwrap` readiness separately from the external council recursive process boundary. `bwrap` does not mark external council ready.",
-          "evidence": "",
+          "evidence": "WSL2 capability test passed with bwrap ready and external council recursive boundary unavailable.",
           "id": "B2-A4",
-          "met": false
+          "met": true
         },
         {
           "criterion": "A native Windows or filesystem-sandbox failure names WSL2 and `bwrap` as the supported remediation. Existing recursive-containment errors remain unchanged.",
-          "evidence": "",
+          "evidence": "Windows sandbox diagnostic test passed; existing Linux and Darwin recursive containment tests passed.",
           "id": "B2-A5",
-          "met": false
+          "met": true
         },
         {
           "criterion": "Windows-style install paths classify correctly. OMP global and local installations are included. The public guide includes the OMP doctor command.",
-          "evidence": "",
+          "evidence": "Windows separator and OMP install classification tests passed; guide includes the OMP doctor path.",
           "id": "B2-A6",
-          "met": false
+          "met": true
         },
         {
           "criterion": "README and public guide take a Windows user from WSL status check through WSL2 distribution setup, Linux package prerequisites, host installation inside WSL, Elves install, and doctor validation.",
-          "evidence": "",
+          "evidence": "README and guide contain the WSL2 status, install, conversion, package, host, Elves, and doctor flow.",
           "id": "B2-A7",
-          "met": false
+          "met": true
         },
         {
           "criterion": "Provider documentation states that all five Windows shortcut runners execute inside WSL2. Fugu, Grok, and OMP need the local kernel sandbox. Manus and Devin perform remote work without `dispatch_external.py` or a local repository sandbox.",
-          "evidence": "",
+          "evidence": "Provider shortcut reference documents all five WSL2 runners and the three local sandbox users.",
           "id": "B2-A8",
-          "met": false
+          "met": true
         },
         {
           "criterion": "Version metadata, CHANGELOG, consistency checks, focused tests, and the full repository verifier pass at version 2.35.0.",

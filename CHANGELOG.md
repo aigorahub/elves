@@ -4,6 +4,24 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.35.0] - 2026-09-01
+
+### Added
+
+* **Windows has a supported WSL2 setup path.** The install doctor now distinguishes native
+  Windows, WSL1, unknown WSL generation, and confirmed WSL2. It gives exact distribution install
+  and conversion commands. It reports local Fugu, Grok, and OMP sandbox readiness separately from
+  external council process-boundary readiness. The README and user guide include the full setup.
+
+### Fixed
+
+* **A council with no review report cannot claim success.** Optional zero-report councils now
+  return `ok=false`, `blocked=false`, and status `unavailable`. Human output, JSON, and exit status
+  distinguish successful, unavailable, and blocked results. Failed lane and model-call evidence is
+  preserved. (#269)
+* **Install discovery accepts Windows path separators and OMP installs.** The doctor uses standard
+  executable lookup behavior and recognizes global and project-local OMP skill roots.
+
 ## [2.34.1] - 2026-09-01
 
 ### Fixed

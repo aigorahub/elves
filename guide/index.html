@@ -512,7 +512,7 @@
     <div class="masthead-inner">
       <div class="brand-row">
         <a class="wordmark" href="https://github.com/aigorahub/elves">Elves</a>
-        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.34.1 source and releases on GitHub</a>
+        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.35.0 source and releases on GitHub</a>
       </div>
       <h1>Using Elves</h1>
       <p class="intro">Plan with the main agent, hand implementation to a separate worker, then
@@ -562,12 +562,13 @@
    git clone --depth 1 https://github.com/aigorahub/elves.git "$ELVES_TMP/elves"
    python3 "$ELVES_TMP/elves/scripts/sync_installed_skills.py" --apply --target &lt;claude|codex|grok|omp&gt;
    rm -rf "$ELVES_TMP"
-   Use target `claude`, `codex`, or `grok` to match what you detected. Requires Python 3.10 or newer.
+   Use target `claude`, `codex`, `grok`, or `omp` to match what you detected. Requires Python 3.10 or newer.
 
 3. Validate each install you performed:
    python3 ~/.claude/skills/elves/scripts/install_doctor.py --startup
    python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup
    python3 ~/.grok/skills/elves/scripts/install_doctor.py --startup
+   python3 ~/.omp/agent/skills/elves/scripts/install_doctor.py --startup
 
 4. In plain language, explain:
    - Elves is a skill for Claude Code, Codex, Grok Build, and Oh My Pi / omp (those are the supported main drivers).
@@ -615,6 +616,44 @@
         <h2>Install Elves</h2>
         <p>Install from a temporary clone. The sync helper updates the main skill and preserves
           user-owned Claude Code aliases.</p>
+
+        <h3>Windows through WSL2</h3>
+        <p>Elves runs on Windows through WSL2. Native Win32 is not supported. Run these commands
+          in PowerShell. Install Ubuntu if no distribution exists. Convert it if the VERSION column
+          shows 1.</p>
+        <div class="code-block">
+          <button class="copy" type="button" data-copy="install-windows">Copy</button>
+          <pre><code id="install-windows">wsl --status
+wsl --list --verbose
+wsl --install -d Ubuntu
+wsl --set-version Ubuntu 2
+wsl -d Ubuntu</code></pre>
+        </div>
+        <p>Run the next commands inside Ubuntu. Install one supported host in the same WSL2
+          distribution. Confirm that its command is on the Linux <code>PATH</code>. Set
+          <code>ELVES_TARGET</code> to <code>claude</code>, <code>codex</code>,
+          <code>grok</code>, or <code>omp</code>.</p>
+        <div class="code-block">
+          <button class="copy" type="button" data-copy="install-windows-wsl">Copy</button>
+          <pre><code id="install-windows-wsl">sudo apt update
+sudo apt install -y git python3 bubblewrap
+ELVES_TARGET=codex
+ELVES_TMP="$(mktemp -d)"
+git clone --depth 1 https://github.com/aigorahub/elves.git "$ELVES_TMP/elves"
+python3 "$ELVES_TMP/elves/scripts/sync_installed_skills.py" --apply --target "$ELVES_TARGET"
+case "$ELVES_TARGET" in
+  claude) ELVES_ROOT="$HOME/.claude/skills/elves" ;;
+  codex) ELVES_ROOT="$HOME/.codex/skills/elves" ;;
+  grok) ELVES_ROOT="$HOME/.grok/skills/elves" ;;
+  omp) ELVES_ROOT="$HOME/.omp/agent/skills/elves" ;;
+esac
+python3 "$ELVES_ROOT/scripts/install_doctor.py" --doctor
+rm -rf "$ELVES_TMP"</code></pre>
+        </div>
+        <p>Fugu, Grok, and OMP local shortcuts need a qualified <code>/usr/bin/bwrap</code> probe.
+          Manus and Devin perform remote work, but their Bash runners also start inside WSL2. The
+          doctor reports the local shortcut sandbox and external council process boundary as
+          separate capabilities.</p>
 
         <div class="host-switch">
           <article class="host">
@@ -667,7 +706,10 @@ python3 ~/.claude/skills/elves/scripts/install_doctor.py --startup
 python3 ~/.codex/skills/elves/scripts/install_doctor.py --startup
 
 # Grok Build
-python3 ~/.grok/skills/elves/scripts/install_doctor.py --startup</code></pre>
+python3 ~/.grok/skills/elves/scripts/install_doctor.py --startup
+
+# Oh My Pi
+python3 ~/.omp/agent/skills/elves/scripts/install_doctor.py --startup</code></pre>
         </div>
       </section>
 

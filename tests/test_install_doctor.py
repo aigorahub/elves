@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 
@@ -143,6 +146,231 @@ class InstallDoctorCacheTests(unittest.TestCase):
             }
             self.assertEqual(active_install.path, active)
             self.assertEqual(observed, expected)
+
+    def test_windows_install_paths_and_omp_are_classified(self) -> None:
+        self.assertEqual(
+            self.install_doctor.infer_platform(
+                Path(r"C:\Users\alice\.omp\agent\skills\elves")
+            ),
+            "omp",
+        )
+        self.assertEqual(
+            self.install_doctor.infer_platform(
+                Path(r"C:\work\repo\.codex\skills\elves")
+            ),
+            "codex",
+        )
+        with mock.patch.object(
+            self.install_doctor,
+            "GLOBAL_INSTALLS",
+            {"omp": Path(r"C:\Users\alice\.omp\agent\skills\elves")},
+        ):
+            self.assertEqual(
+                self.install_doctor.infer_scope(
+                    Path(r"C:\Users\alice\.omp\agent\skills\elves")
+                ),
+                "global",
+            )
+        self.assertIn("omp", self.install_doctor.GLOBAL_INSTALLS)
+        self.assertIn("omp", self.install_doctor.LOCAL_INSTALL_SUFFIXES)
+
+    def test_native_windows_without_distribution_reports_install_command(self) -> None:
+        runner = mock.Mock(
+            return_value=SimpleNamespace(
+                returncode=0,
+                stdout=b"Windows Subsystem for Linux has no installed distributions.\r\n",
+                stderr=b"",
+            )
+        )
+        support = self.install_doctor.build_host_support(
+            platform_name="win32",
+            environ={},
+            kernel_release="10.0.26100",
+            wsl_runner=runner,
+            probe_sandbox=False,
+        )
+        self.assertEqual(support["status"], "needs_wsl_distribution")
+        self.assertFalse(support["supported"])
+        self.assertIn("wsl --install -d Ubuntu", support["remediation"])
+        runner.assert_called_once()
+
+    def test_native_windows_with_wsl2_directs_execution_inside_distro(self) -> None:
+        runner = mock.Mock(
+            return_value=SimpleNamespace(
+                returncode=0,
+                stdout=(
+                    "  NAME      STATE           VERSION\r\n"
+                    "* Ubuntu    Stopped         2\r\n"
+                ).encode("utf-16-le"),
+                stderr=b"",
+            )
+        )
+        support = self.install_doctor.build_host_support(
+            platform_name="win32",
+            environ={},
+            kernel_release="10.0.26100",
+            wsl_runner=runner,
+            probe_sandbox=False,
+        )
+        self.assertEqual(support["status"], "use_wsl2")
+        self.assertFalse(support["supported"])
+        self.assertEqual(support["wsl"]["distribution"], "Ubuntu")
+        self.assertEqual(support["wsl"]["version"], 2)
+        self.assertIn("wsl -d Ubuntu", support["remediation"])
+        self.assertIn("inside", support["summary"].lower())
+
+    def test_native_windows_wsl1_reports_conversion_command(self) -> None:
+        runner = mock.Mock(
+            return_value=SimpleNamespace(
+                returncode=0,
+                stdout=b"  NAME      STATE           VERSION\r\n* Ubuntu    Stopped         1\r\n",
+                stderr=b"",
+            )
+        )
+        support = self.install_doctor.build_host_support(
+            platform_name="win32",
+            environ={},
+            kernel_release="10.0.26100",
+            wsl_runner=runner,
+            probe_sandbox=False,
+        )
+        self.assertEqual(support["status"], "needs_wsl2_conversion")
+        self.assertFalse(support["supported"])
+        self.assertIn("wsl --set-version Ubuntu 2", support["remediation"])
+
+    def test_native_windows_unknown_wsl_generation_is_not_supported(self) -> None:
+        runner = mock.Mock(
+            return_value=SimpleNamespace(
+                returncode=0,
+                stdout=b"  NAME      STATE           VERSION\r\n  Ubuntu    Stopped         ?\r\n",
+                stderr=b"",
+            )
+        )
+        support = self.install_doctor.build_host_support(
+            platform_name="win32",
+            environ={},
+            kernel_release="10.0.26100",
+            wsl_runner=runner,
+            probe_sandbox=False,
+        )
+        self.assertEqual(support["status"], "wsl_generation_unknown")
+        self.assertFalse(support["supported"])
+        self.assertIn("wsl --list --verbose", support["remediation"])
+
+    def test_inside_wsl2_separates_shortcut_and_council_capabilities(self) -> None:
+        backend = SimpleNamespace(name="bwrap", executable=Path("/usr/bin/bwrap"))
+        support = self.install_doctor.build_host_support(
+            platform_name="linux",
+            environ={"WSL_DISTRO_NAME": "Ubuntu"},
+            kernel_release="5.15.146.1-microsoft-standard-WSL2",
+            sandbox_resolver=lambda: backend,
+        )
+        self.assertEqual(support["status"], "supported")
+        self.assertTrue(support["supported"])
+        self.assertEqual(support["wsl"]["version"], 2)
+        self.assertTrue(support["capabilities"]["local_provider_shortcuts"]["ready"])
+        self.assertEqual(
+            support["capabilities"]["local_provider_shortcuts"]["backend"],
+            "bwrap",
+        )
+        self.assertFalse(support["capabilities"]["external_council"]["ready"])
+        self.assertEqual(
+            support["capabilities"]["external_council"]["reason_code"],
+            "isolation_recursive_containment_unavailable",
+        )
+
+    def test_older_microsoft_standard_kernel_is_confirmed_wsl2(self) -> None:
+        support = self.install_doctor.build_host_support(
+            platform_name="linux",
+            environ={"WSL_DISTRO_NAME": "Ubuntu"},
+            kernel_release="4.19.128-microsoft-standard",
+            sandbox_resolver=lambda: None,
+        )
+        self.assertEqual(support["status"], "supported")
+        self.assertEqual(support["wsl"]["version"], 2)
+
+    def test_inside_wsl1_and_unknown_generation_are_not_supported(self) -> None:
+        wsl1 = self.install_doctor.build_host_support(
+            platform_name="linux",
+            environ={"WSL_DISTRO_NAME": "Ubuntu"},
+            kernel_release="4.4.0-19041-Microsoft",
+            probe_sandbox=False,
+        )
+        unknown = self.install_doctor.build_host_support(
+            platform_name="linux",
+            environ={"WSL_DISTRO_NAME": "Ubuntu"},
+            kernel_release="custom-kernel",
+            probe_sandbox=False,
+        )
+        self.assertEqual(wsl1["status"], "needs_wsl2_conversion")
+        self.assertIn("wsl --set-version Ubuntu 2", wsl1["remediation"])
+        self.assertEqual(unknown["status"], "wsl_generation_unknown")
+        self.assertFalse(unknown["supported"])
+
+    def test_doctor_human_and_json_outputs_include_windows_support_state(self) -> None:
+        support = {
+            "status": "needs_wsl_distribution",
+            "supported": False,
+            "summary": "Native Win32 is not supported. Install an Ubuntu WSL2 distribution.",
+            "wsl": {"distribution": None, "version": None, "distributions": []},
+            "remediation": "wsl --install -d Ubuntu",
+            "capabilities": {
+                "local_provider_shortcuts": {
+                    "ready": False,
+                    "backend": None,
+                    "reason": "Enter WSL2 first.",
+                },
+                "external_council": {
+                    "ready": False,
+                    "reason_code": "isolation_recursive_containment_unavailable",
+                    "reason": "Native Windows has no qualified boundary.",
+                },
+            },
+        }
+        active = self.install_doctor.Install(
+            platform="unknown",
+            scope="repo-checkout",
+            path=Path("/repo"),
+            version="2.35.0",
+            active=True,
+        )
+        rendered = self.install_doctor.render_doctor(
+            [active],
+            {"latest_version": "2.35.0", "latest_url": None},
+            [],
+            support,
+        )
+        self.assertIn("Status: needs_wsl_distribution", rendered)
+        self.assertIn("Next command: wsl --install -d Ubuntu", rendered)
+
+        args = SimpleNamespace(
+            startup=False,
+            doctor=True,
+            cache_hours=24,
+            json=True,
+        )
+        stdout = io.StringIO()
+        with mock.patch.object(self.install_doctor, "parse_args", return_value=args), mock.patch.object(
+            self.install_doctor,
+            "discover_installs",
+            return_value=([active], active),
+        ), mock.patch.object(
+            self.install_doctor,
+            "fetch_latest_release",
+            return_value={"latest_version": "2.35.0", "latest_url": None},
+        ), mock.patch.object(
+            self.install_doctor,
+            "build_host_support",
+            return_value=support,
+        ), redirect_stdout(stdout):
+            exit_code = self.install_doctor.main()
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(payload["host_support"]["status"], "needs_wsl_distribution")
+        self.assertEqual(
+            payload["host_support"]["remediation"],
+            "wsl --install -d Ubuntu",
+        )
 
     def test_build_recommendations_reports_updates_mismatch_legacy_and_sync_hint(self) -> None:
         active = self.install_doctor.Install(

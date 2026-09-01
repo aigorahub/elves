@@ -36,3 +36,21 @@
 - Preserved failed-lane reasons, call truth, required blocking, and successful optional councils.
 - Documented the command result contract in `references/council-workflow.md`.
 - Passed 156 dispatch and isolation tests. Nine platform tests skipped on this macOS host.
+
+## 2026-09-01: Batch 2 implementation
+
+- Added native Windows and WSL state detection to the install doctor.
+- Added exact recovery for no distribution and WSL1 conversion.
+- Reported confirmed WSL2 support, local shortcut sandbox readiness, and external council process
+  boundary status as separate fields.
+- Added Windows-specific filesystem-sandbox remediation without changing recursive-containment
+  errors.
+- Added Windows path classification, OMP install discovery, and standard executable lookup.
+- Added the WSL2 setup to the README, public guide, operations guide, and provider reference.
+- Bumped release metadata to 2.35.0 and recorded the intentional council CLI compatibility change.
+- Passed 174 focused doctor, dispatch, and isolation tests. Nine live platform tests skipped on
+  this macOS host.
+- Passed the repository consistency and public API compatibility gates.
+- A first full verifier run passed all 1,644 unit tests but required the intentional API break
+  approval for `cli:cobbler_agents council`. Added that release-scoped approval and passed the
+  focused compatibility gate.

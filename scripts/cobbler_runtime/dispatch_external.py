@@ -37,6 +37,7 @@ from .isolation import (
     IsolatedLane,
     copy_isolated_transport_inputs,
     create_tracked_snapshot,
+    filesystem_sandbox_unavailable_message,
     resolve_fs_sandbox_backend,
     rewrite_argv_repo_paths,
     wrap_argv_with_sandbox,
@@ -904,14 +905,16 @@ def prepare_external_launch(
             # A tracked snapshot alone cannot prevent absolute host/sibling reads.
             # Required routes block; optional routes skip this external attempt.
             if backend is None:
-                reason = (
-                    "filesystem sandbox backend not available "
-                    "(sandbox-exec on macOS or bwrap on Linux)"
+                reason = filesystem_sandbox_unavailable_message(
+                    platform_name=sys.platform,
                 )
                 if isolation_required:
                     raise ValidationIssue(
                         "isolation_sandbox_unavailable",
-                        f"Required {reason}",
+                        filesystem_sandbox_unavailable_message(
+                            platform_name=sys.platform,
+                            required=True,
+                        ),
                     )
                 return _skip_external_attempt(reason)
             isolated = create_tracked_snapshot(

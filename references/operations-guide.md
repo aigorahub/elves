@@ -39,9 +39,17 @@ Elves preflight will warn you if `caffeinate` isn't running and if you are on ba
 systemd-inhibit --what=idle <your-agent-command>
 ```
 
-### Windows (WSL)
+### Windows through WSL2
 
-Open Power Options → Change plan settings → set "Put the computer to sleep" to **Never** for the duration of the run. Restore it afterward.
+Elves does not support native Win32 execution. Run the host and Elves inside a confirmed WSL2
+distribution. In PowerShell, use `wsl --list --verbose`. If no distribution exists, use
+`wsl --install -d Ubuntu`. If the distribution shows VERSION 1, use
+`wsl --set-version <Distro> 2`. Inside WSL2, install `git`, `python3`, and `bubblewrap`, then run
+the install doctor with `--doctor`. The doctor reports Elves host support, local provider shortcut
+sandbox readiness, and external council process-boundary readiness as separate facts.
+
+For a long run, open Power Options, select Change plan settings, and set Put the computer to sleep
+to Never. Restore the prior setting after the run.
 
 ### Cloud / remote (recommended for reliability)
 
