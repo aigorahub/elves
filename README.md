@@ -123,7 +123,8 @@ isolated `dontAsk` settings, and bypass mode locked off. The shortcut requires a
 model-directed command runs, and the Linux boundary omits procfs to prevent parent-environment
 inspection. It does not expose a shared OAuth file because Grok applies the same sandbox to
 provider and tool reads. Fugu's Linux boundary likewise omits procfs around its credential-bearing
-launcher. Manus requests nest empty connector, enabled-skill, and forced-skill lists under
+launcher and exposes only a synthetic `/proc/self/exe` symlink to the qualified real Codex
+executable. Manus requests nest empty connector, enabled-skill, and forced-skill lists under
 `message`, so the wrapper grants no connector or forced-skill IDs explicitly; the documented API
 still loads account-default enabled skills when `enable_skills` is empty, and this route therefore
 does not claim skill isolation. See

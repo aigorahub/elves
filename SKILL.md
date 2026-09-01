@@ -278,7 +278,8 @@ required capability, then execute it without an extra confirmation prompt:
   executable-agent, symlink, hard-link, special, unsafe-mode, and out-of-repository paths with
   bounded diagnostics. Fugu is limited to planning and read-only review. `--write` is rejected.
   The required outer filesystem sandbox remains the read/write authority, and the Linux boundary
-  omits procfs so model-directed commands cannot inspect the credential-bearing parent environment.
+  omits procfs so model-directed commands cannot inspect the credential-bearing parent environment;
+  it exposes only a synthetic `/proc/self/exe` link to the qualified real Codex binary.
   Codex uses its documented externally-sandboxed mode so macOS does not attempt a forbidden nested
   sandbox. Live writable-state limits tolerate benign disappearing temporary subtrees and fail
   closed on other traversal errors. macOS read-only cleanup is best-effort and non-authoritative;
@@ -324,7 +325,7 @@ required capability, then execute it without an extra confirmation prompt:
   worker/shortcut under Claude/Codex/Grok (not the interactive main-driver path), run-scoped
   `--profile` and private HOME/XDG isolation, never spell the CLI `opm`, never pass omp product
   `--prewalk` as Elves prewalk. Prefer explicit model pin via `ELVES_OMP_MODEL`. See
-  `references/omp-worker.md`.
+  `references/omp-worker.md`. Its Linux boundary omits procfs and has no `/proc` view.
   Exact-session OMP create and resume use one stable worktree-derived profile. Isolated profiles
   do not inherit host OAuth. Auth preflight reads a loopback broker from the environment or
   persistent `auth.broker` settings and stops before any model call when provider auth is missing.

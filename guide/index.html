@@ -713,8 +713,10 @@ python3 ~/.grok/skills/elves/scripts/install_doctor.py --startup</code></pre>
             Fugu is limited to planning and read-only review. The runner rejects
             <code>--write</code>. macOS read-only cleanup is
             best-effort and never proof of recursive containment. The
-            Linux boundary omits procfs, and Codex's externally-sandboxed mode runs only inside
-            Elves' mandatory outer boundary. Fugu uses regular
+            Linux boundary omits procfs; it provides only a synthetic
+            <code>/proc/self/exe</code> link to the qualified, narrowly mounted Codex executable,
+            so Codex can discover itself without exposing parent process environments. Codex's
+            externally-sandboxed mode runs only inside Elves' mandatory outer boundary. Fugu uses regular
             <code>fugu/high</code> when the host chooses plain,
             <code>fugu/xhigh</code> with
             <code>--deep</code>, <code>fugu-cyber/xhigh</code> with
@@ -774,7 +776,9 @@ python3 ~/.grok/skills/elves/scripts/install_doctor.py --startup</code></pre>
             isolation snapshot with one provider-matched API key (set <code>ELVES_OMP_MODEL</code>).
             Parked full-run labor uses adapter <code>omp-cli</code>. Opening <code>omp</code> as
             the host with the managed skill root is a supported main driver; that is a different
-            role. Never spell the CLI <code>opm</code>. Shortcut writes are not supported; use
+            role. Never spell the CLI <code>opm</code>. The Linux shortcut omits procfs and has
+            no <code>/proc</code> view; it does not receive Fugu's synthetic Codex
+            <code>/proc/self/exe</code> link. Shortcut writes are not supported; use
             full-run for implementation labor. See <code>references/omp-worker.md</code>.</li>
         </ul>
         <p>Manus chooses whether its internal Wide mode activates; the public API has no documented

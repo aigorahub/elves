@@ -42,7 +42,9 @@ Plain `/fugu <task>` is a read-only planning task whose answer follows the reque
 `/fugu review <scope>` is the opinionated read-only review. Exact includes must be
 admitted and copied; both `.env.*` and `*.env` names are excluded. Live writable-state limits
 tolerate benign disappearing temporary subtrees and fail closed on other audit errors. macOS
-read-only cleanup remains best-effort and never claims recursive containment.
+read-only cleanup remains best-effort and never claims recursive containment. The Linux lane
+omits procfs and exposes only a synthetic `/proc/self/exe` link to the qualified real Codex
+binary.
 
 The runner uses the official `codex-fugu` launcher with policy-admitted tracked and non-ignored
 untracked context, closed interactive input, and a hard wall-clock bound. It selects regular
