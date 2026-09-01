@@ -80,3 +80,12 @@
 - Passed 183 focused doctor, dispatch, and isolation tests. Nine live platform tests skipped on the
   macOS host. Repo consistency and whitespace checks passed.
 - Confirmed current-session driver merge authorization. The exact tip still needs readiness proof.
+
+## 2026-09-01: Review-tip verification
+
+- Ran `scripts/verify_repo.py --final-readiness` at review tip
+  `889d3534cedd841d539f529431e0ffe0c8144520` against `origin/main` for version 2.35.0.
+- Passed compile, shell, JSON, consistency, release, public API, landing acceptance, Markdown link,
+  secret-pattern, installed-bundle, cumulative diff, and clean-worktree gates.
+- Passed all 1,653 unit tests in 348.280 seconds.
+- The verifier returned `VERIFY OK`.

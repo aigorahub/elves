@@ -88,7 +88,7 @@
         },
         {
           "criterion": "Version metadata, CHANGELOG, consistency checks, focused tests, and the full repository verifier pass at version 2.35.0.",
-          "evidence": "Strict CI verifier passed at implementation tip aa83041 for version 2.35.0 with 1,644 unit tests and installed smokes.",
+          "evidence": "Strict final-readiness verifier passed at review tip 889d353 for version 2.35.0 with 1,653 unit tests and installed smokes.",
           "id": "B2-A9",
           "met": true
         }
@@ -123,7 +123,7 @@
     },
     {
       "criterion": "All focused tests and the full repository verification pass at the exact branch tip.",
-      "evidence": "174 focused tests passed, then strict CI verification passed at aa83041 with all 1,644 unit tests.",
+      "evidence": "183 focused tests passed, then strict final-readiness verification passed at 889d353 with all 1,653 unit tests.",
       "id": "M-A4",
       "met": true
     }

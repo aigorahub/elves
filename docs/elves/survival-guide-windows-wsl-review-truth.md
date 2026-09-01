@@ -49,7 +49,8 @@
 - **Planned batches remaining:** 0
 - **Stop allowed right now:** no
 - **Why:** review fixes, exact-tip proof, merge, and GitHub release remain
-- **Next required action:** finish review evidence, commit, push, and run exact-tip verification
+- **Next required action:** commit review-tip evidence, attest the evidence tip, then remove
+  operational run files
 - **continuation_guard.stop_allowed:** false
 
 ## Effort Standard
@@ -75,10 +76,10 @@
 
 ## Current Phase
 
-- **Status:** revising
+- **Status:** validating
 - **Active batch:** terminal review
-- **What was just finished:** Fugu and host findings were fixed; 183 focused tests passed
-- **Single next action:** update evidence, commit, push, then run exact-tip verification
+- **What was just finished:** full final-readiness verification passed at `889d353` with 1,653 tests
+- **Single next action:** commit this evidence, run the landing check, and attest the evidence tip
 
 ## Active Compute
 
