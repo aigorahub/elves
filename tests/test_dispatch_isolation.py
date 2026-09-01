@@ -2144,12 +2144,12 @@ class IsolationSandboxRegressionTests(unittest.TestCase):
             )
 
             triples = list(zip(argv, argv[1:], argv[2:]))
+            resolved = str(codex.resolve())
             self.assertNotIn(("--proc", "/proc"), list(zip(argv, argv[1:])))
             self.assertIn(("--dir", "/proc", "--dir"), triples)
             self.assertIn(("--dir", "/proc/self", "--symlink"), triples)
-            self.assertIn(
-                ("--symlink", str(codex.resolve()), "/proc/self/exe"), triples
-            )
+            self.assertIn(("--symlink", resolved, "/proc/self/exe"), triples)
+            self.assertIn(("--ro-bind", resolved, resolved), triples)
 
     def test_bwrap_explicit_proc_self_exe_does_not_require_fugu_env(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -2167,9 +2167,9 @@ class IsolationSandboxRegressionTests(unittest.TestCase):
             )
 
             triples = list(zip(argv, argv[1:], argv[2:]))
-            self.assertIn(
-                ("--symlink", str(target.resolve()), "/proc/self/exe"), triples
-            )
+            resolved = str(target.resolve())
+            self.assertIn(("--symlink", resolved, "/proc/self/exe"), triples)
+            self.assertIn(("--ro-bind", resolved, resolved), triples)
 
     def test_bwrap_proc_self_exe_rejects_full_proc_or_invalid_target(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -2201,7 +2201,7 @@ class IsolationSandboxRegressionTests(unittest.TestCase):
             self.skipTest("bwrap user namespaces are unavailable")
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            codex = _write_tool_stub(root / "codex")
+            codex = _write_tool_stub(root / "codex").resolve()
             lane = self._lane(root / "lane", backend="bwrap")
             lane.env.update(
                 {
@@ -2211,6 +2211,7 @@ class IsolationSandboxRegressionTests(unittest.TestCase):
             )
             probe = (
                 'test "$(readlink /proc/self/exe)" = "$CODEX_FUGU_REAL_CODEX" '
+                '&& test -x "$(readlink /proc/self/exe)" '
                 "&& test ! -r /proc/1/environ "
                 "&& test ! -r /proc/$$/environ "
                 '&& printf "self=%s\\nparent_environ=blocked\\n" '
