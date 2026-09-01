@@ -2091,8 +2091,120 @@ class IsolationSandboxRegressionTests(unittest.TestCase):
 
             pairs = list(zip(argv, argv[1:]))
             self.assertNotIn(("--proc", "/proc"), pairs)
+            self.assertNotIn(("--dir", "/proc"), pairs)
+            self.assertNotIn(("/proc/self/exe"), argv)
             self.assertIn("--unshare-all", argv)
             self.assertIn(("--dev", "/dev"), pairs)
+
+    def test_bwrap_fugu_env_exposes_synthetic_codex_self_exe(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            executable = _write_tool_stub(root / "fake-agent")
+            codex = _write_tool_stub(root / "codex")
+            lane = self._lane(root / "lane", backend="bwrap")
+            lane.env["PATH"] = f"{root}:/usr/bin:/bin"
+            lane.env["CODEX_FUGU_REAL_CODEX"] = str(codex)
+
+            argv = wrap_argv_with_sandbox(
+                [str(executable), "--version"], lane, mount_proc=False
+            )
+
+            triples = list(zip(argv, argv[1:], argv[2:]))
+            self.assertNotIn(("--proc", "/proc"), list(zip(argv, argv[1:])))
+            self.assertIn(("--dir", "/proc", "--dir"), triples)
+            self.assertIn(("--dir", "/proc/self", "--symlink"), triples)
+            self.assertIn(
+                ("--symlink", str(codex.resolve()), "/proc/self/exe"), triples
+            )
+
+    def test_bwrap_explicit_proc_self_exe_does_not_require_fugu_env(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            executable = _write_tool_stub(root / "fake-agent")
+            target = _write_tool_stub(root / "real-codex")
+            lane = self._lane(root / "lane", backend="bwrap")
+            lane.env["PATH"] = f"{root}:/usr/bin:/bin"
+
+            argv = wrap_argv_with_sandbox(
+                [str(executable), "--version"],
+                lane,
+                mount_proc=False,
+                proc_self_exe=target,
+            )
+
+            triples = list(zip(argv, argv[1:], argv[2:]))
+            self.assertIn(
+                ("--symlink", str(target.resolve()), "/proc/self/exe"), triples
+            )
+
+    def test_bwrap_proc_self_exe_rejects_full_proc_or_invalid_target(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            executable = _write_tool_stub(root / "fake-agent")
+            codex = _write_tool_stub(root / "codex")
+            lane = self._lane(root / "lane", backend="bwrap")
+            lane.env["PATH"] = f"{root}:/usr/bin:/bin"
+            lane.env["CODEX_FUGU_REAL_CODEX"] = str(codex)
+
+            with self.assertRaises(ValidationIssue) as conflict:
+                wrap_argv_with_sandbox([str(executable)], lane)
+            self.assertEqual(
+                conflict.exception.code,
+                "isolation_proc_self_exe_conflicts_with_proc",
+            )
+
+            with self.assertRaises(ValidationIssue) as invalid:
+                wrap_argv_with_sandbox(
+                    [str(executable)],
+                    lane,
+                    mount_proc=False,
+                    proc_self_exe=root / "missing-codex",
+                )
+            self.assertEqual(invalid.exception.code, "launch_executable_not_found")
+
+    def test_bwrap_synthetic_proc_exposes_only_codex_self_exe(self) -> None:
+        if not Path("/usr/bin/bwrap").is_file():
+            self.skipTest("bwrap is unavailable")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            codex = _write_tool_stub(root / "codex")
+            lane = self._lane(root / "lane", backend="bwrap")
+            lane.env.update(
+                {
+                    "CODEX_FUGU_REAL_CODEX": str(codex),
+                    "SAKANA_API_KEY": "proc-isolation-sentinel",
+                }
+            )
+            probe = (
+                'test "$(readlink /proc/self/exe)" = "$CODEX_FUGU_REAL_CODEX" '
+                "&& test ! -r /proc/1/environ "
+                "&& test ! -r /proc/$$/environ "
+                '&& printf "self=%s\\nparent_environ=blocked\\n" '
+                '"$(readlink /proc/self/exe)"'
+            )
+
+            argv = wrap_argv_with_sandbox(
+                ["/bin/sh", "-c", probe], lane, mount_proc=False
+            )
+            result = subprocess.run(
+                argv,
+                cwd=lane.snapshot,
+                env=lane.env,
+                capture_output=True,
+                check=False,
+                text=True,
+                timeout=5,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(
+                result.stdout,
+                f"self={codex.resolve()}\nparent_environ=blocked\n",
+            )
+            self.assertNotIn("proc-isolation-sentinel", result.stdout + result.stderr)
+            self.assertNotIn(
+                ("--proc", "/proc"), list(zip(argv, argv[1:]))
+            )
 
     def test_bwrap_writable_lane_binds_only_snapshot_read_write(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
