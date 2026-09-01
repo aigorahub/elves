@@ -26,3 +26,13 @@
 - Accepted all findings after host verification. Native Win32 and a new sandbox backend remain out
   of scope.
 - Stored the reviewed findings in `docs/elves/fugu-windows-wsl-plan-review.md`.
+
+## 2026-09-01: Batch 1
+
+- Changed optional zero-report councils to `ok=false` and `blocked=false`.
+- Added stable `success`, `unavailable`, and `blocked` council states.
+- Set command exit statuses to 0 for success, 1 for blocked, and 3 for unavailable.
+- Added JSON status and direct human output for all three states.
+- Preserved failed-lane reasons, call truth, required blocking, and successful optional councils.
+- Documented the command result contract in `references/council-workflow.md`.
+- Passed 156 dispatch and isolation tests. Nine platform tests skipped on this macOS host.

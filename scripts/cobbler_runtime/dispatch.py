@@ -141,7 +141,7 @@ def evaluate_quorum(
             confidence = "low"
             notes.append("No successful independent reports")
 
-    ok = not blocked and (successful_count > 0 or not phase_required)
+    ok = not blocked and successful_count > 0
     if blocked:
         ok = False
         confidence = "blocked"

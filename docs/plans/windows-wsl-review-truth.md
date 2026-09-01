@@ -54,23 +54,23 @@ clear provider-isolation check before a paid provider launch.
 
 **Tasks:**
 
-- [ ] Separate review success from phase blocking when no report succeeds.
-- [ ] Add stable `success`, `unavailable`, and `blocked` result states.
-- [ ] Make the human output, JSON output, and exit status distinguish all three states.
-- [ ] Preserve successful optional councils and required-phase blocking behavior.
+- [x] Separate review success from phase blocking when no report succeeds.
+- [x] Add stable `success`, `unavailable`, and `blocked` result states.
+- [x] Make the human output, JSON output, and exit status distinguish all three states.
+- [x] Preserve successful optional councils and required-phase blocking behavior.
 
 **Acceptance criteria:**
 
-- [ ] B1-A1: An optional council with zero successful reports returns `ok=false`,
+- [x] B1-A1: An optional council with zero successful reports returns `ok=false`,
   `blocked=false`, `council_verified=false`, and low confidence.
-- [ ] B1-A2: The council CLI returns a non-zero status and does not print `council: OK` when zero
+- [x] B1-A2: The council CLI returns a non-zero status and does not print `council: OK` when zero
   reports succeed.
-- [ ] B1-A3: JSON includes the explicit result state. Human output says `UNAVAILABLE` when no
+- [x] B1-A3: JSON includes the explicit result state. Human output says `UNAVAILABLE` when no
   report exists and `BLOCKED` only for a blocking result. Exit-only callers receive distinct
   statuses for unavailable and blocked results.
-- [ ] B1-A4: The result keeps the failed lane reason, `successful_count=0`, and
+- [x] B1-A4: The result keeps the failed lane reason, `successful_count=0`, and
   `model_calls_made=false` when isolation prevents every external attempt.
-- [ ] B1-A5: An optional council with one valid report remains successful, and a required phase
+- [x] B1-A5: An optional council with one valid report remains successful, and a required phase
   with unmet quorum remains blocked.
 
 **Docs likely touched:** CHANGELOG.

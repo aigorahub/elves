@@ -678,6 +678,19 @@ class ContextRedactionTests(unittest.TestCase):
 
 
 class QuorumPolicyTests(unittest.TestCase):
+    def test_optional_zero_reports_is_unavailable_without_blocking(self) -> None:
+        ok, verified, blocked, confidence, notes = evaluate_quorum(
+            successful_count=0,
+            target_quorum=None,
+            required_quorum=None,
+            phase_required=False,
+        )
+        self.assertFalse(ok)
+        self.assertFalse(verified)
+        self.assertFalse(blocked)
+        self.assertEqual(confidence, "low")
+        self.assertIn("No successful independent reports", notes)
+
     def test_advisory_target_quorum_degrades_without_blocking(self) -> None:
         ok, verified, blocked, confidence, notes = evaluate_quorum(
             successful_count=1,
@@ -793,6 +806,7 @@ class ParallelDispatchTests(unittest.TestCase):
             elapsed = time.monotonic() - started
 
         self.assertTrue(result.ok)
+        self.assertEqual(result.status, "success")
         self.assertTrue(result.council_verified)
         self.assertEqual(len(result.successful_reports), 3)
         # Use the recorded execution spans as the concurrency proof. An absolute
@@ -1706,15 +1720,72 @@ class CliCouncilTests(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.returncode, 3, result.stderr)
         payload = json.loads(result.stdout)
         # Standalone CLI without injected host reports: no fabricated votes.
-        self.assertTrue(payload["ok"])
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["status"], "unavailable")
         self.assertTrue(payload["host_synthesis_only"])
         self.assertFalse(payload["mutated_repo"])
         self.assertEqual(payload["successful_count"], 0)
         self.assertFalse(payload["council_verified"])
         self.assertFalse(payload["model_calls_made"])
+
+    def test_council_cli_blocked_json_has_distinct_status(self) -> None:
+        cli = REPO_ROOT / "scripts" / "cobbler_agents.py"
+        with tempfile.TemporaryDirectory() as tmp:
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(cli),
+                    "council",
+                    "--json",
+                    "--repo-root",
+                    tmp,
+                    "--task",
+                    "required council smoke",
+                    "--roles",
+                    "architect",
+                    "--phase-required",
+                    "--required-quorum",
+                    "1",
+                    "--timeout",
+                    "15",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        self.assertEqual(result.returncode, 1, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertFalse(payload["ok"])
+        self.assertTrue(payload["blocked"])
+        self.assertEqual(payload["status"], "blocked")
+
+    def test_council_cli_human_output_names_unavailable(self) -> None:
+        cli = REPO_ROOT / "scripts" / "cobbler_agents.py"
+        with tempfile.TemporaryDirectory() as tmp:
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(cli),
+                    "council",
+                    "--repo-root",
+                    tmp,
+                    "--task",
+                    "human council smoke",
+                    "--roles",
+                    "architect",
+                    "--timeout",
+                    "15",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        self.assertEqual(result.returncode, 3, result.stderr)
+        self.assertIn("council: UNAVAILABLE (no review report produced)", result.stdout)
+        self.assertNotIn("council: OK", result.stdout)
 
     def test_lightweight_review_cli_json(self) -> None:
         cli = REPO_ROOT / "scripts" / "cobbler_agents.py"
@@ -2159,6 +2230,56 @@ class AdapterBuilderTests(unittest.TestCase):
 
 
 class DisabledRoutingTests(unittest.TestCase):
+    def test_isolation_skip_is_unavailable_with_attempt_evidence(self) -> None:
+        import cobbler_runtime.dispatch_lane_attempt as lane_attempt
+        from cobbler_runtime.dispatch_external import ExternalLaunchPlan
+
+        skipped_plan = ExternalLaunchPlan(
+            argv=[],
+            cwd="/unused",
+            env={"PATH": "/usr/bin"},
+            isolated=None,
+            isolation_meta={
+                "enabled": False,
+                "external_attempt": "skipped",
+                "fallback_chain": "continue",
+                "reason": "isolation_sandbox_unavailable: no qualified backend",
+            },
+            fallback_host_native=True,
+            invocation=None,
+            stdin_bytes=None,
+        )
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(
+            lane_attempt,
+            "prepare_external_launch",
+            return_value=skipped_plan,
+        ):
+            result = run_council_sync(
+                [
+                    LaneSpec(
+                        lane_id="external",
+                        role="architect",
+                        adapter="custom-cli",
+                        profile="custom",
+                        command_override=(sys.executable, "-c", "raise SystemExit(99)"),
+                    )
+                ],
+                repo_root=Path(tmp),
+                task="isolation skip",
+            )
+
+        payload = result.to_dict()
+        self.assertFalse(result.ok)
+        self.assertFalse(result.blocked)
+        self.assertEqual(result.status, "unavailable")
+        self.assertEqual(payload["successful_count"], 0)
+        self.assertFalse(payload["model_calls_made"])
+        self.assertEqual(result.lane_results[0].failure_class, "unavailable")
+        self.assertIn(
+            "isolation_sandbox_unavailable",
+            result.lane_results[0].attempts[0].reason or "",
+        )
+
     def test_disabled_external_routing_launches_no_provider_and_no_elves_mutation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -2189,6 +2310,8 @@ class DisabledRoutingTests(unittest.TestCase):
             )
             # No successful fabricated votes.
             self.assertEqual(result.successful_count if hasattr(result, "successful_count") else len(result.successful_reports), 0)
+            self.assertFalse(result.ok)
+            self.assertEqual(result.status, "unavailable")
             self.assertFalse(result.council_verified)
             for lane in result.lane_results:
                 self.assertEqual(lane.adapter, "host-native")

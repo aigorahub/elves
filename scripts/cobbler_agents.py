@@ -2540,6 +2540,7 @@ def cmd_council(args: argparse.Namespace) -> int:
 
     if not resolved.ok:
         payload = {
+            "status": "blocked",
             "ok": False,
             "blocked": True,
             "council_verified": False,
@@ -2553,7 +2554,7 @@ def cmd_council(args: argparse.Namespace) -> int:
         }
         if args.json:
             return _emit_json(payload, exit_code=1)
-        print("council: FAILED (resolved config not ok)", file=sys.stderr)
+        print("council: BLOCKED (resolved config not ok)", file=sys.stderr)
         for issue in resolved.issues:
             print(f"  [{issue.code}] {issue.message}", file=sys.stderr)
         return 1
@@ -2592,10 +2593,16 @@ def cmd_council(args: argparse.Namespace) -> int:
     payload["mutated_repo"] = bool(result.mutated_repo)
     payload["host_synthesis_only"] = True
     payload["external_routing_enabled"] = resolved.external_routing_enabled
+    exit_code = 0 if result.status == "success" else 1 if result.status == "blocked" else 3
     if args.json:
-        return _emit_json(payload, exit_code=0 if result.ok and not result.blocked else 1)
+        return _emit_json(payload, exit_code=exit_code)
 
-    print(f"council: {'OK' if result.ok and not result.blocked else 'FAILED'}")
+    if result.status == "success":
+        print("council: OK")
+    elif result.status == "blocked":
+        print("council: BLOCKED")
+    else:
+        print("council: UNAVAILABLE (no review report produced)")
     print(f"  run_id: {result.run_id}")
     print(f"  council_verified: {result.council_verified}")
     print(f"  blocked: {result.blocked}")
@@ -2605,7 +2612,7 @@ def cmd_council(args: argparse.Namespace) -> int:
     print(f"  mutated_repo: {result.mutated_repo}")
     for note in result.notes:
         print(f"  note: {note}")
-    return 0 if result.ok and not result.blocked else 1
+    return exit_code
 
 
 def cmd_lightweight_review(args: argparse.Namespace) -> int:

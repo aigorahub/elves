@@ -44,10 +44,10 @@
 
 ## Stop Gate
 
-- **Planned batches remaining:** 2
+- **Planned batches remaining:** 1
 - **Stop allowed right now:** no
-- **Why:** two implementation batches remain
-- **Next required action:** reconcile the Fugu findings, then implement B1
+- **Why:** Windows through WSL2 implementation and terminal verification remain
+- **Next required action:** implement B2 platform checks, diagnostics, and documentation
 - **continuation_guard.stop_allowed:** false
 
 ## Effort Standard
@@ -74,9 +74,9 @@
 ## Current Phase
 
 - **Status:** implementing
-- **Active batch:** B1
-- **What was just finished:** regular Fugu plan review and host verification of all findings
-- **Single next action:** commit the amended plan, then add the B1 tests
+- **Active batch:** B2
+- **What was just finished:** B1 three-state council results and focused verification
+- **Single next action:** commit and push B1, then add B2 platform-probe tests
 
 ## Active Compute
 
@@ -84,9 +84,9 @@
 
 ## Next Exact Batch
 
-- **Batch:** B1
-- **Scope:** zero-report council result semantics and CLI status
-- **Acceptance criteria:** B1-A1 through B1-A5
+- **Batch:** B2
+- **Scope:** Windows through WSL2 checks, diagnostics, documentation, and release metadata
+- **Acceptance criteria:** B2-A1 through B2-A9
 - **Risk:** standard
 
 ## Post-Checkpoint Control Loop

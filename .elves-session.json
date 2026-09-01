@@ -4,37 +4,37 @@
       "acceptance": [
         {
           "criterion": "An optional council with zero successful reports returns `ok=false`, `blocked=false`, `council_verified=false`, and low confidence.",
-          "evidence": "",
+          "evidence": "QuorumPolicyTests.test_optional_zero_reports_is_unavailable_without_blocking passed.",
           "id": "B1-A1",
-          "met": false
+          "met": true
         },
         {
           "criterion": "The council CLI returns a non-zero status and does not print `council: OK` when zero reports succeed.",
-          "evidence": "",
+          "evidence": "CliCouncilTests zero-report JSON and human-output tests passed with exit status 3.",
           "id": "B1-A2",
-          "met": false
+          "met": true
         },
         {
           "criterion": "JSON includes the explicit result state. Human output says `UNAVAILABLE` when no report exists and `BLOCKED` only for a blocking result. Exit-only callers receive distinct statuses for unavailable and blocked results.",
-          "evidence": "",
+          "evidence": "CLI tests passed for success, unavailable, and blocked status and exit behavior.",
           "id": "B1-A3",
-          "met": false
+          "met": true
         },
         {
           "criterion": "The result keeps the failed lane reason, `successful_count=0`, and `model_calls_made=false` when isolation prevents every external attempt.",
-          "evidence": "",
+          "evidence": "DisabledRoutingTests.test_isolation_skip_is_unavailable_with_attempt_evidence passed.",
           "id": "B1-A4",
-          "met": false
+          "met": true
         },
         {
           "criterion": "An optional council with one valid report remains successful, and a required phase with unmet quorum remains blocked.",
-          "evidence": "",
+          "evidence": "Dispatch quorum and parallel dispatch tests passed for successful optional and blocked required councils.",
           "id": "B1-A5",
-          "met": false
+          "met": true
         }
       ],
       "id": "B1",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "acceptance": [
@@ -99,7 +99,7 @@
   ],
   "branch": "fix/windows-wsl-review-truth",
   "continuation_guard": {
-    "reason": "Fugu review and two planned batches remain",
+    "reason": "Windows through WSL2 implementation and terminal verification remain",
     "stop_allowed": false
   },
   "master_acceptance": [
