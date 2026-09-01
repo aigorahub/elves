@@ -65,6 +65,40 @@ def _write_tool_stub(path: Path) -> Path:
     return path
 
 
+def _live_bwrap_available() -> bool:
+    """Return whether unprivileged bwrap userns works in this environment."""
+    executable = Path("/usr/bin/bwrap")
+    if not executable.is_file():
+        return False
+    result = subprocess.run(
+        [
+            str(executable),
+            "--die-with-parent",
+            "--unshare-all",
+            "--share-net",
+            "--ro-bind",
+            "/usr",
+            "/usr",
+            "--ro-bind",
+            "/bin",
+            "/bin",
+            "--ro-bind-try",
+            "/lib",
+            "/lib",
+            "--ro-bind-try",
+            "/lib64",
+            "/lib64",
+            "--dev",
+            "/dev",
+            "/bin/true",
+        ],
+        capture_output=True,
+        check=False,
+        timeout=5,
+    )
+    return result.returncode == 0
+
+
 FAKE_EXTERNAL = r'''#!/usr/bin/env python3
 """Hostile external lane: try to read secrets; report what is visible."""
 import json, os, sys
@@ -2163,8 +2197,8 @@ class IsolationSandboxRegressionTests(unittest.TestCase):
             self.assertEqual(invalid.exception.code, "launch_executable_not_found")
 
     def test_bwrap_synthetic_proc_exposes_only_codex_self_exe(self) -> None:
-        if not Path("/usr/bin/bwrap").is_file():
-            self.skipTest("bwrap is unavailable")
+        if not _live_bwrap_available():
+            self.skipTest("bwrap user namespaces are unavailable")
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             codex = _write_tool_stub(root / "codex")
