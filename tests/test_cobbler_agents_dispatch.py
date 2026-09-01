@@ -717,6 +717,19 @@ class QuorumPolicyTests(unittest.TestCase):
         self.assertEqual(confidence, "blocked")
         self.assertTrue(any("required_quorum" in note for note in notes))
 
+    def test_required_phase_without_quorum_blocks_when_no_report_succeeds(self) -> None:
+        ok, verified, blocked, confidence, notes = evaluate_quorum(
+            successful_count=0,
+            target_quorum=None,
+            required_quorum=None,
+            phase_required=True,
+        )
+        self.assertFalse(ok)
+        self.assertFalse(verified)
+        self.assertTrue(blocked)
+        self.assertEqual(confidence, "blocked")
+        self.assertIn("Required phase produced no successful independent reports", notes)
+
     def test_required_quorum_ignored_when_phase_not_required(self) -> None:
         # evaluate_quorum still accepts the args; run_council nulls it when phase_required=False.
         ok, verified, blocked, confidence, _notes = evaluate_quorum(
@@ -1749,6 +1762,35 @@ class CliCouncilTests(unittest.TestCase):
                     "--phase-required",
                     "--required-quorum",
                     "1",
+                    "--timeout",
+                    "15",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        self.assertEqual(result.returncode, 1, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertFalse(payload["ok"])
+        self.assertTrue(payload["blocked"])
+        self.assertEqual(payload["status"], "blocked")
+
+    def test_council_cli_required_phase_without_quorum_is_blocked(self) -> None:
+        cli = REPO_ROOT / "scripts" / "cobbler_agents.py"
+        with tempfile.TemporaryDirectory() as tmp:
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(cli),
+                    "council",
+                    "--json",
+                    "--repo-root",
+                    tmp,
+                    "--task",
+                    "required council without explicit quorum",
+                    "--roles",
+                    "architect",
+                    "--phase-required",
                     "--timeout",
                     "15",
                 ],

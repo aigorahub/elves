@@ -4,29 +4,31 @@
 
 - **Run mode:** finite
 - **Stop policy:** stop only after Master Acceptance or a hard blocker
-- **User intent:** plan, obtain a Fugu review, then implement truthful review results and Windows
-  support through WSL2
+- **User intent:** review PR 270 with Fugu and the host, fix all actionable findings, update docs,
+  release version 2.35.0, merge, and publish the matching GitHub release
 - **Checkpoint due by:** none
 - **Checkpoint semantics:** none
 - **May continue after checkpoint:** not applicable
-- **Actual stop conditions:** M-A1 through M-A4 pass, explicit user stop, or hard blocker
+- **Actual stop conditions:** PR 270 is merged, GitHub release v2.35.0 is published, explicit user
+  stop, or hard blocker
 - **Workspace ownership:** branch `fix/windows-wsl-review-truth` in
   `/Users/john/aigora/dev/elves-windows-wsl-review-truth`
 - **Branch tip at start:** `a638c6188452e936f366d8d390b1b133d7454a7e`
-- **Merge policy:** user-merges, no merge without explicit approval in this session
+- **Merge policy:** driver merge is authorized in this session; use a pinned regular merge commit
 - **Final-response policy:** only after finite completion or a hard blocker
 - **Batch completion rule:** update evidence, execution log, survival guide, commit, and push
 - **Re-read rule:** re-read this guide after every host commit and push
 - **Checkpoint rule:** no checkpoint changes the stop policy
 - **Continuation rule:** continue while planned work remains and the Stop Gate is closed
-- **E2E mode:** chat-to-work
+- **E2E mode:** chat-to-land
 - **Work driver:** host-native
 - **Implementation lane:** fast
-- **Delegation scope:** Fugu reviews the plan only and makes no changes
+- **Delegation scope:** Fugu reviewed the plan and the exact PR diff. It made no changes.
 - **Git mode:** host_only
 - **Driver monitor mode:** interactive
 - **Driver update policy:** interactive
-- **Driver review policy:** completed Fugu plan review, then terminal host review
+- **Driver review policy:** completed Fugu PR review, host verification, revision, and exact-tip
+  delta review
 - **High-risk checkpoints:** sandbox wording and final exact-tip verification
 - **Re-drive budget:** 2 substantive attempts per batch
 - **Continuation harness:** survival guide plus session JSON
@@ -38,17 +40,17 @@
 - **Cobbler default:** on
 - **Activated by:** Elves implementation request
 - **Scope:** this two-batch run
-- **Behavior:** host-native implementation with one paid Fugu plan review
+- **Behavior:** host-native implementation with paid Fugu plan and PR reviews
 - **Persistence:** session JSON and run documents
 - **Exit phrases:** explicit user stop or completed Master Acceptance
 
 ## Stop Gate
 
 - **Planned batches remaining:** 0
-- **Stop allowed right now:** yes
-- **Why:** Master Acceptance is complete
-- **Next required action:** commit and push close evidence, then verify the close tip
-- **continuation_guard.stop_allowed:** true
+- **Stop allowed right now:** no
+- **Why:** review fixes, exact-tip proof, merge, and GitHub release remain
+- **Next required action:** finish review evidence, commit, push, and run exact-tip verification
+- **continuation_guard.stop_allowed:** false
 
 ## Effort Standard
 
@@ -73,10 +75,10 @@
 
 ## Current Phase
 
-- **Status:** complete
-- **Active batch:** B2
-- **What was just finished:** strict verifier passed at implementation tip `aa83041`
-- **Single next action:** commit and push close evidence, then run exact-tip verification
+- **Status:** revising
+- **Active batch:** terminal review
+- **What was just finished:** Fugu and host findings were fixed; 183 focused tests passed
+- **Single next action:** update evidence, commit, push, then run exact-tip verification
 
 ## Active Compute
 
@@ -111,6 +113,10 @@
 - Only confirmed WSL2 is supported. WSL1 needs conversion before use.
 - Local shortcut filesystem-sandbox readiness and external council process-boundary readiness are
   separate facts.
+- Every required council phase has an implicit minimum of one valid report.
+- Docker Desktop utility distributions are not usable Elves hosts.
+- A failed WSL query is unknown evidence. It is not proof that no distribution exists.
+- The release version remains 2.35.0 because main is 2.34.1 and no 2.35.0 release exists.
 
 ## Deferred hygiene
 

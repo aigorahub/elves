@@ -27,6 +27,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from cobbler_runtime.schema import ValidationIssue
+
 
 REPO = "aigorahub/elves"
 ACTIVE_ROOT = Path(__file__).resolve().parent.parent
@@ -35,6 +37,7 @@ HTTP_TIMEOUT_SECONDS = 5
 DEFAULT_CACHE_HOURS = 24
 STALE_RELEASE_REVALIDATION_HOURS = 1
 VERSION_RE = re.compile(r'^\s*version:\s*"([^"]+)"\s*$', re.MULTILINE)
+MANAGED_WSL_DISTRIBUTIONS = frozenset({"docker-desktop", "docker-desktop-data"})
 
 
 GLOBAL_INSTALLS = {
@@ -363,26 +366,106 @@ def _decode_wsl_output(raw: bytes | str | None) -> str:
     return raw.decode("utf-8", errors="replace")
 
 
-def _parse_wsl_distributions(output: str) -> list[dict[str, Any]]:
+def _parse_wsl_distribution_names(output: str) -> list[str]:
+    names: list[str] = []
+    for raw_line in output.splitlines():
+        name = raw_line.lstrip("\ufeff").strip()
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
+def _parse_wsl_distributions(
+    output: str,
+    names: list[str],
+) -> list[dict[str, Any]]:
     distributions: list[dict[str, Any]] = []
-    row_pattern = re.compile(
-        r"^\s*\*?\s*(?P<name>.+?)\s+"
-        r"(?P<state>Running|Stopped|Installing|Uninstalling)\s+"
-        r"(?P<version>[12])\s*$",
-        re.IGNORECASE,
+    unmatched = list(names)
+    for raw_line in output.splitlines():
+        line = raw_line.lstrip("\ufeff").strip()
+        is_default = line.startswith("*")
+        if is_default:
+            line = line[1:].lstrip()
+        for name in sorted(unmatched, key=len, reverse=True):
+            if not line.casefold().startswith(name.casefold()):
+                continue
+            remainder = line[len(name) :]
+            if remainder and not remainder[0].isspace():
+                continue
+            match = re.match(r"^\s+(?P<state>.+?)\s+(?P<version>[12])\s*$", remainder)
+            if match is None:
+                continue
+            distributions.append(
+                {
+                    "name": name,
+                    "state": match.group("state").strip().casefold(),
+                    "version": int(match.group("version")),
+                    "default": is_default,
+                    "managed": name.casefold() in MANAGED_WSL_DISTRIBUTIONS,
+                }
+            )
+            unmatched.remove(name)
+            break
+    distributions.extend(
+        {
+            "name": name,
+            "state": None,
+            "version": None,
+            "default": False,
+            "managed": name.casefold() in MANAGED_WSL_DISTRIBUTIONS,
+        }
+        for name in unmatched
     )
-    for line in output.splitlines():
-        match = row_pattern.match(line)
-        if match is None:
-            continue
-        distributions.append(
-            {
-                "name": match.group("name").strip(),
-                "state": match.group("state").lower(),
-                "version": int(match.group("version")),
-            }
-        )
     return distributions
+
+
+def _powershell_argument(value: str) -> str:
+    if re.fullmatch(r"[A-Za-z0-9._-]+", value):
+        return value
+    return "'" + value.replace("'", "''") + "'"
+
+
+def _preferred_wsl_distribution(
+    distributions: list[dict[str, Any]],
+    *,
+    version: int,
+) -> dict[str, Any] | None:
+    candidates = [
+        item
+        for item in distributions
+        if not item["managed"] and item["version"] == version
+    ]
+    return next((item for item in candidates if item["default"]), None) or (
+        candidates[0] if candidates else None
+    )
+
+
+def _run_wsl_query(
+    wsl_runner: Any,
+    *,
+    mode: str,
+    label: str,
+) -> tuple[Any | None, str | None]:
+    try:
+        result = wsl_runner(
+            ["wsl.exe", "--list", mode],
+            capture_output=True,
+            check=False,
+            timeout=10,
+        )
+    except subprocess.TimeoutExpired:
+        return None, f"The WSL {label} query timed out."
+    except OSError:
+        return None, f"The WSL {label} query could not start."
+    except subprocess.SubprocessError:
+        return None, f"The WSL {label} query failed."
+    if getattr(result, "returncode", 1) != 0:
+        return (
+            result,
+            "The WSL "
+            f"{label} query exited with status {getattr(result, 'returncode', 'unknown')}.",
+        )
+    return result, None
 
 
 def _shortcut_capability(
@@ -407,8 +490,10 @@ def _external_council_capability(platform_name: str) -> dict[str, Any]:
         )
     elif platform_name == "darwin":
         reason = "Darwin has no qualified recursive external-process boundary"
-    else:
+    elif platform_name == "win32":
         reason = "Native Windows has no qualified Elves external-process boundary"
+    else:
+        reason = f"{platform_name} has no qualified Elves external-process boundary"
     return {
         "ready": False,
         "reason_code": "isolation_recursive_containment_unavailable",
@@ -443,6 +528,22 @@ def build_host_support(
             "external_council": external_council,
         }
 
+    def wsl_probe_failure(reason: str) -> dict[str, Any]:
+        return {
+            "status": "wsl_probe_failed",
+            "supported": False,
+            "summary": reason + " Native Win32 is not supported.",
+            "wsl": {
+                "distribution": None,
+                "version": None,
+                "distributions": [],
+            },
+            "remediation": "wsl --status; wsl --list --verbose",
+            "capabilities": unsupported_capabilities(
+                "Confirm a working WSL2 distribution before provider checks."
+            ),
+        }
+
     def probe_shortcut_capability(*, expected_backend: str | None = None) -> dict[str, Any]:
         if not probe_sandbox:
             return _shortcut_capability(
@@ -457,7 +558,7 @@ def build_host_support(
                 resolver = resolve_fs_sandbox_backend
             resolved_backend = resolver()
             backend_name = getattr(resolved_backend, "name", None)
-        except (OSError, RuntimeError):
+        except (OSError, RuntimeError, ValidationIssue):
             return _shortcut_capability(
                 ready=False,
                 reason="The filesystem-sandbox probe failed.",
@@ -476,23 +577,49 @@ def build_host_support(
         )
 
     if selected_platform == "win32":
-        try:
-            result = wsl_runner(
-                ["wsl.exe", "--list", "--verbose"],
-                capture_output=True,
-                check=False,
-                timeout=10,
-            )
-        except (OSError, subprocess.SubprocessError):
-            result = None
-        output = _decode_wsl_output(getattr(result, "stdout", b""))
-        distributions = (
-            _parse_wsl_distributions(output)
-            if result is not None and getattr(result, "returncode", 1) == 0
-            else []
+        quiet_result, probe_error = _run_wsl_query(
+            wsl_runner,
+            mode="--quiet",
+            label="distribution",
         )
-        wsl2 = next((item for item in distributions if item["version"] == 2), None)
-        wsl1 = next((item for item in distributions if item["version"] == 1), None)
+        if probe_error is not None:
+            return wsl_probe_failure(probe_error)
+        assert quiet_result is not None
+
+        names = _parse_wsl_distribution_names(
+            _decode_wsl_output(getattr(quiet_result, "stdout", b""))
+        )
+        if not names:
+            return {
+                "status": "needs_wsl_distribution",
+                "supported": False,
+                "summary": "Native Win32 is not supported. Install an Ubuntu WSL2 distribution.",
+                "wsl": {
+                    "distribution": None,
+                    "version": None,
+                    "distributions": [],
+                },
+                "remediation": "wsl --install -d Ubuntu",
+                "capabilities": unsupported_capabilities(
+                    "Install and enter a WSL2 distribution before provider checks."
+                ),
+            }
+
+        verbose_result, probe_error = _run_wsl_query(
+            wsl_runner,
+            mode="--verbose",
+            label="version",
+        )
+        if probe_error is not None:
+            return wsl_probe_failure(probe_error)
+        assert verbose_result is not None
+
+        distributions = _parse_wsl_distributions(
+            _decode_wsl_output(getattr(verbose_result, "stdout", b"")),
+            names,
+        )
+        wsl2 = _preferred_wsl_distribution(distributions, version=2)
+        wsl1 = _preferred_wsl_distribution(distributions, version=1)
         if wsl2 is not None:
             distro = str(wsl2["name"])
             return {
@@ -504,7 +631,7 @@ def build_host_support(
                     "version": 2,
                     "distributions": distributions,
                 },
-                "remediation": f"wsl -d {distro}",
+                "remediation": f"wsl -d {_powershell_argument(distro)}",
                 "capabilities": unsupported_capabilities(
                     "Enter the WSL2 distribution before provider checks."
                 ),
@@ -520,13 +647,13 @@ def build_host_support(
                     "version": 1,
                     "distributions": distributions,
                 },
-                "remediation": f"wsl --set-version {distro} 2",
+                "remediation": f"wsl --set-version {_powershell_argument(distro)} 2",
                 "capabilities": unsupported_capabilities(
                     "Convert the distribution to WSL2 before provider checks."
                 ),
             }
-        no_distribution = "no installed distributions" in output.casefold()
-        if output.strip() and not no_distribution:
+        usable_distributions = [item for item in distributions if not item["managed"]]
+        if usable_distributions:
             return {
                 "status": "wsl_generation_unknown",
                 "supported": False,
@@ -544,7 +671,10 @@ def build_host_support(
         return {
             "status": "needs_wsl_distribution",
             "supported": False,
-            "summary": "Native Win32 is not supported. Install an Ubuntu WSL2 distribution.",
+            "summary": (
+                "Native Win32 is not supported. Install an Ubuntu WSL2 distribution. "
+                "Managed Docker Desktop distributions are not Elves hosts."
+            ),
             "wsl": {
                 "distribution": None,
                 "version": None,
@@ -570,7 +700,7 @@ def build_host_support(
                 else "wsl_generation_unknown"
             )
             remediation = (
-                f"wsl --set-version {distro_name} 2"
+                f"wsl --set-version {_powershell_argument(distro_name)} 2"
                 if wsl_version == 1 and distro_name
                 else "Run `wsl --list --verbose` in Windows and confirm VERSION 2."
             )

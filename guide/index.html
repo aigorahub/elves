@@ -629,6 +629,11 @@ wsl --install -d Ubuntu
 wsl --set-version Ubuntu 2
 wsl -d Ubuntu</code></pre>
         </div>
+        <p>Docker Desktop's internal WSL distributions do not count as an Elves host. The install
+          doctor ignores them when it selects a distribution. A failed WSL query reports
+          <code>wsl_probe_failed</code>. It does not claim that no distribution exists. Run
+          <code>wsl --status</code> and <code>wsl --list --verbose</code> to correct that failure
+          before you retry.</p>
         <p>Run the next commands inside Ubuntu. Install one supported host in the same WSL2
           distribution. Confirm that its command is on the Linux <code>PATH</code>. Set
           <code>ELVES_TARGET</code> to <code>claude</code>, <code>codex</code>,

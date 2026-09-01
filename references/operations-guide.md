@@ -46,7 +46,10 @@ distribution. In PowerShell, use `wsl --list --verbose`. If no distribution exis
 `wsl --install -d Ubuntu`. If the distribution shows VERSION 1, use
 `wsl --set-version <Distro> 2`. Inside WSL2, install `git`, `python3`, and `bubblewrap`, then run
 the install doctor with `--doctor`. The doctor reports Elves host support, local provider shortcut
-sandbox readiness, and external council process-boundary readiness as separate facts.
+sandbox readiness, and external council process-boundary readiness as separate facts. Docker
+Desktop's internal distributions do not count as Elves hosts. A failed WSL query reports
+`wsl_probe_failed`; it does not claim that no distribution exists. Distribution names in generated
+PowerShell commands are quoted when needed.
 
 For a long run, open Power Options, select Change plan settings, and set Put the computer to sleep
 to Never. Restore the prior setting after the run.

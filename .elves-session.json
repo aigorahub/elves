@@ -28,7 +28,7 @@
         },
         {
           "criterion": "An optional council with one valid report remains successful, and a required phase with unmet quorum remains blocked.",
-          "evidence": "Dispatch quorum and parallel dispatch tests passed for successful optional and blocked required councils.",
+          "evidence": "Dispatch and CLI tests passed for successful optional councils and for required phases with or without an explicit quorum.",
           "id": "B1-A5",
           "met": true
         }
@@ -52,7 +52,7 @@
         },
         {
           "criterion": "WSL1 and an unknown WSL generation are not reported as supported. WSL1 reports `wsl --set-version <Distro> 2`. Only confirmed WSL2 is supported.",
-          "evidence": "WSL1, unknown generation, current WSL2, and older microsoft-standard kernel tests passed.",
+          "evidence": "WSL1, unknown generation, localized state, default selection, Docker-only, current WSL2, and older microsoft-standard kernel tests passed.",
           "id": "B2-A3",
           "met": true
         },
@@ -99,8 +99,8 @@
   ],
   "branch": "fix/windows-wsl-review-truth",
   "continuation_guard": {
-    "reason": "Master Acceptance is complete",
-    "stop_allowed": true
+    "reason": "Review fixes, exact-tip proof, merge, and GitHub release remain",
+    "stop_allowed": false
   },
   "master_acceptance": [
     {
@@ -111,7 +111,7 @@
     },
     {
       "criterion": "A Windows user has one supported WSL2 setup path with an exact no-distribution recovery command and provider-isolation readiness evidence.",
-      "evidence": "Install doctor tests and README and guide setup flows prove WSL2 setup and provider readiness reporting.",
+      "evidence": "Install doctor tests and README and guide flows prove WSL2 setup, Docker utility exclusion, failed-probe truth, safe commands, and provider readiness reporting.",
       "id": "M-A2",
       "met": true
     },
@@ -130,5 +130,6 @@
   ],
   "plan_path": "docs/plans/windows-wsl-review-truth.md",
   "run_id": "windows-wsl-review-truth-2026-09-01",
-  "start_head": "a638c6188452e936f366d8d390b1b133d7454a7e"
+  "start_head": "a638c6188452e936f366d8d390b1b133d7454a7e",
+  "worktree_path": "/Users/john/aigora/dev/elves-windows-wsl-review-truth"
 }

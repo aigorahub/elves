@@ -52,6 +52,11 @@ wsl --set-version Ubuntu 2
 wsl -d Ubuntu
 ```
 
+Docker Desktop's internal WSL distributions do not count as an Elves host. The install doctor
+ignores them when it selects a distribution. It reports `wsl_probe_failed` instead of claiming
+that no distribution exists when either WSL query fails. Run `wsl --status` and
+`wsl --list --verbose` to correct that failure before you retry.
+
 Run the remaining commands inside Ubuntu. Install the Linux prerequisites. Then install Claude
 Code, Codex, Grok Build, or Oh My Pi inside the same WSL2 distribution and confirm that its command
 is on the Linux `PATH`.

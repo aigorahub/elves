@@ -21,6 +21,11 @@ All notable changes to the Elves skill are documented here.
   preserved. (#269)
 * **Install discovery accepts Windows path separators and OMP installs.** The doctor uses standard
   executable lookup behavior and recognizes global and project-local OMP skill roots.
+* **PR review closed Windows and required-phase edge cases.** A required council with no explicit
+  quorum now blocks when it produces zero reports. Windows distribution discovery uses the quiet
+  list as locale-neutral identity evidence, prefers the default usable distribution, ignores
+  Docker Desktop's managed distributions, distinguishes failed WSL probes from confirmed absence,
+  and quotes PowerShell distribution arguments when needed.
 
 ## [2.34.1] - 2026-09-01
 

@@ -63,3 +63,20 @@
   installed-bundle, and cumulative diff gates.
 - Passed all 1,644 unit tests in 360.623 seconds.
 - The verifier returned `VERIFY OK`.
+
+## 2026-09-01: PR review and revision
+
+- Read PR 270, issue 269, all review comments, checks, mergeability, and branch protection at exact
+  head `70f1b3cd138b391ece783132d1bb1bd85ee95084`. GitHub had no review comments or requested changes.
+- Ran regular Fugu review against `origin/main...70f1b3c` with a 900-second wall and no extra files.
+  Fugu completed with exit status 0 and reported two P1 and three P2 findings.
+- Verified every Fugu finding against the exact source. Fixed required phases without explicit
+  quorums, Docker Desktop utility distributions, WSL probe failures, localized verbose output, and
+  PowerShell quoting for distribution names.
+- The host review found and fixed one additional diagnostic error for non-Windows platforms.
+- Updated README, public guide, operations guide, council workflow, changelog, and the durable Fugu
+  review record.
+- Kept version 2.35.0. Main is 2.34.1 and GitHub has no v2.35.0 release.
+- Passed 183 focused doctor, dispatch, and isolation tests. Nine live platform tests skipped on the
+  macOS host. Repo consistency and whitespace checks passed.
+- Confirmed current-session driver merge authorization. The exact tip still needs readiness proof.
