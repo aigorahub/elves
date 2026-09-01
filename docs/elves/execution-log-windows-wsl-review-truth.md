@@ -10,4 +10,19 @@
 - Corrected the scope in the plan. Explicit Manus and Devin shortcuts do not use
   `dispatch_external.py`.
 - Selected Windows through WSL2 as the production support path.
-- Next action: validate and commit staging, then run regular Fugu review with a 15-minute wall.
+- Validated and committed the staging contract.
+
+## 2026-09-01: Fugu plan review
+
+- Ran regular Fugu review with `--max-wait 900` and no extra includes.
+- Fugu completed with exit status 0. It reported two P1 findings and three P2 findings.
+- Confirmed that Linux external council dispatch fails its recursive process-boundary gate before
+  it probes `bwrap`. The doctor must report this separately from local shortcut sandbox readiness.
+- Confirmed that the first plan did not reject WSL1 or an unknown WSL generation.
+- Added a three-state council result contract for success, unavailable, and blocked.
+- Added Windows path classification and OMP install discovery to the doctor scope.
+- Clarified that all Windows shortcut runners need WSL2. Fugu, Grok, and OMP also need `bwrap`.
+  Manus and Devin perform remote work without the shared dispatch sandbox.
+- Accepted all findings after host verification. Native Win32 and a new sandbox backend remain out
+  of scope.
+- Stored the reviewed findings in `docs/elves/fugu-windows-wsl-plan-review.md`.

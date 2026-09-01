@@ -26,7 +26,7 @@
 - **Git mode:** host_only
 - **Driver monitor mode:** interactive
 - **Driver update policy:** interactive
-- **Driver review policy:** Fugu plan review, then terminal host review
+- **Driver review policy:** completed Fugu plan review, then terminal host review
 - **High-risk checkpoints:** sandbox wording and final exact-tip verification
 - **Re-drive budget:** 2 substantive attempts per batch
 - **Continuation harness:** survival guide plus session JSON
@@ -46,8 +46,8 @@
 
 - **Planned batches remaining:** 2
 - **Stop allowed right now:** no
-- **Why:** Fugu review and implementation have not completed
-- **Next required action:** commit the plan and run documents, then run Fugu review
+- **Why:** two implementation batches remain
+- **Next required action:** reconcile the Fugu findings, then implement B1
 - **continuation_guard.stop_allowed:** false
 
 ## Effort Standard
@@ -69,24 +69,24 @@
 - [x] Dedicated branch and worktree exist.
 - [x] Preflight passed with advisory notices only.
 - [x] Stop Gate initialized with `Stop allowed right now: no`.
-- [ ] Fugu plan review has completed and findings are reconciled.
+- [x] Fugu plan review has completed and findings are reconciled.
 
 ## Current Phase
 
-- **Status:** staging
+- **Status:** implementing
 - **Active batch:** B1
-- **What was just finished:** worktree creation, preflight, and plan draft
-- **Single next action:** commit the contract and obtain the Fugu plan review
+- **What was just finished:** regular Fugu plan review and host verification of all findings
+- **Single next action:** commit the amended plan, then add the B1 tests
 
 ## Active Compute
 
-- None before the Fugu launch.
+- No provider task remains active.
 
 ## Next Exact Batch
 
 - **Batch:** B1
 - **Scope:** zero-report council result semantics and CLI status
-- **Acceptance criteria:** B1-A1 through B1-A4
+- **Acceptance criteria:** B1-A1 through B1-A5
 - **Risk:** standard
 
 ## Post-Checkpoint Control Loop
@@ -107,6 +107,10 @@
 - Windows support means the host and Elves run inside WSL2.
 - Native Win32 execution stays outside this run.
 - Optional review unavailability is non-successful but non-blocking.
+- Council output has three explicit states: success, unavailable, and blocked.
+- Only confirmed WSL2 is supported. WSL1 needs conversion before use.
+- Local shortcut filesystem-sandbox readiness and external council process-boundary readiness are
+  separate facts.
 
 ## Deferred hygiene
 

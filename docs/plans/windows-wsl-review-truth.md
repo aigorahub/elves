@@ -55,7 +55,8 @@ clear provider-isolation check before a paid provider launch.
 **Tasks:**
 
 - [ ] Separate review success from phase blocking when no report succeeds.
-- [ ] Make the human and JSON CLI results state that no review report was produced.
+- [ ] Add stable `success`, `unavailable`, and `blocked` result states.
+- [ ] Make the human output, JSON output, and exit status distinguish all three states.
 - [ ] Preserve successful optional councils and required-phase blocking behavior.
 
 **Acceptance criteria:**
@@ -64,9 +65,12 @@ clear provider-isolation check before a paid provider launch.
   `blocked=false`, `council_verified=false`, and low confidence.
 - [ ] B1-A2: The council CLI returns a non-zero status and does not print `council: OK` when zero
   reports succeed.
-- [ ] B1-A3: The result keeps the failed lane reason, `successful_count=0`, and
+- [ ] B1-A3: JSON includes the explicit result state. Human output says `UNAVAILABLE` when no
+  report exists and `BLOCKED` only for a blocking result. Exit-only callers receive distinct
+  statuses for unavailable and blocked results.
+- [ ] B1-A4: The result keeps the failed lane reason, `successful_count=0`, and
   `model_calls_made=false` when isolation prevents every external attempt.
-- [ ] B1-A4: An optional council with one valid report remains successful, and a required phase
+- [ ] B1-A5: An optional council with one valid report remains successful, and a required phase
   with unmet quorum remains blocked.
 
 **Docs likely touched:** CHANGELOG.
@@ -100,9 +104,11 @@ clear provider-isolation check before a paid provider launch.
   provider credential handling, and macOS or Linux sandbox weakening.
 - **Acceptance evidence:** deterministic platform-probe tests, rendered doctor tests, sandbox
   diagnostic tests, documentation consistency checks, and full repository verification.
-- **Failure modes / pitfalls:** `wsl.exe` can exist with no distribution. Native-only Elves does
-  not require `bwrap`. Fugu, Grok, and OMP local shortcuts do require it. Manus and Devin do not
-  use the shared local filesystem sandbox.
+- **Failure modes / pitfalls:** `wsl.exe` can exist with no distribution or only a WSL1
+  distribution. Native-only Elves inside WSL2 does not require `bwrap`. Fugu, Grok, and OMP local
+  shortcuts do require it. Linux external council lanes remain unavailable because the recursive
+  process-boundary gate fails before the filesystem-sandbox probe. Manus and Devin do not use the
+  shared local filesystem sandbox, but their Bash launchers still require WSL2 on Windows.
 - **HEAD / run-doc paths / route-session identity / output format:** same run identity as B1;
   host-native implementation after Fugu reviews this plan.
 
@@ -111,8 +117,11 @@ clear provider-isolation check before a paid provider launch.
 - [ ] Add a bounded, testable Windows and WSL support report to the install doctor.
 - [ ] Give a native Windows user with no distribution the exact `wsl --install -d Ubuntu`
   recovery command.
-- [ ] Report whether the active WSL environment has a qualified `bwrap` provider boundary.
+- [ ] Distinguish WSL1, WSL2, and unknown WSL generation. Give the exact WSL1 conversion command.
+- [ ] Report local shortcut filesystem-sandbox readiness separately from external council
+  recursive process-boundary readiness.
 - [ ] Replace generic unsupported-platform sandbox text with Windows through WSL2 remediation.
+- [ ] Make install-path classification accept Windows separators and include OMP installations.
 - [ ] Add one Windows through WSL2 install path to the README and public guide.
 - [ ] State the platform contract and provider differences in detailed references.
 - [ ] Update Elves to version 2.35.0 and record the change.
@@ -123,16 +132,21 @@ clear provider-isolation check before a paid provider launch.
   `needs_wsl_distribution` and show `wsl --install -d Ubuntu`.
 - [ ] B2-A2: On native Windows with a WSL2 distribution, the doctor tells the user to run the
   supported host and Elves inside that distribution. It does not claim native Win32 support.
-- [ ] B2-A3: Inside WSL, the doctor reports the environment as supported and separately reports
-  whether a qualified `bwrap` boundary is ready for Fugu, Grok, OMP, and external council lanes.
-- [ ] B2-A4: A Windows external-lane isolation failure names WSL2 and `bwrap` as the supported
-  remediation. macOS and Linux diagnostics retain their current meaning.
-- [ ] B2-A5: README and public guide take a Windows user from WSL status check through WSL2
+- [ ] B2-A3: WSL1 and an unknown WSL generation are not reported as supported. WSL1 reports
+  `wsl --set-version <Distro> 2`. Only confirmed WSL2 is supported.
+- [ ] B2-A4: Inside WSL2, the doctor reports local shortcut `bwrap` readiness separately from the
+  external council recursive process boundary. `bwrap` does not mark external council ready.
+- [ ] B2-A5: A native Windows or filesystem-sandbox failure names WSL2 and `bwrap` as the supported
+  remediation. Existing recursive-containment errors remain unchanged.
+- [ ] B2-A6: Windows-style install paths classify correctly. OMP global and local installations
+  are included. The public guide includes the OMP doctor command.
+- [ ] B2-A7: README and public guide take a Windows user from WSL status check through WSL2
   distribution setup, Linux package prerequisites, host installation inside WSL, Elves install,
   and doctor validation.
-- [ ] B2-A6: Provider documentation states that Fugu, Grok, and OMP need the local kernel sandbox,
-  while Manus and Devin remote shortcuts are not routed through `dispatch_external.py`.
-- [ ] B2-A7: Version metadata, CHANGELOG, consistency checks, focused tests, and the full
+- [ ] B2-A8: Provider documentation states that all five Windows shortcut runners execute inside
+  WSL2. Fugu, Grok, and OMP need the local kernel sandbox. Manus and Devin perform remote work
+  without `dispatch_external.py` or a local repository sandbox.
+- [ ] B2-A9: Version metadata, CHANGELOG, consistency checks, focused tests, and the full
   repository verifier pass at version 2.35.0.
 
 **Docs likely touched:** README, guide, operations guide, provider shortcuts, SKILL, AGENTS, and

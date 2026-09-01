@@ -15,15 +15,21 @@
           "met": false
         },
         {
-          "criterion": "The result keeps the failed lane reason, `successful_count=0`, and `model_calls_made=false` when isolation prevents every external attempt.",
+          "criterion": "JSON includes the explicit result state. Human output says `UNAVAILABLE` when no report exists and `BLOCKED` only for a blocking result. Exit-only callers receive distinct statuses for unavailable and blocked results.",
           "evidence": "",
           "id": "B1-A3",
           "met": false
         },
         {
-          "criterion": "An optional council with one valid report remains successful, and a required phase with unmet quorum remains blocked.",
+          "criterion": "The result keeps the failed lane reason, `successful_count=0`, and `model_calls_made=false` when isolation prevents every external attempt.",
           "evidence": "",
           "id": "B1-A4",
+          "met": false
+        },
+        {
+          "criterion": "An optional council with one valid report remains successful, and a required phase with unmet quorum remains blocked.",
+          "evidence": "",
+          "id": "B1-A5",
           "met": false
         }
       ],
@@ -45,33 +51,45 @@
           "met": false
         },
         {
-          "criterion": "Inside WSL, the doctor reports the environment as supported and separately reports whether a qualified `bwrap` boundary is ready for Fugu, Grok, OMP, and external council lanes.",
+          "criterion": "WSL1 and an unknown WSL generation are not reported as supported. WSL1 reports `wsl --set-version <Distro> 2`. Only confirmed WSL2 is supported.",
           "evidence": "",
           "id": "B2-A3",
           "met": false
         },
         {
-          "criterion": "A Windows external-lane isolation failure names WSL2 and `bwrap` as the supported remediation. macOS and Linux diagnostics retain their current meaning.",
+          "criterion": "Inside WSL2, the doctor reports local shortcut `bwrap` readiness separately from the external council recursive process boundary. `bwrap` does not mark external council ready.",
           "evidence": "",
           "id": "B2-A4",
           "met": false
         },
         {
-          "criterion": "README and public guide take a Windows user from WSL status check through WSL2 distribution setup, Linux package prerequisites, host installation inside WSL, Elves install, and doctor validation.",
+          "criterion": "A native Windows or filesystem-sandbox failure names WSL2 and `bwrap` as the supported remediation. Existing recursive-containment errors remain unchanged.",
           "evidence": "",
           "id": "B2-A5",
           "met": false
         },
         {
-          "criterion": "Provider documentation states that Fugu, Grok, and OMP need the local kernel sandbox, while Manus and Devin remote shortcuts are not routed through `dispatch_external.py`.",
+          "criterion": "Windows-style install paths classify correctly. OMP global and local installations are included. The public guide includes the OMP doctor command.",
           "evidence": "",
           "id": "B2-A6",
           "met": false
         },
         {
-          "criterion": "Version metadata, CHANGELOG, consistency checks, focused tests, and the full repository verifier pass at version 2.35.0.",
+          "criterion": "README and public guide take a Windows user from WSL status check through WSL2 distribution setup, Linux package prerequisites, host installation inside WSL, Elves install, and doctor validation.",
           "evidence": "",
           "id": "B2-A7",
+          "met": false
+        },
+        {
+          "criterion": "Provider documentation states that all five Windows shortcut runners execute inside WSL2. Fugu, Grok, and OMP need the local kernel sandbox. Manus and Devin perform remote work without `dispatch_external.py` or a local repository sandbox.",
+          "evidence": "",
+          "id": "B2-A8",
+          "met": false
+        },
+        {
+          "criterion": "Version metadata, CHANGELOG, consistency checks, focused tests, and the full repository verifier pass at version 2.35.0.",
+          "evidence": "",
+          "id": "B2-A9",
           "met": false
         }
       ],
