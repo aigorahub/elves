@@ -1,0 +1,116 @@
+{
+  "batches": [
+    {
+      "acceptance": [
+        {
+          "criterion": "An optional council with zero successful reports returns `ok=false`, `blocked=false`, `council_verified=false`, and low confidence.",
+          "evidence": "",
+          "id": "B1-A1",
+          "met": false
+        },
+        {
+          "criterion": "The council CLI returns a non-zero status and does not print `council: OK` when zero reports succeed.",
+          "evidence": "",
+          "id": "B1-A2",
+          "met": false
+        },
+        {
+          "criterion": "The result keeps the failed lane reason, `successful_count=0`, and `model_calls_made=false` when isolation prevents every external attempt.",
+          "evidence": "",
+          "id": "B1-A3",
+          "met": false
+        },
+        {
+          "criterion": "An optional council with one valid report remains successful, and a required phase with unmet quorum remains blocked.",
+          "evidence": "",
+          "id": "B1-A4",
+          "met": false
+        }
+      ],
+      "id": "B1",
+      "status": "pending"
+    },
+    {
+      "acceptance": [
+        {
+          "criterion": "On native Windows with no installed WSL distribution, doctor JSON and prose report `needs_wsl_distribution` and show `wsl --install -d Ubuntu`.",
+          "evidence": "",
+          "id": "B2-A1",
+          "met": false
+        },
+        {
+          "criterion": "On native Windows with a WSL2 distribution, the doctor tells the user to run the supported host and Elves inside that distribution. It does not claim native Win32 support.",
+          "evidence": "",
+          "id": "B2-A2",
+          "met": false
+        },
+        {
+          "criterion": "Inside WSL, the doctor reports the environment as supported and separately reports whether a qualified `bwrap` boundary is ready for Fugu, Grok, OMP, and external council lanes.",
+          "evidence": "",
+          "id": "B2-A3",
+          "met": false
+        },
+        {
+          "criterion": "A Windows external-lane isolation failure names WSL2 and `bwrap` as the supported remediation. macOS and Linux diagnostics retain their current meaning.",
+          "evidence": "",
+          "id": "B2-A4",
+          "met": false
+        },
+        {
+          "criterion": "README and public guide take a Windows user from WSL status check through WSL2 distribution setup, Linux package prerequisites, host installation inside WSL, Elves install, and doctor validation.",
+          "evidence": "",
+          "id": "B2-A5",
+          "met": false
+        },
+        {
+          "criterion": "Provider documentation states that Fugu, Grok, and OMP need the local kernel sandbox, while Manus and Devin remote shortcuts are not routed through `dispatch_external.py`.",
+          "evidence": "",
+          "id": "B2-A6",
+          "met": false
+        },
+        {
+          "criterion": "Version metadata, CHANGELOG, consistency checks, focused tests, and the full repository verifier pass at version 2.35.0.",
+          "evidence": "",
+          "id": "B2-A7",
+          "met": false
+        }
+      ],
+      "id": "B2",
+      "status": "pending"
+    }
+  ],
+  "branch": "fix/windows-wsl-review-truth",
+  "continuation_guard": {
+    "reason": "Fugu review and two planned batches remain",
+    "stop_allowed": false
+  },
+  "master_acceptance": [
+    {
+      "criterion": "No review result can be successful when it contains zero independent review reports.",
+      "evidence": "",
+      "id": "M-A1",
+      "met": false
+    },
+    {
+      "criterion": "A Windows user has one supported WSL2 setup path with an exact no-distribution recovery command and provider-isolation readiness evidence.",
+      "evidence": "",
+      "id": "M-A2",
+      "met": false
+    },
+    {
+      "criterion": "Native Win32 remains fail-closed and is not described as a supported execution path.",
+      "evidence": "",
+      "id": "M-A3",
+      "met": false
+    },
+    {
+      "criterion": "All focused tests and the full repository verification pass at the exact branch tip.",
+      "evidence": "",
+      "id": "M-A4",
+      "met": false
+    }
+  ],
+  "plan_path": "docs/plans/windows-wsl-review-truth.md",
+  "run_id": "windows-wsl-review-truth-2026-09-01",
+  "start_head": "a638c6188452e936f366d8d390b1b133d7454a7e"
+}
