@@ -180,6 +180,12 @@ rather than a removed flag. Reasoning effort defaults to `high`; `ELVES_GROK_EFF
 `low`, `medium`, `high`, or `xhigh`, and `ELVES_GROK_MODEL` pins a model only when the
 authenticated live catalog lists it. The runner reports the CLI version, effort, model, the
 authentication route the CLI itself names, and any omitted flags.
+On a host that cannot nest sandboxes (macOS Seatbelt refuses a second profile inside Elves'
+required outer `sandbox-exec` boundary), the runner fails closed with
+`grok_inner_sandbox_unavailable` before it builds a snapshot, rather than launching with the
+inner profile silently missing. Elves does not drop the inner profile to make a launch succeed,
+and the outer boundary is not optional; use a Linux host with the bwrap backend or select
+another review route.
 Fugu's Linux boundary likewise omits procfs around its credential-bearing
 launcher and exposes only a synthetic `/proc/self/exe` symlink to the qualified real Codex
 executable. Manus requests nest empty connector, enabled-skill, and forced-skill lists under

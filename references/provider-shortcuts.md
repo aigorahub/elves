@@ -365,6 +365,12 @@ reports no route without blocking, and `1` blocks only with `--required` and no 
   `low`, `medium`, `high`, or `xhigh`, and `ELVES_GROK_MODEL` pins a model only when the
   authenticated live catalog lists it. The runner reports the CLI version, effort, model, the
   authentication route the CLI itself names, and any omitted flags.
+  On a host that cannot nest sandboxes (macOS Seatbelt refuses a second profile inside Elves'
+  required outer `sandbox-exec` boundary), the runner fails closed with
+  `grok_inner_sandbox_unavailable` before it builds a snapshot, rather than launching with the
+  inner profile silently missing. Elves does not drop the inner profile to make a launch succeed,
+  and the outer boundary is not optional; use a Linux host with the bwrap backend or select
+  another review route.
 - **Devin:** requires `DEVIN_API_KEY`. It creates a remote session through the official
   `https://api.devin.ai/v1/sessions` API, includes the current origin/branch when available, sends
   empty `secret_ids` and `knowledge_ids`, and polls the documented session endpoint with each

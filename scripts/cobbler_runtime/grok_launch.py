@@ -293,6 +293,59 @@ def resolve_grok_model(requested: str | None, catalog: GrokCatalog) -> str | Non
     return token
 
 
+# macOS Seatbelt refuses a second `sandbox_init` inside an existing profile, so
+# Grok's own `--sandbox` profile cannot initialize under Elves' required outer
+# `sandbox-exec` boundary. Grok Build 1.0.13 refuses to start when its profile
+# cannot apply; older releases only warned and ran on with the inner protection
+# silently missing. Elves reports the conflict instead of either lie.
+NESTED_INNER_SANDBOX_BACKENDS: Mapping[str, str] = {"darwin": "sandbox-exec"}
+INNER_SANDBOX_DISABLED_PROFILES: frozenset[str] = frozenset({"", "none", "off"})
+
+
+def inner_sandbox_conflict(
+    *,
+    platform_name: str,
+    outer_backend: str | None,
+    profile: str = "strict",
+) -> str | None:
+    """Return why the inner Grok profile cannot run under this outer backend."""
+    if (profile or "").strip().lower() in INNER_SANDBOX_DISABLED_PROFILES:
+        return None
+    for prefix, backend in NESTED_INNER_SANDBOX_BACKENDS.items():
+        if platform_name.startswith(prefix) and outer_backend == backend:
+            return (
+                f"{platform_name} cannot nest sandboxes: Grok's inner `{profile}` "
+                f"profile cannot initialize inside Elves' required outer "
+                f"`{backend}` boundary"
+            )
+    return None
+
+
+def require_inner_sandbox(
+    *,
+    platform_name: str,
+    outer_backend: str | None,
+    profile: str = "strict",
+) -> None:
+    """Fail closed rather than run with the inner profile silently missing."""
+    conflict = inner_sandbox_conflict(
+        platform_name=platform_name,
+        outer_backend=outer_backend,
+        profile=profile,
+    )
+    if conflict is None:
+        return
+    raise ValidationIssue(
+        "grok_inner_sandbox_unavailable",
+        conflict,
+        hint=(
+            "Elves will not drop the inner profile to make the launch succeed, and "
+            "the outer boundary is not optional. Run the Grok shortcut on a Linux "
+            "host with the bwrap backend, or select another review route."
+        ),
+    )
+
+
 def isolated_grok_config(*, model_default: str | None = None) -> str:
     """Isolated `config.toml` body for the disposable GROK_HOME.
 

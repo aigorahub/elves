@@ -48,6 +48,7 @@ from cobbler_runtime.isolation import (  # noqa: E402
     IsolationSpec,
     context_bundle_report,
     isolated_lane,
+    resolve_fs_sandbox_backend,
     wrap_argv_with_sandbox,
 )
 from cobbler_runtime.grok_launch import (  # noqa: E402
@@ -55,6 +56,7 @@ from cobbler_runtime.grok_launch import (  # noqa: E402
     isolated_grok_config,
     probe_grok_capabilities,
     probe_grok_catalog,
+    require_inner_sandbox,
     require_supported_grok_cli,
     resolve_grok_effort,
     resolve_grok_model,
@@ -105,6 +107,14 @@ probe_env = {
 try:
     capabilities = probe_grok_capabilities(grok, env=probe_env)
     require_supported_grok_cli(capabilities)
+    # The inner strict profile is part of the advertised posture. If this platform
+    # cannot nest it inside the required outer boundary, say so before paying for a
+    # snapshot rather than launching with a protection that is silently missing.
+    _outer_backend = resolve_fs_sandbox_backend()
+    require_inner_sandbox(
+        platform_name=sys.platform,
+        outer_backend=_outer_backend.name if _outer_backend else None,
+    )
     effort = resolve_grok_effort(requested_effort)
     catalog = probe_grok_catalog(grok, env=parent) if requested_model.strip() else None
     model = resolve_grok_model(requested_model, catalog) if catalog else None

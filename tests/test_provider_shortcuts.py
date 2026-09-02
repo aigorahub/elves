@@ -1818,6 +1818,19 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertNotIn("descendant absence", result.stderr)
         self.assertNotIn("Traceback", result.stderr)
 
+    @property
+    def grok_inner_sandbox_nests(self) -> bool:
+        """macOS Seatbelt refuses Grok's inner profile inside the outer boundary."""
+        return not sys.platform.startswith("darwin")
+
+    def assert_grok_nested_sandbox_block(self, result) -> None:
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("grok_inner_sandbox_unavailable", result.stderr)
+        self.assertIn("cannot nest sandboxes", result.stderr)
+        # Fails before any snapshot is built.
+        self.assertNotIn("Grok context bundle", result.stderr)
+        self.assertIn("review route unavailable", result.stderr)
+
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
     def test_grok_uses_read_only_checked_key_scrubbed_non_bypass_mode(self) -> None:
         for env_name, expected_auth in (
@@ -1840,6 +1853,9 @@ class LocalCliRunnerTests(unittest.TestCase):
                     },
                 )
 
+            if not self.grok_inner_sandbox_nests:
+                self.assert_grok_nested_sandbox_block(result)
+                continue
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("unrelated-secret=<>", result.stdout)
             self.assertIn(f"provider-auth=<{expected_auth}>", result.stdout)
@@ -1879,6 +1895,9 @@ class LocalCliRunnerTests(unittest.TestCase):
                 },
             )
 
+        if not self.grok_inner_sandbox_nests:
+            self.assert_grok_nested_sandbox_block(result)
+            return
         self.assertEqual(result.returncode, 0, result.stderr)
         # The removed flags are gone, not renamed or faked.
         self.assertNotIn("<--check>", result.stdout)
@@ -1942,6 +1961,9 @@ class LocalCliRunnerTests(unittest.TestCase):
                 },
             )
 
+        if not self.grok_inner_sandbox_nests:
+            self.assert_grok_nested_sandbox_block(result)
+            return
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertIn("grok_model_not_in_catalog", result.stderr)
         self.assertNotIn("Grok context bundle", result.stderr)

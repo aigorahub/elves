@@ -22,7 +22,14 @@ simply not passed. Auto-update is disabled through the isolated `[cli] auto_upda
 rather than a removed flag. Reasoning effort defaults to `high`; `ELVES_GROK_EFFORT` selects
 `low`, `medium`, `high`, or `xhigh`, and `ELVES_GROK_MODEL` pins a model only when the
 authenticated live catalog lists it. The runner reports the CLI version, effort, model, the
-authentication route the CLI itself names, and any omitted flags. The Linux
+authentication route the CLI itself names, and any omitted flags.
+On a host that cannot nest sandboxes (macOS Seatbelt refuses a second profile inside Elves'
+required outer `sandbox-exec` boundary), the runner fails closed with
+`grok_inner_sandbox_unavailable` before it builds a snapshot, rather than launching with the
+inner profile silently missing. Elves does not drop the inner profile to make a launch succeed,
+and the outer boundary is not optional; use a Linux host with the bwrap backend or select
+another review route.
+The Linux
 boundary omits procfs and has no `/proc` view; it does not receive Fugu's synthetic Codex
 `/proc/self/exe` link.
 

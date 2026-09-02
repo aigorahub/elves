@@ -32,6 +32,12 @@ All notable changes to the Elves skill are documented here.
   unchanged. `ELVES_GROK_EFFORT` and `ELVES_GROK_MODEL` select reasoning effort and a model; a
   model is admitted only when the authenticated live catalog lists it, so no model id is invented.
   The runner reports CLI version, effort, model, authentication route, and omitted flags.
+* **Grok's inner sandbox profile is no longer silently missing.** macOS refuses a second sandbox
+  inside Elves' required outer `sandbox-exec` boundary, so Grok's own `--sandbox strict` profile
+  cannot initialize there. Older Grok releases warned and ran on without it; 1.0.13 refuses to
+  start. The runner now detects the conflict before it builds a snapshot and fails closed with
+  `grok_inner_sandbox_unavailable`, naming the cause. Elves does not drop the inner profile to
+  make a launch succeed, and the outer boundary is not optional.
 
 ### Added
 

@@ -843,7 +843,12 @@ python3 ~/.omp/agent/skills/elves/scripts/install_doctor.py --startup</code></pr
             <code>high</code>, or <code>xhigh</code>, and <code>ELVES_GROK_MODEL</code> pins a model
             only when the authenticated live catalog lists it. The runner reports the CLI version,
             effort, model, the authentication route the CLI itself names, and any omitted
-            flags.</li>
+            flags. On a host that cannot nest sandboxes (macOS refuses a second profile inside
+            Elves' required outer <code>sandbox-exec</code> boundary), the runner fails closed
+            before it builds a snapshot rather than launching with the inner profile silently
+            missing. Elves does not drop the inner profile to make a launch succeed, and the outer
+            boundary is not optional; use a Linux host with the bwrap backend or select another
+            review route.</li>
           <li><strong>Devin</strong> creates and boundedly follows a remote developer session and
             needs <code>DEVIN_API_KEY</code>. Stored Devin secrets and knowledge are not granted by
             default, and bounded session creation and polling responses share a hard wall-clock

@@ -22,6 +22,8 @@ if str(SCRIPTS) not in sys.path:
 
 from cobbler_runtime.grok_launch import (  # noqa: E402
     DEFAULT_GROK_EFFORT,
+    inner_sandbox_conflict,
+    require_inner_sandbox,
     GrokCapabilities,
     GrokCatalog,
     build_grok_argv,
@@ -258,6 +260,47 @@ class FailClosedTests(unittest.TestCase):
         self.assertEqual(ctx.exception.code, "grok_model_flag_unsupported")
 
 
+class InnerSandboxTests(unittest.TestCase):
+    """The inner profile is never dropped to make a launch succeed."""
+
+    def test_macos_cannot_nest_the_inner_profile(self) -> None:
+        conflict = inner_sandbox_conflict(
+            platform_name="darwin", outer_backend="sandbox-exec"
+        )
+        self.assertIsNotNone(conflict)
+        self.assertIn("cannot nest sandboxes", conflict or "")
+        with self.assertRaises(ValidationIssue) as ctx:
+            require_inner_sandbox(platform_name="darwin", outer_backend="sandbox-exec")
+        self.assertEqual(ctx.exception.code, "grok_inner_sandbox_unavailable")
+        # The remediation never suggests weakening either boundary.
+        hint = ctx.exception.hint or ""
+        self.assertIn("will not drop the inner profile", hint)
+        self.assertIn("outer boundary is not optional", hint)
+
+    def test_linux_bwrap_is_not_blocked_by_elves(self) -> None:
+        self.assertIsNone(
+            inner_sandbox_conflict(platform_name="linux", outer_backend="bwrap")
+        )
+        require_inner_sandbox(platform_name="linux", outer_backend="bwrap")
+
+    def test_no_outer_backend_is_not_a_nesting_conflict(self) -> None:
+        self.assertIsNone(
+            inner_sandbox_conflict(platform_name="darwin", outer_backend=None)
+        )
+
+    def test_a_disabled_inner_profile_is_not_the_nesting_case(self) -> None:
+        # Elves never selects these, but the rule must not misfire on them.
+        for profile in ("", "none", "off"):
+            self.assertIsNone(
+                inner_sandbox_conflict(
+                    platform_name="darwin",
+                    outer_backend="sandbox-exec",
+                    profile=profile,
+                ),
+                profile,
+            )
+
+
 class CatalogTests(unittest.TestCase):
     def test_live_catalog_and_auth_route_are_read(self) -> None:
         catalog = parse_grok_catalog(CATALOG_TEXT)
@@ -306,6 +349,7 @@ class RunnerWiringTests(unittest.TestCase):
         self.assertIn("build_grok_argv", body)
         self.assertIn("probe_grok_capabilities", body)
         self.assertIn("isolated_grok_config", body)
+        self.assertIn("require_inner_sandbox", body)
 
     def test_runner_keeps_its_isolation_and_credential_posture(self) -> None:
         body = (REPO_ROOT / "scripts" / "run_grok.sh").read_text(encoding="utf-8")

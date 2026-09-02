@@ -2924,6 +2924,8 @@ GROK_LAUNCH_SURFACE_PHRASES = {
         "fails closed",
         "auto_update",
         "authenticated live catalog lists it",
+        "cannot nest sandboxes",
+        "outer boundary is not optional",
     ]
     for label in ['SKILL.md', 'AGENTS.md', 'README.md', 'guide/index.html', 'references/provider-shortcuts.md', 'aliases/claude/grok/SKILL.md']
 }

@@ -107,6 +107,8 @@ _FAILURE_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
             r"\bis not installed\b",
             r"\barguments are incomplete\b",
             r"\bunknown [a-z]+ profile\b",
+            r"\bcannot nest sandboxes\b",
+            r"\bdoes not advertise required launch controls\b",
         ),
     ),
     (

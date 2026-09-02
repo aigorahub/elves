@@ -121,6 +121,12 @@ assume `./scripts` belongs to the target repository and do not execute mappings 
   `low`, `medium`, `high`, or `xhigh`, and `ELVES_GROK_MODEL` pins a model only when the
   authenticated live catalog lists it. The runner reports the CLI version, effort, model, the
   authentication route the CLI itself names, and any omitted flags.
+  On a host that cannot nest sandboxes (macOS Seatbelt refuses a second profile inside Elves'
+  required outer `sandbox-exec` boundary), the runner fails closed with
+  `grok_inner_sandbox_unavailable` before it builds a snapshot, rather than launching with the
+  inner profile silently missing. Elves does not drop the inner profile to make a launch succeed,
+  and the outer boundary is not optional; use a Linux host with the bwrap backend or select
+  another review route.
 - Devin task → `run_devin.sh <instructions>` (remote session, bounded wait, no default stored
   secret or knowledge grants; creation and polling share one hard wall-clock bound)
 - Oh My Pi task → `run_omp.sh <instructions>` (optional headless worker shortcut under other hosts;
