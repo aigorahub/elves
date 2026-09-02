@@ -26,6 +26,7 @@ import ast
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -60,6 +61,37 @@ if not xai_key and not legacy_xai_key:
     )
 credential_name = "XAI_API_KEY" if xai_key else "GROK_CODE_XAI_API_KEY"
 credential_value = xai_key or legacy_xai_key
+
+# Effort is pinned to the highest level the operator asks for; the default
+# stays `high`. The installed CLI publishes the accepted levels; an unknown
+# spelling fails closed here rather than at the provider.
+GROK_EFFORT_LEVELS = ("low", "medium", "high", "xhigh")
+effort = (parent.get("ELVES_GROK_EFFORT") or "high").strip().lower()
+if effort not in GROK_EFFORT_LEVELS:
+    raise SystemExit(
+        "Error: ELVES_GROK_EFFORT must be one of " + ", ".join(GROK_EFFORT_LEVELS) + "."
+    )
+
+
+def installed_help_flags() -> set[str]:
+    """Long flags the installed Grok CLI advertises. `--check` left the CLI in
+    1.0.x; passing a flag the binary does not know aborts the launch, so optional
+    flags are gated on the help grammar instead of a version guess."""
+    try:
+        probe = subprocess.run(
+            [grok, "--help"],
+            capture_output=True,
+            text=True,
+            timeout=20,
+            env={"PATH": parent_path, "HOME": str(Path.home()), "GROK_HOME": str(source_home)},
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return set()
+    return set(re.findall(r"--[a-z][a-z0-9-]*", probe.stdout + probe.stderr))
+
+
+optional_flags = ["--check"] if "--check" in installed_help_flags() else []
 
 
 def configured_model_default() -> str:
@@ -162,10 +194,10 @@ try:
                 "--sandbox",
                 "strict",
                 "--effort",
-                "high",
+                effort,
                 "--output-format",
                 "plain",
-                "--check",
+                *optional_flags,
                 "--single=" + prompt,
             ],
             lane,

@@ -157,6 +157,7 @@ class LocalCliRunnerTests(unittest.TestCase):
         binary.write_text(
             "#!/bin/sh\n"
             "printf 'unrelated-secret=<%s>\\n' \"${AWS_SECRET_ACCESS_KEY:-}\"\n"
+            "if [ \"${1:-}\" = --help ]; then if [ -f \"$0.help\" ]; then cat \"$0.help\"; else printf -- '--help --effort --check --single\\n'; fi; exit 0; fi\n"
             "printf '<%s>\\n' \"$@\"\n"
             "if [ \"$(basename \"$0\")\" = grok ]; then\n"
             "  if [ -n \"${XAI_API_KEY:-}\" ]; then printf 'provider-auth=<current>\\n'; fi\n"
@@ -1821,6 +1822,45 @@ class LocalCliRunnerTests(unittest.TestCase):
             self.assertNotIn("reasoning-effort", result.stdout)
             self.assertNotIn("always-approve", result.stdout)
             self.assertNotIn("bypassPermissions", result.stdout)
+
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    def test_grok_gates_check_on_installed_help_and_honors_effort_override(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bin_dir = Path(tmpdir)
+            self.make_fake(bin_dir, "grok")
+            base_env = {
+                "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                "XAI_API_KEY": "test-xai-key",
+            }
+            # Grok CLI 1.0.x dropped --check; a help grammar without it must not
+            # send the flag, and the operator's effort override rides through.
+            help_file = bin_dir / "grok.help"
+            help_file.write_text("--help --effort --single\n", encoding="utf-8")
+            modern = run_script(
+                "run_grok.sh",
+                "inspect",
+                env={**base_env, "ELVES_GROK_EFFORT": "xhigh"},
+            )
+            self.assertEqual(modern.returncode, 0, modern.stderr)
+            self.assertNotIn("<--check>", modern.stdout)
+            self.assertIn("<--effort>", modern.stdout)
+            self.assertIn("<xhigh>", modern.stdout)
+            self.assertIn("<--single=inspect>", modern.stdout)
+
+            help_file.unlink()
+            legacy = run_script("run_grok.sh", "inspect", env=base_env)
+            self.assertEqual(legacy.returncode, 0, legacy.stderr)
+            self.assertIn("<--check>", legacy.stdout)
+            self.assertIn("<high>", legacy.stdout)
+
+            rejected = run_script(
+                "run_grok.sh",
+                "inspect",
+                env={**base_env, "ELVES_GROK_EFFORT": "ultra"},
+            )
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertIn("ELVES_GROK_EFFORT", rejected.stderr)
+            self.assertNotIn("<--single", rejected.stdout)
 
     def test_grok_shared_oauth_fails_closed_before_provider_launch(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

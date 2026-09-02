@@ -290,7 +290,10 @@ After settlement, report Fugu's answer or salvage and the route used.
   as described below.
 - **Grok:** requires the `grok` CLI plus explicit `XAI_API_KEY` (or the legacy
   `GROK_CODE_XAI_API_KEY`). It uses documented headless single-prompt mode, `high`
-  reasoning, self-checking, and `dontAsk`, which silently denies unapproved mutations. The runner
+  reasoning by default (`ELVES_GROK_EFFORT=low|medium|high|xhigh` overrides it; an unknown
+  level fails closed before launch), self-checking only when the installed CLI still
+  advertises `--check` (Grok CLI 1.0.x dropped it, and an unknown flag aborts the launch), and
+  `dontAsk`, which silently denies unapproved mutations. The runner
   copies tracked source into a disposable snapshot and requires Elves' qualified outer kernel
   sandbox, which makes that snapshot read-only independently of Grok's profile merger. It constructs
   isolated HOME/GROK_HOME state, projects only the selected named key to Grok itself, and selects a

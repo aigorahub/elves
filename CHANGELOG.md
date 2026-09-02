@@ -4,6 +4,17 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- `run_grok.sh` passes `--check` only when the installed Grok CLI advertises it. Grok CLI
+  1.0.x removed the flag, and every `/grok` launch failed with `unexpected argument '--check'`.
+  The help grammar is probed before launch.
+
+### Added
+
+- `ELVES_GROK_EFFORT` (`low|medium|high|xhigh`) overrides the `/grok` shortcut's pinned
+  `high` reasoning effort; unknown levels fail closed before the provider is called.
+
 ## [2.35.0] - 2026-09-01
 
 ### Added
