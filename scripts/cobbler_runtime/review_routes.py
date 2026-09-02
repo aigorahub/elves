@@ -146,18 +146,21 @@ def classify_review_route_failure(
 ) -> str | None:
     """Classify one optional-route failure into a stable reason code.
 
-    Returns ``None`` when the evidence shows no failure (exit code ``0`` and no
-    failure wording). Unclassifiable non-zero exits are ``provider`` failures,
-    which is still a real fallback trigger.
+    An explicit ``exit_code`` of ``0`` means success and returns ``None``, whatever
+    the text says. With no exit code, the text alone decides. Unclassifiable
+    non-zero exits are ``provider`` failures, which is still a real fallback
+    trigger.
     """
+    # An explicit success code is authoritative. A successful log may still say
+    # "retry on timeout" or "not found"; that is not a route failure.
+    if exit_code is not None and int(exit_code) == 0:
+        return None
     body = (text or "").lower()
     for reason, patterns in _FAILURE_PATTERNS:
         for pattern in patterns:
             if re.search(pattern, body):
                 return reason
     if exit_code is None:
-        return None
-    if exit_code == 0:
         return None
     return _EXIT_CODE_REASONS.get(int(exit_code), "provider")
 

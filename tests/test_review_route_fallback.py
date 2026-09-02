@@ -68,6 +68,20 @@ class FailureClassificationTests(unittest.TestCase):
         self.assertIsNone(classify_review_route_failure(exit_code=0))
         self.assertIsNone(classify_review_route_failure(text="ordered P0-P3 findings"))
 
+    def test_an_explicit_success_code_outranks_failure_wording(self) -> None:
+        # A clean review log may still discuss timeouts, keys, or missing files.
+        for text in (
+            "P2: the caller should retry on timeout",
+            "the api key is never logged",
+            "returns 403 when unauthorized",
+            "module not found is handled",
+        ):
+            self.assertIsNone(
+                classify_review_route_failure(exit_code=0, text=text), text
+            )
+            # Without an exit code the text still decides.
+            self.assertIsNotNone(classify_review_route_failure(text=text), text)
+
     def test_reason_vocabulary_is_closed(self) -> None:
         self.assertEqual(normalize_review_route_reason("Quota"), "quota")
         self.assertEqual(normalize_review_route_reason("not-independent"), "not_independent")

@@ -15,7 +15,9 @@ All notable changes to the Elves skill are documented here.
   byte size, category, reason, and remediation, and every supported runner prints the same omission
   block. Source, prose instructions, executable agent configuration, and explicit `--include` paths
   still fail closed, with a remediation that asks for a derived text, image, or transcript artifact.
-  Writable lanes keep fail-closed behavior.
+  Writable lanes keep fail-closed behavior. Every omission is named in the manifest with its path,
+  byte size, category, and reason, with the remediation written once for the whole snapshot, and
+  the runner preamble reports exact totals rather than the length of its bounded printed list.
 
 ### Fixed
 
@@ -38,6 +40,21 @@ All notable changes to the Elves skill are documented here.
   start. The runner now detects the conflict before it builds a snapshot and fails closed with
   `grok_inner_sandbox_unavailable`, naming the cause. Elves does not drop the inner profile to
   make a launch succeed, and the outer boundary is not optional.
+* **An optional route failure always tells the host to reroute.** The Grok and omp runners
+  previously exited silently on a missing CLI, a missing credential, or ambiguous provider keys, so
+  a host that reroutes on the directive treated those as hard stops. Every non-zero exit now emits
+  the reroute directive with the right reason. The Grok runner also classifies the provider's own
+  stderr, so a quota or authentication message no longer collapses into a generic provider
+  failure; stderr still streams through unchanged and the retained tail is never re-printed.
+* **A successful run is never classified as a route failure.** `classify_review_route_failure` now
+  treats an explicit exit code of `0` as authoritative, so a clean log that mentions a timeout, an
+  API key, or a missing module is not recorded as a fallback.
+* **Grok help parsing reads option rows, not prose.** Flags are taken from option rows and explicit
+  `[aliases: ...]` rows only, so a help page that merely mentions a removed flag cannot make the
+  runner pass it again. `build_grok_argv` now requires the platform and outer backend, so no caller
+  can reach argv without the inner-sandbox nesting check. The reported authentication route is
+  bounded and character-restricted, and recognizes both the API key and the Grok Build
+  subscription.
 
 ### Added
 

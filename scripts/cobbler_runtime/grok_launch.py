@@ -54,8 +54,27 @@ OPTIONAL_GROK_FLAGS: tuple[str, ...] = ("--no-auto-update", "--check")
 MODEL_FLAG_CANDIDATES: tuple[str, ...] = ("--model", "-m")
 
 _FLAG_PATTERN = re.compile(r"(?<![\w-])(--?[A-Za-z][A-Za-z0-9-]*)")
+# An option row starts with the flag itself, for example "  -m, --model <MODEL>"
+# or "      --reasoning-effort <EFFORT>". Description prose is indented under it.
+_OPTION_ROW = re.compile(r"^\s*(-[A-Za-z0-9-]|--[A-Za-z][A-Za-z0-9-]*)")
+# Clap advertises alternate spellings on their own line: "[aliases: --effort]".
+_ALIAS_ROW = re.compile(r"^\s*\[aliases?:(?P<body>[^\]]*)\]\s*$")
 _CATALOG_ENTRY = re.compile(r"^\s*[*-]\s+(?P<model>[A-Za-z0-9][A-Za-z0-9._-]*)")
-_AUTH_LINE = re.compile(r"^\s*You are using\s+(?P<route>[^.\n]+?)\s*\.?\s*$", re.MULTILINE)
+_AUTH_LINE = re.compile(
+    r"^\s*You are (?:using|logged in with)\s+(?P<route>\S[^\n]*?)\.?\s*$",
+    re.MULTILINE,
+)
+# The auth route is a short label such as "XAI_API_KEY" or "grok.com". It is
+# printed to stderr, so it is bounded and character-restricted: a future CLI that
+# ever put a live credential on that line cannot leak it through this field.
+_AUTH_ROUTE_SAFE = re.compile(r"^[A-Za-z0-9._@ -]{1,64}$")
+
+
+def _safe_auth_route(value: str | None) -> str | None:
+    token = (value or "").strip()
+    if not token or _AUTH_ROUTE_SAFE.match(token) is None:
+        return "unrecognized" if token else None
+    return token
 
 
 @dataclass(frozen=True)
@@ -129,6 +148,7 @@ def _run_probe(
             list(argv),
             capture_output=True,
             text=True,
+            errors="replace",
             check=False,
             stdin=subprocess.DEVNULL,
             timeout=GROK_PROBE_TIMEOUT_SECONDS,
@@ -155,8 +175,24 @@ def _run_probe(
 
 
 def parse_grok_flags(help_text: str) -> frozenset[str]:
-    """Collect the option spellings a help page advertises."""
-    return frozenset(_FLAG_PATTERN.findall(help_text or ""))
+    """Collect the option spellings a help page actually advertises.
+
+    Only option rows and explicit ``[aliases: ...]`` rows count. Prose is ignored,
+    so a sentence such as "``--check`` was removed" cannot make the runner pass a
+    flag the CLI no longer accepts.
+    """
+    flags: set[str] = set()
+    for raw in (help_text or "").splitlines():
+        alias = _ALIAS_ROW.match(raw)
+        if alias is not None:
+            flags.update(_FLAG_PATTERN.findall(alias.group("body")))
+            continue
+        if _OPTION_ROW.match(raw) is None:
+            continue
+        # Take the flag spec only, never the description that follows it.
+        spec = re.split(r"\s{2,}|\t", raw.strip(), maxsplit=1)[0]
+        flags.update(_FLAG_PATTERN.findall(spec))
+    return frozenset(flags)
 
 
 def probe_grok_capabilities(
@@ -247,7 +283,7 @@ def parse_grok_catalog(text: str) -> GrokCatalog:
         models.append(match.group("model"))
     return GrokCatalog(
         models=tuple(dict.fromkeys(models)),
-        auth_route=auth.group("route").strip() if auth else None,
+        auth_route=_safe_auth_route(auth.group("route") if auth else None),
         available=bool(models),
         reason=None if models else "live catalog listed no models",
     )
@@ -366,14 +402,25 @@ def build_grok_argv(
     snapshot: str | Path,
     prompt: str,
     capabilities: GrokCapabilities,
+    platform_name: str,
+    outer_backend: str | None,
     effort: str = DEFAULT_GROK_EFFORT,
     model: str | None = None,
     auth_route: str | None = None,
     sandbox_profile: str = "strict",
     output_format: str = "plain",
 ) -> GrokLaunchPlan:
-    """Build the headless argv from the flags this CLI actually advertises."""
+    """Build the headless argv from the flags this CLI actually advertises.
+
+    ``platform_name`` and ``outer_backend`` are required so no caller can build a
+    launch that silently skips the inner-sandbox nesting check.
+    """
     effort_flag = require_supported_grok_cli(capabilities)
+    require_inner_sandbox(
+        platform_name=platform_name,
+        outer_backend=outer_backend,
+        profile=sandbox_profile,
+    )
     resolved_effort = resolve_grok_effort(effort)
     binary = Path(str(executable))
     if not binary.is_absolute():

@@ -8,8 +8,27 @@ if [ -z "$PROMPT_CONTENT" ]; then
   echo "Usage: run_grok.sh <instructions>" >&2
   exit 2
 fi
+# Grok is an optional review route. Every non-zero exit, including the ones that
+# happen before Python starts, tells the host driver to select another reviewer.
+route_unavailable() {
+  # The directive is built on stdout so a broken interpreter cannot turn a
+  # missing-tool message into a stack trace on the route's stderr.
+  local directive
+  directive=$(python3 - "$1" "$SCRIPT_DIR" <<'ROUTEPY' 2>/dev/null
+import sys
+sys.path.insert(0, sys.argv[2])
+from cobbler_runtime.review_routes import route_unavailable_directive
+print(route_unavailable_directive("Grok", sys.argv[1]))
+ROUTEPY
+) || return 0
+  if [ -n "$directive" ]; then
+    printf '%s\n' "$directive" >&2
+  fi
+  return 0
+}
 if ! command -v grok >/dev/null 2>&1; then
   echo "Error: Grok Build CLI not found." >&2
+  route_unavailable runner
   exit 127
 fi
 if ! REPO_ROOT=$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null); then
@@ -29,6 +48,7 @@ GROK_EFFORT="${ELVES_GROK_EFFORT:-}"
 
 exec python3 - "$PROMPT_CONTENT" "$REPO_ROOT" "$SCRIPT_DIR" "$GROK_MODEL" "$GROK_EFFORT" <<'PY'
 import ast
+import collections
 import json
 import os
 from pathlib import Path
@@ -80,16 +100,22 @@ parent = dict(os.environ)
 parent_path = parent.get("PATH", "/usr/bin:/bin")
 grok = shutil.which("grok", path=parent_path)
 if not grok:
-    raise SystemExit("Error: Grok Build CLI not found.")
+    print("Error: Grok Build CLI not found.", file=sys.stderr)
+    print(route_unavailable_directive("Grok", "runner"), file=sys.stderr)
+    raise SystemExit(127)
 
 source_home = Path(parent.get("GROK_HOME") or (Path.home() / ".grok")).expanduser()
 xai_key = parent.get("XAI_API_KEY", "")
 legacy_xai_key = parent.get("GROK_CODE_XAI_API_KEY", "")
 if not xai_key and not legacy_xai_key:
-    raise SystemExit(
+    print(
         "Error: run_grok.sh requires an explicit XAI_API_KEY (or legacy "
-        "GROK_CODE_XAI_API_KEY). Shared-file OAuth is not exposed to shortcut agents."
+        "GROK_CODE_XAI_API_KEY). Shared-file OAuth is not exposed to shortcut agents.",
+        file=sys.stderr,
     )
+    print(route_unavailable_directive("Grok", "authentication"), file=sys.stderr)
+    # Exit status is unchanged; only the reroute directive is new.
+    raise SystemExit(1)
 credential_name = "XAI_API_KEY" if xai_key else "GROK_CODE_XAI_API_KEY"
 credential_value = xai_key or legacy_xai_key
 
@@ -228,6 +254,8 @@ try:
             snapshot=lane.snapshot,
             prompt=prompt,
             capabilities=capabilities,
+            platform_name=sys.platform,
+            outer_backend=_outer_backend.name if _outer_backend else None,
             effort=effort,
             model=model,
             auth_route=catalog.auth_route if catalog else None,
@@ -244,14 +272,32 @@ try:
             lane,
             mount_proc=False,
         )
-        completed = subprocess.run(
+        # stdout streams live. stderr is passed through byte for byte while a
+        # bounded tail is kept, so a quota or auth message classifies correctly
+        # instead of collapsing to a generic provider failure. The retained text
+        # is used only to pick a reason code; it is never re-printed.
+        process = subprocess.Popen(
             command,
             cwd=lane.snapshot,
             env=lane.env,
-            check=False,
+            stderr=subprocess.PIPE,
         )
-        _route_unavailable(completed.returncode)
-        raise SystemExit(completed.returncode)
+        tail = collections.deque(maxlen=8 * 1024)
+        assert process.stderr is not None
+        with process.stderr:
+            while True:
+                chunk = process.stderr.read(4096)
+                if not chunk:
+                    break
+                sys.stderr.buffer.write(chunk)
+                sys.stderr.buffer.flush()
+                tail.extend(chunk)
+        returncode = process.wait()
+        _route_unavailable(
+            returncode,
+            bytes(tail).decode("utf-8", "replace"),
+        )
+        raise SystemExit(returncode)
 except ValidationIssue as exc:
     print(f"Error: Grok isolation failed closed: {exc}", file=sys.stderr)
     _route_unavailable(2, f"{exc.code}: {exc.message}")

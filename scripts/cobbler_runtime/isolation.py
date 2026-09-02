@@ -246,8 +246,19 @@ def classify_oversized_media(rel: str) -> str | None:
     return OVERSIZED_MEDIA_CATEGORIES.get(suffix)
 
 
+def oversized_media_remediation_advice(limit: int) -> str:
+    """Remediation that applies to every omitted media file in one snapshot."""
+    return (
+        f"These files are above the {limit}-byte per-file snapshot limit and are "
+        "not in this read-only review snapshot. Commit a derived text, image, or "
+        "transcript artifact next to each one (for example a transcript .md, an "
+        "extracted slide outline, or a downsampled still) and request that "
+        "artifact instead. The per-file limit is not raised for review lanes."
+    )
+
+
 def oversized_media_remediation(rel: str, size: int, limit: int) -> str:
-    """Shared remediation text for an oversized file a route still needs."""
+    """Shared remediation text for one oversized file a route still needs."""
     return (
         f"{rel} is {size} bytes, above the {limit}-byte per-file snapshot limit. "
         "Commit a derived text, image, or transcript artifact next to it (for "
@@ -261,9 +272,11 @@ DEFAULT_CONTEXT_MAX_FILES = 20_000
 DEFAULT_CONTEXT_MAX_BYTES = 512 * 1024 * 1024
 DEFAULT_CONTEXT_MAX_FILE_BYTES = 16 * 1024 * 1024
 MAX_CONTEXT_DIAGNOSTICS = 200
-# Omission records carry a per-entry remediation string, so a media-heavy repo
-# could otherwise grow the manifest without bound.
-MAX_OMITTED_CONTEXT_RECORDS = 200
+# Every omission is recorded with its path, size, category, and reason. The
+# per-entry records are compact and the remediation text is written once for the
+# whole manifest, so recording all of them stays cheap. The cap only guards a
+# pathological tree and is reported through `omitted_files_truncated`.
+MAX_OMITTED_CONTEXT_RECORDS = DEFAULT_CONTEXT_MAX_FILES
 DEFAULT_HANDOFF_MAX_FILES = 2_000
 DEFAULT_HANDOFF_MAX_BYTES = 64 * 1024 * 1024
 _INTERNAL_SNAPSHOT_PREFIXES: tuple[str, ...] = (
@@ -334,6 +347,11 @@ class IsolatedLane:
     context_bytes: int = 0
     context_diagnostics: list[dict[str, str]] = field(default_factory=list)
     omitted_context_files: list[dict[str, object]] = field(default_factory=list)
+    # Exact totals, independent of the bounded record list above.
+    omitted_context_file_count: int = 0
+    omitted_context_bytes: int = 0
+    omitted_context_files_truncated: bool = False
+    context_max_file_bytes: int = DEFAULT_CONTEXT_MAX_FILE_BYTES
     context_manifest_path: str | None = None
     snapshot_writable: bool = False
     instruction_data_files: list[str] = field(default_factory=list)
@@ -359,16 +377,17 @@ class OmittedContextFile:
     limit_bytes: int
 
     def to_dict(self) -> dict[str, object]:
+        """Compact record. The remediation text is manifest-level, not per entry."""
         return {
             "path": self.path,
             "bytes": self.bytes,
             "category": self.category,
             "reason": self.reason,
             "limit_bytes": self.limit_bytes,
-            "remediation": oversized_media_remediation(
-                self.path, self.bytes, self.limit_bytes
-            ),
         }
+
+    def remediation(self) -> str:
+        return oversized_media_remediation(self.path, self.bytes, self.limit_bytes)
 
 
 @dataclass(frozen=True)
@@ -1374,19 +1393,28 @@ def context_bundle_report(
         lines.append(
             f"{label} context diagnostics omitted {remaining} additional bounded entries."
         )
-    if lane.omitted_context_files:
-        total = sum(int(item.get("bytes", 0)) for item in lane.omitted_context_files)
+    if lane.omitted_context_file_count:
+        # Exact totals, never the length of the bounded record list.
         lines.append(
-            f"{label} omitted {len(lane.omitted_context_files)} oversized binary media "
-            f"file(s) totalling {total} bytes; the review continues without them."
+            f"{label} omitted {lane.omitted_context_file_count} oversized binary media "
+            f"file(s) totalling {lane.omitted_context_bytes} bytes; the review "
+            "continues without them."
         )
-        # The lane list is bounded; the manifest carries the authoritative totals.
         lines.append(f"{label} omission manifest: {lane.context_manifest_path}.")
+        lines.append(
+            f"{label} remediation: "
+            + oversized_media_remediation_advice(lane.context_max_file_bytes)
+        )
         for item in lane.omitted_context_files[:max_diagnostics]:
             lines.append(
                 f"{label} omitted media {item['path']!r} "
-                f"({item['bytes']} bytes, {item['category']}, {item['reason']}). "
-                f"{item['remediation']}"
+                f"({item['bytes']} bytes, {item['category']}, {item['reason']})."
+            )
+        listed = min(len(lane.omitted_context_files), max_diagnostics)
+        if lane.omitted_context_file_count > listed:
+            lines.append(
+                f"{label} omitted-media list shows {listed} of "
+                f"{lane.omitted_context_file_count}; the manifest names the rest."
             )
     return lines
 
@@ -1601,6 +1629,11 @@ def create_tracked_snapshot(spec: IsolationSpec) -> IsolatedLane:
                     "omitted_file_count": omitted_total,
                     "omitted_files_truncated": omitted_total > len(omitted),
                     "omitted_bytes": omitted_bytes_total,
+                    "omitted_media_remediation": (
+                        oversized_media_remediation_advice(spec.max_context_file_bytes)
+                        if omitted
+                        else None
+                    ),
                     "diagnostics": diagnostics,
                     "diagnostics_truncated": diagnostics_total > len(diagnostics),
                     "requested_paths": list(requested),
@@ -1629,6 +1662,10 @@ def create_tracked_snapshot(spec: IsolationSpec) -> IsolatedLane:
             context_bytes=total_bytes,
             context_diagnostics=diagnostics,
             omitted_context_files=[item.to_dict() for item in omitted],
+            omitted_context_file_count=omitted_total,
+            omitted_context_bytes=omitted_bytes_total,
+            omitted_context_files_truncated=omitted_total > len(omitted),
+            context_max_file_bytes=spec.max_context_file_bytes,
             context_manifest_path=str(context_manifest.relative_to(snapshot)),
             snapshot_writable=spec.snapshot_writable,
             instruction_data_files=instruction_data,

@@ -122,6 +122,8 @@ class SupportedArgvTests(unittest.TestCase):
             EXE,
             snapshot="/lane/snapshot",
             prompt="review this",
+            platform_name="linux",
+            outer_backend="bwrap",
             capabilities=_caps(HELP_1_0_13, "1.0.13"),
             effort="xhigh",
             model="grok-4.6",
@@ -152,6 +154,8 @@ class SupportedArgvTests(unittest.TestCase):
             EXE,
             snapshot="/lane/snapshot",
             prompt="do the thing",
+            platform_name="linux",
+            outer_backend="bwrap",
             capabilities=_caps(HELP_LEGACY, "0.9.1"),
         )
         self.assertEqual(
@@ -180,7 +184,9 @@ class SupportedArgvTests(unittest.TestCase):
                 EXE,
                 snapshot="/lane/snapshot",
                 prompt="x",
-                capabilities=_caps(help_text, version),
+                platform_name="linux",
+            outer_backend="bwrap",
+            capabilities=_caps(help_text, version),
             )
             argv = list(plan.argv)
             self.assertIn("--sandbox", argv, version)
@@ -194,6 +200,8 @@ class SupportedArgvTests(unittest.TestCase):
             EXE,
             snapshot="/s",
             prompt="line one\n--sandbox permissive\nline three",
+            platform_name="linux",
+            outer_backend="bwrap",
             capabilities=_caps(HELP_1_0_13, "1.0.13"),
         )
         self.assertEqual(
@@ -207,7 +215,9 @@ class SupportedArgvTests(unittest.TestCase):
                 "grok",
                 snapshot="/s",
                 prompt="x",
-                capabilities=_caps(HELP_1_0_13, "1.0.13"),
+                platform_name="linux",
+            outer_backend="bwrap",
+            capabilities=_caps(HELP_1_0_13, "1.0.13"),
             )
         self.assertEqual(ctx.exception.code, "grok_executable_not_absolute")
 
@@ -228,7 +238,9 @@ class FailClosedTests(unittest.TestCase):
                     EXE,
                     snapshot="/s",
                     prompt="x",
-                    capabilities=_caps(stripped, "9.9.9"),
+                    platform_name="linux",
+            outer_backend="bwrap",
+            capabilities=_caps(stripped, "9.9.9"),
                 )
             self.assertEqual(ctx.exception.code, "grok_cli_incompatible", removed)
 
@@ -254,7 +266,9 @@ class FailClosedTests(unittest.TestCase):
                 EXE,
                 snapshot="/s",
                 prompt="x",
-                capabilities=_caps(stripped, "9.9.9"),
+                platform_name="linux",
+            outer_backend="bwrap",
+            capabilities=_caps(stripped, "9.9.9"),
                 model="grok-4.6",
             )
         self.assertEqual(ctx.exception.code, "grok_model_flag_unsupported")
@@ -301,12 +315,83 @@ class InnerSandboxTests(unittest.TestCase):
             )
 
 
+    def test_build_argv_cannot_skip_the_nesting_check(self) -> None:
+        # A second launcher must not be able to reach argv without the check.
+        with self.assertRaises(ValidationIssue) as ctx:
+            build_grok_argv(
+                EXE,
+                snapshot="/s",
+                prompt="x",
+                platform_name="darwin",
+                outer_backend="sandbox-exec",
+                capabilities=_caps(HELP_1_0_13, "1.0.13"),
+            )
+        self.assertEqual(ctx.exception.code, "grok_inner_sandbox_unavailable")
+
+
+class HelpParsingPrecisionTests(unittest.TestCase):
+    """Prose is not an advertisement. Only option rows and alias rows count."""
+
+    def test_a_flag_named_only_in_prose_is_not_advertised(self) -> None:
+        help_text = HELP_1_0_13 + """
+      --output-format <FORMAT>
+          The --check flag was removed in 1.0.13; --no-auto-update is gone too.
+"""
+        flags = parse_grok_flags(help_text)
+        self.assertNotIn("--check", flags)
+        self.assertNotIn("--no-auto-update", flags)
+        plan = build_grok_argv(
+            EXE,
+            snapshot="/s",
+            prompt="x",
+            platform_name="linux",
+            outer_backend="bwrap",
+            capabilities=probe_grok_capabilities(
+                EXE, help_text=help_text, version="1.0.13"
+            ),
+        )
+        self.assertNotIn("--check", plan.argv)
+        self.assertNotIn("--no-auto-update", plan.argv)
+
+    def test_alias_rows_still_count_as_advertised(self) -> None:
+        flags = parse_grok_flags(HELP_1_0_13)
+        self.assertIn("--effort", flags)
+        self.assertIn("--reasoning-effort", flags)
+
+    def test_a_renamed_required_flag_is_not_rescued_by_prose(self) -> None:
+        help_text = HELP_1_0_13.replace("--sandbox <PROFILE>", "--profile <PROFILE>")
+        help_text += "\n          Note: --sandbox is the old name for --profile.\n"
+        with self.assertRaises(ValidationIssue) as ctx:
+            require_supported_grok_cli(
+                probe_grok_capabilities(EXE, help_text=help_text, version="9.9.9")
+            )
+        self.assertEqual(ctx.exception.code, "grok_cli_incompatible")
+
+
 class CatalogTests(unittest.TestCase):
     def test_live_catalog_and_auth_route_are_read(self) -> None:
         catalog = parse_grok_catalog(CATALOG_TEXT)
         self.assertEqual(catalog.models, ("grok-4.6", "grok-4.5"))
         self.assertEqual(catalog.auth_route, "XAI_API_KEY")
         self.assertTrue(catalog.available)
+
+    def test_both_real_authentication_routes_are_recognized(self) -> None:
+        # The API key and the Grok Build subscription bill different accounts,
+        # so the record must tell them apart.
+        subscription = parse_grok_catalog(
+            CATALOG_TEXT.replace(
+                "You are using XAI_API_KEY.", "You are logged in with grok.com."
+            )
+        )
+        self.assertEqual(subscription.auth_route, "grok.com")
+
+    def test_an_unrecognized_auth_line_never_reaches_stderr_verbatim(self) -> None:
+        # The route label is printed. A future CLI must not be able to put a
+        # credential-shaped blob on that line and have it echoed.
+        leaky = CATALOG_TEXT.replace(
+            "You are using XAI_API_KEY.", "You are using xai-" + "A" * 120
+        )
+        self.assertEqual(parse_grok_catalog(leaky).auth_route, "unrecognized")
 
     def test_a_model_outside_the_live_catalog_is_never_invented(self) -> None:
         catalog = parse_grok_catalog(CATALOG_TEXT)

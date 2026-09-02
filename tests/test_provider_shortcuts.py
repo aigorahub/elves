@@ -1968,6 +1968,63 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertIn("grok_model_not_in_catalog", result.stderr)
         self.assertNotIn("Grok context bundle", result.stderr)
 
+    def test_grok_missing_credential_reroutes_instead_of_hard_stopping(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bin_dir = Path(tmpdir)
+            self.make_fake(bin_dir, "grok", grok_help=self.CURRENT_GROK_HELP)
+            result = run_script(
+                "run_grok.sh",
+                "inspect",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "XAI_API_KEY": "",
+                    "GROK_CODE_XAI_API_KEY": "",
+                },
+            )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("review route unavailable [authentication]", result.stderr)
+
+    def test_grok_missing_cli_reroutes_instead_of_hard_stopping(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # An empty PATH entry plus a minimal system PATH: no grok anywhere.
+            result = run_script(
+                "run_grok.sh",
+                "inspect",
+                env={
+                    "PATH": tmpdir + os.pathsep + "/usr/bin:/bin",
+                    "XAI_API_KEY": "test-xai-key",
+                },
+            )
+        self.assertEqual(result.returncode, 127)
+        self.assertIn("review route unavailable [runner]", result.stderr)
+
+    def test_omp_ambiguous_credentials_reroute_instead_of_hard_stopping(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bin_dir = Path(tmpdir)
+            self.make_fake(bin_dir, "omp")
+            result = run_script(
+                "run_omp.sh",
+                "inspect",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "ELVES_OMP_MODEL": "",
+                    "GEMINI_API_KEY": "a-key",
+                    "OPENROUTER_API_KEY": "b-key",
+                },
+            )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("review route unavailable [unconfigured]", result.stderr)
+
+    def test_omp_missing_cli_reroutes_instead_of_hard_stopping(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = run_script(
+                "run_omp.sh",
+                "inspect",
+                env={"PATH": tmpdir + os.pathsep + "/usr/bin:/bin"},
+            )
+        self.assertEqual(result.returncode, 127)
+        self.assertIn("review route unavailable [runner]", result.stderr)
+
     def test_grok_shared_oauth_fails_closed_before_provider_launch(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

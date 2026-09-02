@@ -122,7 +122,8 @@ class ReadOnlySnapshotOmissionTests(unittest.TestCase):
                 self.assertEqual(record["category"], "video")
                 self.assertEqual(record["reason"], "oversized_binary_media")
                 self.assertEqual(record["limit_bytes"], LIMIT)
-                self.assertIn("transcript", record["remediation"])
+                # The remediation is manifest-level, not repeated per record.
+                self.assertNotIn("remediation", record)
             finally:
                 lane.cleanup()
 
@@ -293,9 +294,8 @@ class ContextManifestReportingTests(unittest.TestCase):
                 self.assertEqual(
                     by_path["assets/lesson.mp4"]["reason"], "oversized_binary_media"
                 )
-                self.assertIn(
-                    "transcript", by_path["assets/lesson.mp4"]["remediation"]
-                )
+                self.assertNotIn("remediation", by_path["assets/lesson.mp4"])
+                self.assertIn("transcript", manifest["omitted_media_remediation"])
                 omitted_diagnostics = [
                     item
                     for item in manifest["diagnostics"]
@@ -308,17 +308,17 @@ class ContextManifestReportingTests(unittest.TestCase):
             finally:
                 lane.cleanup()
 
-    def test_omission_records_are_bounded_but_counts_stay_exact(self) -> None:
+    def test_every_omission_is_named_and_counts_stay_exact(self) -> None:
         from cobbler_runtime.isolation import MAX_OMITTED_CONTEXT_RECORDS
 
-        limit = MAX_OMITTED_CONTEXT_RECORDS
+        self.assertGreaterEqual(MAX_OMITTED_CONTEXT_RECORDS, 20_000)
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp) / "repo"
             repo.mkdir()
             _init_repo(repo)
             media = repo / "media"
             media.mkdir()
-            total = limit + 3
+            total = 24
             for index in range(total):
                 _write_big(media / f"clip{index:04d}.mp4", size=LIMIT * 2)
             _commit_all(repo)
@@ -332,12 +332,13 @@ class ContextManifestReportingTests(unittest.TestCase):
             )
             try:
                 manifest = _manifest(lane)
-                self.assertEqual(len(manifest["omitted_files"]), limit)
-                self.assertTrue(manifest["omitted_files_truncated"])
-                # Counts and bytes stay exact even though the records are bounded.
+                # Every omission is named: the cap only guards a pathological tree.
+                self.assertEqual(len(manifest["omitted_files"]), total)
+                self.assertFalse(manifest["omitted_files_truncated"])
                 self.assertEqual(manifest["omitted_file_count"], total)
                 self.assertEqual(manifest["omitted_bytes"], total * LIMIT * 2)
-                self.assertEqual(len(lane.omitted_context_files), limit)
+                self.assertEqual(lane.omitted_context_file_count, total)
+                self.assertEqual(lane.omitted_context_bytes, total * LIMIT * 2)
             finally:
                 lane.cleanup()
 
@@ -399,6 +400,38 @@ class CrossHarnessParityTests(unittest.TestCase):
             finally:
                 lane.cleanup()
 
+    def test_preamble_reports_exact_totals_when_the_listing_is_bounded(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            repo.mkdir()
+            _init_repo(repo)
+            media = repo / "media"
+            media.mkdir()
+            total = 25
+            for index in range(total):
+                _write_big(media / f"clip{index:03d}.mp4", size=LIMIT * 2)
+            _commit_all(repo)
+
+            lane = create_tracked_snapshot(
+                IsolationSpec(
+                    repo_root=repo,
+                    lane_id="preamble-totals",
+                    max_context_file_bytes=LIMIT,
+                )
+            )
+            try:
+                body = "\n".join(
+                    context_bundle_report(lane, label="Grok", max_diagnostics=5)
+                )
+                # The count is the real total, not the length of the printed list.
+                self.assertIn(f"omitted {total} oversized binary media", body)
+                self.assertIn(f"totalling {total * LIMIT * 2} bytes", body)
+                self.assertIn(f"shows 5 of {total}", body)
+                self.assertIn("the manifest names the rest", body)
+                self.assertIn("transcript", body)
+            finally:
+                lane.cleanup()
+
     def test_every_harness_shares_one_default_spec(self) -> None:
         spec = IsolationSpec(repo_root=Path("."), lane_id="defaults")
         self.assertTrue(spec.omit_oversized_media)
@@ -439,7 +472,8 @@ class OmittedContextFileRecordTests(unittest.TestCase):
         self.assertEqual(payload["bytes"], 99)
         self.assertEqual(payload["category"], "audio")
         self.assertEqual(payload["limit_bytes"], 10)
-        self.assertIn("derived text", payload["remediation"])
+        self.assertNotIn("remediation", payload)
+        self.assertIn("derived text", record.remediation())
         # JSON-serializable for the context manifest.
         json.dumps(payload)
 
