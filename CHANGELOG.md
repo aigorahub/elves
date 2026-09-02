@@ -9,6 +9,9 @@ All notable changes to the Elves skill are documented here.
 - `run_grok.sh` passes `--check` only when the installed Grok CLI advertises it. Grok CLI
   1.0.x removed the flag, and every `/grok` launch failed with `unexpected argument '--check'`.
   The help grammar is probed before launch.
+- `run_grok.sh` no longer requests Grok's own `strict` profile under a macOS sandbox-exec lane:
+  macOS refuses the nested sandbox and Grok refused to start. The outer kernel sandbox remains the
+  read/write authority there; bwrap lanes keep `strict`.
 
 ### Added
 

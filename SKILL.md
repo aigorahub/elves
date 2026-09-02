@@ -311,8 +311,9 @@ required capability, then execute it without an extra confirmation prompt:
   fail closed for resume until an operator reconciles the provider task list.
 - `/grok <instructions>` or `grok build <instructions>` → `scripts/run_grok.sh <instructions>` for
   a headless, high-reasoning Grok task with non-bypass permissions over a disposable tracked-source
-  snapshot in Elves' required outer kernel sandbox, plus Grok's built-in inner `strict` profile,
-  provider-documented isolated `dontAsk` settings, and bypass locked off. It requires an explicit
+  snapshot in Elves' required outer kernel sandbox, plus Grok's built-in inner `strict` profile
+  under bwrap (off under macOS sandbox-exec, which refuses nesting; the outer lane is the authority
+  there), provider-documented isolated `dontAsk` settings, and bypass locked off. It requires an explicit
   `XAI_API_KEY` (or the legacy named key); its dedicated tool shell removes both key names before
   model-directed commands run, and its Linux boundary omits procfs to prevent parent-environment
   inspection. Shared-file OAuth fails closed because Grok applies its sandbox to both provider and

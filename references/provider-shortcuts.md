@@ -298,9 +298,13 @@ After settlement, report Fugu's answer or salvage and the route used.
   sandbox, which makes that snapshot read-only independently of Grok's profile merger. It constructs
   isolated HOME/GROK_HOME state, projects only the selected named key to Grok itself, and selects a
   dedicated shell that unsets both supported key names before every model-directed terminal command.
-  Grok also runs its built-in inner `strict` profile for narrow reads and Linux child-network
-  restriction; it does not add a custom read-deny profile because Grok implements that profile with
-  a nested Linux bwrap that would recreate procfs. The outer snapshot policy removes credential and
+  Under a Linux bwrap lane Grok also runs its built-in inner `strict` profile for narrow reads and
+  child-network restriction; it does not add a custom read-deny profile because Grok implements that
+  profile with a nested Linux bwrap that would recreate procfs. Under a macOS sandbox-exec lane
+  Grok's own profile is `off`, because macOS refuses a nested sandbox-exec ("sandbox initialization
+  failed: Operation not permitted") and the CLI refuses to start; the outer kernel sandbox stays the
+  read/write authority there, the same externally-sandboxed shape the Codex lane uses, and the
+  runner says so on stderr. The outer snapshot policy removes credential and
   executable configuration paths instead. The
   runner writes `permissions.defaultMode: dontAsk` to isolated Claude-compatible settings (the
   similarly named CLI flag does not activate this mode) and locks bypass mode off in isolated Grok

@@ -1818,7 +1818,9 @@ class LocalCliRunnerTests(unittest.TestCase):
             self.assertIn("<high>", result.stdout)
             self.assertIn("<--check>", result.stdout)
             self.assertIn("<--sandbox>", result.stdout)
-            self.assertIn("<strict>", result.stdout)
+            # macOS refuses a nested sandbox-exec, so the outer lane is the
+            # authority there and Grok's own profile is off; bwrap keeps strict.
+            self.assertIn("<off>" if sys.platform == "darwin" else "<strict>", result.stdout)
             self.assertNotIn("reasoning-effort", result.stdout)
             self.assertNotIn("always-approve", result.stdout)
             self.assertNotIn("bypassPermissions", result.stdout)

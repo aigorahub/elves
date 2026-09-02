@@ -158,6 +158,20 @@ try:
         # read-deny with a nested bwrap re-exec that mounts procfs. The outer
         # Elves sandbox already removes credential/config paths, independently
         # vetoes snapshot writes, and deliberately leaves procfs unmounted.
+        #
+        # macOS refuses a nested sandbox-exec: under the Elves lane Grok's own
+        # `strict` fails with "sandbox initialization failed: Operation not
+        # permitted" and the CLI refuses to start. The outer kernel sandbox is
+        # the read/write authority there (the same externally-sandboxed shape
+        # the Codex lane uses), so Grok runs with its own profile off under
+        # sandbox-exec and keeps `strict` under bwrap.
+        grok_sandbox_profile = "off" if lane.sandbox_backend == "sandbox-exec" else "strict"
+        if grok_sandbox_profile == "off":
+            print(
+                "run_grok.sh: outer sandbox-exec lane is the filesystem authority; "
+                "Grok's own sandbox profile is off because macOS refuses nesting.",
+                file=sys.stderr,
+            )
 
         # Grok itself needs the provider variable, but model-directed terminal
         # commands do not. GROK_SHELL is Grok's documented shell-selection
@@ -192,7 +206,7 @@ try:
                 "--cwd",
                 str(lane.snapshot),
                 "--sandbox",
-                "strict",
+                grok_sandbox_profile,
                 "--effort",
                 effort,
                 "--output-format",
