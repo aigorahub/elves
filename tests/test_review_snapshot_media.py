@@ -308,6 +308,39 @@ class ContextManifestReportingTests(unittest.TestCase):
             finally:
                 lane.cleanup()
 
+    def test_omission_records_are_bounded_but_counts_stay_exact(self) -> None:
+        from cobbler_runtime.isolation import MAX_OMITTED_CONTEXT_RECORDS
+
+        limit = MAX_OMITTED_CONTEXT_RECORDS
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            repo.mkdir()
+            _init_repo(repo)
+            media = repo / "media"
+            media.mkdir()
+            total = limit + 3
+            for index in range(total):
+                _write_big(media / f"clip{index:04d}.mp4", size=LIMIT * 2)
+            _commit_all(repo)
+
+            lane = create_tracked_snapshot(
+                IsolationSpec(
+                    repo_root=repo,
+                    lane_id="omission-bound",
+                    max_context_file_bytes=LIMIT,
+                )
+            )
+            try:
+                manifest = _manifest(lane)
+                self.assertEqual(len(manifest["omitted_files"]), limit)
+                self.assertTrue(manifest["omitted_files_truncated"])
+                # Counts and bytes stay exact even though the records are bounded.
+                self.assertEqual(manifest["omitted_file_count"], total)
+                self.assertEqual(manifest["omitted_bytes"], total * LIMIT * 2)
+                self.assertEqual(len(lane.omitted_context_files), limit)
+            finally:
+                lane.cleanup()
+
     def test_manifest_stays_private_and_inside_the_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp) / "repo"

@@ -261,6 +261,9 @@ DEFAULT_CONTEXT_MAX_FILES = 20_000
 DEFAULT_CONTEXT_MAX_BYTES = 512 * 1024 * 1024
 DEFAULT_CONTEXT_MAX_FILE_BYTES = 16 * 1024 * 1024
 MAX_CONTEXT_DIAGNOSTICS = 200
+# Omission records carry a per-entry remediation string, so a media-heavy repo
+# could otherwise grow the manifest without bound.
+MAX_OMITTED_CONTEXT_RECORDS = 200
 DEFAULT_HANDOFF_MAX_FILES = 2_000
 DEFAULT_HANDOFF_MAX_BYTES = 64 * 1024 * 1024
 _INTERNAL_SNAPSHOT_PREFIXES: tuple[str, ...] = (
@@ -1377,6 +1380,8 @@ def context_bundle_report(
             f"{label} omitted {len(lane.omitted_context_files)} oversized binary media "
             f"file(s) totalling {total} bytes; the review continues without them."
         )
+        # The lane list is bounded; the manifest carries the authoritative totals.
+        lines.append(f"{label} omission manifest: {lane.context_manifest_path}.")
         for item in lane.omitted_context_files[:max_diagnostics]:
             lines.append(
                 f"{label} omitted media {item['path']!r} "
@@ -1446,6 +1451,8 @@ def create_tracked_snapshot(spec: IsolationSpec) -> IsolatedLane:
         diagnostics: list[dict[str, str]] = []
         diagnostics_total = 0
         omitted: list[OmittedContextFile] = []
+        omitted_total = 0
+        omitted_bytes_total = 0
         # Only read-only lanes omit. A writable lane must still fail closed: an
         # omitted path would look deleted to the handoff audit.
         omit_oversized_media = bool(spec.omit_oversized_media) and not bool(
@@ -1479,13 +1486,17 @@ def create_tracked_snapshot(spec: IsolationSpec) -> IsolatedLane:
                     continue
                 inert = snapshot / "_instruction_evidence" / f"{rel.replace('/', '__')}.txt"
                 inert.parent.mkdir(parents=True, exist_ok=True)
-                # Prose instruction evidence is never omitted for size.
-                if not _copy_tracked_regular_file(
+                # Prose instruction evidence is never omitted for size. The call
+                # keeps the default omit_oversized_media=False, so the result is a
+                # plain bool and an oversized instruction file fails closed.
+                instruction_copied = _copy_tracked_regular_file(
                     repo_root,
                     rel,
                     inert,
                     max_file_bytes=spec.max_context_file_bytes,
-                ):
+                )
+                assert not isinstance(instruction_copied, OmittedContextFile)
+                if not instruction_copied:
                     if rel in requested_set:
                         raise ValidationIssue(
                             "isolation_requested_path_unavailable",
@@ -1528,7 +1539,10 @@ def create_tracked_snapshot(spec: IsolationSpec) -> IsolatedLane:
                 omit_oversized_media=omit_oversized_media and rel not in requested_set,
             )
             if isinstance(copied, OmittedContextFile):
-                omitted.append(copied)
+                omitted_total += 1
+                omitted_bytes_total += copied.bytes
+                if len(omitted) < MAX_OMITTED_CONTEXT_RECORDS:
+                    omitted.append(copied)
                 record_diagnostic(
                     rel, f"{copied.reason}:{copied.category}", status="omitted"
                 )
@@ -1584,8 +1598,9 @@ def create_tracked_snapshot(spec: IsolationSpec) -> IsolatedLane:
                     "max_context_file_bytes": spec.max_context_file_bytes,
                     "omit_oversized_media": omit_oversized_media,
                     "omitted_files": [item.to_dict() for item in omitted],
-                    "omitted_file_count": len(omitted),
-                    "omitted_bytes": sum(item.bytes for item in omitted),
+                    "omitted_file_count": omitted_total,
+                    "omitted_files_truncated": omitted_total > len(omitted),
+                    "omitted_bytes": omitted_bytes_total,
                     "diagnostics": diagnostics,
                     "diagnostics_truncated": diagnostics_total > len(diagnostics),
                     "requested_paths": list(requested),
