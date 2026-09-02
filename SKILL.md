@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Grok Build, Oh My Pi (omp), Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.35.0"
+  version: "2.36.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -84,7 +84,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.35.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.36.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
@@ -295,6 +295,23 @@ required capability, then execute it without an extra confirmation prompt:
   bounded host pipe, final output stays pinned to a no-follow descriptor, and raw
   events/resumable state remain only inside the disposable lane. Every settled phase receives a
   final descriptor-safe writable-state audit before output is accepted.
+
+  **Review snapshot media policy (all harnesses and hosts).** Read-only review snapshots omit
+  oversized binary media instead of failing the whole review. Video, audio, presentation, archive,
+  image, font, and 3D binaries above the per-file limit are left out of the snapshot; the 16 MiB
+  per-file limit is not raised. The context manifest records each omitted path, byte size, and
+  reason, and every runner prints the same omission block. Source, prose instructions, executable
+  agent configuration, and explicit `--include` paths still fail closed, with a remediation that asks
+  for a derived text, image, or transcript artifact. Writable lanes keep fail-closed behavior.
+
+  **Fugu is optional (review route fallback).** When a review route is unavailable because of quota,
+  authentication, catalog, runner, timeout, or provider failure, probe the supported review routes
+  and select another available independent reviewer instead of stopping. Preserve an explicit user
+  route when it works; otherwise prefer a supported native reviewer when no optional provider works.
+  Record requested route, actual route, and fallback reason. Do not claim a review ran when it did
+  not, and do not let optional-provider failure block the run while a qualified review route exists.
+  Host-neutral helper: `python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" review-route --host
+  <host> --requested <route> --unavailable <route>=<reason>`.
 - `/manus <topic>` → `scripts/run_manus.sh <topic>` for one private, bounded Manus deep-web task.
   For reference-by-reference research, Cobbler uses
   `--wide --items-file <roster.json> [--file <source>] <goal>`: request native Wide Research,

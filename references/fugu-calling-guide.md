@@ -12,6 +12,30 @@ against 2026 Claude Code / Codex agent practice (scope the task, goal + constrai
 done-when, separate research from action, verify before acting) and public Fugu
 operator notes (Ultra is slow; do not max everything).
 
+## Fugu is optional
+
+A failed Fugu call is a routing event, not a stopped run. On any non-zero exit the runner prints one
+directive line naming the reason. A quota, authentication, catalog, runner, timeout, or provider
+failure all mean the same thing: reroute. Feed it to the host-neutral selector, take the route it returns, and record requested
+route, actual route, and fallback reason:
+
+```bash
+python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" review-route \
+  --host claude-code --requested fugu --unavailable fugu=timeout --available grok --json
+```
+
+Do not claim a review ran when it did not. A selected route is not a completed review; only a
+harvested report is. Full contract: `references/provider-shortcuts.md`
+(**Fugu is optional: review route fallback**).
+
+## Oversized media in the review snapshot
+
+Read-only review snapshots omit oversized binary media rather than fail. Large MP4, WAV, FLAC,
+PPTX, and archive files above the per-file limit are left out, and the context manifest records each omitted path, byte
+size, and reason. Fugu cannot read them. If the review genuinely needs one, commit a derived text,
+image, or transcript artifact next to it and name that artifact in the task string or `--include`.
+The 16 MiB per-file limit is not raised.
+
 ## The one-line version
 
 Do not pipe a Fugu run through `tail`. Use plain regular Fugu by default. Use Cyber for an

@@ -4,6 +4,31 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.36.0] - 2026-09-02
+
+### Fixed
+
+* **A large media file no longer fails the whole review.** Read-only isolation snapshots omit
+  oversized binary media instead of failing before Fugu or Grok review starts. Video, audio,
+  presentation, archive, image, font, and 3D binaries above the per-file limit are left out of the
+  snapshot; the 16 MiB per-file limit is not raised. The context manifest records each omitted path,
+  byte size, category, reason, and remediation, and every supported runner prints the same omission
+  block. Source, prose instructions, executable agent configuration, and explicit `--include` paths
+  still fail closed, with a remediation that asks for a derived text, image, or transcript artifact.
+  Writable lanes keep fail-closed behavior.
+
+### Added
+
+* **An unavailable optional review route reroutes instead of stopping the run.** Fugu is optional.
+  Quota, authentication, catalog, runner, timeout, and provider failures now select another
+  available independent reviewer, preserving an explicit user route when it works and preferring a
+  supported native reviewer when no optional provider works. The new host-neutral
+  `cobbler_agents.py review-route` verb records requested route, actual route, and fallback reason.
+  Optional-provider failure never blocks the run while a qualified review route exists, and a
+  selected route is never reported as a completed review. The Fugu, Grok, and omp runners print one
+  reroute directive on any non-zero exit. Claude Code, Codex, Grok Build, and Oh My Pi share the
+  same selector and guidance.
+
 ## [2.35.0] - 2026-09-01
 
 ### Added

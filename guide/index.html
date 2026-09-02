@@ -512,7 +512,7 @@
     <div class="masthead-inner">
       <div class="brand-row">
         <a class="wordmark" href="https://github.com/aigorahub/elves">Elves</a>
-        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.35.0 source and releases on GitHub</a>
+        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.36.0 source and releases on GitHub</a>
       </div>
       <h1>Using Elves</h1>
       <p class="intro">Plan with the main agent, hand implementation to a separate worker, then
@@ -791,6 +791,25 @@ python3 ~/.omp/agent/skills/elves/scripts/install_doctor.py --startup</code></pr
             in the disposable lane. Events cross a bounded host-owned pipe, final output stays pinned
             to a no-follow descriptor, and a final descriptor-safe writable-state audit runs after
             each phase settles.</li>
+          <li><strong>Review snapshot media policy</strong> applies to every harness and host.
+            Read-only review snapshots omit oversized binary media instead of failing the whole
+            review. Video, audio, presentation, archive, image, font, and 3D binaries above the
+            per-file limit are left out; the 16 MiB per-file limit is not raised. The context
+            manifest records each omitted path, byte size, and reason, and every runner prints the
+            same omission block. Source, prose instructions, executable agent configuration, and
+            explicit <code>--include</code> paths still fail closed, with a remediation that asks
+            for a derived text, image, or transcript artifact. Writable lanes keep fail-closed
+            behavior.</li>
+          <li><strong>Fugu is optional.</strong> When a review route is unavailable because of
+            quota, authentication, catalog, runner, timeout, or provider failure, Elves probes the
+            supported review routes and selects another available independent reviewer instead of
+            stopping. An explicit user route is preserved when it works; otherwise a supported
+            native reviewer is preferred when no optional provider works. Elves records requested
+            route, actual route, and fallback reason. It does not claim a review ran when it did
+            not, and optional-provider failure does not block the run while a qualified review
+            route exists. Probe with
+            <code>cobbler_agents.py review-route --host &lt;host&gt; --requested &lt;route&gt;
+            --unavailable &lt;route&gt;=&lt;reason&gt;</code>.</li>
           <li><strong>Manus</strong> creates private, bounded deep-web research and needs
             <code>MANUS_API_KEY</code>. To request one worker per paper or reference, use
             <code>/manus --wide --items-file references.json &lt;goal&gt;</code>. Cobbler requests

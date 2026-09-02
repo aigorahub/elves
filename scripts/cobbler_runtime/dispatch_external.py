@@ -943,6 +943,10 @@ def prepare_external_launch(
                 "sandbox_backend": isolated.sandbox_backend,
                 "process_containment": isolated.process_containment,
                 "instruction_data_files": list(isolated.instruction_data_files),
+                # Oversized binary media omitted from a read-only review snapshot.
+                # Recorded so the lane record never implies the provider saw them.
+                "omitted_context_files": list(isolated.omitted_context_files),
+                "context_manifest": isolated.context_manifest_path,
             }
         except Exception as exc:  # noqa: BLE001
             if isolated is not None:

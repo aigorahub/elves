@@ -38,10 +38,23 @@ sys.path.insert(0, str(script_dir))
 
 from cobbler_runtime.isolation import (  # noqa: E402
     IsolationSpec,
+    context_bundle_report,
     isolated_lane,
     wrap_argv_with_sandbox,
 )
+from cobbler_runtime.review_routes import (  # noqa: E402
+    classify_review_route_failure,
+    route_unavailable_directive,
+)
 from cobbler_runtime.schema import ValidationIssue  # noqa: E402
+
+
+def _route_unavailable(status: int, text: str = "") -> None:
+    """Grok is an optional review route; tell the host driver to reroute."""
+    if status == 0:
+        return
+    reason = classify_review_route_failure(exit_code=status, text=text) or "provider"
+    print(route_unavailable_directive("Grok", reason), file=sys.stderr)
 
 
 parent = dict(os.environ)
@@ -96,6 +109,8 @@ try:
             require_fs_sandbox=True,
         )
     ) as lane:
+        for line in context_bundle_report(lane, label="Grok"):
+            print(line, file=sys.stderr)
         home = lane.home
         grok_home = home / ".grok"
         grok_home.mkdir(mode=0o700)
@@ -177,8 +192,10 @@ try:
             env=lane.env,
             check=False,
         )
+        _route_unavailable(completed.returncode)
         raise SystemExit(completed.returncode)
 except ValidationIssue as exc:
     print(f"Error: Grok isolation failed closed: {exc}", file=sys.stderr)
+    _route_unavailable(2, f"{exc.code}: {exc.message}")
     raise SystemExit(2) from exc
 PY

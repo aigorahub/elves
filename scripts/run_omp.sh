@@ -56,8 +56,25 @@ if not omp:
     raise SystemExit("Error: omp CLI not found.")
 
 sys.path.insert(0, str(Path(script_dir).resolve()))
-from cobbler_runtime.isolation import IsolationSpec, isolated_lane, wrap_argv_with_sandbox
+from cobbler_runtime.isolation import (
+    IsolationSpec,
+    context_bundle_report,
+    isolated_lane,
+    wrap_argv_with_sandbox,
+)
+from cobbler_runtime.review_routes import (
+    classify_review_route_failure,
+    route_unavailable_directive,
+)
 from cobbler_runtime.schema import ValidationIssue
+
+
+def _route_unavailable(status: int, text: str = "") -> None:
+    """omp is an optional review route; tell the host driver to reroute."""
+    if status == 0:
+        return
+    reason = classify_review_route_failure(exit_code=status, text=text) or "provider"
+    print(route_unavailable_directive("omp", reason), file=sys.stderr)
 
 parent = dict(os.environ)
 parent_path = parent.get("PATH", "/usr/bin:/bin")
@@ -129,6 +146,8 @@ try:
             require_fs_sandbox=True,
         )
     ) as lane:
+        for line in context_bundle_report(lane, label="omp"):
+            print(line, file=sys.stderr)
         home = lane.home
         # Empty tools dir so omp does not scan host Claude binary trees.
         claude_tools = home / ".claude" / "tools"
@@ -193,14 +212,18 @@ try:
                 sys.stderr.write(f"omp shortcut transport invalid: {exc}\n")
                 if stdout:
                     sys.stdout.write(stdout)
+                _route_unavailable(2, f"transport invalid: {exc}")
                 raise SystemExit(2) from exc
         if stdout:
             sys.stdout.write(stdout)
         if proc.stderr:
             sys.stderr.write(proc.stderr)
+        _route_unavailable(proc.returncode, proc.stderr or "")
         raise SystemExit(proc.returncode)
 except ValidationIssue as exc:
+    _route_unavailable(2, f"{exc.code}: {exc.message}")
     raise SystemExit(f"Error: omp shortcut isolation failed: {exc}") from exc
 except TimeoutError as exc:
+    _route_unavailable(124, str(exc))
     raise SystemExit(str(exc)) from exc
 PY

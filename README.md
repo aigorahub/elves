@@ -8,7 +8,7 @@ Oh My Pi (omp) driver plans and reviews; a subscription-native (or optional exte
 implements; durable run files let the work survive context compaction. You write the plan and own
 the merge decision. The agent does the middle.
 
-**Current release: v2.35.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.36.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 **New to Elves?** Use the [practical user guide](https://aigorahub.github.io/elves/) — especially
@@ -180,6 +180,23 @@ still loads account-default enabled skills when `enable_skills` is empty, and th
 does not claim skill isolation. See
 [`references/provider-shortcuts.md`](references/provider-shortcuts.md) for requirements, auth
 environment names, timeouts, and follow behavior.
+
+**Review snapshot media policy (all harnesses and hosts).** Read-only review snapshots omit
+oversized binary media instead of failing the whole review. Video, audio, presentation, archive,
+image, font, and 3D binaries above the per-file limit are left out of the snapshot; the 16 MiB
+per-file limit is not raised. The context manifest records each omitted path, byte size, and
+reason, and every runner prints the same omission block. Source, prose instructions, executable
+agent configuration, and explicit `--include` paths still fail closed, with a remediation that asks
+for a derived text, image, or transcript artifact. Writable lanes keep fail-closed behavior.
+
+**Fugu is optional (review route fallback).** When a review route is unavailable because of quota,
+authentication, catalog, runner, timeout, or provider failure, probe the supported review routes
+and select another available independent reviewer instead of stopping. Preserve an explicit user
+route when it works; otherwise prefer a supported native reviewer when no optional provider works.
+Record requested route, actual route, and fallback reason. Do not claim a review ran when it did
+not, and do not let optional-provider failure block the run while a qualified review route exists.
+Host-neutral helper: `python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" review-route --host
+<host> --requested <route> --unavailable <route>=<reason>`.
 
 ### Per-project install
 

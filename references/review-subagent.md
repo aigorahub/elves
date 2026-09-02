@@ -92,6 +92,22 @@ blocker for a native-first run; it is a warning only when the fallback changes r
 It is blocking only when the survival guide explicitly made that phase route required and the
 coordinator could not satisfy it. Do not infer route authority from model prestige.
 
+## Review Route Context
+
+Fugu is optional. When a review route is unavailable because of quota, authentication, catalog,
+runner, timeout, or provider failure, the run selects another available independent reviewer instead
+of stopping. Verify that the record names requested route, actual route, and fallback reason, that a
+supported native reviewer was preferred when no optional provider worked, and that nothing claims a
+review ran when it did not. An optional-provider failure alone is not a blocker while a qualified
+review route exists; only a required review with no route at all blocks. The host-neutral selector
+is `cobbler_agents.py review-route`.
+
+Read-only review snapshots omit oversized binary media instead of failing the review. When the diff
+touches video, audio, presentation, or archive binaries, expect them to be absent from the reviewer's
+snapshot and listed in the context manifest with path, byte size, and reason. Do not treat an omitted
+media file as a deletion, and do not accept a review claim that depends on reading one: ask for a
+derived text, image, or transcript artifact instead. The 16 MiB per-file limit is not raised.
+
 ## Math Domain Workflow Context
 
 If the PR touches a mathematical run or math workflow docs, verify that Cobbler remains the

@@ -132,6 +132,14 @@ from cobbler_runtime.leases import (  # noqa: E402
 )
 from cobbler_runtime.host_profiles import resolve_host_profile  # noqa: E402
 from cobbler_runtime.schema import ValidationIssue  # noqa: E402
+from cobbler_runtime.review_routes import (  # noqa: E402
+    ReviewRouteProbe,
+    SUPPORTED_REVIEW_HOSTS,
+    normalize_review_route_reason,
+    review_claim,
+    review_route_blocks_run,
+    select_review_route,
+)
 from cobbler_runtime.sessions import SessionRegistry  # noqa: E402
 from cobbler_runtime.implement import (  # noqa: E402
     launch_payload,
@@ -2646,6 +2654,71 @@ def cmd_lightweight_review(args: argparse.Namespace) -> int:
     return 0 if result.ok else 1
 
 
+def cmd_review_route(args: argparse.Namespace) -> int:
+    """Select the review route that will actually run; never claims one ran.
+
+    Fugu and every other optional provider are optional. This verb records the
+    requested route, the actual route, and the fallback reason, so an unavailable
+    provider reroutes the review instead of stopping the run.
+    """
+    probes: list[ReviewRouteProbe] = []
+    for name in args.available or ():
+        probes.append(ReviewRouteProbe(name=str(name).strip(), available=True))
+    for item in args.unavailable or ():
+        raw = str(item)
+        name, _, reason = raw.partition("=")
+        if not name.strip():
+            print(
+                "review-route: --unavailable needs <route>[=<reason>]",
+                file=sys.stderr,
+            )
+            return 2
+        probes.append(
+            ReviewRouteProbe(
+                name=name.strip(),
+                available=False,
+                reason=normalize_review_route_reason(reason),
+            )
+        )
+    try:
+        decision = select_review_route(
+            host=args.host,
+            requested=args.requested,
+            probes=probes,
+            exclude=tuple(args.exclude or ()),
+        )
+    except ValidationIssue as exc:
+        if args.json:
+            return _emit_json(
+                {"status": "blocked", "ok": False, "issues": [exc.to_dict()]},
+                exit_code=2,
+            )
+        print(f"review-route: BLOCKED [{exc.code}] {exc.message}", file=sys.stderr)
+        return 2
+
+    blocks = review_route_blocks_run(decision, required=bool(args.required))
+    payload = review_claim(decision, report_produced=False)
+    payload["required"] = bool(args.required)
+    payload["blocked"] = blocks
+    payload["ok"] = decision.selected
+    # A selected route is not a completed review. Only the run that harvests a
+    # report may set review_ran.
+    payload["model_calls_made"] = False
+    exit_code = 0 if decision.selected else (1 if blocks else 3)
+    if args.json:
+        return _emit_json(payload, exit_code=exit_code)
+    print(f"review-route: {decision.status.upper()}")
+    print(f"  host: {decision.host}")
+    print(f"  requested_route: {decision.requested_route}")
+    print(f"  actual_route: {decision.actual_route}")
+    print(f"  fallback_reason: {decision.fallback_reason}")
+    print(f"  review_ran: {payload['review_ran']}")
+    print(f"  blocked: {blocks}")
+    for note in decision.notes:
+        print(f"  note: {note}")
+    return exit_code
+
+
 class _NoAbbrevArgumentParser(argparse.ArgumentParser):
     """Operator parser that rejects abbreviated long options.
 
@@ -3136,6 +3209,53 @@ def build_parser() -> argparse.ArgumentParser:
     light.add_argument("--timeout", type=float, default=30.0, help="Timeout seconds")
     light.add_argument("--head", default=None, help="Optional HEAD sha for packets")
     light.set_defaults(func=cmd_lightweight_review)
+
+    review_route = sub.add_parser(
+        "review-route",
+        help="Select an available review route when an optional provider fails",
+    )
+    _add_common_flags(review_route)
+    review_route.add_argument(
+        "--host",
+        required=True,
+        choices=list(SUPPORTED_REVIEW_HOSTS),
+        help="Host driver asking for a review route",
+    )
+    review_route.add_argument(
+        "--requested",
+        default=None,
+        help="Explicit user route to preserve when it works (for example fugu)",
+    )
+    review_route.add_argument(
+        "--available",
+        action="append",
+        default=[],
+        metavar="ROUTE",
+        help="Route probed as available (repeatable)",
+    )
+    review_route.add_argument(
+        "--unavailable",
+        action="append",
+        default=[],
+        metavar="ROUTE=REASON",
+        help=(
+            "Route probed as unavailable with a reason "
+            "(quota|authentication|catalog|runner|timeout|provider); repeatable"
+        ),
+    )
+    review_route.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        metavar="ROUTE",
+        help="Route that cannot review independently (for example the implementer)",
+    )
+    review_route.add_argument(
+        "--required",
+        action="store_true",
+        help="Block only when no review route at all is available",
+    )
+    review_route.set_defaults(func=cmd_review_route)
 
     session = sub.add_parser(
         "session",
