@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Grok Build, Oh My Pi (omp), Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.35.0"
+  version: "2.36.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -84,7 +84,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.35.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.36.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
@@ -295,6 +295,23 @@ required capability, then execute it without an extra confirmation prompt:
   bounded host pipe, final output stays pinned to a no-follow descriptor, and raw
   events/resumable state remain only inside the disposable lane. Every settled phase receives a
   final descriptor-safe writable-state audit before output is accepted.
+
+  **Review snapshot media policy (all harnesses and hosts).** Read-only review snapshots omit
+  oversized binary media instead of failing the whole review. Video, audio, presentation, archive,
+  image, font, and 3D binaries above the per-file limit are left out of the snapshot; the 16 MiB
+  per-file limit is not raised. The context manifest records each omitted path, byte size, and
+  reason, and every runner prints the same omission block. Source, prose instructions, executable
+  agent configuration, and explicit `--include` paths still fail closed, with a remediation that asks
+  for a derived text, image, or transcript artifact. Writable lanes keep fail-closed behavior.
+
+  **Fugu is optional (review route fallback).** When a review route is unavailable because of quota,
+  authentication, catalog, runner, timeout, or provider failure, probe the supported review routes
+  and select another available independent reviewer instead of stopping. Preserve an explicit user
+  route when it works; otherwise prefer a supported native reviewer when no optional provider works.
+  Record requested route, actual route, and fallback reason. Do not claim a review ran when it did
+  not, and do not let optional-provider failure block the run while a qualified review route exists.
+  Host-neutral helper: `python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" review-route --host
+  <host> --requested <route> --unavailable <route>=<reason>`.
 - `/manus <topic>` → `scripts/run_manus.sh <topic>` for one private, bounded Manus deep-web task.
   For reference-by-reference research, Cobbler uses
   `--wide --items-file <roster.json> [--file <source>] <goal>`: request native Wide Research,
@@ -310,13 +327,27 @@ required capability, then execute it without an extra confirmation prompt:
   isolation. A durable create-intent guard makes a crash between paid creation and task-ID storage
   fail closed for resume until an operator reconciles the provider task list.
 - `/grok <instructions>` or `grok build <instructions>` → `scripts/run_grok.sh <instructions>` for
-  a headless, high-reasoning Grok task with non-bypass permissions over a disposable tracked-source
+  a headless Grok task at `high` reasoning by default, with non-bypass permissions over a disposable tracked-source
   snapshot in Elves' required outer kernel sandbox, plus Grok's built-in inner `strict` profile,
   provider-documented isolated `dontAsk` settings, and bypass locked off. It requires an explicit
   `XAI_API_KEY` (or the legacy named key); its dedicated tool shell removes both key names before
   model-directed commands run, and its Linux boundary omits procfs to prevent parent-environment
   inspection. Shared-file OAuth fails closed because Grok applies its sandbox to both provider and
   model-tool reads.
+  The runner builds argv from the flags the installed Grok Build CLI advertises: an absent safety
+  flag (isolated `--cwd`, inner `--sandbox strict`, headless `--single`, `--output-format`,
+  explicit reasoning effort) fails closed, while a quality flag the installed version dropped is
+  simply not passed. Auto-update is disabled through the isolated `[cli] auto_update` config key
+  rather than a removed flag. Reasoning effort defaults to `high`; `ELVES_GROK_EFFORT` selects
+  `low`, `medium`, `high`, or `xhigh`, and `ELVES_GROK_MODEL` pins a model only when the
+  authenticated live catalog lists it. The runner reports the CLI version, effort, model, the
+  authentication route the CLI itself names, and any omitted flags.
+  On a host that cannot nest sandboxes (macOS Seatbelt refuses a second profile inside Elves'
+  required outer `sandbox-exec` boundary), the runner fails closed with
+  `grok_inner_sandbox_unavailable` before it builds a snapshot, rather than launching with the
+  inner profile silently missing. Elves does not drop the inner profile to make a launch succeed,
+  and the outer boundary is not optional; use a Linux host with the bwrap backend or select
+  another review route.
 - `/devin <instructions>` → `scripts/run_devin.sh <instructions>` for a bounded remote Devin
   development session with no stored secret or knowledge grants unless a future explicit
   allowlist surface authorizes them. Its creation and poll requests use bounded response bodies and
@@ -840,6 +871,11 @@ credential, or routing authority). Continuity only writes OS timer templates —
 activates them. Usage ceilings are checkpoints, never stops. See the guide's "v2.24 run tools"
 section, `references/host-parity.md`, and `AGENTS.md` (Codex adapter pointer).
 
+`review-route` joins them as a host-neutral helper on the same CLI surface and the same honesty
+boundary: it selects an available review route and records requested route, actual route, and
+fallback reason. It never claims a review ran and never carries landing, merge, or credential
+authority.
+
 ## v2.22 runtime helpers (planning harvest, compact output, lanes)
 
 - **Any-model worker pin:** `resolve_user_specified_worker_model` + handoff cache keys
@@ -860,7 +896,7 @@ lanes remain useful but are not the default happy path.
 Claude Code, Codex, Grok Build, and Oh My Pi (omp) provide the same workflow and prewalk safety contract.
 Exact-session prewalk preserves the same qualification, trajectory, checkpoint, visibility,
 fallback, and authority semantics on every host; supervised transport syntax may differ.
-The v2.24 run tools (`redrive`, `learnings`, `usage`, `salvage`, `continuity`) share one CLI
+The v2.24 run tools (`redrive`, `learnings`, `usage`, `salvage`, `continuity`, `review-route`) share one CLI
 surface and one honesty boundary on every host — see **v2.24 run tools (host-neutral)** above
 and `references/host-parity.md`.
 **Codex Goals** are optional continuation plumbing — distinct from **Grok Build goal mode**.

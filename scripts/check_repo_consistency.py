@@ -246,6 +246,62 @@ def main() -> int:
             "Fugu host routing",
         )
     )
+    # These phrases are full sentences that wrap across lines in prose surfaces,
+    # so compare against whitespace-collapsed text rather than raw file bytes.
+    def _flat(label: str) -> str:
+        return " ".join(read_text(REPO_ROOT / label).split())
+
+    review_snapshot_texts = {
+        label: _flat(label) for label in REVIEW_SNAPSHOT_MEDIA_PHRASES
+    }
+    errors.extend(
+        find_missing_phrases(
+            review_snapshot_texts,
+            REVIEW_SNAPSHOT_MEDIA_PHRASES,
+            "review snapshot media policy",
+        )
+    )
+    errors.extend(
+        find_forbidden_phrases(
+            review_snapshot_texts,
+            REVIEW_SNAPSHOT_MEDIA_FORBIDDEN_PHRASES,
+            "review snapshot media policy",
+        )
+    )
+    review_route_texts = {
+        label: _flat(label) for label in REVIEW_ROUTE_FALLBACK_PHRASES
+    }
+    errors.extend(
+        find_missing_phrases(
+            review_route_texts,
+            REVIEW_ROUTE_FALLBACK_PHRASES,
+            "review route fallback",
+        )
+    )
+    errors.extend(
+        find_forbidden_phrases(
+            review_route_texts,
+            REVIEW_ROUTE_FALLBACK_FORBIDDEN_PHRASES,
+            "review route fallback",
+        )
+    )
+    grok_launch_texts = {
+        label: _flat(label) for label in GROK_LAUNCH_SURFACE_PHRASES
+    }
+    errors.extend(
+        find_missing_phrases(
+            grok_launch_texts,
+            GROK_LAUNCH_SURFACE_PHRASES,
+            "Grok launch surface",
+        )
+    )
+    errors.extend(
+        find_forbidden_phrases(
+            grok_launch_texts,
+            GROK_LAUNCH_SURFACE_FORBIDDEN_PHRASES,
+            "Grok launch surface",
+        )
+    )
     errors.extend(
         find_missing_phrases(
             {label: read_text(REPO_ROOT / label) for label in PREWALK_PHRASES},
@@ -787,6 +843,9 @@ def main() -> int:
     print("- Fugu shortcut model/effort profiles are aligned")
     print("- Fugu invocation grammar is aligned on every restating surface")
     print("- Fugu host routing decision anchors are aligned")
+    print("- Review snapshot media omission policy is aligned")
+    print("- Optional review route fallback guidance is aligned")
+    print("- Grok launch surface guidance is aligned")
     return 0
 
 

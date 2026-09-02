@@ -2870,3 +2870,70 @@ PARALLELVES_CONTRACT_PHRASES = {
         "the width test passes, and every decline records a concrete reason.",
     ],
 }
+
+
+# Read-only review snapshots omit oversized binary media; every other category still
+# fails closed. Restating surfaces must not drift into "raise the limit" or
+# "skip the review" wording.
+REVIEW_SNAPSHOT_MEDIA_PHRASES = {
+    label: [
+        "omit oversized binary media",
+        "16 MiB per-file limit is not raised",
+        "derived text, image, or transcript artifact",
+    ]
+    for label in ['SKILL.md', 'AGENTS.md', 'README.md', 'references/provider-shortcuts.md', 'references/fugu-calling-guide.md', 'references/review-subagent.md', 'aliases/claude/fugu/SKILL.md', 'aliases/claude/grok/SKILL.md', 'aliases/claude/omp/SKILL.md']
+}
+
+REVIEW_SNAPSHOT_MEDIA_FORBIDDEN_PHRASES = {
+    label: [
+        "raise the 16 MiB",
+        "raises the per-file limit",
+    ]
+    for label in ['SKILL.md', 'AGENTS.md', 'README.md', 'references/provider-shortcuts.md', 'references/fugu-calling-guide.md', 'references/review-subagent.md', 'aliases/claude/fugu/SKILL.md', 'aliases/claude/grok/SKILL.md', 'aliases/claude/omp/SKILL.md']
+}
+
+# Fugu is one optional review route. Restating surfaces must keep the reroute,
+# the recorded route triple, and the no-false-claim rule together.
+REVIEW_ROUTE_FALLBACK_PHRASES = {
+    label: [
+        "quota, authentication, catalog, runner, timeout, or provider failure",
+        "requested route, actual route, and fallback reason",
+        "review-route",
+    ]
+    for label in ['SKILL.md', 'AGENTS.md', 'README.md', 'references/provider-shortcuts.md', 'references/fugu-calling-guide.md', 'references/review-subagent.md', 'aliases/claude/fugu/SKILL.md']
+}
+
+REVIEW_ROUTE_FALLBACK_FORBIDDEN_PHRASES = {
+    label: [
+        "Fugu is required",
+        "blocks the run when Fugu",
+    ]
+    for label in ['SKILL.md', 'AGENTS.md', 'README.md', 'references/provider-shortcuts.md', 'references/fugu-calling-guide.md', 'references/review-subagent.md', 'aliases/claude/fugu/SKILL.md']
+}
+
+
+# The Grok runner follows the installed CLI's advertised flags. Restating
+# surfaces must keep the fail-closed safety set, the config-key auto-update
+# replacement, and the catalog-bound model rule together, and must not claim a
+# flag the runner no longer hardcodes.
+GROK_LAUNCH_SURFACE_PHRASES = {
+    label: [
+        "flags the installed Grok Build CLI advertises"
+        if label != "guide/index.html"
+        else "flags the installed CLI advertises",
+        "fails closed",
+        "auto_update",
+        "authenticated live catalog lists it",
+        "cannot nest sandboxes",
+        "outer boundary is not optional",
+    ]
+    for label in ['SKILL.md', 'AGENTS.md', 'README.md', 'guide/index.html', 'references/provider-shortcuts.md', 'aliases/claude/grok/SKILL.md']
+}
+
+GROK_LAUNCH_SURFACE_FORBIDDEN_PHRASES = {
+    label: [
+        "self-checking",
+        "always passes --check",
+    ]
+    for label in ['SKILL.md', 'AGENTS.md', 'README.md', 'guide/index.html', 'references/provider-shortcuts.md', 'aliases/claude/grok/SKILL.md']
+}

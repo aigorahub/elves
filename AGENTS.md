@@ -1,5 +1,5 @@
 ---
-version: "2.35.0"
+version: "2.36.0"
 ---
 
 # Elves: Codex repository adapter
@@ -36,6 +36,11 @@ advisory instruments (never landing, merge, credential, or routing authority), t
 per-host slash surfaces for them** — do not invent top-level Codex or Grok commands — and the
 workflow contracts that mandate them (SKILL.md worker-failure recovery, labor completeness,
 Skill Memory) apply to all four hosts unchanged. See the guide's "v2.24 run tools" section.
+
+`review-route` joins them as a host-neutral helper on the same CLI surface and the same honesty
+boundary: it selects an available review route and records requested route, actual route, and
+fallback reason. It never claims a review ran and never carries landing, merge, or credential
+authority.
 
 ## Codex invocation (host-honest)
 
@@ -86,6 +91,23 @@ assume `./scripts` belongs to the target repository and do not execute mappings 
   wall budget, one narrow high-stakes gate); Ultra uses exact-session staged synthesis and bounded incremental
   event parsing through a host-owned pipe, pins final output to a no-follow descriptor, and runs a
   final descriptor-safe writable-state audit after settlement.
+
+  **Review snapshot media policy (all harnesses and hosts).** Read-only review snapshots omit
+  oversized binary media instead of failing the whole review. Video, audio, presentation, archive,
+  image, font, and 3D binaries above the per-file limit are left out of the snapshot; the 16 MiB
+  per-file limit is not raised. The context manifest records each omitted path, byte size, and
+  reason, and every runner prints the same omission block. Source, prose instructions, executable
+  agent configuration, and explicit `--include` paths still fail closed, with a remediation that asks
+  for a derived text, image, or transcript artifact. Writable lanes keep fail-closed behavior.
+
+  **Fugu is optional (review route fallback).** When a review route is unavailable because of quota,
+  authentication, catalog, runner, timeout, or provider failure, probe the supported review routes
+  and select another available independent reviewer instead of stopping. Preserve an explicit user
+  route when it works; otherwise prefer a supported native reviewer when no optional provider works.
+  Record requested route, actual route, and fallback reason. Do not claim a review ran when it did
+  not, and do not let optional-provider failure block the run while a qualified review route exists.
+  Host-neutral helper: `python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" review-route --host
+  <host> --requested <route> --unavailable <route>=<reason>`.
 - Manus research → `run_manus.sh <topic>` for one private bounded task, or
   `run_manus.sh --wide --items-file <roster.json> [--file <source>] <goal>` for Cobbler-managed
   native-Wide-first research with exact coverage repair; use `--fanout` for deterministic
@@ -96,6 +118,20 @@ assume `./scripts` belongs to the target repository and do not execute mappings 
   tracked-source snapshot in a required outer kernel sandbox, built-in inner `strict`, isolated `dontAsk`
   plus bypass lock, explicit `XAI_API_KEY`, a key-scrubbing tool shell, and no Linux procfs; no
   shared OAuth file)
+  The runner builds argv from the flags the installed Grok Build CLI advertises: an absent safety
+  flag (isolated `--cwd`, inner `--sandbox strict`, headless `--single`, `--output-format`,
+  explicit reasoning effort) fails closed, while a quality flag the installed version dropped is
+  simply not passed. Auto-update is disabled through the isolated `[cli] auto_update` config key
+  rather than a removed flag. Reasoning effort defaults to `high`; `ELVES_GROK_EFFORT` selects
+  `low`, `medium`, `high`, or `xhigh`, and `ELVES_GROK_MODEL` pins a model only when the
+  authenticated live catalog lists it. The runner reports the CLI version, effort, model, the
+  authentication route the CLI itself names, and any omitted flags.
+  On a host that cannot nest sandboxes (macOS Seatbelt refuses a second profile inside Elves'
+  required outer `sandbox-exec` boundary), the runner fails closed with
+  `grok_inner_sandbox_unavailable` before it builds a snapshot, rather than launching with the
+  inner profile silently missing. Elves does not drop the inner profile to make a launch succeed,
+  and the outer boundary is not optional; use a Linux host with the bwrap backend or select
+  another review route.
 - Devin task → `run_devin.sh <instructions>` (remote session, bounded wait, no default stored
   secret or knowledge grants; creation and polling share one hard wall-clock bound)
 - Oh My Pi task → `run_omp.sh <instructions>` (optional headless worker shortcut under other hosts;

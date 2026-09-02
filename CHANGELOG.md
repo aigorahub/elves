@@ -4,6 +4,74 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.36.0] - 2026-09-02
+
+### Fixed
+
+* **A large media file no longer fails the whole review.** Read-only isolation snapshots omit
+  oversized binary media instead of failing before Fugu or Grok review starts. Video, audio,
+  presentation, archive, image, font, and 3D binaries above the per-file limit are left out of the
+  snapshot; the 16 MiB per-file limit is not raised. The context manifest records each omitted path,
+  byte size, category, reason, and remediation, and every supported runner prints the same omission
+  block. Source, prose instructions, executable agent configuration, and explicit `--include` paths
+  still fail closed, with a remediation that asks for a derived text, image, or transcript artifact.
+  Writable lanes keep fail-closed behavior. Every omission is named in the manifest with its path,
+  byte size, category, and reason, with the remediation written once for the whole snapshot, and
+  the runner preamble reports exact totals rather than the length of its bounded printed list.
+
+### Fixed
+
+* **The Grok Build shortcut works with the current CLI again.** Grok Build 1.0.13 removed the
+  top-level `--no-auto-update` and `--check` flags, and `scripts/run_grok.sh` passed both
+  unconditionally, so every launch died with `error: unexpected argument '--check' found`. The
+  runner now reads the installed CLI's advertised flags before it builds a snapshot. Safety flags
+  (isolated `--cwd`, inner `--sandbox strict`, headless `--single`, `--output-format`, and an
+  explicit reasoning effort) are required and fail closed when absent; quality flags an installed
+  version dropped are simply not passed, so older releases keep their original argv. Auto-update
+  suppression moved to the isolated `[cli] auto_update = false` config key, which every supported
+  version reads and which no longer depends on a removed flag. The outer kernel sandbox, the inner
+  strict profile, the credential grant, the key-scrubbing tool shell, and the bypass lock are
+  unchanged. `ELVES_GROK_EFFORT` and `ELVES_GROK_MODEL` select reasoning effort and a model; a
+  model is admitted only when the authenticated live catalog lists it, so no model id is invented.
+  The runner reports CLI version, effort, model, authentication route, and omitted flags.
+* **Grok's inner sandbox profile is no longer silently missing.** macOS refuses a second sandbox
+  inside Elves' required outer `sandbox-exec` boundary, so Grok's own `--sandbox strict` profile
+  cannot initialize there. Older Grok releases warned and ran on without it; 1.0.13 refuses to
+  start. The runner now detects the conflict before it builds a snapshot and fails closed with
+  `grok_inner_sandbox_unavailable`, naming the cause. Elves does not drop the inner profile to
+  make a launch succeed, and the outer boundary is not optional.
+* **An optional route failure always tells the host to reroute.** The Grok and omp runners
+  previously exited silently on a missing CLI, a missing credential, or ambiguous provider keys, so
+  a host that reroutes on the directive treated those as hard stops. Every non-zero exit now emits
+  the reroute directive with the right reason. The Grok runner also classifies the provider's own
+  stderr, so a quota or authentication message no longer collapses into a generic provider
+  failure; stderr still streams through unchanged and the retained tail is never re-printed.
+* **A successful run is never classified as a route failure.** `classify_review_route_failure` now
+  treats an explicit exit code of `0` as authoritative, so a clean log that mentions a timeout, an
+  API key, or a missing module is not recorded as a fallback.
+* **Grok help parsing reads option rows, not prose.** Flags are taken from option rows and explicit
+  `[aliases: ...]` rows only, so a help page that merely mentions a removed flag cannot make the
+  runner pass it again. `build_grok_argv` now requires the platform and outer backend, so no caller
+  can reach argv without the inner-sandbox nesting check. The reported authentication route is
+  bounded and character-restricted, and recognizes both the API key and the Grok Build
+  subscription.
+* **`scripts/run_omp.sh` is gated like its siblings.** It carries embedded Python but was absent
+  from the `verify_repo` shell battery, so it received neither a syntax check nor an embedded
+  Python compile check in CI.
+
+### Added
+
+* **An unavailable optional review route reroutes instead of stopping the run.** Fugu is optional.
+  Quota, authentication, catalog, runner, timeout, and provider failures now select another
+  available independent reviewer, preserving an explicit user route when it works and preferring a
+  supported native reviewer when no optional provider works. The new host-neutral
+  `cobbler_agents.py review-route` verb records requested route, actual route, and fallback reason.
+  Optional-provider failure never blocks the run while a qualified review route exists, and a
+  selected route is never reported as a completed review. The Fugu, Grok, and omp runners print one
+  reroute directive on any non-zero exit. Claude Code, Codex, Grok Build, and Oh My Pi share the
+  same selector and guidance. `review-route` is listed with the other host-neutral run tools on
+  every host surface.
+
 ## [2.35.0] - 2026-09-01
 
 ### Added

@@ -281,6 +281,56 @@ Wall limits are hard walls (not stream idle timeouts). While a launch runs:
 
 After settlement, report Fugu's answer or salvage and the route used.
 
+### Review snapshot media policy (all harnesses and hosts)
+
+Read-only review snapshots omit oversized binary media instead of failing the whole review. A
+course repository with a 300 MB MP4, a 90 MB WAV, or a 40 MB PPTX used to fail the shared snapshot
+before Fugu or Grok ever started; those files are now left out and the review runs.
+
+- **Omitted:** video, audio, presentation, archive, image, font, and 3D binaries whose size is above
+  the per-file limit. Classification is by extension only, so `notes.mp4.md` is prose, not media.
+- **Not omitted, still fail closed:** source, prose instructions, executable agent configuration,
+  and any path named by `--include`. The failure carries a remediation that asks for a derived text,
+  image, or transcript artifact (a transcript `.md`, an extracted slide outline, a downsampled
+  still) committed next to the binary and requested instead.
+- **The 16 MiB per-file limit is not raised.** Omission is a read-only review behavior, not a bigger
+  budget. Writable lanes keep fail-closed behavior, because an omitted path would read as a deletion
+  in the handoff audit.
+- **Recorded:** the context manifest (`_elves_context/manifest.json`) lists each omitted path, byte
+  size, category, reason, and remediation under `omitted_files`, plus `omitted_file_count`,
+  `omitted_bytes`, and `omit_oversized_media`. The same entries appear as `status: "omitted"`
+  diagnostics, and every runner prints the same omission block before launch.
+
+### Fugu is optional: review route fallback
+
+Fugu is one optional review route, not the review. When a route is unavailable because of quota,
+authentication, catalog, runner, timeout, or provider failure, probe the supported review routes and
+select another available independent reviewer instead of stopping.
+
+1. Preserve an explicit user route when it works.
+2. Otherwise select the first available independent optional provider (`fugu`, `grok`, `omp`,
+   `council`), skipping the implementer so the review stays independent.
+3. Prefer a supported native reviewer when no optional provider works.
+4. Record requested route, actual route, and fallback reason.
+5. Do not claim a review ran when it did not. A selected route is not a completed review.
+6. Do not let optional-provider failure block the run while a qualified review route exists. Only a
+   required review with no route at all blocks.
+
+The optional runners print one directive line on any non-zero exit
+(`… review route unavailable [<reason>]: select another available review agent …`). The host-neutral
+selector is:
+
+```bash
+python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" review-route \
+  --host claude-code --requested fugu --unavailable fugu=quota --available grok --json
+```
+
+`--host` is one of `claude-code`, `codex`, `grok-build`, `omp`. Reasons are `quota`,
+`authentication`, `catalog`, `runner`, `timeout`, or `provider`. Exit `0` selected a route, `3`
+reports no route without blocking, and `1` blocks only with `--required` and no route at all.
+
+### Other provider route contracts
+
 - **Manus:** requires `MANUS_API_KEY`. The ordinary form creates one private `manus-1.6-max` task
   through `https://api.manus.ai/v2/task.create` with `x-manus-api-key`, explicitly empty
   `message.connectors`, `message.enable_skills`, and `message.force_skills`, then polls with a
@@ -290,7 +340,7 @@ After settlement, report Fugu's answer or salvage and the route used.
   as described below.
 - **Grok:** requires the `grok` CLI plus explicit `XAI_API_KEY` (or the legacy
   `GROK_CODE_XAI_API_KEY`). It uses documented headless single-prompt mode, `high`
-  reasoning, self-checking, and `dontAsk`, which silently denies unapproved mutations. The runner
+  reasoning by default, and `dontAsk`, which silently denies unapproved mutations. The runner
   copies tracked source into a disposable snapshot and requires Elves' qualified outer kernel
   sandbox, which makes that snapshot read-only independently of Grok's profile merger. It constructs
   isolated HOME/GROK_HOME state, projects only the selected named key to Grok itself, and selects a
@@ -307,6 +357,20 @@ After settlement, report Fugu's answer or salvage and the route used.
   and a deny would prevent authentication. It
   does not invent a model id; the authenticated live Grok configuration selects the available
   model.
+  The runner builds argv from the flags the installed Grok Build CLI advertises: an absent safety
+  flag (isolated `--cwd`, inner `--sandbox strict`, headless `--single`, `--output-format`,
+  explicit reasoning effort) fails closed, while a quality flag the installed version dropped is
+  simply not passed. Auto-update is disabled through the isolated `[cli] auto_update` config key
+  rather than a removed flag. Reasoning effort defaults to `high`; `ELVES_GROK_EFFORT` selects
+  `low`, `medium`, `high`, or `xhigh`, and `ELVES_GROK_MODEL` pins a model only when the
+  authenticated live catalog lists it. The runner reports the CLI version, effort, model, the
+  authentication route the CLI itself names, and any omitted flags.
+  On a host that cannot nest sandboxes (macOS Seatbelt refuses a second profile inside Elves'
+  required outer `sandbox-exec` boundary), the runner fails closed with
+  `grok_inner_sandbox_unavailable` before it builds a snapshot, rather than launching with the
+  inner profile silently missing. Elves does not drop the inner profile to make a launch succeed,
+  and the outer boundary is not optional; use a Linux host with the bwrap backend or select
+  another review route.
 - **Devin:** requires `DEVIN_API_KEY`. It creates a remote session through the official
   `https://api.devin.ai/v1/sessions` API, includes the current origin/branch when available, sends
   empty `secret_ids` and `knowledge_ids`, and polls the documented session endpoint with each

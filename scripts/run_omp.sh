@@ -9,8 +9,27 @@ if [ -z "$PROMPT_CONTENT" ]; then
   echo "Usage: run_omp.sh <instructions>" >&2
   exit 2
 fi
+# omp is an optional review route. Every non-zero exit, including the ones before
+# Python starts, tells the host driver to select another reviewer.
+route_unavailable() {
+  # The directive is built on stdout so a broken interpreter cannot turn a
+  # missing-tool message into a stack trace on the route's stderr.
+  local directive
+  directive=$(python3 - "$1" "$SCRIPT_DIR" <<'ROUTEPY' 2>/dev/null
+import sys
+sys.path.insert(0, sys.argv[2])
+from cobbler_runtime.review_routes import route_unavailable_directive
+print(route_unavailable_directive("omp", sys.argv[1]))
+ROUTEPY
+) || return 0
+  if [ -n "$directive" ]; then
+    printf '%s\n' "$directive" >&2
+  fi
+  return 0
+}
 if ! command -v omp >/dev/null 2>&1; then
   echo "Error: omp (Oh My Pi) CLI not found on PATH." >&2
+  route_unavailable runner
   exit 127
 fi
 if ! REPO_ROOT=$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null); then
@@ -51,13 +70,38 @@ if write_mode in {"1", "true", "yes", "yolo"}:
         "Use the parked full-run omp-cli worker for implementation labor."
     )
 
+sys.path.insert(0, str(Path(script_dir).resolve()))
+from cobbler_runtime.isolation import (
+    IsolationSpec,
+    context_bundle_report,
+    isolated_lane,
+    wrap_argv_with_sandbox,
+)
+from cobbler_runtime.review_routes import (
+    classify_review_route_failure,
+    route_unavailable_directive,
+)
+from cobbler_runtime.schema import ValidationIssue
+
+
+def _route_unavailable(status: int, text: str = "") -> None:
+    """omp is an optional review route; tell the host driver to reroute."""
+    if status == 0:
+        return
+    reason = classify_review_route_failure(exit_code=status, text=text) or "provider"
+    print(route_unavailable_directive("omp", reason), file=sys.stderr)
+
+
+def _route_exit(message: str, reason: str, status: int = 2) -> None:
+    """Report an optional-route failure, then exit. Never a silent hard stop."""
+    print(message, file=sys.stderr)
+    print(route_unavailable_directive("omp", reason), file=sys.stderr)
+    raise SystemExit(status)
+
+
 omp = shutil.which("omp")
 if not omp:
-    raise SystemExit("Error: omp CLI not found.")
-
-sys.path.insert(0, str(Path(script_dir).resolve()))
-from cobbler_runtime.isolation import IsolationSpec, isolated_lane, wrap_argv_with_sandbox
-from cobbler_runtime.schema import ValidationIssue
+    _route_exit("Error: omp CLI not found.", "runner", 127)
 
 parent = dict(os.environ)
 parent_path = parent.get("PATH", "/usr/bin:/bin")
@@ -88,9 +132,10 @@ def resolve_credential(model_id: str) -> tuple[str, str]:
             value = parent.get(name, "")
             if value:
                 return name, value
-        raise SystemExit(
+        _route_exit(
             f"Error: model `{model_id}` requires one of "
-            f"{', '.join(PROVIDER_KEYS[family])} in the environment."
+            f"{', '.join(PROVIDER_KEYS[family])} in the environment.",
+            "authentication",
         )
     present = [
         (name, parent[name])
@@ -106,13 +151,15 @@ def resolve_credential(model_id: str) -> tuple[str, str]:
         name, value = next(iter(seen.items()))
         return name, value
     if not seen:
-        raise SystemExit(
+        _route_exit(
             "Error: set ELVES_OMP_MODEL=provider/model and the matching provider API key "
-            "(e.g. GEMINI_API_KEY)."
+            "(e.g. GEMINI_API_KEY).",
+            "authentication",
         )
-    raise SystemExit(
+    _route_exit(
         "Error: multiple provider API keys present; set ELVES_OMP_MODEL to select one "
-        f"(found: {', '.join(sorted(seen))})."
+        f"(found: {', '.join(sorted(seen))}).",
+        "unconfigured",
     )
 
 
@@ -129,6 +176,8 @@ try:
             require_fs_sandbox=True,
         )
     ) as lane:
+        for line in context_bundle_report(lane, label="omp"):
+            print(line, file=sys.stderr)
         home = lane.home
         # Empty tools dir so omp does not scan host Claude binary trees.
         claude_tools = home / ".claude" / "tools"
@@ -193,14 +242,18 @@ try:
                 sys.stderr.write(f"omp shortcut transport invalid: {exc}\n")
                 if stdout:
                     sys.stdout.write(stdout)
+                _route_unavailable(2, f"transport invalid: {exc}")
                 raise SystemExit(2) from exc
         if stdout:
             sys.stdout.write(stdout)
         if proc.stderr:
             sys.stderr.write(proc.stderr)
+        _route_unavailable(proc.returncode, proc.stderr or "")
         raise SystemExit(proc.returncode)
 except ValidationIssue as exc:
+    _route_unavailable(2, f"{exc.code}: {exc.message}")
     raise SystemExit(f"Error: omp shortcut isolation failed: {exc}") from exc
 except TimeoutError as exc:
+    _route_unavailable(124, str(exc))
     raise SystemExit(str(exc)) from exc
 PY

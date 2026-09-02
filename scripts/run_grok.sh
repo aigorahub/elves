@@ -8,8 +8,27 @@ if [ -z "$PROMPT_CONTENT" ]; then
   echo "Usage: run_grok.sh <instructions>" >&2
   exit 2
 fi
+# Grok is an optional review route. Every non-zero exit, including the ones that
+# happen before Python starts, tells the host driver to select another reviewer.
+route_unavailable() {
+  # The directive is built on stdout so a broken interpreter cannot turn a
+  # missing-tool message into a stack trace on the route's stderr.
+  local directive
+  directive=$(python3 - "$1" "$SCRIPT_DIR" <<'ROUTEPY' 2>/dev/null
+import sys
+sys.path.insert(0, sys.argv[2])
+from cobbler_runtime.review_routes import route_unavailable_directive
+print(route_unavailable_directive("Grok", sys.argv[1]))
+ROUTEPY
+) || return 0
+  if [ -n "$directive" ]; then
+    printf '%s\n' "$directive" >&2
+  fi
+  return 0
+}
 if ! command -v grok >/dev/null 2>&1; then
   echo "Error: Grok Build CLI not found." >&2
+  route_unavailable runner
   exit 127
 fi
 if ! REPO_ROOT=$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null); then
@@ -21,8 +40,15 @@ if ! python3 -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) e
   echo "run_grok.sh requires Python >= 3.10 (repo floor); found $(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')" >&2
   exit 2
 fi
-exec python3 - "$PROMPT_CONTENT" "$REPO_ROOT" "$SCRIPT_DIR" <<'PY'
+
+# Opt-in review selectors. Empty keeps the historical posture: the authenticated
+# live configuration picks the model, and reasoning effort stays `high`.
+GROK_MODEL="${ELVES_GROK_MODEL:-}"
+GROK_EFFORT="${ELVES_GROK_EFFORT:-}"
+
+exec python3 - "$PROMPT_CONTENT" "$REPO_ROOT" "$SCRIPT_DIR" "$GROK_MODEL" "$GROK_EFFORT" <<'PY'
 import ast
+import collections
 import json
 import os
 from pathlib import Path
@@ -34,32 +60,97 @@ import sys
 prompt = sys.argv[1]
 repo_root = Path(sys.argv[2]).resolve()
 script_dir = Path(sys.argv[3]).resolve()
+requested_model = sys.argv[4] if len(sys.argv) > 4 else ""
+requested_effort = sys.argv[5] if len(sys.argv) > 5 else ""
 sys.path.insert(0, str(script_dir))
 
 from cobbler_runtime.isolation import (  # noqa: E402
     IsolationSpec,
+    context_bundle_report,
     isolated_lane,
+    resolve_fs_sandbox_backend,
     wrap_argv_with_sandbox,
 )
+from cobbler_runtime.grok_launch import (  # noqa: E402
+    build_grok_argv,
+    isolated_grok_config,
+    probe_grok_capabilities,
+    probe_grok_catalog,
+    require_inner_sandbox,
+    require_supported_grok_cli,
+    resolve_grok_effort,
+    resolve_grok_model,
+)
+from cobbler_runtime.review_routes import (  # noqa: E402
+    classify_review_route_failure,
+    route_unavailable_directive,
+)
 from cobbler_runtime.schema import ValidationIssue  # noqa: E402
+
+
+def _route_unavailable(status: int, text: str = "") -> None:
+    """Grok is an optional review route; tell the host driver to reroute."""
+    if status == 0:
+        return
+    reason = classify_review_route_failure(exit_code=status, text=text) or "provider"
+    print(route_unavailable_directive("Grok", reason), file=sys.stderr)
 
 
 parent = dict(os.environ)
 parent_path = parent.get("PATH", "/usr/bin:/bin")
 grok = shutil.which("grok", path=parent_path)
 if not grok:
-    raise SystemExit("Error: Grok Build CLI not found.")
+    print("Error: Grok Build CLI not found.", file=sys.stderr)
+    print(route_unavailable_directive("Grok", "runner"), file=sys.stderr)
+    raise SystemExit(127)
 
 source_home = Path(parent.get("GROK_HOME") or (Path.home() / ".grok")).expanduser()
 xai_key = parent.get("XAI_API_KEY", "")
 legacy_xai_key = parent.get("GROK_CODE_XAI_API_KEY", "")
 if not xai_key and not legacy_xai_key:
-    raise SystemExit(
+    print(
         "Error: run_grok.sh requires an explicit XAI_API_KEY (or legacy "
-        "GROK_CODE_XAI_API_KEY). Shared-file OAuth is not exposed to shortcut agents."
+        "GROK_CODE_XAI_API_KEY). Shared-file OAuth is not exposed to shortcut agents.",
+        file=sys.stderr,
     )
+    print(route_unavailable_directive("Grok", "authentication"), file=sys.stderr)
+    # Exit status is unchanged; only the reroute directive is new.
+    raise SystemExit(1)
 credential_name = "XAI_API_KEY" if xai_key else "GROK_CODE_XAI_API_KEY"
 credential_value = xai_key or legacy_xai_key
+
+# Read the installed CLI's advertised surface before building the lane, so an
+# incompatible Grok Build never costs a snapshot. Flags are not invented: an
+# absent safety flag fails closed, and an absent quality flag is dropped.
+# `--help` and `--version` never need the provider key, so they run on a minimal
+# environment. Only the catalog probe, which must be authenticated to be truthful,
+# receives the parent environment.
+probe_env = {
+    "PATH": parent_path,
+    "HOME": parent.get("HOME", ""),
+    "LANG": parent.get("LANG", "C.UTF-8"),
+}
+try:
+    capabilities = probe_grok_capabilities(grok, env=probe_env)
+    require_supported_grok_cli(capabilities)
+    # The inner strict profile is part of the advertised posture. If this platform
+    # cannot nest it inside the required outer boundary, say so before paying for a
+    # snapshot rather than launching with a protection that is silently missing.
+    _outer_backend = resolve_fs_sandbox_backend()
+    require_inner_sandbox(
+        platform_name=sys.platform,
+        outer_backend=_outer_backend.name if _outer_backend else None,
+    )
+    effort = resolve_grok_effort(requested_effort)
+    catalog = probe_grok_catalog(grok, env=parent) if requested_model.strip() else None
+    model = resolve_grok_model(requested_model, catalog) if catalog else None
+except ValidationIssue as exc:
+    print(f"Error: Grok launch preflight failed closed [{exc.code}]: {exc}", file=sys.stderr)
+    if exc.hint:
+        print(f"Hint: {exc.hint}", file=sys.stderr)
+    reason = classify_review_route_failure(exit_code=2, text=f"{exc.code}: {exc.message}")
+    print(route_unavailable_directive("Grok", reason or "runner"), file=sys.stderr)
+    raise SystemExit(2) from exc
 
 
 def configured_model_default() -> str:
@@ -96,6 +187,8 @@ try:
             require_fs_sandbox=True,
         )
     ) as lane:
+        for line in context_bundle_report(lane, label="Grok"):
+            print(line, file=sys.stderr)
         home = lane.home
         grok_home = home / ".grok"
         grok_home.mkdir(mode=0o700)
@@ -113,13 +206,16 @@ try:
         )
         (grok_home / "requirements.toml").chmod(0o600)
 
-        model_default = configured_model_default()
-        if model_default:
-            (grok_home / "config.toml").write_text(
-                "[models]\n" + f"default = {json.dumps(model_default)}\n",
-                encoding="utf-8",
-            )
-            (grok_home / "config.toml").chmod(0o600)
+        # Auto-update replaced the removed `--no-auto-update` flag with the
+        # `[cli] auto_update` config key, which every supported version reads. The
+        # outer kernel sandbox stays the authority: it never grants write access to
+        # the CLI's own install tree. Only these keys are written; the host's own
+        # config (permission mode, plugins, MCP servers) is never copied in.
+        (grok_home / "config.toml").write_text(
+            isolated_grok_config(model_default=model or configured_model_default()),
+            encoding="utf-8",
+        )
+        (grok_home / "config.toml").chmod(0o600)
 
         # Grok's built-in strict profile narrows reads and blocks child network
         # on Linux. Do not add a custom deny profile here: Grok implements Linux
@@ -153,32 +249,57 @@ try:
                 "SHELL": str(scrub_shell),
             }
         )
+        plan = build_grok_argv(
+            str(Path(grok).resolve()),
+            snapshot=lane.snapshot,
+            prompt=prompt,
+            capabilities=capabilities,
+            platform_name=sys.platform,
+            outer_backend=_outer_backend.name if _outer_backend else None,
+            effort=effort,
+            model=model,
+            auth_route=catalog.auth_route if catalog else None,
+        )
+        print(
+            f"Grok launch: cli={plan.capabilities.version or 'unknown'} "
+            f"effort={plan.effort} model={plan.model or 'authenticated-default'} "
+            f"auth={plan.auth_route or 'unreported'} "
+            f"omitted_flags={','.join(plan.omitted_flags) or 'none'}.",
+            file=sys.stderr,
+        )
         command = wrap_argv_with_sandbox(
-            [
-                str(Path(grok).resolve()),
-                "--no-auto-update",
-                "--cwd",
-                str(lane.snapshot),
-                "--sandbox",
-                "strict",
-                "--effort",
-                "high",
-                "--output-format",
-                "plain",
-                "--check",
-                "--single=" + prompt,
-            ],
+            list(plan.argv),
             lane,
             mount_proc=False,
         )
-        completed = subprocess.run(
+        # stdout streams live. stderr is passed through byte for byte while a
+        # bounded tail is kept, so a quota or auth message classifies correctly
+        # instead of collapsing to a generic provider failure. The retained text
+        # is used only to pick a reason code; it is never re-printed.
+        process = subprocess.Popen(
             command,
             cwd=lane.snapshot,
             env=lane.env,
-            check=False,
+            stderr=subprocess.PIPE,
         )
-        raise SystemExit(completed.returncode)
+        tail = collections.deque(maxlen=8 * 1024)
+        assert process.stderr is not None
+        with process.stderr:
+            while True:
+                chunk = process.stderr.read(4096)
+                if not chunk:
+                    break
+                sys.stderr.buffer.write(chunk)
+                sys.stderr.buffer.flush()
+                tail.extend(chunk)
+        returncode = process.wait()
+        _route_unavailable(
+            returncode,
+            bytes(tail).decode("utf-8", "replace"),
+        )
+        raise SystemExit(returncode)
 except ValidationIssue as exc:
     print(f"Error: Grok isolation failed closed: {exc}", file=sys.stderr)
+    _route_unavailable(2, f"{exc.code}: {exc.message}")
     raise SystemExit(2) from exc
 PY

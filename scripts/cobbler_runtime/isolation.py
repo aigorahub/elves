@@ -158,10 +158,125 @@ DEFAULT_EXCLUDED_FILE_NAMES: frozenset[str] = frozenset(SECRET_FILE_NAMES) | fro
 
 DEFAULT_EXCLUDED_FILE_GLOBS: tuple[str, ...] = SECRET_FILE_GLOBS
 
+# Oversized binary media that a read-only review lane can omit instead of failing.
+# The map is an explicit allowlist by extension: anything absent stays fail-closed,
+# so source, prose, and executable agent configuration never disappear silently.
+OVERSIZED_MEDIA_CATEGORIES: Mapping[str, str] = {
+    # video
+    ".mp4": "video",
+    ".m4v": "video",
+    ".mov": "video",
+    ".avi": "video",
+    ".mkv": "video",
+    ".webm": "video",
+    ".mpg": "video",
+    ".mpeg": "video",
+    ".wmv": "video",
+    ".prores": "video",
+    # audio
+    ".wav": "audio",
+    ".flac": "audio",
+    ".aif": "audio",
+    ".aiff": "audio",
+    ".mp3": "audio",
+    ".m4a": "audio",
+    ".aac": "audio",
+    ".ogg": "audio",
+    ".opus": "audio",
+    ".wma": "audio",
+    # presentation and office binaries
+    ".pptx": "presentation",
+    ".ppt": "presentation",
+    ".key": "presentation",
+    ".odp": "presentation",
+    ".docx": "document",
+    ".doc": "document",
+    ".xlsx": "document",
+    ".xls": "document",
+    ".pdf": "document",
+    # archives and disk images
+    ".zip": "archive",
+    ".tar": "archive",
+    ".gz": "archive",
+    ".tgz": "archive",
+    ".bz2": "archive",
+    ".xz": "archive",
+    ".7z": "archive",
+    ".rar": "archive",
+    ".dmg": "archive",
+    ".iso": "archive",
+    # raster and vector image binaries (SVG is text and stays fail-closed)
+    ".png": "image",
+    ".jpg": "image",
+    ".jpeg": "image",
+    ".gif": "image",
+    ".bmp": "image",
+    ".tif": "image",
+    ".tiff": "image",
+    ".webp": "image",
+    ".heic": "image",
+    ".psd": "image",
+    ".ai": "image",
+    ".raw": "image",
+    # fonts and 3D/model binaries
+    ".ttf": "font",
+    ".otf": "font",
+    ".woff": "font",
+    ".woff2": "font",
+    ".blend": "model",
+    ".fbx": "model",
+    ".glb": "model",
+    ".usdz": "model",
+}
+
+OVERSIZED_MEDIA_OMISSION_REASON = "oversized_binary_media"
+
+
+def classify_oversized_media(rel: str) -> str | None:
+    """Return the media category for ``rel``, or ``None`` when it is not media.
+
+    Only the extension decides. A path with no extension, a text extension, or a
+    double extension whose last component is not listed (``notes.mp4.md``) is not
+    media and keeps fail-closed behavior.
+    """
+    name = PurePosixPath(str(rel)).name
+    suffix = PurePosixPath(name).suffix.lower()
+    if not suffix:
+        return None
+    return OVERSIZED_MEDIA_CATEGORIES.get(suffix)
+
+
+def oversized_media_remediation_advice(limit: int) -> str:
+    """Remediation that applies to every omitted media file in one snapshot."""
+    return (
+        f"These files are above the {limit}-byte per-file snapshot limit and are "
+        "not in this read-only review snapshot. Commit a derived text, image, or "
+        "transcript artifact next to each one (for example a transcript .md, an "
+        "extracted slide outline, or a downsampled still) and request that "
+        "artifact instead. The per-file limit is not raised for review lanes."
+    )
+
+
+def oversized_media_remediation(rel: str, size: int, limit: int) -> str:
+    """Shared remediation text for one oversized file a route still needs."""
+    return (
+        f"{rel} is {size} bytes, above the {limit}-byte per-file snapshot limit. "
+        "Commit a derived text, image, or transcript artifact next to it (for "
+        "example a transcript .md, an extracted slide outline, or a downsampled "
+        "still) and request that artifact instead. The per-file limit is not "
+        "raised for review lanes."
+    )
+
+
 DEFAULT_CONTEXT_MAX_FILES = 20_000
 DEFAULT_CONTEXT_MAX_BYTES = 512 * 1024 * 1024
 DEFAULT_CONTEXT_MAX_FILE_BYTES = 16 * 1024 * 1024
 MAX_CONTEXT_DIAGNOSTICS = 200
+# Every omission is recorded with its path, size, category, and reason. The
+# per-entry records are compact and the remediation text is written once for the
+# whole manifest, so recording all of them stays cheap. The cap only guards a
+# pathological tree and is reported through `omitted_files_truncated`.
+MAX_OMITTED_CONTEXT_RECORDS = DEFAULT_CONTEXT_MAX_FILES
 DEFAULT_HANDOFF_MAX_FILES = 2_000
 DEFAULT_HANDOFF_MAX_BYTES = 64 * 1024 * 1024
 _INTERNAL_SNAPSHOT_PREFIXES: tuple[str, ...] = (
@@ -197,6 +312,10 @@ class IsolationSpec:
     max_context_files: int = DEFAULT_CONTEXT_MAX_FILES
     max_context_bytes: int = DEFAULT_CONTEXT_MAX_BYTES
     max_context_file_bytes: int = DEFAULT_CONTEXT_MAX_FILE_BYTES
+    # Read-only review lanes omit oversized binary media instead of failing the
+    # whole snapshot. Writable lanes keep fail-closed behavior because an omitted
+    # file cannot be reconciled in the handoff diff.
+    omit_oversized_media: bool = True
     snapshot_writable: bool = False
     credential_grants: dict[str, str] = field(default_factory=dict)
     base_env: dict[str, str] = field(default_factory=dict)
@@ -227,6 +346,12 @@ class IsolatedLane:
     untracked_file_count: int = 0
     context_bytes: int = 0
     context_diagnostics: list[dict[str, str]] = field(default_factory=list)
+    omitted_context_files: list[dict[str, object]] = field(default_factory=list)
+    # Exact totals, independent of the bounded record list above.
+    omitted_context_file_count: int = 0
+    omitted_context_bytes: int = 0
+    omitted_context_files_truncated: bool = False
+    context_max_file_bytes: int = DEFAULT_CONTEXT_MAX_FILE_BYTES
     context_manifest_path: str | None = None
     snapshot_writable: bool = False
     instruction_data_files: list[str] = field(default_factory=list)
@@ -239,6 +364,30 @@ class IsolatedLane:
 
     def cleanup(self) -> None:
         _remove_tree_strict(self.root)
+
+
+@dataclass(frozen=True)
+class OmittedContextFile:
+    """One oversized binary media file left out of a read-only review snapshot."""
+
+    path: str
+    bytes: int
+    category: str
+    reason: str
+    limit_bytes: int
+
+    def to_dict(self) -> dict[str, object]:
+        """Compact record. The remediation text is manifest-level, not per entry."""
+        return {
+            "path": self.path,
+            "bytes": self.bytes,
+            "category": self.category,
+            "reason": self.reason,
+            "limit_bytes": self.limit_bytes,
+        }
+
+    def remediation(self) -> str:
+        return oversized_media_remediation(self.path, self.bytes, self.limit_bytes)
 
 
 @dataclass(frozen=True)
@@ -709,17 +858,36 @@ def _copy_tracked_regular_file(
     destination: Path,
     *,
     max_file_bytes: int = DEFAULT_CONTEXT_MAX_FILE_BYTES,
-) -> bool:
+    omit_oversized_media: bool = False,
+) -> bool | OmittedContextFile:
+    """Copy one tracked file into the snapshot.
+
+    Returns ``True`` on a copy, ``False`` when the source vanished or has no body,
+    and an :class:`OmittedContextFile` when ``omit_oversized_media`` is set and the
+    source is oversized binary media. Every other oversized file fails closed.
+    """
     opened = _open_tracked_regular_fd(repo_root, rel)
     if opened is None:
         return False
     source_fd, source_info = opened
     if source_info.st_size > max_file_bytes:
         os.close(source_fd)
+        category = classify_oversized_media(rel) if omit_oversized_media else None
+        if category is not None:
+            return OmittedContextFile(
+                path=rel,
+                bytes=int(source_info.st_size),
+                category=category,
+                reason=OVERSIZED_MEDIA_OMISSION_REASON,
+                limit_bytes=int(max_file_bytes),
+            )
         raise ValidationIssue(
             "isolation_context_file_too_large",
             f"Context file exceeds the {max_file_bytes}-byte per-file limit: {rel}",
             path=str(repo_root / rel),
+            hint=oversized_media_remediation(
+                rel, int(source_info.st_size), int(max_file_bytes)
+            ),
         )
     try:
         with os.fdopen(source_fd, "rb", closefd=True) as source, destination.open("xb") as target:
@@ -1197,6 +1365,60 @@ def build_isolated_env(
     return env
 
 
+def context_bundle_report(
+    lane: IsolatedLane,
+    *,
+    label: str,
+    max_diagnostics: int = 20,
+) -> list[str]:
+    """Host-neutral snapshot preamble shared by every supported review runner.
+
+    Every harness prints the same counts, the same bounded exclusion list, and the
+    same omitted-media block, so Claude Code, Codex, Grok Build, and OMP report one
+    snapshot truth.
+    """
+    lines = [
+        f"{label} context bundle: "
+        f"{lane.tracked_file_count} tracked, {lane.untracked_file_count} non-ignored "
+        f"untracked, {lane.context_bytes} bytes; "
+        f"manifest={lane.context_manifest_path}."
+    ]
+    for diagnostic in lane.context_diagnostics[:max_diagnostics]:
+        status = str(diagnostic.get("status", "excluded"))
+        lines.append(
+            f"{label} context {status} {diagnostic['path']!r}: {diagnostic['reason']}."
+        )
+    remaining = len(lane.context_diagnostics) - max_diagnostics
+    if remaining > 0:
+        lines.append(
+            f"{label} context diagnostics omitted {remaining} additional bounded entries."
+        )
+    if lane.omitted_context_file_count:
+        # Exact totals, never the length of the bounded record list.
+        lines.append(
+            f"{label} omitted {lane.omitted_context_file_count} oversized binary media "
+            f"file(s) totalling {lane.omitted_context_bytes} bytes; the review "
+            "continues without them."
+        )
+        lines.append(f"{label} omission manifest: {lane.context_manifest_path}.")
+        lines.append(
+            f"{label} remediation: "
+            + oversized_media_remediation_advice(lane.context_max_file_bytes)
+        )
+        for item in lane.omitted_context_files[:max_diagnostics]:
+            lines.append(
+                f"{label} omitted media {item['path']!r} "
+                f"({item['bytes']} bytes, {item['category']}, {item['reason']})."
+            )
+        listed = min(len(lane.omitted_context_files), max_diagnostics)
+        if lane.omitted_context_file_count > listed:
+            lines.append(
+                f"{label} omitted-media list shows {listed} of "
+                f"{lane.omitted_context_file_count}; the manifest names the rest."
+            )
+    return lines
+
+
 def create_tracked_snapshot(spec: IsolationSpec) -> IsolatedLane:
     validate_credential_grant_names(
         spec.credential_grants,
@@ -1256,14 +1478,20 @@ def create_tracked_snapshot(spec: IsolationSpec) -> IsolatedLane:
         instruction_data: list[str] = []
         diagnostics: list[dict[str, str]] = []
         diagnostics_total = 0
+        omitted: list[OmittedContextFile] = []
+        omitted_total = 0
+        omitted_bytes_total = 0
+        # Only read-only lanes omit. A writable lane must still fail closed: an
+        # omitted path would look deleted to the handoff audit.
+        omit_oversized_media = bool(spec.omit_oversized_media) and not bool(
+            spec.snapshot_writable
+        )
 
-        def record_diagnostic(rel: str, reason: str) -> None:
+        def record_diagnostic(rel: str, reason: str, *, status: str = "excluded") -> None:
             nonlocal diagnostics_total
             diagnostics_total += 1
             if len(diagnostics) < MAX_CONTEXT_DIAGNOSTICS:
-                diagnostics.append(
-                    {"path": rel, "status": "excluded", "reason": reason}
-                )
+                diagnostics.append({"path": rel, "status": status, "reason": reason})
 
         count = 0
         untracked_count = 0
@@ -1286,12 +1514,17 @@ def create_tracked_snapshot(spec: IsolationSpec) -> IsolatedLane:
                     continue
                 inert = snapshot / "_instruction_evidence" / f"{rel.replace('/', '__')}.txt"
                 inert.parent.mkdir(parents=True, exist_ok=True)
-                if not _copy_tracked_regular_file(
+                # Prose instruction evidence is never omitted for size. The call
+                # keeps the default omit_oversized_media=False, so the result is a
+                # plain bool and an oversized instruction file fails closed.
+                instruction_copied = _copy_tracked_regular_file(
                     repo_root,
                     rel,
                     inert,
                     max_file_bytes=spec.max_context_file_bytes,
-                ):
+                )
+                assert not isinstance(instruction_copied, OmittedContextFile)
+                if not instruction_copied:
                     if rel in requested_set:
                         raise ValidationIssue(
                             "isolation_requested_path_unavailable",
@@ -1324,12 +1557,25 @@ def create_tracked_snapshot(spec: IsolationSpec) -> IsolatedLane:
                 continue
             dest = snapshot.joinpath(*PurePosixPath(rel).parts)
             dest.parent.mkdir(parents=True, exist_ok=True)
-            if not _copy_tracked_regular_file(
+            copied = _copy_tracked_regular_file(
                 repo_root,
                 rel,
                 dest,
                 max_file_bytes=spec.max_context_file_bytes,
-            ):
+                # An explicit --include is a host request; it keeps fail-closed
+                # behavior with a remediation hint instead of vanishing.
+                omit_oversized_media=omit_oversized_media and rel not in requested_set,
+            )
+            if isinstance(copied, OmittedContextFile):
+                omitted_total += 1
+                omitted_bytes_total += copied.bytes
+                if len(omitted) < MAX_OMITTED_CONTEXT_RECORDS:
+                    omitted.append(copied)
+                record_diagnostic(
+                    rel, f"{copied.reason}:{copied.category}", status="omitted"
+                )
+                continue
+            if not copied:
                 if rel in requested_set:
                     raise ValidationIssue(
                         "isolation_requested_path_unavailable",
@@ -1377,6 +1623,17 @@ def create_tracked_snapshot(spec: IsolationSpec) -> IsolatedLane:
                     "untracked_files": untracked_count,
                     "instruction_files": len(instruction_data),
                     "context_bytes": total_bytes,
+                    "max_context_file_bytes": spec.max_context_file_bytes,
+                    "omit_oversized_media": omit_oversized_media,
+                    "omitted_files": [item.to_dict() for item in omitted],
+                    "omitted_file_count": omitted_total,
+                    "omitted_files_truncated": omitted_total > len(omitted),
+                    "omitted_bytes": omitted_bytes_total,
+                    "omitted_media_remediation": (
+                        oversized_media_remediation_advice(spec.max_context_file_bytes)
+                        if omitted
+                        else None
+                    ),
                     "diagnostics": diagnostics,
                     "diagnostics_truncated": diagnostics_total > len(diagnostics),
                     "requested_paths": list(requested),
@@ -1404,6 +1661,11 @@ def create_tracked_snapshot(spec: IsolationSpec) -> IsolatedLane:
             untracked_file_count=untracked_count,
             context_bytes=total_bytes,
             context_diagnostics=diagnostics,
+            omitted_context_files=[item.to_dict() for item in omitted],
+            omitted_context_file_count=omitted_total,
+            omitted_context_bytes=omitted_bytes_total,
+            omitted_context_files_truncated=omitted_total > len(omitted),
+            context_max_file_bytes=spec.max_context_file_bytes,
             context_manifest_path=str(context_manifest.relative_to(snapshot)),
             snapshot_writable=spec.snapshot_writable,
             instruction_data_files=instruction_data,

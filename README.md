@@ -8,7 +8,7 @@ Oh My Pi (omp) driver plans and reviews; a subscription-native (or optional exte
 implements; durable run files let the work survive context compaction. You write the plan and own
 the merge decision. The agent does the middle.
 
-**Current release: v2.35.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.36.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 **New to Elves?** Use the [practical user guide](https://aigorahub.github.io/elves/) — especially
@@ -166,13 +166,27 @@ a bounded remote task, including its creation request, without granting stored s
 by default. Oh My Pi (`/omp` / `$elves omp`) runs headless `omp` over the shared isolation
 snapshot with a single provider-matched API key and never modifies the live checkout from the
 shortcut (use parked `omp-cli` full-run for implementation labor). Grok uses
-headless high-reasoning mode without approval bypass over a disposable tracked-source snapshot in
+headless mode at `high` reasoning by default, without approval bypass over a disposable tracked-source snapshot in
 Elves' required outer kernel sandbox, plus Grok's built-in inner `strict` profile, provider-documented
 isolated `dontAsk` settings, and bypass mode locked off. The shortcut requires an explicit
 `XAI_API_KEY`; a dedicated Grok tool shell removes both supported key names before any
 model-directed command runs, and the Linux boundary omits procfs to prevent parent-environment
 inspection. It does not expose a shared OAuth file because Grok applies the same sandbox to
-provider and tool reads. Fugu's Linux boundary likewise omits procfs around its credential-bearing
+provider and tool reads. The runner builds argv from the flags the installed Grok Build CLI advertises: an absent safety
+flag (isolated `--cwd`, inner `--sandbox strict`, headless `--single`, `--output-format`,
+explicit reasoning effort) fails closed, while a quality flag the installed version dropped is
+simply not passed. Auto-update is disabled through the isolated `[cli] auto_update` config key
+rather than a removed flag. Reasoning effort defaults to `high`; `ELVES_GROK_EFFORT` selects
+`low`, `medium`, `high`, or `xhigh`, and `ELVES_GROK_MODEL` pins a model only when the
+authenticated live catalog lists it. The runner reports the CLI version, effort, model, the
+authentication route the CLI itself names, and any omitted flags.
+On a host that cannot nest sandboxes (macOS Seatbelt refuses a second profile inside Elves'
+required outer `sandbox-exec` boundary), the runner fails closed with
+`grok_inner_sandbox_unavailable` before it builds a snapshot, rather than launching with the
+inner profile silently missing. Elves does not drop the inner profile to make a launch succeed,
+and the outer boundary is not optional; use a Linux host with the bwrap backend or select
+another review route.
+Fugu's Linux boundary likewise omits procfs around its credential-bearing
 launcher and exposes only a synthetic `/proc/self/exe` symlink to the qualified real Codex
 executable. Manus requests nest empty connector, enabled-skill, and forced-skill lists under
 `message`, so the wrapper grants no connector or forced-skill IDs explicitly; the documented API
@@ -180,6 +194,23 @@ still loads account-default enabled skills when `enable_skills` is empty, and th
 does not claim skill isolation. See
 [`references/provider-shortcuts.md`](references/provider-shortcuts.md) for requirements, auth
 environment names, timeouts, and follow behavior.
+
+**Review snapshot media policy (all harnesses and hosts).** Read-only review snapshots omit
+oversized binary media instead of failing the whole review. Video, audio, presentation, archive,
+image, font, and 3D binaries above the per-file limit are left out of the snapshot; the 16 MiB
+per-file limit is not raised. The context manifest records each omitted path, byte size, and
+reason, and every runner prints the same omission block. Source, prose instructions, executable
+agent configuration, and explicit `--include` paths still fail closed, with a remediation that asks
+for a derived text, image, or transcript artifact. Writable lanes keep fail-closed behavior.
+
+**Fugu is optional (review route fallback).** When a review route is unavailable because of quota,
+authentication, catalog, runner, timeout, or provider failure, probe the supported review routes
+and select another available independent reviewer instead of stopping. Preserve an explicit user
+route when it works; otherwise prefer a supported native reviewer when no optional provider works.
+Record requested route, actual route, and fallback reason. Do not claim a review ran when it did
+not, and do not let optional-provider failure block the run while a qualified review route exists.
+Host-neutral helper: `python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" review-route --host
+<host> --requested <route> --unavailable <route>=<reason>`.
 
 ### Per-project install
 

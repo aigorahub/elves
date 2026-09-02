@@ -54,6 +54,8 @@ SHELL_SCRIPTS = [
     "scripts/run_manus.sh",
     "scripts/run_grok.sh",
     "scripts/run_devin.sh",
+    # run_omp.sh carries embedded Python like its siblings and was never gated.
+    "scripts/run_omp.sh",
 ]
 
 JSON_PATHS = [

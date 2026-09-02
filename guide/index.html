@@ -512,7 +512,7 @@
     <div class="masthead-inner">
       <div class="brand-row">
         <a class="wordmark" href="https://github.com/aigorahub/elves">Elves</a>
-        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.35.0 source and releases on GitHub</a>
+        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.36.0 source and releases on GitHub</a>
       </div>
       <h1>Using Elves</h1>
       <p class="intro">Plan with the main agent, hand implementation to a separate worker, then
@@ -791,6 +791,25 @@ python3 ~/.omp/agent/skills/elves/scripts/install_doctor.py --startup</code></pr
             in the disposable lane. Events cross a bounded host-owned pipe, final output stays pinned
             to a no-follow descriptor, and a final descriptor-safe writable-state audit runs after
             each phase settles.</li>
+          <li><strong>Review snapshot media policy</strong> applies to every harness and host.
+            Read-only review snapshots omit oversized binary media instead of failing the whole
+            review. Video, audio, presentation, archive, image, font, and 3D binaries above the
+            per-file limit are left out; the 16 MiB per-file limit is not raised. The context
+            manifest records each omitted path, byte size, and reason, and every runner prints the
+            same omission block. Source, prose instructions, executable agent configuration, and
+            explicit <code>--include</code> paths still fail closed, with a remediation that asks
+            for a derived text, image, or transcript artifact. Writable lanes keep fail-closed
+            behavior.</li>
+          <li><strong>Fugu is optional.</strong> When a review route is unavailable because of
+            quota, authentication, catalog, runner, timeout, or provider failure, Elves probes the
+            supported review routes and selects another available independent reviewer instead of
+            stopping. An explicit user route is preserved when it works; otherwise a supported
+            native reviewer is preferred when no optional provider works. Elves records requested
+            route, actual route, and fallback reason. It does not claim a review ran when it did
+            not, and optional-provider failure does not block the run while a qualified review
+            route exists. Probe with
+            <code>cobbler_agents.py review-route --host &lt;host&gt; --requested &lt;route&gt;
+            --unavailable &lt;route&gt;=&lt;reason&gt;</code>.</li>
           <li><strong>Manus</strong> creates private, bounded deep-web research and needs
             <code>MANUS_API_KEY</code>. To request one worker per paper or reference, use
             <code>/manus --wide --items-file references.json &lt;goal&gt;</code>. Cobbler requests
@@ -806,14 +825,30 @@ python3 ~/.omp/agent/skills/elves/scripts/install_doctor.py --startup</code></pr
             connector or forced-skill IDs explicitly. Manus documents that empty
             <code>enable_skills</code> loads account-default enabled skills, so this route does not
             promise skill isolation.</li>
-          <li><strong>Grok</strong> runs the installed Grok Build CLI headlessly at high reasoning
+          <li><strong>Grok</strong> runs the installed Grok Build CLI headlessly at
+            <code>high</code> reasoning by default,
             without bypassing permissions over a disposable tracked-source snapshot in a required
             outer kernel sandbox. Grok also uses its built-in inner <code>strict</code> profile,
             provider-documented isolated <code>dontAsk</code> settings, and a bypass lock. It
             requires an explicit <code>XAI_API_KEY</code>; a dedicated tool shell removes both key
             names before model-directed commands run, and the Linux boundary omits procfs to block
             parent-environment inspection. Shared-file OAuth is rejected because Grok applies its
-            sandbox to both provider and tool reads.</li>
+            sandbox to both provider and tool reads. Argv is built from the flags the installed
+            CLI advertises: a missing safety flag (isolated <code>--cwd</code>, inner
+            <code>--sandbox strict</code>, headless <code>--single</code>,
+            <code>--output-format</code>, explicit reasoning effort) fails closed, while a quality
+            flag the installed version dropped is simply not passed. Auto-update is disabled
+            through the isolated <code>[cli] auto_update</code> config key rather than a removed
+            flag. <code>ELVES_GROK_EFFORT</code> selects <code>low</code>, <code>medium</code>,
+            <code>high</code>, or <code>xhigh</code>, and <code>ELVES_GROK_MODEL</code> pins a model
+            only when the authenticated live catalog lists it. The runner reports the CLI version,
+            effort, model, the authentication route the CLI itself names, and any omitted
+            flags. On a host that cannot nest sandboxes (macOS refuses a second profile inside
+            Elves' required outer <code>sandbox-exec</code> boundary), the runner fails closed
+            before it builds a snapshot rather than launching with the inner profile silently
+            missing. Elves does not drop the inner profile to make a launch succeed, and the outer
+            boundary is not optional; use a Linux host with the bwrap backend or select another
+            review route.</li>
           <li><strong>Devin</strong> creates and boundedly follows a remote developer session and
             needs <code>DEVIN_API_KEY</code>. Stored Devin secrets and knowledge are not granted by
             default, and bounded session creation and polling responses share a hard wall-clock
@@ -1239,7 +1274,8 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" preferences reset</code></
 
       <section id="v224-tools">
         <h2>v2.24 run tools</h2>
-        <p>Five driver-facing helpers landed in v2.24 (design adapted, with attribution, from
+        <p>Five driver-facing helpers landed in v2.24, joined by <code>review-route</code> in
+          v2.36 (design adapted, with attribution, from
           PrimeIntellect's prime-agent, MIT). All are advisory instruments for the run — none of
           them grants landing, merge, credential, or routing authority.</p>
 
@@ -1262,14 +1298,20 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" salvage tail --log .elves/
 
 # Continuity watchdog (opt-in): OS-owned timer re-checks a full-run after the session dies
 python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" continuity install --session-id RUN --branch BR --start-head SHA --packet PACKET
-python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" continuity status</code></pre>
+python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" continuity status
+
+# Review route: pick an available reviewer when an optional provider fails
+python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" review-route --host claude-code \
+  --requested fugu --unavailable fugu=quota --available grok --json</code></pre>
         </div>
 
         <p>Honesty boundaries: the re-drive guard fails toward <em>changed</em> (a fingerprint
           error can never manufacture futility); usage ceilings are advisory checkpoints, never
           stops and never routing inputs; salvage text is untrusted observed output; the
           continuity watchdog only writes templates — Elves never activates the timer, defaults
-          to detect-and-report, and never resumes a terminal run. Details:
+          to detect-and-report, and never resumes a terminal run; <code>review-route</code> selects
+          a route and records requested route, actual route, and fallback reason, and never claims
+          a review ran. Details:
           <code>references/e2e-chat-to-land.md</code>, <code>references/learnings-template.md</code>,
           <code>references/schema-and-acceptance.md</code>, and
           <code>references/operations-guide.md</code>.</p>

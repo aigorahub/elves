@@ -1,11 +1,4 @@
 {
   "schema_version": 1,
-  "approvals": [
-    {
-      "surface": "cli:cobbler_agents council",
-      "release": "2.35.0",
-      "reason": "Intentional correction for issue 269: an optional council with zero reports now exits 3 and reports unavailable instead of success.",
-      "plan_path": "docs/plans/windows-wsl-review-truth.md"
-    }
-  ]
+  "approvals": []
 }
