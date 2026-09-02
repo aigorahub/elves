@@ -166,13 +166,21 @@ a bounded remote task, including its creation request, without granting stored s
 by default. Oh My Pi (`/omp` / `$elves omp`) runs headless `omp` over the shared isolation
 snapshot with a single provider-matched API key and never modifies the live checkout from the
 shortcut (use parked `omp-cli` full-run for implementation labor). Grok uses
-headless high-reasoning mode without approval bypass over a disposable tracked-source snapshot in
+headless mode at `high` reasoning by default, without approval bypass over a disposable tracked-source snapshot in
 Elves' required outer kernel sandbox, plus Grok's built-in inner `strict` profile, provider-documented
 isolated `dontAsk` settings, and bypass mode locked off. The shortcut requires an explicit
 `XAI_API_KEY`; a dedicated Grok tool shell removes both supported key names before any
 model-directed command runs, and the Linux boundary omits procfs to prevent parent-environment
 inspection. It does not expose a shared OAuth file because Grok applies the same sandbox to
-provider and tool reads. Fugu's Linux boundary likewise omits procfs around its credential-bearing
+provider and tool reads. The runner builds argv from the flags the installed Grok Build CLI advertises: an absent safety
+flag (isolated `--cwd`, inner `--sandbox strict`, headless `--single`, `--output-format`,
+explicit reasoning effort) fails closed, while a quality flag the installed version dropped is
+simply not passed. Auto-update is disabled through the isolated `[cli] auto_update` config key
+rather than a removed flag. Reasoning effort defaults to `high`; `ELVES_GROK_EFFORT` selects
+`low`, `medium`, `high`, or `xhigh`, and `ELVES_GROK_MODEL` pins a model only when the
+authenticated live catalog lists it. The runner reports the CLI version, effort, model, the
+authentication route the CLI itself names, and any omitted flags.
+Fugu's Linux boundary likewise omits procfs around its credential-bearing
 launcher and exposes only a synthetic `/proc/self/exe` symlink to the qualified real Codex
 executable. Manus requests nest empty connector, enabled-skill, and forced-skill lists under
 `message`, so the wrapper grants no connector or forced-skill IDs explicitly; the documented API

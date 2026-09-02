@@ -340,7 +340,7 @@ reports no route without blocking, and `1` blocks only with `--required` and no 
   as described below.
 - **Grok:** requires the `grok` CLI plus explicit `XAI_API_KEY` (or the legacy
   `GROK_CODE_XAI_API_KEY`). It uses documented headless single-prompt mode, `high`
-  reasoning, self-checking, and `dontAsk`, which silently denies unapproved mutations. The runner
+  reasoning by default, and `dontAsk`, which silently denies unapproved mutations. The runner
   copies tracked source into a disposable snapshot and requires Elves' qualified outer kernel
   sandbox, which makes that snapshot read-only independently of Grok's profile merger. It constructs
   isolated HOME/GROK_HOME state, projects only the selected named key to Grok itself, and selects a
@@ -357,6 +357,14 @@ reports no route without blocking, and `1` blocks only with `--required` and no 
   and a deny would prevent authentication. It
   does not invent a model id; the authenticated live Grok configuration selects the available
   model.
+  The runner builds argv from the flags the installed Grok Build CLI advertises: an absent safety
+  flag (isolated `--cwd`, inner `--sandbox strict`, headless `--single`, `--output-format`,
+  explicit reasoning effort) fails closed, while a quality flag the installed version dropped is
+  simply not passed. Auto-update is disabled through the isolated `[cli] auto_update` config key
+  rather than a removed flag. Reasoning effort defaults to `high`; `ELVES_GROK_EFFORT` selects
+  `low`, `medium`, `high`, or `xhigh`, and `ELVES_GROK_MODEL` pins a model only when the
+  authenticated live catalog lists it. The runner reports the CLI version, effort, model, the
+  authentication route the CLI itself names, and any omitted flags.
 - **Devin:** requires `DEVIN_API_KEY`. It creates a remote session through the official
   `https://api.devin.ai/v1/sessions` API, includes the current origin/branch when available, sends
   empty `secret_ids` and `knowledge_ids`, and polls the documented session endpoint with each

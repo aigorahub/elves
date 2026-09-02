@@ -2910,3 +2910,28 @@ REVIEW_ROUTE_FALLBACK_FORBIDDEN_PHRASES = {
     ]
     for label in ['SKILL.md', 'AGENTS.md', 'README.md', 'references/provider-shortcuts.md', 'references/fugu-calling-guide.md', 'references/review-subagent.md', 'aliases/claude/fugu/SKILL.md']
 }
+
+
+# The Grok runner follows the installed CLI's advertised flags. Restating
+# surfaces must keep the fail-closed safety set, the config-key auto-update
+# replacement, and the catalog-bound model rule together, and must not claim a
+# flag the runner no longer hardcodes.
+GROK_LAUNCH_SURFACE_PHRASES = {
+    label: [
+        "flags the installed Grok Build CLI advertises"
+        if label != "guide/index.html"
+        else "flags the installed CLI advertises",
+        "fails closed",
+        "auto_update",
+        "authenticated live catalog lists it",
+    ]
+    for label in ['SKILL.md', 'AGENTS.md', 'README.md', 'guide/index.html', 'references/provider-shortcuts.md', 'aliases/claude/grok/SKILL.md']
+}
+
+GROK_LAUNCH_SURFACE_FORBIDDEN_PHRASES = {
+    label: [
+        "self-checking",
+        "always passes --check",
+    ]
+    for label in ['SKILL.md', 'AGENTS.md', 'README.md', 'guide/index.html', 'references/provider-shortcuts.md', 'aliases/claude/grok/SKILL.md']
+}

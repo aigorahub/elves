@@ -13,8 +13,16 @@ This is the Elves-managed Claude Code alias for `/grok <instructions>`.
 Load the installed `elves` skill's **Provider shortcut protocols** and
 `references/provider-shortcuts.md`. Resolve `scripts/run_grok.sh` from the active Elves skill root,
 keep the target repository as the working directory, validate the instructions and CLI, and run
-it. Preserve the runner's headless `high`-reasoning, self-checking, non-bypass permission posture;
-do not invent a model id or turn this shortcut into an Elves main-driver route. The Linux
+it. Preserve the runner's headless non-bypass permission posture and its `high` reasoning default;
+do not invent a model id or turn this shortcut into an Elves main-driver route.
+The runner builds argv from the flags the installed Grok Build CLI advertises: an absent safety
+flag (isolated `--cwd`, inner `--sandbox strict`, headless `--single`, `--output-format`,
+explicit reasoning effort) fails closed, while a quality flag the installed version dropped is
+simply not passed. Auto-update is disabled through the isolated `[cli] auto_update` config key
+rather than a removed flag. Reasoning effort defaults to `high`; `ELVES_GROK_EFFORT` selects
+`low`, `medium`, `high`, or `xhigh`, and `ELVES_GROK_MODEL` pins a model only when the
+authenticated live catalog lists it. The runner reports the CLI version, effort, model, the
+authentication route the CLI itself names, and any omitted flags. The Linux
 boundary omits procfs and has no `/proc` view; it does not receive Fugu's synthetic Codex
 `/proc/self/exe` link.
 

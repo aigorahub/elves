@@ -285,6 +285,23 @@ def main() -> int:
             "review route fallback",
         )
     )
+    grok_launch_texts = {
+        label: _flat(label) for label in GROK_LAUNCH_SURFACE_PHRASES
+    }
+    errors.extend(
+        find_missing_phrases(
+            grok_launch_texts,
+            GROK_LAUNCH_SURFACE_PHRASES,
+            "Grok launch surface",
+        )
+    )
+    errors.extend(
+        find_forbidden_phrases(
+            grok_launch_texts,
+            GROK_LAUNCH_SURFACE_FORBIDDEN_PHRASES,
+            "Grok launch surface",
+        )
+    )
     errors.extend(
         find_missing_phrases(
             {label: read_text(REPO_ROOT / label) for label in PREWALK_PHRASES},
@@ -828,6 +845,7 @@ def main() -> int:
     print("- Fugu host routing decision anchors are aligned")
     print("- Review snapshot media omission policy is aligned")
     print("- Optional review route fallback guidance is aligned")
+    print("- Grok launch surface guidance is aligned")
     return 0
 
 

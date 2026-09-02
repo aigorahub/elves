@@ -113,6 +113,14 @@ assume `./scripts` belongs to the target repository and do not execute mappings 
   tracked-source snapshot in a required outer kernel sandbox, built-in inner `strict`, isolated `dontAsk`
   plus bypass lock, explicit `XAI_API_KEY`, a key-scrubbing tool shell, and no Linux procfs; no
   shared OAuth file)
+  The runner builds argv from the flags the installed Grok Build CLI advertises: an absent safety
+  flag (isolated `--cwd`, inner `--sandbox strict`, headless `--single`, `--output-format`,
+  explicit reasoning effort) fails closed, while a quality flag the installed version dropped is
+  simply not passed. Auto-update is disabled through the isolated `[cli] auto_update` config key
+  rather than a removed flag. Reasoning effort defaults to `high`; `ELVES_GROK_EFFORT` selects
+  `low`, `medium`, `high`, or `xhigh`, and `ELVES_GROK_MODEL` pins a model only when the
+  authenticated live catalog lists it. The runner reports the CLI version, effort, model, the
+  authentication route the CLI itself names, and any omitted flags.
 - Devin task → `run_devin.sh <instructions>` (remote session, bounded wait, no default stored
   secret or knowledge grants; creation and polling share one hard wall-clock bound)
 - Oh My Pi task → `run_omp.sh <instructions>` (optional headless worker shortcut under other hosts;

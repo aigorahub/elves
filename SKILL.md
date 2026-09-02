@@ -327,13 +327,21 @@ required capability, then execute it without an extra confirmation prompt:
   isolation. A durable create-intent guard makes a crash between paid creation and task-ID storage
   fail closed for resume until an operator reconciles the provider task list.
 - `/grok <instructions>` or `grok build <instructions>` → `scripts/run_grok.sh <instructions>` for
-  a headless, high-reasoning Grok task with non-bypass permissions over a disposable tracked-source
+  a headless Grok task at `high` reasoning by default, with non-bypass permissions over a disposable tracked-source
   snapshot in Elves' required outer kernel sandbox, plus Grok's built-in inner `strict` profile,
   provider-documented isolated `dontAsk` settings, and bypass locked off. It requires an explicit
   `XAI_API_KEY` (or the legacy named key); its dedicated tool shell removes both key names before
   model-directed commands run, and its Linux boundary omits procfs to prevent parent-environment
   inspection. Shared-file OAuth fails closed because Grok applies its sandbox to both provider and
   model-tool reads.
+  The runner builds argv from the flags the installed Grok Build CLI advertises: an absent safety
+  flag (isolated `--cwd`, inner `--sandbox strict`, headless `--single`, `--output-format`,
+  explicit reasoning effort) fails closed, while a quality flag the installed version dropped is
+  simply not passed. Auto-update is disabled through the isolated `[cli] auto_update` config key
+  rather than a removed flag. Reasoning effort defaults to `high`; `ELVES_GROK_EFFORT` selects
+  `low`, `medium`, `high`, or `xhigh`, and `ELVES_GROK_MODEL` pins a model only when the
+  authenticated live catalog lists it. The runner reports the CLI version, effort, model, the
+  authentication route the CLI itself names, and any omitted flags.
 - `/devin <instructions>` → `scripts/run_devin.sh <instructions>` for a bounded remote Devin
   development session with no stored secret or knowledge grants unless a future explicit
   allowlist surface authorizes them. Its creation and poll requests use bounded response bodies and

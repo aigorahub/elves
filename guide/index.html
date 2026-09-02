@@ -825,14 +825,25 @@ python3 ~/.omp/agent/skills/elves/scripts/install_doctor.py --startup</code></pr
             connector or forced-skill IDs explicitly. Manus documents that empty
             <code>enable_skills</code> loads account-default enabled skills, so this route does not
             promise skill isolation.</li>
-          <li><strong>Grok</strong> runs the installed Grok Build CLI headlessly at high reasoning
+          <li><strong>Grok</strong> runs the installed Grok Build CLI headlessly at
+            <code>high</code> reasoning by default,
             without bypassing permissions over a disposable tracked-source snapshot in a required
             outer kernel sandbox. Grok also uses its built-in inner <code>strict</code> profile,
             provider-documented isolated <code>dontAsk</code> settings, and a bypass lock. It
             requires an explicit <code>XAI_API_KEY</code>; a dedicated tool shell removes both key
             names before model-directed commands run, and the Linux boundary omits procfs to block
             parent-environment inspection. Shared-file OAuth is rejected because Grok applies its
-            sandbox to both provider and tool reads.</li>
+            sandbox to both provider and tool reads. Argv is built from the flags the installed
+            CLI advertises: a missing safety flag (isolated <code>--cwd</code>, inner
+            <code>--sandbox strict</code>, headless <code>--single</code>,
+            <code>--output-format</code>, explicit reasoning effort) fails closed, while a quality
+            flag the installed version dropped is simply not passed. Auto-update is disabled
+            through the isolated <code>[cli] auto_update</code> config key rather than a removed
+            flag. <code>ELVES_GROK_EFFORT</code> selects <code>low</code>, <code>medium</code>,
+            <code>high</code>, or <code>xhigh</code>, and <code>ELVES_GROK_MODEL</code> pins a model
+            only when the authenticated live catalog lists it. The runner reports the CLI version,
+            effort, model, the authentication route the CLI itself names, and any omitted
+            flags.</li>
           <li><strong>Devin</strong> creates and boundedly follows a remote developer session and
             needs <code>DEVIN_API_KEY</code>. Stored Devin secrets and knowledge are not granted by
             default, and bounded session creation and polling responses share a hard wall-clock

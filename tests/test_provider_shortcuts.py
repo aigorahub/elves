@@ -152,10 +152,49 @@ class CaptureServer:
     "provider runner heredocs require Python >= 3.10 (repo floor); skipping on older interpreter",
 )
 class LocalCliRunnerTests(unittest.TestCase):
-    def make_fake(self, root: Path, name: str) -> Path:
+    # Grok Build advertises its launch controls through `--help`, and the runner
+    # builds argv from that surface. LEGACY_GROK_HELP is a release that still
+    # offers `--no-auto-update`/`--check` and spells effort `--effort`;
+    # CURRENT_GROK_HELP is Grok Build 1.0.13, which dropped both quality flags and
+    # renamed the effort flag.
+    LEGACY_GROK_HELP = (
+        "Options:\n"
+        "      --no-auto-update\n"
+        "      --check\n"
+        "      --cwd <CWD>\n"
+        "      --sandbox <PROFILE>\n"
+        "      --effort <EFFORT>\n"
+        "      --output-format <FORMAT>\n"
+        "  -m, --model <MODEL>\n"
+        "  -p, --single <PROMPT>\n"
+    )
+    CURRENT_GROK_HELP = (
+        "Options:\n"
+        "      --cwd <CWD>\n"
+        "      --sandbox <PROFILE>\n"
+        "      --reasoning-effort <EFFORT>\n"
+        "          [aliases: --effort]\n"
+        "      --output-format <FORMAT>\n"
+        "  -m, --model <MODEL>\n"
+        "  -p, --single <PROMPT>\n"
+    )
+
+    def make_fake(self, root: Path, name: str, *, grok_help: str | None = None) -> Path:
         binary = root / name
+        help_text = grok_help if grok_help is not None else self.LEGACY_GROK_HELP
         binary.write_text(
             "#!/bin/sh\n"
+            "if [ \"$(basename \"$0\")\" = grok ]; then\n"
+            "  case \"${1:-}\" in\n"
+            f"    --help) cat <<'GROKHELP'\n{help_text}GROKHELP\n"
+            "      exit 0 ;;\n"
+            "    --version) printf 'grok 9.9.9 (test)\\n'; exit 0 ;;\n"
+            "    models)\n"
+            "      printf 'You are using XAI_API_KEY.\\n\\nAvailable models:\\n"
+            "  * grok-4.6 (default)\\n  - grok-4.5\\n'\n"
+            "      exit 0 ;;\n"
+            "  esac\n"
+            "fi\n"
             "printf 'unrelated-secret=<%s>\\n' \"${AWS_SECRET_ACCESS_KEY:-}\"\n"
             "printf '<%s>\\n' \"$@\"\n"
             "if [ \"$(basename \"$0\")\" = grok ]; then\n"
@@ -171,7 +210,7 @@ class LocalCliRunnerTests(unittest.TestCase):
             "    printf 'snapshot-write=<blocked>\\n'\n"
             "  fi\n"
             "fi\n"
-            "for file in \"${HOME:-}/.claude/settings.json\" \"${GROK_HOME:-}/requirements.toml\" \"${GROK_HOME:-}/sandbox.toml\"; do\n"
+            "for file in \"${HOME:-}/.claude/settings.json\" \"${GROK_HOME:-}/requirements.toml\" \"${GROK_HOME:-}/sandbox.toml\" \"${GROK_HOME:-}/config.toml\"; do\n"
             "  if [ -f \"$file\" ]; then\n"
             "    while IFS= read -r line || [ -n \"$line\" ]; do printf 'config=<%s>\\n' \"$line\"; done < \"$file\"\n"
             "  fi\n"
@@ -1821,6 +1860,91 @@ class LocalCliRunnerTests(unittest.TestCase):
             self.assertNotIn("reasoning-effort", result.stdout)
             self.assertNotIn("always-approve", result.stdout)
             self.assertNotIn("bypassPermissions", result.stdout)
+
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    def test_grok_current_cli_drops_removed_flags_and_keeps_the_safety_posture(self) -> None:
+        """Grok Build 1.0.13 removed --no-auto-update/--check; the launch still runs."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bin_dir = Path(tmpdir)
+            self.make_fake(bin_dir, "grok", grok_help=self.CURRENT_GROK_HELP)
+            result = run_script(
+                "run_grok.sh",
+                "inspect",
+                "this",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "XAI_API_KEY": "test-xai-key",
+                    "ELVES_GROK_EFFORT": "xhigh",
+                    "ELVES_GROK_MODEL": "grok-4.6",
+                },
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        # The removed flags are gone, not renamed or faked.
+        self.assertNotIn("<--check>", result.stdout)
+        self.assertNotIn("<--no-auto-update>", result.stdout)
+        # The safety posture is unchanged.
+        self.assertIn("<--sandbox>", result.stdout)
+        self.assertIn("<strict>", result.stdout)
+        self.assertIn("<--cwd>", result.stdout)
+        self.assertIn("<--single=inspect this>", result.stdout)
+        self.assertIn("snapshot-write=<blocked>", result.stdout)
+        self.assertIn("tool-current=<> tool-legacy=<>", result.stdout)
+        self.assertIn("config=<disable_bypass_permissions_mode = true>", result.stdout)
+        # Opt-in selectors reach the CLI under its current spelling.
+        self.assertIn("<--reasoning-effort>", result.stdout)
+        self.assertIn("<xhigh>", result.stdout)
+        self.assertIn("<--model>", result.stdout)
+        self.assertIn("<grok-4.6>", result.stdout)
+        # Auto-update suppression moved to the isolated config key.
+        self.assertIn("config=<auto_update = false>", result.stdout)
+        # The route record names the real authentication route.
+        self.assertIn("auth=XAI_API_KEY", result.stderr)
+        self.assertIn("omitted_flags=--no-auto-update,--check", result.stderr)
+
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    def test_grok_incompatible_cli_fails_before_building_a_snapshot(self) -> None:
+        stripped = self.CURRENT_GROK_HELP.replace("--sandbox <PROFILE>", "--profile <X>")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bin_dir = Path(tmpdir)
+            self.make_fake(bin_dir, "grok", grok_help=stripped)
+            result = run_script(
+                "run_grok.sh",
+                "inspect",
+                "this",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "XAI_API_KEY": "test-xai-key",
+                },
+            )
+
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("grok_cli_incompatible", result.stderr)
+        self.assertIn("--sandbox", result.stderr)
+        # No snapshot was built, so no context bundle was ever reported.
+        self.assertNotIn("Grok context bundle", result.stderr)
+        # The optional route tells the host driver to reroute.
+        self.assertIn("review route unavailable", result.stderr)
+
+    @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
+    def test_grok_model_outside_the_live_catalog_is_never_invented(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bin_dir = Path(tmpdir)
+            self.make_fake(bin_dir, "grok", grok_help=self.CURRENT_GROK_HELP)
+            result = run_script(
+                "run_grok.sh",
+                "inspect",
+                "this",
+                env={
+                    "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                    "XAI_API_KEY": "test-xai-key",
+                    "ELVES_GROK_MODEL": "grok-4.6-fast",
+                },
+            )
+
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("grok_model_not_in_catalog", result.stderr)
+        self.assertNotIn("Grok context bundle", result.stderr)
 
     def test_grok_shared_oauth_fails_closed_before_provider_launch(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

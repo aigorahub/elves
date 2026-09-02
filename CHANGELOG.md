@@ -17,6 +17,22 @@ All notable changes to the Elves skill are documented here.
   still fail closed, with a remediation that asks for a derived text, image, or transcript artifact.
   Writable lanes keep fail-closed behavior.
 
+### Fixed
+
+* **The Grok Build shortcut works with the current CLI again.** Grok Build 1.0.13 removed the
+  top-level `--no-auto-update` and `--check` flags, and `scripts/run_grok.sh` passed both
+  unconditionally, so every launch died with `error: unexpected argument '--check' found`. The
+  runner now reads the installed CLI's advertised flags before it builds a snapshot. Safety flags
+  (isolated `--cwd`, inner `--sandbox strict`, headless `--single`, `--output-format`, and an
+  explicit reasoning effort) are required and fail closed when absent; quality flags an installed
+  version dropped are simply not passed, so older releases keep their original argv. Auto-update
+  suppression moved to the isolated `[cli] auto_update = false` config key, which every supported
+  version reads and which no longer depends on a removed flag. The outer kernel sandbox, the inner
+  strict profile, the credential grant, the key-scrubbing tool shell, and the bypass lock are
+  unchanged. `ELVES_GROK_EFFORT` and `ELVES_GROK_MODEL` select reasoning effort and a model; a
+  model is admitted only when the authenticated live catalog lists it, so no model id is invented.
+  The runner reports CLI version, effort, model, authentication route, and omitted flags.
+
 ### Added
 
 * **An unavailable optional review route reroutes instead of stopping the run.** Fugu is optional.
