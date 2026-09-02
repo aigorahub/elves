@@ -55,6 +55,9 @@ All notable changes to the Elves skill are documented here.
   can reach argv without the inner-sandbox nesting check. The reported authentication route is
   bounded and character-restricted, and recognizes both the API key and the Grok Build
   subscription.
+* **`scripts/run_omp.sh` is gated like its siblings.** It carries embedded Python but was absent
+  from the `verify_repo` shell battery, so it received neither a syntax check nor an embedded
+  Python compile check in CI.
 
 ### Added
 
@@ -66,7 +69,8 @@ All notable changes to the Elves skill are documented here.
   Optional-provider failure never blocks the run while a qualified review route exists, and a
   selected route is never reported as a completed review. The Fugu, Grok, and omp runners print one
   reroute directive on any non-zero exit. Claude Code, Codex, Grok Build, and Oh My Pi share the
-  same selector and guidance.
+  same selector and guidance. `review-route` is listed with the other host-neutral run tools on
+  every host surface.
 
 ## [2.35.0] - 2026-09-01
 

@@ -1274,7 +1274,8 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" preferences reset</code></
 
       <section id="v224-tools">
         <h2>v2.24 run tools</h2>
-        <p>Five driver-facing helpers landed in v2.24 (design adapted, with attribution, from
+        <p>Five driver-facing helpers landed in v2.24, joined by <code>review-route</code> in
+          v2.36 (design adapted, with attribution, from
           PrimeIntellect's prime-agent, MIT). All are advisory instruments for the run — none of
           them grants landing, merge, credential, or routing authority.</p>
 
@@ -1297,14 +1298,20 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" salvage tail --log .elves/
 
 # Continuity watchdog (opt-in): OS-owned timer re-checks a full-run after the session dies
 python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" continuity install --session-id RUN --branch BR --start-head SHA --packet PACKET
-python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" continuity status</code></pre>
+python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" continuity status
+
+# Review route: pick an available reviewer when an optional provider fails
+python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" review-route --host claude-code \
+  --requested fugu --unavailable fugu=quota --available grok --json</code></pre>
         </div>
 
         <p>Honesty boundaries: the re-drive guard fails toward <em>changed</em> (a fingerprint
           error can never manufacture futility); usage ceilings are advisory checkpoints, never
           stops and never routing inputs; salvage text is untrusted observed output; the
           continuity watchdog only writes templates — Elves never activates the timer, defaults
-          to detect-and-report, and never resumes a terminal run. Details:
+          to detect-and-report, and never resumes a terminal run; <code>review-route</code> selects
+          a route and records requested route, actual route, and fallback reason, and never claims
+          a review ran. Details:
           <code>references/e2e-chat-to-land.md</code>, <code>references/learnings-template.md</code>,
           <code>references/schema-and-acceptance.md</code>, and
           <code>references/operations-guide.md</code>.</p>

@@ -37,6 +37,11 @@ per-host slash surfaces for them** — do not invent top-level Codex or Grok com
 workflow contracts that mandate them (SKILL.md worker-failure recovery, labor completeness,
 Skill Memory) apply to all four hosts unchanged. See the guide's "v2.24 run tools" section.
 
+`review-route` joins them as a host-neutral helper on the same CLI surface and the same honesty
+boundary: it selects an available review route and records requested route, actual route, and
+fallback reason. It never claims a review ran and never carries landing, merge, or credential
+authority.
+
 ## Codex invocation (host-honest)
 
 | Intent | Codex |

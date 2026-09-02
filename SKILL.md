@@ -871,6 +871,11 @@ credential, or routing authority). Continuity only writes OS timer templates —
 activates them. Usage ceilings are checkpoints, never stops. See the guide's "v2.24 run tools"
 section, `references/host-parity.md`, and `AGENTS.md` (Codex adapter pointer).
 
+`review-route` joins them as a host-neutral helper on the same CLI surface and the same honesty
+boundary: it selects an available review route and records requested route, actual route, and
+fallback reason. It never claims a review ran and never carries landing, merge, or credential
+authority.
+
 ## v2.22 runtime helpers (planning harvest, compact output, lanes)
 
 - **Any-model worker pin:** `resolve_user_specified_worker_model` + handoff cache keys
@@ -891,7 +896,7 @@ lanes remain useful but are not the default happy path.
 Claude Code, Codex, Grok Build, and Oh My Pi (omp) provide the same workflow and prewalk safety contract.
 Exact-session prewalk preserves the same qualification, trajectory, checkpoint, visibility,
 fallback, and authority semantics on every host; supervised transport syntax may differ.
-The v2.24 run tools (`redrive`, `learnings`, `usage`, `salvage`, `continuity`) share one CLI
+The v2.24 run tools (`redrive`, `learnings`, `usage`, `salvage`, `continuity`, `review-route`) share one CLI
 surface and one honesty boundary on every host — see **v2.24 run tools (host-neutral)** above
 and `references/host-parity.md`.
 **Codex Goals** are optional continuation plumbing — distinct from **Grok Build goal mode**.
