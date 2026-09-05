@@ -59,7 +59,17 @@ Stage this Elves run. Do not start implementing the batches in this call.
 - If the plan is mathematical, record math as a Cobbler-managed domain workflow and copy any
   explicit math role/provider preferences into the survival guide without making provider keys
   required by default
-- Create or switch to the branch, open or update the PR, and record the PR number
+- For an implementation run, create or switch to the branch. The driver opens or
+  reuses a draft implementation PR at the first useful pushed commit, preferably
+  staging, before bulk execution. Record the PR number and configured bot trigger.
+  If staging has no useful diff, record a pending PR and plan a safe checkpoint
+  at the first useful worker push for driver PR creation. Workers do not own PR
+  actions. The pending PR exception needs a supported checkpoint and passing
+  staging gates; otherwise use a useful staging diff before launch. Keep one
+  packet and the exact prewalk `Continue.` transition. Record PR URL, base,
+  and head. On resume, reuse the branch's existing PR. Never mark unfinished
+  work ready only to trigger a bot. Read-only audits and harvests do not
+  authorize this step.
 - Claim a dedicated checkout: confirm no other agent is working this branch or working tree. When other agents may touch the repo, create the branch directly in a dedicated git worktree instead of in the main checkout (`./scripts/preflight.sh --create-worktree <branch> --base origin/main`; add `--dry-run` to inspect first), and record the branch tip as a collision tripwire. The helper prints the branch, worktree path, base ref, and collision tripwire and does not reuse, delete, or repair existing worktrees. Record the created worktree path as `worktree_path` in `.elves-session.json`, and expect post-merge teardown of that worktree via the separate gc helper (`./scripts/preflight.sh --gc-worktrees`; report by default, `--apply` removes only clean, fully merged, fully pushed worktrees).
 - If the run may be delegated to a separate worker (Run Control `Work driver` ≠ host-native),
   write the standalone coordinator→implementer packet now and record its path in Run Control
@@ -106,7 +116,17 @@ Stage this Elves run. Do not start implementing the batches in this call.
 - If the plan is mathematical, record math as a Cobbler-managed domain workflow and copy any
   explicit math role/provider preferences into the survival guide without making provider keys
   required by default
-- Create or switch to the branch, open or update the PR, and record the PR number
+- For an implementation run, create or switch to the branch. The driver opens or
+  reuses a draft implementation PR at the first useful pushed commit, preferably
+  staging, before bulk execution. Record the PR number and configured bot trigger.
+  If staging has no useful diff, record a pending PR and plan a safe checkpoint
+  at the first useful worker push for driver PR creation. Workers do not own PR
+  actions. The pending PR exception needs a supported checkpoint and passing
+  staging gates; otherwise use a useful staging diff before launch. Keep one
+  packet and the exact prewalk `Continue.` transition. Record PR URL, base,
+  and head. On resume, reuse the branch's existing PR. Never mark unfinished
+  work ready only to trigger a bot. Read-only audits and harvests do not
+  authorize this step.
 - Claim a dedicated checkout: confirm no other agent is working this branch or working tree. When other agents may touch the repo, create the branch directly in a dedicated git worktree instead of in the main checkout (`./scripts/preflight.sh --create-worktree <branch> --base origin/main`; add `--dry-run` to inspect first), and record the branch tip as a collision tripwire. The helper prints the branch, worktree path, base ref, and collision tripwire and does not reuse, delete, or repair existing worktrees. Record the created worktree path as `worktree_path` in `.elves-session.json`, and expect post-merge teardown of that worktree via the separate gc helper (`./scripts/preflight.sh --gc-worktrees`; report by default, `--apply` removes only clean, fully merged, fully pushed worktrees).
 - If the run may be delegated to a separate worker (Run Control `Work driver` ≠ host-native),
   write the standalone coordinator→implementer packet now and record its path in Run Control

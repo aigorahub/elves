@@ -92,6 +92,50 @@ blocker for a native-first run; it is a warning only when the fallback changes r
 It is blocking only when the survival guide explicitly made that phase route required and the
 coordinator could not satisfy it. Do not infer route authority from model prestige.
 
+## Early draft PR and bot review
+
+For an authorized implementation run, the driver opens or reuses its draft
+implementation PR at the first useful pushed commit. Prefer a staging commit
+with the accepted plan or other useful run changes. Open the draft before
+bulk execution and before parking for a trusted worker. Do not create an
+empty commit only to open a PR. Do not wait for the finished implementation.
+A separate plan PR does not replace the implementation PR. Read-only audits
+and issue harvests do not authorize PR creation.
+If staging has no useful diff, record that the draft is pending and arrange
+a safe worker checkpoint at the first useful push. The driver opens the PR
+at that checkpoint before bulk work continues. It does not wait for the whole
+worker run. Do not prompt a working or parked seat to obtain this checkpoint;
+include it in the launch packet and use the existing return mechanism.
+This exception requires a checkpoint supported by the installed route and
+passing staging gates. If either is unavailable, create a useful staging diff
+and open the draft before launch. Do not improvise a checkpoint or send a
+second worker packet. Exact prewalk keeps its session and `Continue.` transition.
+Record the PR URL and number, base branch, and exact head in the run records.
+On resume, query by repository and branch and reuse the existing PR, including
+when the local record is missing. Refresh its recorded head after pushes.
+
+The driver owns PR creation, metadata, reviewer requests, and comment replies.
+Workers can commit and push within their recorded feature-branch authority;
+this rule grants them no PR actions. The draft body states the accepted scope,
+unfinished work, and checks that have actually run.
+
+Inspect repository configuration and the bot's documented triggers. Record
+whether it reviews draft PRs, initial creation, later pushes, or explicit
+requests. Confirm a bot review, bot-owned check, or queued bot job on GitHub.
+Unrelated CI does not prove that bot review started. A draft alone does not
+prove that a bot started. Use the documented request mechanism only when
+existing authority permits it. Do not install or reconfigure a bot as an
+implicit part of opening the PR. If draft review is unsupported or unavailable,
+record that limit and keep incomplete work in draft. Never remove draft state
+only to trigger review.
+
+Take new bot feedback into driver review at safe checkpoints, wakes, and
+terminal reconciliation. Routine comments do not interrupt a healthy parked
+worker. The driver checks relevance against the current head, fixes confirmed
+blockers within scope, and records dispositions under the existing review
+rules. Early feedback does not replace the final independent cumulative
+review, required checks, or exact-head readiness gates.
+
 ## Agy review requirements
 
 Every Agy review and re-review uses `/boost`, including lightweight reviews.
@@ -643,7 +687,7 @@ Parse with python3. Filter out comments already recorded in `.elves-session.json
 
 The built-in review is the minimum viable loop. Users can strengthen it by:
 
-- **Installing GitHub reviewer bots** (CodeRabbit, GitHub Copilot code review, SonarCloud, etc.): these produce detailed, automated reviews on every push that the subagent reads and acts on
+- **Installing GitHub reviewer bots** (CodeRabbit, GitHub Copilot code review, SonarCloud, etc.): configured triggers can produce reviews during implementation. Check each bot's draft and push support. The driver reads and resolves feedback under the early review rules above.
 - **Adding a custom review API** (configure in the survival guide under `## Tool Configuration`)
 - **Adding smoke tests** (curl endpoints after preview deployment)
 - **Adding visual review** (screenshot capture and inspection)

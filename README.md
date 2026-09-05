@@ -11,6 +11,19 @@ the merge decision. The agent does the middle.
 **Current release: v2.36.1**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
+Implementation runs get a draft PR at the first useful pushed commit,
+preferably during staging, before bulk execution. The driver opens or reuses
+it and checks whether configured bots review drafts. It uses a permitted
+documented bot request when needed. If draft review is unavailable, it records
+that limit and keeps unfinished work in draft. Bot feedback enters driver
+review at safe boundaries. Final independent review still applies. Workers
+do not gain PR authority. Read-only audits and harvests do not open PRs.
+If staging has no useful diff, a planned worker checkpoint gives the driver
+control at the first useful push when the installed route and staging gates
+permit it. Otherwise useful staging changes must supply the draft before launch.
+The driver opens the draft before bulk
+work continues. It checks for the bot's own review, check, or queued job.
+
 **New to Elves?** Use the [practical user guide](https://aigorahub.github.io/elves/) — especially
 **[Paste this to your agent](https://aigorahub.github.io/elves/#agent-onboarding)** at the top.
 That copy-ready block installs Elves for Claude Code, Codex, Grok Build, and/or Oh My Pi (omp)

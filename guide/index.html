@@ -1139,6 +1139,22 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" route-worker --json \
 
       <section id="watch">
         <h2>Watch the work</h2>
+        <p>The driver opens or reuses a draft implementation PR at the first useful
+          pushed commit, preferably during staging, before bulk execution. Configured
+          bots can then review while work continues. The driver checks each bot's
+          draft support and trigger. It uses a documented review request only when
+          permitted. If draft review is unavailable, it records that limit and keeps
+          unfinished work in draft.</p>
+        <p>If staging has no useful diff, the driver plans a safe checkpoint at the
+          worker's first useful push only when the installed route and staging gates
+          permit it. Otherwise it opens the draft from useful staging changes before
+          launch. It opens a pending draft before bulk work continues.
+          A bot review, its own check, or a queued bot job proves that review started.
+          Unrelated CI does not.</p>
+        <p>Workers do not own PR actions. Bot feedback enters driver review at safe
+          checkpoints or when the driver returns from a parked run. Early bot review
+          does not replace final independent review. Read-only audits and issue
+          harvests do not open PRs.</p>
         <p class="lede">Before the driver parks, it should display the worker's live output or give
           you an exact command to follow the log. You can watch the worker without asking the
           driver to narrate routine progress.</p>

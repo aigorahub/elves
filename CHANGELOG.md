@@ -8,6 +8,11 @@ All notable changes to the Elves skill are documented here.
 
 ### Fixed
 
+- Implementation runs open or reuse a driver-owned draft PR at the first
+  useful pushed commit, preferably staging, before bulk execution. The driver
+  checks bot draft triggers and takes feedback at safe boundaries. Missing
+  draft review support never marks unfinished work ready. Final independent
+  review and read-only audit and harvest scopes remain required.
 - Agy reviews require context coverage before a clean verdict. The host
   checks changed files, callers, tests, instructions, and task docs against
   read evidence. Missing context blocks a pass.

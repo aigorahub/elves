@@ -596,9 +596,31 @@ choreography**. See `references/plan-template.md`.
 
 ## Staging
 
-Launch only when: plan cleaned, run docs current, branch/PR recorded, preflight green, acceptance
+Launch only when: plan cleaned, run docs current, branch/PR recorded (or the supported pending
+draft checkpoint below is recorded), preflight green, acceptance
 contract reconciled, run mode/non-negotiables recorded, no unresolved planning blockers. In single-
 kickoff E2E, continue immediately once launch-ready.
+
+For an authorized implementation run, the driver opens or reuses the draft
+implementation PR at the first useful pushed commit, preferably a staging
+commit, before bulk execution. Do not wait for implementation to finish.
+The driver owns PR creation and bot requests; workers keep their existing
+feature-branch commit and push authority. Read-only audits and issue harvests
+do not create PRs. Check the configured bot trigger and draft support. Use a
+documented review request only when permitted. If draft review is unavailable,
+record that limit and keep the incomplete PR in draft. Never mark it ready
+only to start a bot. See `references/review-subagent.md` for early review rules.
+If staging has no useful diff, record PR creation as pending and arrange a
+safe worker checkpoint at its first useful push only when the installed route
+supports it and all staging gates permit it. Otherwise prepare a useful staging
+diff and open the draft before launch. The driver creates a pending draft
+there before bulk work resumes. Do not wait for the whole worker run or send
+prompts into a working or parked seat. Confirm a bot review, bot-owned check,
+or queued bot job; unrelated CI is not proof that bot review started.
+Record the PR URL/number, base branch, and exact current head. After resume,
+look up the existing PR by repository and branch before creating another.
+The checkpoint uses the original worker packet. It must not change the exact
+prewalk session transition or add a second packet; the transition remains `Continue.`.
 
 If Run Control `Work driver` ≠ host-native (or the run may be delegated), the standalone
 coordinator→implementer packet is written and its path recorded in Run Control and as
@@ -703,6 +725,10 @@ Do not wait for user acknowledgment.
 
 Outside parked full-run: nonblocking new/unresolved poll after host pushes. Terminal readiness waits
 for required checks/reviewers. Trusted parked worker pushes defer host PR polling until wake.
+Open the draft before parking for bulk execution. Bot feedback enters driver review at the next
+safe checkpoint, wake, or terminal reconciliation. Routine comments do not
+interrupt a healthy worker. Early bot review never replaces final independent
+review of the cumulative diff at the exact head.
 
 ### 14–15. Drift check when evidence warrants; continue or stop
 
