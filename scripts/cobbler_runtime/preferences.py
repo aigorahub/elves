@@ -30,6 +30,7 @@ SAFE_PATHS: dict[str, tuple[type, set[str] | None]] = {
     "worker.native_effort": (str, {"auto", "low", "medium", "high", "xhigh", "max"}),
     "worker.prewalk": (str, {"off", "auto", "required", "experimental"}),
     "worker.parallel": (str, {"off", "auto"}),
+    **{f"team.{role}": (str, None) for role in ("lead", "proposer", "investigator", "implementer", "critic", "reviewer")},
 }
 
 _FORBIDDEN_SEGMENTS = frozenset(
@@ -108,10 +109,13 @@ def _validate_known_fields(data: Mapping[str, Any]) -> None:
     if not isinstance(worker, Mapping):
         raise ValidationIssue("invalid_type", "`worker` must be an object", path="worker")
     for dotted, (expected_type, choices) in SAFE_PATHS.items():
-        _, name = dotted.split(".", 1)
-        if name not in worker:
+        group, name = dotted.split(".", 1)
+        values = data.get(group, {})
+        if not isinstance(values, Mapping):
+            raise ValidationIssue("invalid_type", f"`{group}` must be an object", path=group)
+        if name not in values:
             continue
-        value = worker[name]
+        value = values[name]
         if not isinstance(value, expected_type) or (choices is not None and value not in choices):
             allowed = ", ".join(sorted(choices or ()))
             raise ValidationIssue(

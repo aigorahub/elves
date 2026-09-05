@@ -321,3 +321,12 @@ chain, empty `blockers` / `remaining_risks`. Worker `merge_authority` is always 
 5. Execution log
 6. `.ai-docs/manifest.md` if present
 7. Constitution if present
+
+## Optional team contract (v2.37)
+
+The driver owns `team` and `team_callback` in the canonical session. Team version
+1 records exact driver identity, append only contributors, helper lifecycle,
+discussion evidence, and independent review identity, commit, path, and digest.
+Worker reports cannot replace these fields. Callback protocol 1 points to a local
+Lantern executable, state directory, and scoped credential. These are run state,
+not model preferences or product files. See `agent-teams.md`.

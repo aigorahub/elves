@@ -668,13 +668,18 @@ class LaneSupervisor:
         running = [k for k, v in statuses.items() if v == "running"]
         failed = [k for k, v in statuses.items() if v == "failed"]
         completed = [k for k, v in statuses.items() if v == "completed"]
+        pending = [k for k, v in statuses.items() if v == "pending"]
         return {
             "lane_count": len(self._lanes),
             "running": running,
+            "pending": pending,
             "failed": failed,
             "completed": completed,
-            "all_terminal": not running and len(self._lanes) > 0,
-            "ok_to_integrate": not running and not failed and len(completed) == len(self._lanes),
+            "all_terminal": bool(statuses) and all(
+                status in {"completed", "failed", "demoted_serial"}
+                for status in statuses.values()
+            ),
+            "ok_to_integrate": bool(statuses) and len(completed) == len(statuses),
             "lanes": {k: v.to_dict() for k, v in self._lanes.items()},
         }
 

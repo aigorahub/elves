@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Grok Build, Oh My Pi (omp), Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.36.1"
+  version: "2.37.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -84,7 +84,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.36.1):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.37.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
@@ -593,6 +593,24 @@ execution. Required: plan, survival guide, learnings, execution log, active bran
 Plans express **intent, acceptance, risk, caution, affected surfaces, constitution impacts, focused
 tests, review focus, dependencies**, and optional checkpoints — **without implementation
 choreography**. See `references/plan-template.md`.
+
+## Driver and helper teams
+
+Use one driver with bounded helpers for a shared task, independent proposals then
+critique for brainstorming, and separate writer lanes for implementation. Canonical
+commands and gates: `references/agent-teams.md`. The `team` and `team-lanes` CLI
+commands work on every supported host. Saved role choices use existing preferences.
+
+Stage exact driver and helper identities. Record all substantive contributors.
+The independent landing reviewer must be outside that set. A fresh same family
+reviewer is valid. Use the qualified Agy plan mode and Boost harness when selected.
+Review routing and final readiness enforce contributor exclusion and exact commit
+evidence. Worker reports cannot rewrite the driver ledger or callback configuration.
+
+Lantern callbacks are optional. Pull reports at named driver checkpoints. Never
+prompt a working or parked seat. Keep the one packet prewalk transition. Persist
+report results before acknowledgement and reconcile ambiguous effects before retry.
+Only the driver integrates lane results or performs authorized landing.
 
 ## Staging
 

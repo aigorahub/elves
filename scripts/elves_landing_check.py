@@ -55,6 +55,7 @@ from cobbler_runtime.landing_authority import (
     terminal_action,
 )
 from cobbler_runtime.landing_profile import evaluate_landing_profile
+from cobbler_runtime.schema import ValidationIssue
 
 
 DEFAULT_SESSION = ".elves-session.json"
@@ -1294,6 +1295,12 @@ def _check_host_landing_control(
             "Landing readiness requires Git to resolve HEAD to an exact 40-character commit.",
         )
         return
+
+    from cobbler_runtime.teams import readiness_check as team_readiness_check
+    try:
+        team_readiness_check(session, current_head)
+    except ValidationIssue as exc:
+        report.error(exc.code, exc.message)
 
     control, readiness = _landing_control_from_session(session, report)
     if readiness is None:

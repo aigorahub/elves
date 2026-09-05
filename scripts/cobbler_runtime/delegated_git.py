@@ -47,6 +47,8 @@ HOST_CONTROL_FIELDS: frozenset[str] = frozenset(
         "pr_number",
         "continuation_guard",
         "driver_monitor_mode",
+        "team",
+        "team_callback",
     }
 )
 

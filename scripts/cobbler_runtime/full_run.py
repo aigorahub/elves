@@ -3794,6 +3794,8 @@ def prepare_full_run(
     allow_overwrite: bool = False,
 ) -> dict[str, Any]:
     """Create private full-run artifact tree for one exact session."""
+    from .teams import checkpoint_guard
+    checkpoint_guard(repo_root, "after-staging")
     sid = (session_id or "").strip()
     normalized_grant_names = _normalize_credential_grant_names(
         credential_grant_names

@@ -1,5 +1,5 @@
 ---
-version: "2.36.1"
+version: "2.37.0"
 ---
 
 # Elves: Codex repository adapter
@@ -184,6 +184,9 @@ provider usage, but not merge, protected-ref, secret, or approval-bypass authori
   `review_context.review_prompt_block` verbatim, or derive the identical table from native
   `Confidence:` trailers; Claude Code/Codex semantics are identical
   (`references/review-subagent.md`; `references/host-parity.md`)
+- **Driver and helper teams:** `team` and `team-lanes` use optional Lantern callbacks,
+  independent proposals, contributor exclusion, and persistent writer gates. Canonical
+  contract: `references/agent-teams.md`; no separate Codex workflow.
 - **Parallel lanes (Parallelves):** serial default; `worker.parallel=auto` is recommend-only and
   nothing auto-launches (`references/parallelves.md`; SKILL.md Parallel lanes)
 - **Prewalk:** exact-session guide→execution continuity only; a cold packet handoff is not prewalk,
