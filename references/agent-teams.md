@@ -132,7 +132,12 @@ Explicit configuration qualifies the endpoint and records a private local
 authorization outside the checkout. A checked out session alone cannot execute
 a callback. Failed qualification permits a corrected configuration. Callback
 subprocesses receive a minimal environment without provider API keys.
-Python executables run through the current Python interpreter, including Windows.
+Python callback executables run through the current Python interpreter. Full
+Elves team and writer execution retains the existing platform support: macOS,
+Linux, and Windows through WSL2. Native Windows Python is not a qualified Elves
+execution host. Inside WSL2, use executable, state, and credential paths that the
+WSL filesystem can resolve. Native Lantern transport tests do not qualify native
+Windows Elves execution.
 Commands use argument arrays, closed stdin, and a timeout of at most 60 seconds.
 
 Use `team post --input message.json` for assignment, progress, question, answer,

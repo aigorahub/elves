@@ -411,7 +411,7 @@ def _run(args):
             target = (target if target.is_absolute() else root / target).absolute()
             # Packet text contains scoped config paths, never credential contents.
             from .storage import guard_repo_path
-            guard_repo_path(root,target)
+            target = guard_repo_path(Path(args.repo_root),target)
             target.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
             if target.is_symlink(): issue('team_packet_path', 'Packet output cannot be a symbolic link')
             target.write_text(packet)
@@ -521,7 +521,7 @@ def run(args):
         target = Path(args.session)
         target = (target if target.is_absolute() else root / target).absolute()
         from .storage import guard_repo_path
-        target = guard_repo_path(root, target)
+        target = guard_repo_path(Path(args.repo_root), target)
         args.session = str(target)
         with session_lock(target):
             payload, code = _run(args)

@@ -173,6 +173,18 @@ class TeamTests(unittest.TestCase):
                 self.assertFalse(driver_parked({'start_head':'b'*40},root))
                 monitor.assert_not_called()
 
+    def test_public_helper_packet_accepts_checkout_entry_alias(self):
+        cli=Path(__file__).resolve().parents[1]/'scripts/cobbler_agents.py'
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp).resolve(); checkout=root/'checkout'; checkout.mkdir(); alias=root/'entry'; alias.symlink_to(checkout,target_is_directory=True)
+            state=session(); state.update(run_id='run',worktree_path=str(checkout))
+            state['team']['helpers']['task']={'task':'Inspect checkout','role':'investigator','identity':HELPER,'intent':'Find cause','build_on':['src'],'owned_surfaces':['analysis'],'forbidden_surfaces':['product edits'],'acceptance':['Cite evidence'],'state':'assigned'}
+            (checkout/'.elves-session.json').write_text(json.dumps(state))
+            target=alias/'.elves/runtime/packet.md'
+            result=subprocess.run([sys.executable,str(cli),'team','helper-packet','--repo-root',str(alias),'--session',str(alias/'.elves-session.json'),'--task-id','task','--output',str(target)],capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.assertTrue(target.is_file())
+
 
 class CallbackTests(unittest.TestCase):
     def setUp(self):
