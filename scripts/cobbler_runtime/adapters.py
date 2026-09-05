@@ -293,6 +293,8 @@ _RESERVED_CONTROL_FLAGS: dict[str, frozenset[str]] = {
             "--agent",
             "--add-dir",
             "--print-timeout",
+            "--disable-slash-commands",
+            "--output-format",
         }
     ),
     "opencode-cli": frozenset(
@@ -602,6 +604,7 @@ def default_decoder_for_adapter(adapter: str) -> str:
         "codex-fugu": "codex-jsonl",
         "devin-cli": "custom-json-envelope",
         "omp-cli": "omp-jsonl",
+        "antigravity-cli": "agy-jsonl",
         "custom-cli": "custom-json-envelope",
         "host-native": "host-injected",
     }.get(name, "custom-json-envelope")
@@ -1075,7 +1078,46 @@ def build_readonly_invocation(
             if exact_session:
                 # Exact conversation resume — planning context for later review.
                 argv_list.extend(["--conversation", exact_session])
-            argv_list.extend(["--print", full_prompt, "--mode", "plan"])
+            # Every review, including a lightweight or resumed review, uses Boost.
+            # Do not infer a review role from words in a planning task.
+            review_role = str(role or profile).strip().lower()
+            if review_role in {"review", "lightweight_review"}:
+                if not work_cwd or not Path(work_cwd).is_absolute():
+                    raise ValidationIssue(
+                        "agy_review_workspace_required",
+                        "Agy review requires an absolute admitted workspace path",
+                    )
+                full_prompt = (
+                    f"Admitted review workspace: {work_cwd}\n"
+                    "Give this absolute workspace path and these constraints to every child. "
+                    "Use absolute paths for file reads. Return findings only. Do not edit files, "
+                    "commit, push, merge, or change permissions. Read the supplied diff and "
+                    "commit evidence; the admitted snapshot may have no .git directory. "
+                    "Do not assume shell commands are permitted. Wait for the investigation "
+                    "and verification results before returning the final structured role report. "
+                    "A delegation notice is not a completed review. Report denied reads or "
+                    "missing evidence as a block. Include the reviewed commit in evidence. "
+                    "Read every changed file and the relevant callers, tests, repository "
+                    "instructions, and task documentation before giving a verdict. Trace each "
+                    "finding through those files and check for evidence that disproves it. "
+                    "Return {role_report, review_coverage}. review_coverage must contain full "
+                    "head_sha and base_sha, changed_files and read_files lists, context_files "
+                    "with callers/tests/instructions/task_docs lists, missing_context list, "
+                    "context_exclusions mapping each empty context category to a specific "
+                    "not-applicable reason, and exclusions list of {path, reason}. "
+                    "List only reads actually performed. Explain each exclusion; the host must "
+                    "approve omissions. Do not return pass while required context is missing. "
+                    "The host will compare this declaration with its independent diff and "
+                    "tool-read evidence; this declaration alone does not prove coverage.\n"
+                    f"Expected reviewed head from the context packet: {packet_obj.get('head_sha') or 'not supplied; report missing context rather than guessing'}\n\n"
+                    + full_prompt
+                )
+            agy_prompt = (
+                "/boost " + full_prompt
+                if review_role in {"review", "lightweight_review"}
+                else full_prompt
+            )
+            argv_list.extend(["--print", agy_prompt, "--mode", "plan", "--output-format", "stream-json"])
             if requested_model:
                 argv_list.extend(["--model", str(requested_model)])
             argv_list.extend(extras)
@@ -1087,15 +1129,15 @@ def build_readonly_invocation(
                 tool_scope="read-only",
                 sandbox_scope="ephemeral",
                 notes=(
-                    "Antigravity CLI (agy) headless --print; pin latest Gemini model "
-                    "(3.1 Pro plan/review, 3.5 Flash optional labor). Not Lane A / not "
+                    "Antigravity CLI (agy) headless --print; reviews require /boost. "
+                    "Pin the selected model from the live agy catalog. Not Lane A / not "
                     "host-import write-lease qualified. Experimental implement: host "
                     "launches agy with --dangerously-skip-permissions separately. "
                     "Pass exact session_id/--conversation so review resumes planning chat."
                 ),
                 stdin_text=None,
                 input_mode="none",
-                decoder="custom-json-envelope",
+                decoder="agy-jsonl",
                 cwd=work_cwd,
                 session_id=exact_session,
             )
@@ -1550,6 +1592,129 @@ def decode_codex_jsonl(
     )
 
 
+def _validate_agy_review_coverage(coverage: Any, *, verdict: str) -> dict[str, Any]:
+    """Validate declared coverage, not whether files were actually read."""
+    def fail(detail: str) -> None:
+        raise ValidationIssue(
+            "agy_incomplete_review_coverage", detail,
+            hint="The host must compare coverage with the exact diff and tool-read evidence.",
+        )
+
+    if not isinstance(coverage, dict):
+        fail("Agy review requires a review_coverage object")
+    for key in ("head_sha", "base_sha"):
+        value = coverage.get(key)
+        if not isinstance(value, str) or re.fullmatch(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", value) is None:
+            fail(f"Agy coverage requires an exact full {key}")
+
+    def paths(value: Any, label: str) -> list[str]:
+        if not isinstance(value, list) or any(not isinstance(path, str) or not path.strip() for path in value):
+            fail(f"Agy coverage {label} must be a list of nonempty strings")
+        return value
+
+    changed = paths(coverage.get("changed_files"), "changed_files")
+    reads = set(paths(coverage.get("read_files"), "read_files"))
+    missing = paths(coverage.get("missing_context"), "missing_context")
+    context = coverage.get("context_files")
+    if not isinstance(context, dict):
+        fail("Agy coverage requires context_files")
+    context_exclusions = coverage.get("context_exclusions", {})
+    if not isinstance(context_exclusions, dict):
+        fail("Agy context_exclusions must map empty categories to reasons")
+    required = set(changed)
+    for category in ("callers", "tests", "instructions", "task_docs"):
+        category_paths = paths(context.get(category), f"context_files.{category}")
+        if not category_paths and verdict == "pass":
+            reason = context_exclusions.get(category)
+            if not isinstance(reason, str) or not reason.strip():
+                fail(f"Empty Agy context category {category} requires a not-applicable reason")
+        required.update(category_paths)
+    exclusions = coverage.get("exclusions")
+    if not isinstance(exclusions, list):
+        fail("Agy coverage requires exclusions with path and reason")
+    excluded = set()
+    for item in exclusions:
+        if not isinstance(item, dict) or any(
+            not isinstance(item.get(key), str) or not item[key].strip()
+            for key in ("path", "reason")
+        ):
+            fail("Each Agy coverage exclusion requires a path and reason")
+        excluded.add(item["path"])
+    if verdict == "pass" and (missing or required - reads - excluded):
+        fail("Agy cannot pass review with missing required context or uncovered declared files")
+    return coverage
+
+
+def decode_agy_jsonl(
+    stdout: str,
+    *,
+    expected_role: str | None = None,
+) -> TransportDecodeResult:
+    """Decode one native Agy turn, without treating a child spawn as completion."""
+    guidance = "Use a supervised Agy terminal review if the isolated headless route cannot qualify."
+    try:
+        events = [json.loads(line) for line in stdout.splitlines() if line.strip()]
+        if not events or any(not isinstance(event, dict) for event in events):
+            raise ValueError("expected native event objects")
+        starts = [event for event in events if event.get("event") == "init"]
+        ends = [event for event in events if event.get("event") == "result"]
+        if len(starts) != 1 or len(ends) != 1 or events[0] != starts[0] or events[-1] != ends[0]:
+            raise ValueError("expected one init and one final result")
+        init = starts[0]["init"]
+        result = ends[0]["result"]
+        if not isinstance(init, dict) or not isinstance(result, dict):
+            raise ValueError("invalid init or result payload")
+        session = starts[0]["conversation_id"]
+        if not isinstance(session, str) or not session or result.get("conversation_id") != session:
+            raise ValueError("conflicting or missing conversation identity")
+        model = init.get("model")
+        if model is not None and (not isinstance(model, str) or not model.strip()):
+            raise ValueError("invalid model identity")
+    except (ValueError, KeyError, TypeError) as exc:
+        raise ValidationIssue("agy_invalid_transport", str(exc), hint=guidance) from exc
+
+    if result.get("status") != "SUCCESS" or result.get("error"):
+        raise ValidationIssue("agy_failed_status", "Agy did not return a successful final result", hint=guidance)
+    if result.get("denied_actions"):
+        raise ValidationIssue("agy_denied_actions", "Agy reported denied tool actions", hint=guidance)
+    review = expected_role in {"review", "lightweight_review"}
+    if review:
+        commands = init.get("expanded_commands", [])
+        if not isinstance(commands, list) or not any(
+            isinstance(command, dict) and command.get("name") == "boost"
+            and command.get("type") == "system" for command in commands
+        ):
+            raise ValidationIssue("agy_boost_unverified", "Agy did not confirm system Boost expansion", hint=guidance)
+    # Only the final result may supply a report. Intermediate agent text and
+    # subagent DONE events can describe delegation, not completed child work.
+    try:
+        body = result.get("structured_output")
+        if body is None:
+            body = _parse_json_object(result.get("response", ""))
+        coverage = body.get("review_coverage") if isinstance(body, dict) else None
+        if isinstance(body, dict) and "role_report" in body:
+            body = body["role_report"]
+        report = validate_role_report(body, expected_role=expected_role)
+    except (ValidationIssue, AttributeError, TypeError) as exc:
+        raise ValidationIssue("agy_missing_review_report", "Agy returned no valid final role report", hint=guidance) from exc
+    if review:
+        coverage = _validate_agy_review_coverage(coverage, verdict=report["verdict"])
+        # Keep model declarations in the redacted report path. Transport notes
+        # carry no model-authored paths or explanations.
+        report["evidence"].append(
+            "Model-reported review coverage; host verification required: "
+            + json.dumps(coverage, sort_keys=True)
+        )
+    return TransportDecodeResult(
+        role_report=report,
+        actual_model=model,
+        model_evidence_source="agy.init.model" if model else None,
+        session_id=session,
+        transport_notes=("agy-jsonl", "boost-expanded" if review else "native-result",
+                         "host-must-verify-terminal-review-evidence"),
+    )
+
+
 def decode_custom_json_envelope(
     stdout: str,
     *,
@@ -1771,6 +1936,8 @@ def decode_adapter_output(
         result = decode_codex_jsonl(stdout, expected_role=expected_role)
     elif name in {"omp-jsonl"}:
         result = decode_omp_jsonl(stdout, expected_role=expected_role)
+    elif name == "agy-jsonl":
+        result = decode_agy_jsonl(stdout, expected_role=expected_role)
     elif name in {"custom-json-envelope", "json-role-report", "json-transport-envelope"}:
         result = decode_custom_json_envelope(stdout, expected_role=expected_role)
     else:

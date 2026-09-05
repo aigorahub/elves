@@ -512,7 +512,7 @@
     <div class="masthead-inner">
       <div class="brand-row">
         <a class="wordmark" href="https://github.com/aigorahub/elves">Elves</a>
-        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.36.0 source and releases on GitHub</a>
+        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.36.1 source and releases on GitHub</a>
       </div>
       <h1>Using Elves</h1>
       <p class="intro">Plan with the main agent, hand implementation to a separate worker, then
@@ -1139,6 +1139,22 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" route-worker --json \
 
       <section id="watch">
         <h2>Watch the work</h2>
+        <p>The driver opens or reuses a draft implementation PR at the first useful
+          pushed commit, preferably during staging, before bulk execution. Configured
+          bots can then review while work continues. The driver checks each bot's
+          draft support and trigger. It uses a documented review request only when
+          permitted. If draft review is unavailable, it records that limit and keeps
+          unfinished work in draft.</p>
+        <p>If staging has no useful diff, the driver plans a safe checkpoint at the
+          worker's first useful push only when the installed route and staging gates
+          permit it. Otherwise it opens the draft from useful staging changes before
+          launch. It opens a pending draft before bulk work continues.
+          A bot review, its own check, or a queued bot job proves that review started.
+          Unrelated CI does not.</p>
+        <p>Workers do not own PR actions. Bot feedback enters driver review at safe
+          checkpoints or when the driver returns from a parked run. Early bot review
+          does not replace final independent review. Read-only audits and issue
+          harvests do not open PRs.</p>
         <p class="lede">Before the driver parks, it should display the worker's live output or give
           you an exact command to follow the log. You can watch the worker without asking the
           driver to narrate routine progress.</p>
@@ -1206,6 +1222,7 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" \
 
       <section id="finish">
         <h2>Review and finish</h2>
+        <p>Agy reviews and reviews of fixes require <code>/boost</code> in plan mode. Use a separate reviewer session. If Boost fails, use an authorized independent fallback or report a block. A plain Agy response does not satisfy review. Use a supervised terminal when headless transport is unqualified. Pass the absolute review workspace to every Boost worker. Approve only scoped review actions. Keep the terminal open until the children finish and the final report names the exact commit. A parent success or delegation notice does not prove completion. A clean review also needs verified coverage of changed files, relevant callers, tests, instructions, and task documentation. Missing required context blocks a clean result.</p>
         <p>At the end, the driver reviews the complete branch rather than repeatedly reviewing each
           batch. It checks the plan's acceptance criteria, the risky surfaces, relevant tests, and
           unresolved GitHub feedback.</p>

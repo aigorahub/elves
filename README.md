@@ -8,8 +8,21 @@ Oh My Pi (omp) driver plans and reviews; a subscription-native (or optional exte
 implements; durable run files let the work survive context compaction. You write the plan and own
 the merge decision. The agent does the middle.
 
-**Current release: v2.36.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.36.1**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
+
+Implementation runs get a draft PR at the first useful pushed commit,
+preferably during staging, before bulk execution. The driver opens or reuses
+it and checks whether configured bots review drafts. It uses a permitted
+documented bot request when needed. If draft review is unavailable, it records
+that limit and keeps unfinished work in draft. Bot feedback enters driver
+review at safe boundaries. Final independent review still applies. Workers
+do not gain PR authority. Read-only audits and harvests do not open PRs.
+If staging has no useful diff, a planned worker checkpoint gives the driver
+control at the first useful push when the installed route and staging gates
+permit it. Otherwise useful staging changes must supply the draft before launch.
+The driver opens the draft before bulk
+work continues. It checks for the bot's own review, check, or queued job.
 
 **New to Elves?** Use the [practical user guide](https://aigorahub.github.io/elves/) — especially
 **[Paste this to your agent](https://aigorahub.github.io/elves/#agent-onboarding)** at the top.
@@ -624,6 +637,20 @@ Convert idle hours into shipped code: try, check, feed back, repeat. Memory live
 chat. Root cause over band-aids; centralize over duplicate; extend over create; favor boring
 technology. The human owns what is worth building and whether it merges — the agent owns the
 middle.
+
+Agy reviews always use `/boost` in plan mode, including reviews of fixes.
+The reviewer uses a separate session from the code writers. Boost failure
+requires an authorized independent fallback or a block; a plain Agy response
+does not satisfy review. Pass the absolute admitted workspace to all Boost
+workers. Use a supervised terminal when headless transport is unqualified.
+Keep required isolation. Approve scoped review actions and wait for child
+completion plus a final report at the exact commit. Headless success alone
+does not prove a review. See [the review rules](references/review-subagent.md).
+
+A clean Agy review also needs context coverage. Read changed files, relevant
+callers, tests, instructions, and task docs. The host checks the coverage
+record against the diff and read evidence. Missing required context blocks
+a clean result.
 
 ## Contributing
 

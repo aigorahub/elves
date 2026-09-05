@@ -12,6 +12,22 @@
 Before worker launch, plan / session / packet acceptance id→criterion mappings must match.
 Missing, extra, duplicate, or text-mismatched criteria block launch.
 
+For an authorized implementation run, record the draft implementation PR
+before bulk execution. The driver opens or reuses it at the first useful
+pushed commit, preferably the staging commit. Workers do not create PRs or
+request bot reviews. Record the configured bot trigger and whether it works
+on drafts. A missing draft trigger is a stated review limit, not permission
+to mark incomplete work ready. Read-only audits and harvests keep their scope.
+See `review-subagent.md` for early bot feedback and final review requirements.
+When staging has no useful diff, record a pending PR and bind a safe worker
+checkpoint at its first useful push. The driver creates the draft before bulk
+work continues, without prompting a working or parked seat.
+Use this exception only when the installed route supports that checkpoint
+and staging gates pass. Otherwise open a draft from useful staging changes
+before launch. Keep one worker packet and the exact prewalk `Continue.`
+transition. Record PR URL/number, base branch, and current head; after resume,
+look up and reuse the repository branch's existing PR before creating one.
+
 `sync-session` derives both batch rows and top-level `master_acceptance` rows from the
 authoritative plan. It accepts the bare and bracketed spellings above, keeps the exact parsed
 criterion text, and preserves existing `met`, `evidence`, and other runtime fields. It refuses to

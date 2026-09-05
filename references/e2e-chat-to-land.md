@@ -42,6 +42,23 @@ plan/docs/PR first, then batch loop. One *user* message is the recommended produ
 before launch-ready is still forbidden. After launch-ready in E2E mode, **continue into the batch
 loop without waiting for a second human call.**
 
+The driver opens or reuses a draft implementation PR at the first useful
+pushed commit, preferably staging, before bulk execution. This gives configured
+bots a chance to review while work continues. Check each bot's actual draft
+and push triggers; do not assume a draft starts review. A permitted documented
+review request can start a bot. Otherwise record the unavailable trigger and
+keep incomplete work in draft. Workers do not own PR actions. Driver review
+takes bot feedback at safe boundaries and still requires final independent
+review of the cumulative diff. Read-only audit and harvest requests do not
+enter this implementation flow.
+If staging has no useful diff, stage a safe checkpoint at the worker's first
+useful push only when the installed route and staging gates support it.
+Otherwise open the draft from useful staging changes before launch. The driver
+opens a pending draft at the supported checkpoint before bulk execution continues.
+Do not wait for worker completion or prompt a working or parked seat.
+Keep the original packet and exact prewalk `Continue.` transition. Record the
+PR URL, base branch, and head; resume reuses the branch's existing PR.
+
 ## Flow
 
 ```text

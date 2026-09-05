@@ -2112,6 +2112,31 @@ class AdapterBuilderTests(unittest.TestCase):
                 role="review",
                 repo_root=Path(tmp),
             )
+            self.assertTrue(agy.argv[agy.argv.index("--print") + 1].startswith("/boost "))
+            self.assertIn(f"Admitted review workspace: {tmp}", agy.argv[agy.argv.index("--print") + 1])
+            self.assertIn("Give this absolute workspace path", agy.argv[agy.argv.index("--print") + 1])
+            self.assertIn("review_coverage", agy.argv[agy.argv.index("--print") + 1])
+            self.assertIn("repository instructions", agy.argv[agy.argv.index("--print") + 1])
+            self.assertEqual(agy.argv[agy.argv.index("--output-format") + 1], "stream-json")
+            self.assertEqual(agy.decoder, "agy-jsonl")
+            for review_role in ("review", "lightweight_review", "planning"):
+                invocation = build_readonly_invocation(
+                    adapter="antigravity-cli", profile="review", role=review_role,
+                    packet_path=packet, prompt_path=prompt, executable="agy",
+                    task="review the patch", repo_root=Path(tmp),
+                )
+                self.assertEqual(
+                    invocation.argv[invocation.argv.index("--print") + 1].startswith("/boost "),
+                    review_role != "planning",
+                )
+            for disabled in ("--disable-slash-commands", "--disable-slash-commands=true",
+                             "--output-format=text", "--output-format"):
+                with self.assertRaises(ValidationIssue):
+                    build_readonly_invocation(
+                        adapter="antigravity-cli", profile="review", role="review",
+                        packet_path=packet, prompt_path=prompt, executable="agy",
+                        extra_args=(disabled,), repo_root=Path(tmp),
+                    )
             self.assertTrue(agy.read_only)
             self.assertEqual(agy.input_mode, "none")
             self.assertIsNone(agy.stdin_text)
@@ -2159,6 +2184,7 @@ class AdapterBuilderTests(unittest.TestCase):
                 role="review",
                 repo_root=Path(tmp),
             )
+            self.assertTrue(agy_resume.argv[agy_resume.argv.index("--print") + 1].startswith("/boost "))
             self.assertIn("--conversation", agy_resume.argv)
             self.assertIn("11111111-2222-3333-4444-555555555555", agy_resume.argv)
 
@@ -2671,6 +2697,98 @@ class RemediationBlockerTests(unittest.TestCase):
         self.assertEqual(list(profile.extra_args), [])
         self.assertEqual(list(profile.env_grants), [])
         self.assertEqual(profile.session_mode.value, "ephemeral")
+
+    def test_agy_native_result_and_transport_guards(self) -> None:
+        report = {
+            "role": "review", "verdict": "pass", "confidence": "high",
+            "key_findings": [], "evidence": ["Reviewed commit abc123"],
+            "risks": [], "recommended_actions": [], "open_questions": [],
+        }
+        coverage = {
+            "head_sha": "a" * 40, "base_sha": "b" * 40,
+            "changed_files": ["README.md"],
+            "read_files": ["README.md", "AGENTS.md", "docs/task.md"],
+            "context_files": {"callers": [], "tests": [], "instructions": ["AGENTS.md"],
+                              "task_docs": ["docs/task.md"]},
+            "context_exclusions": {"callers": "Documentation-only change has no code callers",
+                                   "tests": "Documentation-only change has no executable behavior"},
+            "missing_context": [], "exclusions": [],
+        }
+        envelope = {"role_report": report, "review_coverage": coverage}
+        def events():
+            return [
+                {"event": "init", "conversation_id": "parent-session", "init": {
+                    "model": "gemini-3.8-flash-high",
+                    "expanded_commands": [{"name": "boost", "type": "system"}]}},
+                {"event": "result", "result": {"conversation_id": "parent-session",
+                    "status": "SUCCESS", "response": json.dumps(envelope)}},
+            ]
+        def decode(rows, **kwargs):
+            return decode_adapter_output(
+                "\n".join(json.dumps(row) for row in rows), decoder="agy-jsonl",
+                expected_role="review", **kwargs,
+            )
+        decoded = decode(events(), requested_model="gemini-3.8-flash-high")
+        self.assertEqual(decoded.session_id, "parent-session")
+        self.assertEqual(decoded.model_evidence_source, "agy.init.model")
+        self.assertEqual(decoded.role_report["evidence"][:-1], report["evidence"])
+        self.assertIn("Model-reported review coverage; host verification required", decoded.role_report["evidence"][-1])
+        rows = events()
+        rows[-1]["result"]["structured_output"] = envelope
+        rows[-1]["result"]["response"] = ""
+        self.assertEqual(decode(rows).role_report["verdict"], "pass")
+        for change, code in (
+            (lambda r: r[-1]["result"].update(status="ERROR"), "agy_failed_status"),
+            (lambda r: r[-1]["result"].update(status="WAITING"), "agy_failed_status"),
+            (lambda r: r[-1]["result"].update(denied_actions=[{"action": "command"}]), "agy_denied_actions"),
+            (lambda r: r[-1]["result"].update(conversation_id="other-session"), "agy_invalid_transport"),
+            (lambda r: r[0]["init"].update(expanded_commands=[]), "agy_boost_unverified"),
+            (lambda r: r[0]["init"].update(expanded_commands=[{"name": "boost", "type": "skill"}]), "agy_boost_unverified"),
+            (lambda r: r[-1]["result"].update(response="I delegated the review and am waiting."), "agy_missing_review_report"),
+        ):
+            with self.subTest(code=code):
+                rows = events()
+                change(rows)
+                with self.assertRaises(ValidationIssue) as caught:
+                    decode(rows)
+                self.assertEqual(caught.exception.code, code)
+        with self.assertRaises(ValidationIssue) as caught:
+            decode(events(), requested_model="different-model")
+        self.assertEqual(caught.exception.code, "actual_model_mismatch")
+        # A DONE spawn event and intermediate JSON are not a final report.
+        rows = events()
+        rows.insert(1, {"event": "step_update", "step_update": {
+            "state": "DONE", "step_type": "subagent", "text_delta": json.dumps(report)}})
+        rows[-1]["result"]["response"] = "Waiting for the child."
+        with self.assertRaises(ValidationIssue) as caught:
+            decode(rows)
+        self.assertEqual(caught.exception.code, "agy_missing_review_report")
+
+        for change in (
+            lambda e: e.pop("review_coverage"),
+            lambda e: e["review_coverage"].update(head_sha="main"),
+            lambda e: e["review_coverage"]["read_files"].remove("README.md"),
+            lambda e: e["review_coverage"]["read_files"].remove("docs/task.md"),
+            lambda e: e["review_coverage"].update(missing_context=["Need API callers"]),
+            lambda e: e["review_coverage"]["context_files"].pop("instructions"),
+            lambda e: e["review_coverage"].update(context_exclusions={}),
+            lambda e: e["review_coverage"].update(exclusions=[{"path": "README.md", "reason": ""}]),
+        ):
+            modified = json.loads(json.dumps(envelope))
+            change(modified)
+            rows = events()
+            rows[-1]["result"]["response"] = json.dumps(modified)
+            with self.assertRaises(ValidationIssue) as caught:
+                decode(rows)
+            self.assertEqual(caught.exception.code, "agy_incomplete_review_coverage")
+        # A gap is reportable as blocked; it must never become a clean pass.
+        modified = json.loads(json.dumps(envelope))
+        modified["role_report"]["verdict"] = "blocked"
+        modified["review_coverage"]["missing_context"] = ["docs/task.md is not readable"]
+        modified["review_coverage"]["read_files"].remove("docs/task.md")
+        rows = events()
+        rows[-1]["result"]["response"] = json.dumps(modified)
+        self.assertEqual(decode(rows).role_report["verdict"], "blocked")
 
     def test_decoder_claude_and_grok_and_codex_fixtures(self) -> None:
         report = {

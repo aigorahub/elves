@@ -4,6 +4,29 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.36.1] - 2026-09-05
+
+### Fixed
+
+- Implementation runs open or reuse a driver-owned draft PR at the first
+  useful pushed commit, preferably staging, before bulk execution. The driver
+  checks bot draft triggers and takes feedback at safe boundaries. Missing
+  draft review support never marks unfinished work ready. Final independent
+  review and read-only audit and harvest scopes remain required.
+- Agy reviews require context coverage before a clean verdict. The host
+  checks changed files, callers, tests, instructions, and task docs against
+  read evidence. Missing context blocks a pass.
+- Agy review and lightweight review calls now start with `/boost`, including
+  exact session resumes. Plan mode remains set. Extra arguments cannot
+  disable slash command expansion.
+- Agy native output now has transport checks for session identity, Boost
+  expansion, denied tools, and a valid final report. Review requests pass the
+  admitted workspace to children. Unqualified headless transport uses an
+  authorized supervised seat while required isolation remains in place.
+- The review rules reject plain Agy fallback after Boost failure. Reviewers
+  must use a separate session from code writers and return evidence for the
+  exact commit. Updated the skill, README, and guide.
+
 ## [2.36.0] - 2026-09-02
 
 ### Fixed

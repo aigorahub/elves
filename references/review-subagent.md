@@ -92,6 +92,185 @@ blocker for a native-first run; it is a warning only when the fallback changes r
 It is blocking only when the survival guide explicitly made that phase route required and the
 coordinator could not satisfy it. Do not infer route authority from model prestige.
 
+## Early draft PR and bot review
+
+For an authorized implementation run, the driver opens or reuses its draft
+implementation PR at the first useful pushed commit. Prefer a staging commit
+with the accepted plan or other useful run changes. Open the draft before
+bulk execution and before parking for a trusted worker. Do not create an
+empty commit only to open a PR. Do not wait for the finished implementation.
+A separate plan PR does not replace the implementation PR. Read-only audits
+and issue harvests do not authorize PR creation.
+If staging has no useful diff, record that the draft is pending and arrange
+a safe worker checkpoint at the first useful push. The driver opens the PR
+at that checkpoint before bulk work continues. It does not wait for the whole
+worker run. Do not prompt a working or parked seat to obtain this checkpoint;
+include it in the launch packet and use the existing return mechanism.
+This exception requires a checkpoint supported by the installed route and
+passing staging gates. If either is unavailable, create a useful staging diff
+and open the draft before launch. Do not improvise a checkpoint or send a
+second worker packet. Exact prewalk keeps its session and `Continue.` transition.
+Record the PR URL and number, base branch, and exact head in the run records.
+On resume, query by repository and branch and reuse the existing PR, including
+when the local record is missing. Refresh its recorded head after pushes.
+
+The driver owns PR creation, metadata, reviewer requests, and comment replies.
+Workers can commit and push within their recorded feature-branch authority;
+this rule grants them no PR actions. The draft body states the accepted scope,
+unfinished work, and checks that have actually run.
+
+Inspect repository configuration and the bot's documented triggers. Record
+whether it reviews draft PRs, initial creation, later pushes, or explicit
+requests. Confirm a bot review, bot-owned check, or queued bot job on GitHub.
+Unrelated CI does not prove that bot review started. A draft alone does not
+prove that a bot started. Use the documented request mechanism only when
+existing authority permits it. Do not install or reconfigure a bot as an
+implicit part of opening the PR. If draft review is unsupported or unavailable,
+record that limit and keep incomplete work in draft. Never remove draft state
+only to trigger review.
+
+Take new bot feedback into driver review at safe checkpoints, wakes, and
+terminal reconciliation. Routine comments do not interrupt a healthy parked
+worker. The driver checks relevance against the current head, fixes confirmed
+blockers within scope, and records dispositions under the existing review
+rules. Early feedback does not replace the final independent cumulative
+review, required checks, or exact-head readiness gates.
+
+## Agy review requirements
+
+Every Agy review and re-review uses `/boost`, including lightweight reviews.
+Keep plan mode and slash command expansion enabled. Never pass
+`--disable-slash-commands` or retry the review without Boost. Prefer
+`gemini-3.8-flash-high` when the live Agy catalog lists it and the user did
+not name another model. This preference does not authorize a model change
+on an exact session resume.
+
+The review session must be separate from every agent that wrote code.
+Require the reviewed commit, file and line evidence, failure conditions,
+and checks that could disprove each finding. Separate unsupported concerns
+from confirmed defects. `/grill-me` remains optional planning input.
+
+### Context coverage before conclusions
+
+The host records the exact head, base, and changed paths from Git before
+review starts. Agy must read each changed file and trace relevant callers,
+tests, configuration, repository instructions, and task documentation. Read
+the full relevant functions and document sections. A filename match, diff
+hunk, or search snippet is not proof that the surrounding contract was read.
+Use current primary documentation for external behavior when local evidence
+does not define it. Do not infer an API contract from its name.
+
+Before a verdict, list the paths read, the relevant context paths, missing
+context, and each exclusion with its reason. Read the context before forming
+conclusions. For each finding, state the expected behavior from code or docs,
+the failure path, and the evidence that could disprove it. The Boost verifier
+must check those claims and the coverage gaps independently.
+
+Headless review output uses an envelope with `role_report` and
+`review_coverage`. The role report keeps the existing schema. Coverage has:
+
+```text
+head_sha, base_sha: full commit IDs
+changed_files, read_files: path lists
+context_files: {callers: [...], tests: [...], instructions: [...], task_docs: [...]}
+context_exclusions: {<empty context category>: <specific reason it does not apply>}
+missing_context: remaining required context
+exclusions: [{path: <path>, reason: <specific reason>}]
+```
+
+The decoder rejects a pass without coverage, with missing context, or with
+declared files absent from reads and exclusions. Empty context categories
+need a specific reason. A blocked report can retain gaps. The saved evidence
+labels this coverage as model reported. It is not tool evidence.
+
+The host must compare the declaration with its own diff inventory and actual
+read results or the complete context supplied to the reviewer. It must check
+head and base identity and approve each exclusion. A model cannot exclude
+required context merely to pass. Deleted files need base content; generated
+or binary files need relevant source or another suitable check. Missing
+required evidence blocks a clean review even when Agy reports high confidence.
+Apply the same coverage checks to supervised terminal reports. Never count
+a list of file names as proof that those files were read.
+
+Confirm Boost activation from the actual CLI output or events. If Boost
+fails, is unavailable, or cannot be confirmed active, mark the Agy route
+unavailable. Use an independent fallback only within existing user route
+authority. A plain Agy response cannot satisfy required review. The host
+still needs a completed report at the exact commit before landing.
+
+The review request must name the absolute admitted workspace, base, and head.
+Pass that workspace to every Boost worker. Children can start in Agy's scratch
+folder. An isolated snapshot has supplied diff and commit evidence; do not
+send children to the original checkout or assume the snapshot has Git history.
+
+Headless launch is conditional on transport qualification. Agy can return
+`SUCCESS` and exit zero after denying a required tool. Require native session
+and model evidence, system Boost expansion, completed child work, and a valid
+final report. Reject delegation notices, tool denials, and missing reports.
+The JSON decoder checks transport and report shape. The host must still
+verify the reviewed commit and child completion before accepting the review.
+
+When headless transport is unqualified, use an authorized supervised terminal
+seat with `agy --model <listed-id> --effort <listed-effort> --mode plan`.
+Send the review request with its Boost command once. Keep the terminal alive
+until the children finish. Inspect `/agents` and child events when the parent
+looks idle. Approve only required review reads or checks at a verified
+permission card. Do not grant all shell commands or enable a bypass flag.
+After an expired permission, inspect the child before resuming its work.
+Use `--conversation <exact-id>` with the same model and effort after a stopped
+session. Never send status prompts while a child works.
+
+A direct terminal review is a separate transport. It does not qualify the
+isolated Elves adapter. Preserve the adapter's snapshot, isolated HOME, and
+outer sandbox. Do not copy the user's whole Agy profile or change global
+permission settings to make a review start. A required isolation or auth
+failure remains a transport block.
+
+### Supervised Agy procedure
+
+1. Read `agy models` and `agy --help` once for the run. Record the CLI version
+   and exact listed model. From the review workspace, start:
+   `agy --model gemini-3.8-flash-high --effort high --mode plan`.
+   Use a different listed model only when the run names it. In Herdr, use
+   `herdr agent start <review-name> --kind agy --pane <pane-id> --
+   --model gemini-3.8-flash-high --effort high --mode plan`.
+2. At the ready prompt, send one request in this form:
+   `/boost Review PR <number> at head <sha> against base <sha>. Workspace:
+   <absolute-path>. Pass this path and these rules to every worker. Return
+   findings only. Do not edit, commit, push, or merge. Check each finding
+   against counterevidence. Wait for investigation and verification before
+   the final report. Name the exact reviewed commit and any missing evidence.`
+3. Read the parent and child state. Agy can show a ready parent prompt while
+   Boost works. Use `/agents` for local state. At a visible child permission
+   card, read the exact command or path. Approve one required read or check
+   with the key shown by that card. Current cards show `ctrl+k approve` and
+   `alt+j manage`. Confirm the tool result. Never press a key at a login or
+   account picker. Stop and restart that exact session once instead.
+   Check active review seats for permission cards at least every 20 seconds.
+   Live child requests expired after 60 seconds. Re-read the current card
+   immediately before approval; a new request can replace an expired one.
+4. Wait for the final report and completed Boost workers. Compare claimed
+   checks with actual tool results. Compare the head and base with host Git
+   records. Reject a mismatched commit ID. Reject a report that says all checks
+   passed when required reads or tests were denied. Fix valid findings,
+   commit and push, then request a Boost review of the new exact head only
+   after the previous workers have stopped. Preserve the reviewer session
+   with `agy --conversation <exact-id> --model <same-id> --effort <same-effort>
+   --mode plan` after a process stop. Do not start a competing reviewer.
+   Bind the parent ID from root CLI events or the launch record. Herdr can
+   report a Boost child ID as `agent_session`; do not adopt it as the parent.
+   Check the recorded resume argv with
+   `herdr pane process-info --pane <pane-id>` before recovery.
+
+The live CLI test on 2026-09-05 used Gemini 3.8 Flash High and confirmed
+Boost investigation plus a separate verification worker. Initial print mode
+denied reads and returned a delegation response. An interactive resume
+allowed scoped reads. This is terminal transport evidence, not proof that
+the isolated headless adapter works on another machine. Keep the final
+review result separate from this transport test.
+
+See [Google's Boost guide](https://www.antigravity.google/docs/boost/).
+
 ## Review Route Context
 
 Fugu is optional. When a review route is unavailable because of quota, authentication, catalog,
@@ -508,7 +687,7 @@ Parse with python3. Filter out comments already recorded in `.elves-session.json
 
 The built-in review is the minimum viable loop. Users can strengthen it by:
 
-- **Installing GitHub reviewer bots** (CodeRabbit, GitHub Copilot code review, SonarCloud, etc.): these produce detailed, automated reviews on every push that the subagent reads and acts on
+- **Installing GitHub reviewer bots** (CodeRabbit, GitHub Copilot code review, SonarCloud, etc.): configured triggers can produce reviews during implementation. Check each bot's draft and push support. The driver reads and resolves feedback under the early review rules above.
 - **Adding a custom review API** (configure in the survival guide under `## Tool Configuration`)
 - **Adding smoke tests** (curl endpoints after preview deployment)
 - **Adding visual review** (screenshot capture and inspection)
