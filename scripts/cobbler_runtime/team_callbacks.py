@@ -98,6 +98,16 @@ class CallbackAdapter:
         message = dict(message)
         message.setdefault('message_id', str(uuid.uuid4()))
         message.setdefault('schema_version', 1)
+        for field in ('message_id', 'run_id', 'task_id', 'recipient'):
+            if not isinstance(message.get(field), str) or not message[field].strip():
+                raise fail('team_callback_message_invalid', f'Message requires nonempty {field}')
+        if message['schema_version'] != 1 or not isinstance(message.get('body'), dict):
+            raise fail('team_callback_message_invalid', 'Message requires schema 1 and an object body')
+        if message.get('kind') not in ('assignment','progress','question','answer','decision','pr_opened','review_requested','review_result','blocked','completion','cancellation'):
+            raise fail('team_callback_message_invalid', 'Message kind is unsupported')
+        ttl = message.get('ttl_seconds', 86400)
+        if isinstance(ttl, bool) or not isinstance(ttl, int) or not 0 < ttl <= 604800:
+            raise fail('team_callback_message_invalid', 'Message TTL must be 1 to 604800 seconds')
         encoded = json.dumps(message, sort_keys=True, separators=(',', ':'), allow_nan=False)
         if len(encoded.encode()) > 65536:
             raise fail('team_callback_message_size', 'Message exceeds the size limit')
@@ -125,7 +135,7 @@ class CallbackAdapter:
             with os.fdopen(fd, 'w') as handle:
                 handle.write(row[0])
             result = self.call('post', '--actor', self.config['actor_credential'], '--input', filename)
-            if result.get('message_id') != mid or result.get('status') not in ('stored', 'queued', 'claimed', 'consumed', 'expired', 'unresolved'):
+            if result.get('message_id') != mid or result.get('status') not in ('stored', 'queued', 'claimed', 'consumed', 'expired', 'unresolved', 'retired'):
                 raise fail('team_callback_receipt', 'Callback did not return a storage receipt for the expected message')
             with self.db() as db:
                 db.execute('UPDATE outbox SET status=? WHERE id=?', ('stored', mid))
@@ -141,18 +151,28 @@ class CallbackAdapter:
         messages = payload.get('messages')
         if not isinstance(messages, list):
             raise fail('team_callback_output', 'Receive must return messages')
-        ready = []
+        acknowledgements = []
         with self.db() as db:
             for message in messages:
                 if not isinstance(message, dict) or not isinstance(message.get('message_id'), str) or not message.get('receipt'):
                     raise fail('team_callback_output', 'Received message lacks identity or receipt')
                 mid = message['message_id']
-                prior = db.execute('SELECT status FROM inbox WHERE id=?', (mid,)).fetchone()
-                if prior and prior[0] == 'consumed':
-                    continue
-                db.execute('INSERT OR IGNORE INTO inbox VALUES (?,?,?,NULL)', (mid, json.dumps(message), 'received'))
-            # Include messages already stored before a crash; never discard them on an empty receive.
-            ready = [json.loads(row[0]) for row in db.execute("SELECT message FROM inbox WHERE status='received' ORDER BY rowid LIMIT 20")]
+                prior = db.execute('SELECT status,message FROM inbox WHERE id=?', (mid,)).fetchone()
+                encoded = json.dumps(message)
+                if prior:
+                    original = json.loads(prior[1])
+                    stable = lambda item: {key:value for key,value in item.items() if key not in ('receipt','status')}
+                    if stable(original) != stable(message):
+                        raise fail('team_callback_duplicate', 'Received message ID has different content')
+                    db.execute('UPDATE inbox SET message=? WHERE id=?', (encoded,mid))
+                    if prior[0] == 'consumed':
+                        acknowledgements.append((mid,message['receipt']))
+                else:
+                    db.execute('INSERT INTO inbox VALUES (?,?,?,NULL)', (mid,encoded,'received'))
+            unresolved = set(payload.get('unresolved', []))
+            ready = [json.loads(row[0]) for row in db.execute("SELECT message FROM inbox WHERE status='received' ORDER BY rowid LIMIT 20") if json.loads(row[0])['message_id'] not in unresolved]
+        for mid, receipt in acknowledgements:
+            self.call('ack', '--actor', self.config['actor_credential'], '--message-id', mid, '--receipt', receipt)
         return {'checkpoint': name, 'messages': ready, 'unresolved': payload.get('unresolved', []), 'automatic_actions': False}
 
     def consume(self, mid: str, result: dict[str, Any]) -> dict[str, Any]:
@@ -173,3 +193,47 @@ class CallbackAdapter:
         with self.db() as db:
             return {'outbox': [{'message_id': r[0], 'status': r[1]} for r in db.execute('SELECT id,status FROM outbox')],
                     'inbox': [{'message_id': r[0], 'status': r[1]} for r in db.execute('SELECT id,status FROM inbox')]}
+
+
+def report_command(args):
+    """Scoped helper transport. Does not load or mutate the driver session."""
+    try:
+        from .teams import read_json
+        adapter = CallbackAdapter(read_json(args.config), Path(args.runtime))
+        action = args.report_action
+        if action == 'post':
+            payload = adapter.post(read_json(args.input))
+        elif action == 'retry':
+            payload = adapter.retry(args.message_id)
+        elif action == 'checkpoint':
+            payload = adapter.checkpoint(args.checkpoint)
+        elif action == 'consume':
+            payload = adapter.consume(args.message_id, read_json(args.input))
+        elif action == 'status':
+            payload = adapter.status()
+        elif action == 'inspect':
+            payload = adapter.call('inspect','--actor',adapter.config['actor_credential'],'--message-id',args.message_id)
+        elif action == 'reconcile':
+            payload = adapter.call('reconcile','--actor',adapter.config['actor_credential'],'--message-id',args.message_id,'--outcome',args.outcome)
+        else:
+            payload = adapter.probe()
+        print(json.dumps({'ok':True,'result':payload},sort_keys=True))
+        return 0
+    except (ValidationIssue,OSError,ValueError,TypeError) as exc:
+        print(json.dumps({'ok':False,'error':getattr(exc,'code','team_callback_failed'),'message':str(exc)}))
+        return 1
+
+
+def add_report_parser(sub):
+    parser = sub.add_parser('team-report',help='Helper scoped reports without driver session access')
+    actions = parser.add_subparsers(dest='report_action',required=True)
+    for action in ('probe','post','retry','checkpoint','consume','status','inspect','reconcile'):
+        command=actions.add_parser(action)
+        command.add_argument('--config',required=True,type=Path)
+        command.add_argument('--runtime',required=True,type=Path)
+        command.add_argument('--json',action='store_true')
+        if action in ('post','consume'): command.add_argument('--input',required=True,type=Path)
+        if action in ('retry','consume','inspect','reconcile'): command.add_argument('--message-id',required=True)
+        if action == 'checkpoint': command.add_argument('--checkpoint',required=True,choices=CHECKPOINTS)
+        if action == 'reconcile': command.add_argument('--outcome',required=True,choices=('consumed','retry'))
+        command.set_defaults(func=report_command)

@@ -343,8 +343,18 @@ _CLI_INSPECTOR = textwrap.dedent(
             return command in values and isinstance(op, ast.Eq)
         return False
 
-    def handler_contract(name, command):
+    def handler_contract(name, command, handler=None):
         node = functions.get(name)
+        if node is None and inspect.isfunction(handler):
+            # Modular CLI handlers are part of the shipped API. Inspect only
+            # source under this CLI's scripts directory, never external plugins.
+            try:
+                source_path = Path(inspect.getsourcefile(handler)).resolve()
+                source_path.relative_to(path.parent)
+                parsed = ast.parse(textwrap.dedent(inspect.getsource(handler)))
+                node = next((item for item in parsed.body if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))), None)
+            except (OSError, TypeError, ValueError, SyntaxError):
+                node = None
         if node is None:
             return {
                 "output_calls": [],
@@ -857,7 +867,7 @@ _CLI_INSPECTOR = textwrap.dedent(
                     "epilog": current.epilog,
                     "handler": handler_name,
                     "handler_contract": (
-                        handler_contract(handler_name, command) if handler_name else None
+                        handler_contract(handler_name, command, handler) if handler_name else None
                     ),
                     "help": current.description,
                     "mutually_exclusive_groups": sorted(

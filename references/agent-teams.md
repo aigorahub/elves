@@ -39,7 +39,9 @@ The result is a dispatch specification, not a new agent process.
 ## Driver and helper records
 
 The public entry point is `python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" team`.
-Each command accepts `--repo-root` and `--session`. JSON input files must be local,
+Each team command accepts `--repo-root` and `--session`. New team, team-report,
+and team-lanes commands return a JSON object with `ok` and a nested `result` on
+success. Failures return `ok: false` and error details. JSON input files must be local,
 bounded files. Keep them and credentials out of Git.
 
 `team init --input driver.json` records version 1 team state in the canonical
@@ -50,6 +52,18 @@ The driver enters the contributor ledger immediately.
 `team add-helper --input helper.json` records `task_id`, a concrete `task`, `role`,
 and `identity`. The default limit is three active helpers. `--max-helpers` accepts
 one to eight. The driver queues excess work. Helpers cannot create more helpers.
+Before launch, use `team helper-packet --task-id ID --output PATH` to build the
+original kickoff packet. The helper assignment must include intent, build_on,
+owned_surfaces, forbidden_surfaces, and acceptance. Add the helper's own `callback`
+configuration when its route can reach the local transport. The generator checks
+the registered run, task, exact helper identity, and driver return address. It
+rejects the driver credential. It includes automatic progress, question, blocked,
+and completion reporting instructions using the scoped `team-report` CLI. That
+CLI does not read or mutate the driver session. Isolated routes without access
+to the local transport return evidence through their existing adapter; the driver
+publishes those reports. Include this block in the original worker packet, never
+as an extra prewalk turn.
+
 Launch through the existing qualified dispatch or worker adapter. Registration
 alone does not start a process or prove that work ran.
 
@@ -73,7 +87,10 @@ uses fresh dispatch executions. A failed proposal phase does not start critique.
 The driver produces the final recommendation with evidence and unresolved dissent.
 The command saves its discussion identity before launch and records each completed
 phase before the next phase starts. Retrying the same discussion blocks until the
-driver reconciles the stored evidence and exact adapter sessions. Use a new
+driver reconciles the stored evidence and exact adapter sessions. After stopping
+or resolving the recorded executions, `team discussion-resolve --discussion-id ID
+--input resolution.json` can record `outcome: cancelled` with evidence. This keeps
+contributors in the ledger. Use a new
 `--discussion-id` only for a new authorized round.
 The command records discussion results and observed contributor executions. Routes
 that report a native session also enter that exact session in the contributor

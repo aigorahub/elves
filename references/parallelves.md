@@ -91,3 +91,50 @@ qualification, cached-proof auto activation, explicit experimental mode, and eve
 - **Phase 3**: prewalk lanes after the lane runtime ships.
 
 Runtime lane supervision is explicitly future work and ships in no v1 batch.
+
+## Persistent team writer lanes (v2.37)
+
+`cobbler_agents.py team-lanes` adds persistent driver records to the existing lane
+validator. Existing worker adapters launch and stop workers. The lane store does
+not create a competing process supervisor. Use `team init` first, then bind the
+lane store to the canonical session:
+
+```sh
+python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" team-lanes init \
+  --state /absolute/run/lanes.sqlite3 --repo /absolute/run/worktree \
+  --run-id RUN --session /absolute/run/worktree/.elves-session.json \
+  --actor-session DRIVER_SESSION --actor-kind codex --actor-model MODEL
+```
+
+Register each `L1`, `L2`, or later lane with `register --lane L1 --worktree PATH
+--branch BRANCH --session EXACT_SESSION --kind KIND --model MODEL --owns src/area`.
+Repeat `--owns` for separate roots and `--depends-on` for earlier lane IDs. Every
+mutation and integration gate takes the recorded driver `--actor-session`,
+`--actor-kind`, and `--actor-model`, plus `--state`.
+
+After the qualified adapter starts the writer, record `start` with its exact
+session, kind, and model. Record `complete` with the same identity and
+`--result-head SHA`. This checks the actual worktree and branch. Completion is not
+integration. `gate --lane L1` checks commit ancestry, all changed paths, clean
+worktrees, dependencies, and a conflict free merge preview. This requires Git 2.38 or later for
+`merge-tree --write-tree`; unsupported Git fails the gate. `integrate --lane L1`
+checks again and creates a regular merge commit on the recorded driver branch.
+It does not merge the integration PR onto main or grant landing authority.
+
+A persisted integration reservation prevents automatic repeat after interruption.
+Use `reconcile --lane L1 --outcome integrated` only when the exact merge parents
+and result tree prove completion. `--outcome not-applied` requires proof that the
+reservation made no Git change. Ambiguous results stay blocked for inspection.
+
+`status` reads durable state after restart. Pending, running, completed, and
+integrating lanes are not terminal. A failed lane blocks readiness until the
+driver resolves it. `cancel --lane L1 --reason TEXT` records a disposition only.
+Stop the exact worker through its existing adapter first. Cancellation never
+removes a contributor from the review exclusion ledger.
+
+A linked session records `team_lanes` with the state path and run ID. Registration
+records writer contributors before committing its lane record. Final readiness
+checks the live store, exact Git head, integrated ancestry, contributor retention,
+and terminal dispositions. Without `--session`, the store remains a standalone
+instrument and does not attest canonical run readiness. Use linked mode for an
+Elves team run.

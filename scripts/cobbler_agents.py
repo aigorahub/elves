@@ -2700,6 +2700,17 @@ def cmd_review_route(args: argparse.Namespace) -> int:
             probes=probes,
             exclude=tuple(args.exclude or ()),
         )
+        if team_session and "team" in team_session and decision.selected:
+            candidate = read_json(args.reviewer_identity)
+            route_kinds = {
+                "codex-native-review": {"codex"}, "claude-code-subagent": {"claude", "claude-code"},
+                "grok-native-review": {"grok", "grok-build"}, "grok": {"grok", "grok-build"},
+                "omp-native-review": {"omp", "omp-cli"}, "omp": {"omp", "omp-cli"},
+                "fugu": {"fugu", "codex-fugu"},
+            }
+            allowed = route_kinds.get(decision.actual_route)
+            if allowed is not None and candidate.get("kind") not in allowed:
+                raise ValidationIssue("team_reviewer_route_mismatch", "Selected route does not match the recorded reviewer kind; qualify a matching independent session")
     except ValidationIssue as exc:
         if args.json:
             return _emit_json(
@@ -2758,6 +2769,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
     from cobbler_runtime.teams import add_parser as add_team_parser
     add_team_parser(sub)
+    from cobbler_runtime.team_callbacks import add_report_parser
+    add_report_parser(sub)
     from cobbler_runtime.team_lanes import add_parser as add_team_lanes_parser
     add_team_lanes_parser(sub)
 

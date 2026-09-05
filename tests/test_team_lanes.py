@@ -365,7 +365,7 @@ class WriterLanesTests(unittest.TestCase):
         output = io.StringIO()
         with redirect_stdout(output):
             self.assertEqual(args.func(args), 0)
-        self.assertEqual(json.loads(output.getvalue())["run_id"], "run-one")
+        self.assertEqual(json.loads(output.getvalue())["result"]["run_id"], "run-one")
         args.state = self.root / "absent.sqlite"
         output = io.StringIO()
         with redirect_stdout(output):
@@ -377,7 +377,7 @@ class WriterLanesTests(unittest.TestCase):
                                  "team-lanes", "status", "--state", str(self.path), "--json"],
                                 text=True, capture_output=True)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(json.loads(result.stdout)["run_id"], "run-one")
+        self.assertEqual(json.loads(result.stdout)["result"]["run_id"], "run-one")
 
     def test_database_serializes_competing_ownership_registration(self):
         processes = []

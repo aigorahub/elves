@@ -116,12 +116,37 @@ class LaneStore:
                 connection.execute("CREATE TABLE IF NOT EXISTS run (singleton INTEGER PRIMARY KEY CHECK(singleton=1), payload TEXT NOT NULL)")
             row = connection.execute("SELECT payload FROM run WHERE singleton=1").fetchone()
             state = json.loads(row[0]) if row else None
+            _require(create or state is not None, "state_invalid", "The lane database has no run record.")
             if state is not None:
                 _require(isinstance(state, dict) and state.get("version") == SCHEMA_VERSION,
                          "schema_version", "Unsupported lane database version.")
                 _require(isinstance(state.get("driver"), dict) and isinstance(state.get("lanes"), dict)
                          and isinstance(state.get("run_id"), str),
                          "state_invalid", "The lane database has an invalid run record.")
+                for record in [state["driver"], *state["lanes"].values()]:
+                    _require(isinstance(record, dict) and all(isinstance(record.get(key), str) and record[key]
+                             for key in ("worktree", "branch", "common", "head")),
+                             "state_invalid", "The lane database has an invalid checkout record.")
+                    agent = record.get("identity")
+                    _require(isinstance(agent, dict) and set(agent) == {"session", "kind", "model"},
+                             "state_invalid", "The lane database has an invalid agent identity.")
+                    identity(**agent)
+                for lane_id, lane in state["lanes"].items():
+                    _require(lane.get("id") == lane_id and lane.get("status") in
+                             {"pending", "running", "completed", "failed", "cancelled", "integrating", "integrated"}
+                             and isinstance(lane.get("base_head"), str)
+                             and isinstance(lane.get("owned_surfaces"), list)
+                             and all(isinstance(surface, str) and surface for surface in lane["owned_surfaces"])
+                             and isinstance(lane.get("depends_on"), list)
+                             and all(isinstance(dep, str) and dep in state["lanes"] for dep in lane["depends_on"])
+                             and "result_head" in lane and "integration" in lane,
+                             "state_invalid", "The lane database has an invalid lifecycle record.")
+                    if lane["status"] in {"integrating", "integrated"}:
+                        reservation = lane["integration"]
+                        _require(isinstance(reservation, dict) and all(isinstance(reservation.get(key), str)
+                                 for key in ("id", "driver_head", "lane_head", "expected_tree")) and
+                                 (lane["status"] != "integrated" or isinstance(reservation.get("merged_head"), str)),
+                                 "state_invalid", "The lane database has an invalid integration reservation.")
             yield connection, state
             connection.commit()
         except BaseException:
@@ -237,7 +262,7 @@ class LaneStore:
                      "dependency_unknown", "Dependencies must name earlier registered lanes once each.")
             for surface in owns:
                 _require(bool(surface) and "\\" not in surface and not re.search(r"[\x00-\x1f*?\[\]]", surface) and
-                         all(part not in {"", ".", "..", ".git"} for part in surface.rstrip("/").split("/")),
+                         all(part.casefold() not in {"", ".", "..", ".git"} for part in surface.rstrip("/").split("/")),
                          "surface_invalid", "Owned surfaces must be literal repository-relative paths.")
             lane = {**checkout, "id": lane_id, "identity": worker, "owned_surfaces": owns,
                     "depends_on": depends_on, "batches": [lane_id], "status": "pending",
@@ -412,7 +437,7 @@ class LaneStore:
             groups = {status: [lid for lid, lane in lanes.items() if lane["status"] == status]
                       for status in ("pending", "running", "completed", "failed", "cancelled", "integrating", "integrated")}
             return {"ok": True, "version": state["version"], "run_id": state["run_id"],
-                    "driver": state["driver"], "lanes": lanes, **groups,
+                    "driver": state["driver"], "session_path": state.get("session_path"), "lanes": lanes, **groups,
                     "all_terminal": bool(lanes) and all(l["status"] in TERMINAL for l in lanes.values()),
                     "all_integrated": bool(lanes) and all(l["status"] == "integrated" for l in lanes.values()),
                     "ready": bool(lanes) and all(l["status"] in {"integrated", "cancelled"} for l in lanes.values()),
@@ -484,7 +509,7 @@ def _command(args: argparse.Namespace) -> int:
                 result = store.reconcile(actor=actor, lane_id=args.lane, outcome=args.outcome)
             else:
                 result = getattr(store, action)(actor=actor, lane_id=args.lane)
-        print(json.dumps(result, sort_keys=True))
+        print(json.dumps({"ok": True, "result": result}, sort_keys=True))
         return 0
     except ValidationIssue as exc:
         print(json.dumps({"ok": False, "issues": [exc.to_dict()]}))
