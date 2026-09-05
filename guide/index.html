@@ -512,7 +512,7 @@
     <div class="masthead-inner">
       <div class="brand-row">
         <a class="wordmark" href="https://github.com/aigorahub/elves">Elves</a>
-        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.36.1 source and releases on GitHub</a>
+        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.37.0 source and releases on GitHub</a>
       </div>
       <h1>Using Elves</h1>
       <p class="intro">Plan with the main agent, hand implementation to a separate worker, then
@@ -1398,7 +1398,18 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" review-route --host claude
           <li><a href="https://github.com/aigorahub/elves/blob/main/references/host-parity.md">Claude Code and Codex parity</a></li>
         </ul>
       </section>
-    </main>
+
+<section id="agent-teams">
+  <h2>Use a team on one task</h2>
+  <p>Ask Elves for a driver with helpers. For brainstorming, ask several models to
+  propose solutions independently, then compare them. The driver records evidence
+  and disagreements. It keeps the final reviewer outside the contributor team.</p>
+  <p>Save model choices through existing onboarding. Optional Lantern callbacks
+  report progress at driver checkpoints. Separate writer lanes check file ownership
+  and dependencies before the driver integrates their work.</p>
+  <p><a href="https://github.com/aigorahub/elves/blob/main/references/agent-teams.md">Team commands and setup</a></p>
+</section>
+</main>
   </div>
 
   <footer>

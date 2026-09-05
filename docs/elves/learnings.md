@@ -123,6 +123,9 @@ silently deleting it.
 
 ## Product and Domain Invariants
 
+A team callback storage receipt proves delivery state. Check result evidence
+separately before marking acceptance complete.
+
 - [2026-07-17] Native-worker prewalk is a trajectory property, never a packet-format improvement.
   One worker receives the packet once, creates a bounded TODO, makes a model-free-validated task
   edit, and resumes the exact session/worktree on the execution route with only `Continue.`. Static

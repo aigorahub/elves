@@ -108,6 +108,7 @@ class LaneResult:
     attempts: list[AttemptResult] = field(default_factory=list)
     successful_attempt_index: int | None = None
     failure_class: str | None = None
+    native_session_id: str | None = None
     execution_id: str | None = None
     process_launched: bool = False
     # Explicit call/mutation truth (not inferred from path substrings).

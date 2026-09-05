@@ -2544,6 +2544,8 @@ def _add_common_flags(subparser: argparse.ArgumentParser) -> None:
 def cmd_council(args: argparse.Namespace) -> int:
     """Parallel read-only council fan-out. Host still owns fitted synthesis."""
     repo_root = _repo_root_from_args(args)
+    from cobbler_runtime.teams import checkpoint_guard
+    checkpoint_guard(repo_root, "before-review")
     resolved = resolve_from_repo(repo_root)
 
     if not resolved.ok:
@@ -2626,6 +2628,8 @@ def cmd_council(args: argparse.Namespace) -> int:
 def cmd_lightweight_review(args: argparse.Namespace) -> int:
     """Single bounded utility review; not a council vote and not high-risk close."""
     repo_root = _repo_root_from_args(args)
+    from cobbler_runtime.teams import checkpoint_guard
+    checkpoint_guard(repo_root, "before-review")
     result = run_lightweight_review_sync(
         repo_root=repo_root,
         task=args.task,
@@ -2681,12 +2685,32 @@ def cmd_review_route(args: argparse.Namespace) -> int:
             )
         )
     try:
+        from cobbler_runtime.teams import read_json, reviewer_check
+        session_file = Path(args.session) if getattr(args, "session", None) else _repo_root_from_args(args) / ".elves-session.json"
+        team_session = read_json(session_file) if session_file.exists() else None
+        if team_session and "team" in team_session:
+            if not args.reviewer_identity:
+                raise ValidationIssue("team_reviewer_identity_missing", "Team review routing requires an exact reviewer identity")
+            from cobbler_runtime.teams import checkpoint_guard
+            checkpoint_guard(_repo_root_from_args(args), "before-review", session=team_session)
+            reviewer_check(team_session, read_json(args.reviewer_identity))
         decision = select_review_route(
             host=args.host,
             requested=args.requested,
             probes=probes,
             exclude=tuple(args.exclude or ()),
         )
+        if team_session and "team" in team_session and decision.selected:
+            candidate = read_json(args.reviewer_identity)
+            route_kinds = {
+                "codex-native-review": {"codex"}, "claude-code-subagent": {"claude", "claude-code"},
+                "grok-native-review": {"grok", "grok-build"}, "grok": {"grok", "grok-build"},
+                "omp-native-review": {"omp", "omp-cli"}, "omp": {"omp", "omp-cli"},
+                "fugu": {"fugu", "codex-fugu"},
+            }
+            allowed = route_kinds.get(decision.actual_route)
+            if allowed is not None and candidate.get("kind") not in allowed:
+                raise ValidationIssue("team_reviewer_route_mismatch", "Selected route does not match the recorded reviewer kind; qualify a matching independent session")
     except ValidationIssue as exc:
         if args.json:
             return _emit_json(
@@ -2743,6 +2767,12 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     sub = parser.add_subparsers(dest="command", required=True)
+    from cobbler_runtime.teams import add_parser as add_team_parser
+    add_team_parser(sub)
+    from cobbler_runtime.team_callbacks import add_report_parser
+    add_report_parser(sub)
+    from cobbler_runtime.team_lanes import add_parser as add_team_lanes_parser
+    add_team_lanes_parser(sub)
 
     preferences = sub.add_parser(
         "preferences",
@@ -3215,6 +3245,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Select an available review route when an optional provider fails",
     )
     _add_common_flags(review_route)
+    review_route.add_argument("--session", help="Team session requiring reviewer exclusion")
+    review_route.add_argument("--reviewer-identity", help="Exact candidate reviewer identity JSON")
     review_route.add_argument(
         "--host",
         required=True,
@@ -3872,6 +3904,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(raw_argv)
     try:
         return int(args.func(args))
+    except ValidationIssue as error:
+        return _emit_json({"ok": False, "issues": [error.to_dict()]}, exit_code=1)
     except StorageError as error:
         command = str(getattr(args, "command", "cobbler"))
         return _emit_storage_error(args, error, command=command)

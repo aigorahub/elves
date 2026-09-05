@@ -31,6 +31,8 @@ from .setup import (
     which_executable,
 )
 from .toml_compat import loads as load_toml_text
+from .preferences import preference_snapshot
+from .schema import ValidationIssue
 
 
 # Purposes the user assigns tools to. Core map to setup role slots.
@@ -282,6 +284,7 @@ class OnboardPacket:
     inventory: list[dict[str, Any]] = field(default_factory=list)
     env_present: dict[str, bool] = field(default_factory=dict)
     current_roles: dict[str, str] = field(default_factory=dict)
+    team_roles: dict[str, str] = field(default_factory=dict)
     purposes: list[dict[str, Any]] = field(default_factory=list)
     questions: list[dict[str, Any]] = field(default_factory=list)
     recommendations: list[str] = field(default_factory=list)
@@ -555,6 +558,12 @@ def build_onboarding_packet(
     if shutil.which("gcloud"):
         notes.append("gcloud present: AlphaEvolve may be available if the project has a runner.")
 
+    preference_warnings = []
+    try:
+        team_roles = preference_snapshot().values.get("team", {})
+    except ValidationIssue as exc:
+        team_roles = {}
+        preference_warnings.append(f"Saved team preferences are unavailable: {exc}")
     return OnboardPacket(
         generated_at=_utc_now(),
         host_hints={
@@ -564,16 +573,18 @@ def build_onboarding_packet(
             "cli_apply": "python3 scripts/cobbler_agents.py onboard apply --planning … --review …",
             "cli_show": "python3 scripts/cobbler_agents.py onboard show --json",
             "cli_probe": "python3 scripts/cobbler_agents.py onboard probe --json",
+            "cli_team_preferences": "python3 scripts/cobbler_agents.py preferences set team.proposer <configured-profile> --json",
             "cli_probe_smoke": "python3 scripts/cobbler_agents.py onboard probe --json --smoke",
         },
         inventory=[i.to_dict() for i in inventory],
         env_present=env_present,
         current_roles=current,
+        team_roles=team_roles,
         purposes=list(PURPOSE_CATALOG),
         questions=questions,
         recommendations=recommend_routes(inventory),
         notes=notes,
-        warnings=list(state.warnings),
+        warnings=list(state.warnings) + preference_warnings,
     )
 
 

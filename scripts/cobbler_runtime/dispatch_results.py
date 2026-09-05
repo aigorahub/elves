@@ -263,6 +263,7 @@ def assemble_external_result(
                 if attempt.requested_model is not None
                 else None
             ),
+            native_session_id=decoded.session_id,
             actual_model=decoded.actual_model,
             model_evidence_source=decoded.model_evidence_source,
             report=decoded.role_report,
@@ -301,6 +302,7 @@ def assemble_external_result(
             if attempt.requested_model is not None
             else None
         ),
+        native_session_id=decoded.session_id,
         actual_model=decoded.actual_model,
         model_evidence_source=decoded.model_evidence_source,
         stdout_summary=summarize(stdout, exact_values=exact_secret_values),

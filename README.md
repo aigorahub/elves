@@ -8,7 +8,7 @@ Oh My Pi (omp) driver plans and reviews; a subscription-native (or optional exte
 implements; durable run files let the work survive context compaction. You write the plan and own
 the merge decision. The agent does the middle.
 
-**Current release: v2.36.1**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.37.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 Implementation runs get a draft PR at the first useful pushed commit,
@@ -691,3 +691,13 @@ make mistakes. Always review the PR before merging.
 MIT, see [LICENSE](LICENSE).
 
 Copyright (c) 2026 Aigora.
+
+## Teams on one task
+
+Ask for a driver with helpers, or ask several models to propose and compare
+solutions. Elves uses its existing model routes. It records contributor identities
+and keeps the landing reviewer independent. Optional Lantern reports arrive at
+driver checkpoints. Persistent writer lanes check dependencies, worktree identity,
+and actual changed files before driver integration.
+
+Read the [team guide](references/agent-teams.md) for setup, commands, and limits.

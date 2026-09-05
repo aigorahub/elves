@@ -4,6 +4,24 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.37.0] - 2026-09-05
+
+- Add driver and helper team commands, saved role preferences, and independent
+  proposal and critique rounds through existing council dispatch.
+- Add optional Lantern protocol 1 callbacks with persistent message IDs, bounded
+  subprocess calls, checkpoint consumption, and recovery receipts. Standalone
+  Elves keeps its existing behavior.
+- Record contributors and reject their sessions as independent landing reviewers.
+  Accept a fresh same family reviewer. Check review commit and report digest at
+  final readiness.
+- Persist writer lane identities, dependencies, and integration state. Check actual
+  Git changes and ownership before driver integration. Pending lanes are not terminal.
+  Integrated lanes retain their proof after writer worktree cleanup.
+- Validate proposals before recording a discussion. Reject supplied helper packet
+  proof and mismatched callback epochs. Report invalid team JSON and missing
+  review evidence without a traceback. Keep onboarding usable when saved team
+  preferences need repair.
+
 ## [2.36.1] - 2026-09-05
 
 ### Fixed
