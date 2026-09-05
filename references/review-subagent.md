@@ -160,8 +160,12 @@ failure remains a transport block.
    with the key shown by that card. Current cards show `ctrl+k approve` and
    `alt+j manage`. Confirm the tool result. Never press a key at a login or
    account picker. Stop and restart that exact session once instead.
+   Check active review seats for permission cards at least every 20 seconds.
+   Live child requests expired after 60 seconds. Re-read the current card
+   immediately before approval; a new request can replace an expired one.
 4. Wait for the final report and completed Boost workers. Compare claimed
-   checks with actual tool results. Reject a report that says all checks
+   checks with actual tool results. Compare the head and base with host Git
+   records. Reject a mismatched commit ID. Reject a report that says all checks
    passed when required reads or tests were denied. Fix valid findings,
    commit and push, then request a Boost review of the new exact head only
    after the previous workers have stopped. Preserve the reviewer session
