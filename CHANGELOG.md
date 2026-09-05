@@ -2,7 +2,9 @@
 
 All notable changes to the Elves skill are documented here.
 
-## 2.37.0
+## [Unreleased]
+
+## [2.37.0] - 2026-09-05
 
 - Add driver and helper team commands, saved role preferences, and independent
   proposal and critique rounds through existing council dispatch.
@@ -14,9 +16,6 @@ All notable changes to the Elves skill are documented here.
   final readiness.
 - Persist writer lane identities, dependencies, and integration state. Check actual
   Git changes and ownership before driver integration. Pending lanes are not terminal.
-
-
-## [Unreleased]
 
 ## [2.36.1] - 2026-09-05
 

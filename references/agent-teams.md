@@ -14,7 +14,10 @@ The driver stages an Elves run and opens a draft PR at the first useful commit.
 It preserves the current model, permission, worktree, review, and landing rules.
 Team initialization records the canonical worktree path. All callback commands
 check that path. Canonical session changes share a process lock with writer lane
-registration, so concurrent updates cannot remove contributors.
+registration, so concurrent updates cannot remove contributors. A discussion holds
+that driver lock through both phases. Concurrent driver commands stop after a
+bounded lock wait and can be retried at the next boundary. Scoped helper reports
+use their own transport store and do not take the driver session lock.
 A request to implement stops at a landable PR unless the user authorizes merge.
 
 ## Saved choices
@@ -120,7 +123,7 @@ The driver configures `team configure-callback --input callback.json` with:
   "protocol": 1,
   "executable": "/absolute/lantern/bin/team_mailbox.py",
   "state_dir": "/absolute/private/lantern/herd",
-  "actor_credential": "/absolute/private/lantern/herd/driver-credential.json",
+  "actor_credential": "<ABSOLUTE_ACTOR_CREDENTIAL_FILE>",
   "timeout_seconds": 10
 }
 ```
