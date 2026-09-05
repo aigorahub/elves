@@ -294,6 +294,7 @@ _RESERVED_CONTROL_FLAGS: dict[str, frozenset[str]] = {
             "--add-dir",
             "--print-timeout",
             "--disable-slash-commands",
+            "--output-format",
         }
     ),
     "opencode-cli": frozenset(
@@ -603,6 +604,7 @@ def default_decoder_for_adapter(adapter: str) -> str:
         "codex-fugu": "codex-jsonl",
         "devin-cli": "custom-json-envelope",
         "omp-cli": "omp-jsonl",
+        "antigravity-cli": "agy-jsonl",
         "custom-cli": "custom-json-envelope",
         "host-native": "host-injected",
     }.get(name, "custom-json-envelope")
@@ -1079,12 +1081,30 @@ def build_readonly_invocation(
             # Every review, including a lightweight or resumed review, uses Boost.
             # Do not infer a review role from words in a planning task.
             review_role = str(role or profile).strip().lower()
+            if review_role in {"review", "lightweight_review"}:
+                if not work_cwd or not Path(work_cwd).is_absolute():
+                    raise ValidationIssue(
+                        "agy_review_workspace_required",
+                        "Agy review requires an absolute admitted workspace path",
+                    )
+                full_prompt = (
+                    f"Admitted review workspace: {work_cwd}\n"
+                    "Give this absolute workspace path and these constraints to every child. "
+                    "Use absolute paths for file reads. Return findings only. Do not edit files, "
+                    "commit, push, merge, or change permissions. Read the supplied diff and "
+                    "commit evidence; the admitted snapshot may have no .git directory. "
+                    "Do not assume shell commands are permitted. Wait for the investigation "
+                    "and verification results before returning the final structured role report. "
+                    "A delegation notice is not a completed review. Report denied reads or "
+                    "missing evidence as a block. Include the reviewed commit in evidence.\n\n"
+                    + full_prompt
+                )
             agy_prompt = (
                 "/boost " + full_prompt
                 if review_role in {"review", "lightweight_review"}
                 else full_prompt
             )
-            argv_list.extend(["--print", agy_prompt, "--mode", "plan"])
+            argv_list.extend(["--print", agy_prompt, "--mode", "plan", "--output-format", "stream-json"])
             if requested_model:
                 argv_list.extend(["--model", str(requested_model)])
             argv_list.extend(extras)
@@ -1104,7 +1124,7 @@ def build_readonly_invocation(
                 ),
                 stdin_text=None,
                 input_mode="none",
-                decoder="custom-json-envelope",
+                decoder="agy-jsonl",
                 cwd=work_cwd,
                 session_id=exact_session,
             )
@@ -1559,6 +1579,67 @@ def decode_codex_jsonl(
     )
 
 
+def decode_agy_jsonl(
+    stdout: str,
+    *,
+    expected_role: str | None = None,
+) -> TransportDecodeResult:
+    """Decode one native Agy turn, without treating a child spawn as completion."""
+    guidance = "Use a supervised Agy terminal review if the isolated headless route cannot qualify."
+    try:
+        events = [json.loads(line) for line in stdout.splitlines() if line.strip()]
+        if not events or any(not isinstance(event, dict) for event in events):
+            raise ValueError("expected native event objects")
+        starts = [event for event in events if event.get("event") == "init"]
+        ends = [event for event in events if event.get("event") == "result"]
+        if len(starts) != 1 or len(ends) != 1 or events[0] != starts[0] or events[-1] != ends[0]:
+            raise ValueError("expected one init and one final result")
+        init = starts[0]["init"]
+        result = ends[0]["result"]
+        if not isinstance(init, dict) or not isinstance(result, dict):
+            raise ValueError("invalid init or result payload")
+        session = starts[0]["conversation_id"]
+        if not isinstance(session, str) or not session or result.get("conversation_id") != session:
+            raise ValueError("conflicting or missing conversation identity")
+        model = init.get("model")
+        if model is not None and (not isinstance(model, str) or not model.strip()):
+            raise ValueError("invalid model identity")
+    except (ValueError, KeyError, TypeError) as exc:
+        raise ValidationIssue("agy_invalid_transport", str(exc), hint=guidance) from exc
+
+    if result.get("status") != "SUCCESS" or result.get("error"):
+        raise ValidationIssue("agy_failed_status", "Agy did not return a successful final result", hint=guidance)
+    if result.get("denied_actions"):
+        raise ValidationIssue("agy_denied_actions", "Agy reported denied tool actions", hint=guidance)
+    review = expected_role in {"review", "lightweight_review"}
+    if review:
+        commands = init.get("expanded_commands", [])
+        if not isinstance(commands, list) or not any(
+            isinstance(command, dict) and command.get("name") == "boost"
+            and command.get("type") == "system" for command in commands
+        ):
+            raise ValidationIssue("agy_boost_unverified", "Agy did not confirm system Boost expansion", hint=guidance)
+    # Only the final result may supply a report. Intermediate agent text and
+    # subagent DONE events can describe delegation, not completed child work.
+    try:
+        body = result.get("structured_output")
+        if body is None:
+            body = _parse_json_object(result.get("response", ""))
+        if isinstance(body, dict) and "role_report" in body:
+            body = body["role_report"]
+        report = validate_role_report(body, expected_role=expected_role)
+    except (ValidationIssue, AttributeError, TypeError) as exc:
+        raise ValidationIssue("agy_missing_review_report", "Agy returned no valid final role report", hint=guidance) from exc
+    return TransportDecodeResult(
+        role_report=report,
+        actual_model=model,
+        model_evidence_source="agy.init.model" if model else None,
+        session_id=session,
+        transport_notes=("agy-jsonl", "boost-expanded" if review else "native-result",
+                         "host-must-verify-terminal-review-evidence"),
+    )
+
+
 def decode_custom_json_envelope(
     stdout: str,
     *,
@@ -1780,6 +1861,8 @@ def decode_adapter_output(
         result = decode_codex_jsonl(stdout, expected_role=expected_role)
     elif name in {"omp-jsonl"}:
         result = decode_omp_jsonl(stdout, expected_role=expected_role)
+    elif name == "agy-jsonl":
+        result = decode_agy_jsonl(stdout, expected_role=expected_role)
     elif name in {"custom-json-envelope", "json-role-report", "json-transport-envelope"}:
         result = decode_custom_json_envelope(stdout, expected_role=expected_role)
     else:

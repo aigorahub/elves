@@ -112,6 +112,69 @@ unavailable. Use an independent fallback only within existing user route
 authority. A plain Agy response cannot satisfy required review. The host
 still needs a completed report at the exact commit before landing.
 
+The review request must name the absolute admitted workspace, base, and head.
+Pass that workspace to every Boost worker. Children can start in Agy's scratch
+folder. An isolated snapshot has supplied diff and commit evidence; do not
+send children to the original checkout or assume the snapshot has Git history.
+
+Headless launch is conditional on transport qualification. Agy can return
+`SUCCESS` and exit zero after denying a required tool. Require native session
+and model evidence, system Boost expansion, completed child work, and a valid
+final report. Reject delegation notices, tool denials, and missing reports.
+The JSON decoder checks transport and report shape. The host must still
+verify the reviewed commit and child completion before accepting the review.
+
+When headless transport is unqualified, use an authorized supervised terminal
+seat with `agy --model <listed-id> --effort <listed-effort> --mode plan`.
+Send the review request with its Boost command once. Keep the terminal alive
+until the children finish. Inspect `/agents` and child events when the parent
+looks idle. Approve only required review reads or checks at a verified
+permission card. Do not grant all shell commands or enable a bypass flag.
+After an expired permission, inspect the child before resuming its work.
+Use `--conversation <exact-id>` with the same model and effort after a stopped
+session. Never send status prompts while a child works.
+
+A direct terminal review is a separate transport. It does not qualify the
+isolated Elves adapter. Preserve the adapter's snapshot, isolated HOME, and
+outer sandbox. Do not copy the user's whole Agy profile or change global
+permission settings to make a review start. A required isolation or auth
+failure remains a transport block.
+
+### Supervised Agy procedure
+
+1. Read `agy models` and `agy --help` once for the run. Record the CLI version
+   and exact listed model. From the review workspace, start:
+   `agy --model gemini-3.8-flash-high --effort high --mode plan`.
+   Use a different listed model only when the run names it. In Herdr, use
+   `herdr agent start <review-name> --kind agy --pane <pane-id> --
+   --model gemini-3.8-flash-high --effort high --mode plan`.
+2. At the ready prompt, send one request in this form:
+   `/boost Review PR <number> at head <sha> against base <sha>. Workspace:
+   <absolute-path>. Pass this path and these rules to every worker. Return
+   findings only. Do not edit, commit, push, or merge. Check each finding
+   against counterevidence. Wait for investigation and verification before
+   the final report. Name the exact reviewed commit and any missing evidence.`
+3. Read the parent and child state. Agy can show a ready parent prompt while
+   Boost works. Use `/agents` for local state. At a visible child permission
+   card, read the exact command or path. Approve one required read or check
+   with the key shown by that card. Current cards show `ctrl+k approve` and
+   `alt+j manage`. Confirm the tool result. Never press a key at a login or
+   account picker. Stop and restart that exact session once instead.
+4. Wait for the final report and completed Boost workers. Compare claimed
+   checks with actual tool results. Reject a report that says all checks
+   passed when required reads or tests were denied. Fix valid findings,
+   commit and push, then request a Boost review of the new exact head only
+   after the previous workers have stopped. Preserve the reviewer session
+   with `agy --conversation <exact-id> --model <same-id> --effort <same-effort>
+   --mode plan` after a process stop. Do not start a competing reviewer.
+
+The live CLI test on 2026-09-05 used Gemini 3.8 Flash High and confirmed
+Boost investigation plus a separate verification worker. Initial print mode
+denied reads and returned a delegation response. An interactive resume
+allowed scoped reads. This is terminal transport evidence, not proof that
+the isolated headless adapter works on another machine. Keep the final
+review result separate from this transport test.
+
 See [Google's Boost guide](https://www.antigravity.google/docs/boost/).
 
 ## Review Route Context

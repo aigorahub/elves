@@ -2113,6 +2113,10 @@ class AdapterBuilderTests(unittest.TestCase):
                 repo_root=Path(tmp),
             )
             self.assertTrue(agy.argv[agy.argv.index("--print") + 1].startswith("/boost "))
+            self.assertIn(f"Admitted review workspace: {tmp}", agy.argv[agy.argv.index("--print") + 1])
+            self.assertIn("Give this absolute workspace path", agy.argv[agy.argv.index("--print") + 1])
+            self.assertEqual(agy.argv[agy.argv.index("--output-format") + 1], "stream-json")
+            self.assertEqual(agy.decoder, "agy-jsonl")
             for review_role in ("review", "lightweight_review", "planning"):
                 invocation = build_readonly_invocation(
                     adapter="antigravity-cli", profile="review", role=review_role,
@@ -2123,7 +2127,8 @@ class AdapterBuilderTests(unittest.TestCase):
                     invocation.argv[invocation.argv.index("--print") + 1].startswith("/boost "),
                     review_role != "planning",
                 )
-            for disabled in ("--disable-slash-commands", "--disable-slash-commands=true"):
+            for disabled in ("--disable-slash-commands", "--disable-slash-commands=true",
+                             "--output-format=text", "--output-format"):
                 with self.assertRaises(ValidationIssue):
                     build_readonly_invocation(
                         adapter="antigravity-cli", profile="review", role="review",
@@ -2690,6 +2695,60 @@ class RemediationBlockerTests(unittest.TestCase):
         self.assertEqual(list(profile.extra_args), [])
         self.assertEqual(list(profile.env_grants), [])
         self.assertEqual(profile.session_mode.value, "ephemeral")
+
+    def test_agy_native_result_and_transport_guards(self) -> None:
+        report = {
+            "role": "review", "verdict": "pass", "confidence": "high",
+            "key_findings": [], "evidence": ["Reviewed commit abc123"],
+            "risks": [], "recommended_actions": [], "open_questions": [],
+        }
+        def events():
+            return [
+                {"event": "init", "conversation_id": "parent-session", "init": {
+                    "model": "gemini-3.8-flash-high",
+                    "expanded_commands": [{"name": "boost", "type": "system"}]}},
+                {"event": "result", "result": {"conversation_id": "parent-session",
+                    "status": "SUCCESS", "response": json.dumps(report)}},
+            ]
+        def decode(rows, **kwargs):
+            return decode_adapter_output(
+                "\n".join(json.dumps(row) for row in rows), decoder="agy-jsonl",
+                expected_role="review", **kwargs,
+            )
+        decoded = decode(events(), requested_model="gemini-3.8-flash-high")
+        self.assertEqual(decoded.session_id, "parent-session")
+        self.assertEqual(decoded.model_evidence_source, "agy.init.model")
+        self.assertEqual(decoded.role_report["evidence"], report["evidence"])
+        rows = events()
+        rows[-1]["result"]["structured_output"] = {"role_report": report}
+        rows[-1]["result"]["response"] = ""
+        self.assertEqual(decode(rows).role_report["verdict"], "pass")
+        for change, code in (
+            (lambda r: r[-1]["result"].update(status="ERROR"), "agy_failed_status"),
+            (lambda r: r[-1]["result"].update(status="WAITING"), "agy_failed_status"),
+            (lambda r: r[-1]["result"].update(denied_actions=[{"action": "command"}]), "agy_denied_actions"),
+            (lambda r: r[-1]["result"].update(conversation_id="other-session"), "agy_invalid_transport"),
+            (lambda r: r[0]["init"].update(expanded_commands=[]), "agy_boost_unverified"),
+            (lambda r: r[0]["init"].update(expanded_commands=[{"name": "boost", "type": "skill"}]), "agy_boost_unverified"),
+            (lambda r: r[-1]["result"].update(response="I delegated the review and am waiting."), "agy_missing_review_report"),
+        ):
+            with self.subTest(code=code):
+                rows = events()
+                change(rows)
+                with self.assertRaises(ValidationIssue) as caught:
+                    decode(rows)
+                self.assertEqual(caught.exception.code, code)
+        with self.assertRaises(ValidationIssue) as caught:
+            decode(events(), requested_model="different-model")
+        self.assertEqual(caught.exception.code, "actual_model_mismatch")
+        # A DONE spawn event and intermediate JSON are not a final report.
+        rows = events()
+        rows.insert(1, {"event": "step_update", "step_update": {
+            "state": "DONE", "step_type": "subagent", "text_delta": json.dumps(report)}})
+        rows[-1]["result"]["response"] = "Waiting for the child."
+        with self.assertRaises(ValidationIssue) as caught:
+            decode(rows)
+        self.assertEqual(caught.exception.code, "agy_missing_review_report")
 
     def test_decoder_claude_and_grok_and_codex_fixtures(self) -> None:
         report = {

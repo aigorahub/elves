@@ -113,7 +113,9 @@ opt-in for the current PR.
    authority.
 4. Host review: independent review of `git diff <default-branch>...HEAD`.
    Every Agy review and re-review requires `/boost` in plan mode. No plain
-   Agy fallback. See `references/review-subagent.md` for the evidence rules.
+   Agy fallback. Use the supervised Agy procedure in
+   `references/review-subagent.md` when headless transport is unqualified.
+   Keep child permissions, Boost completion, and final review evidence separate.
 5. Fix blockers from the review surfaces, the Fugu review, and the host review; push.
 6. Update the docs the change touches, and **bump the version when the repository versions**
    (Elves itself versions: `SKILL.md` metadata, `AGENTS.md`, the `CHANGELOG.md` release heading, and

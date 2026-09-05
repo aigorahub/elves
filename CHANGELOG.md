@@ -11,6 +11,10 @@ All notable changes to the Elves skill are documented here.
 - Agy review and lightweight review calls now start with `/boost`, including
   exact session resumes. Plan mode remains set. Extra arguments cannot
   disable slash command expansion.
+- Agy native output now has transport checks for session identity, Boost
+  expansion, denied tools, and a valid final report. Review requests pass the
+  admitted workspace to children. Unqualified headless transport uses an
+  authorized supervised seat while required isolation remains in place.
 - The review rules reject plain Agy fallback after Boost failure. Reviewers
   must use a separate session from code writers and return evidence for the
   exact commit. Updated the skill, README, and guide.

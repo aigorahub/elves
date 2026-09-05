@@ -628,7 +628,11 @@ middle.
 Agy reviews always use `/boost` in plan mode, including reviews of fixes.
 The reviewer uses a separate session from the code writers. Boost failure
 requires an authorized independent fallback or a block; a plain Agy response
-does not satisfy review. See [the review rules](references/review-subagent.md).
+does not satisfy review. Pass the absolute admitted workspace to all Boost
+workers. Use a supervised terminal when headless transport is unqualified.
+Keep required isolation. Approve scoped review actions and wait for child
+completion plus a final report at the exact commit. Headless success alone
+does not prove a review. See [the review rules](references/review-subagent.md).
 
 ## Contributing
 
