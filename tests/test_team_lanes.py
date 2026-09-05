@@ -6,6 +6,7 @@ import argparse
 from contextlib import redirect_stdout
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -69,7 +70,10 @@ class WriterLanesTests(unittest.TestCase):
         return path, worker, head
 
     def link_session(self):
-        self.session_path = self.root / "session.json"
+        exclude = self.repo / ".git/info/exclude"
+        exclude.write_text(exclude.read_text() + "\n.elves/\n")
+        self.session_path = self.repo / ".elves/session.json"
+        self.session_path.parent.mkdir(exist_ok=True)
         driver = {"session_id": self.actor["session"], "kind": self.actor["kind"], "model": self.actor["model"]}
         session = {"run_id": "run-one", "worktree_path": str(self.repo),
                    "team": {"version": 1, "driver": driver, "contributors": [{**driver, "role": "lead"}], "helpers": {}}}
@@ -291,6 +295,12 @@ class WriterLanesTests(unittest.TestCase):
         self.assertIssue("team_lanes_protected_branch", tl.LaneStore(self.root / "other.sqlite").initialize,
                          repo=self.repo, run_id="bad", driver=self.actor)
 
+    def test_configured_default_branch_cannot_be_driver(self):
+        self.git(self.repo, "config", "init.defaultBranch", "trunk")
+        self.git(self.repo, "switch", "-c", "trunk")
+        self.assertIssue("team_lanes_protected_branch", tl.LaneStore(self.root / "other.sqlite").initialize,
+                         repo=self.repo, run_id="bad", driver=self.actor)
+
     def test_existing_database_cannot_be_reinitialized(self):
         self.assertIssue("team_lanes_already_initialized", self.store.initialize,
                          repo=self.repo, run_id="other", driver=self.actor)
@@ -357,6 +367,138 @@ class WriterLanesTests(unittest.TestCase):
 
     def test_standalone_readiness_remains_neutral(self):
         tl.readiness_check({"run_id": "standalone"}, "not-needed")
+
+    def test_empty_linked_ledger_requires_explicit_abandonment(self):
+        session = self.link_session()
+        self.assertFalse(self.store.status()["all_terminal"])
+        head = self.git(self.repo, "rev-parse", "HEAD")
+        self.assertIssue("team_lanes_not_ready", tl.readiness_check, session=session, head=head)
+        self.assertIssue("team_lanes_reason_required", self.store.abandon, actor=self.actor, reason="")
+        result = self.store.abandon(actor=self.actor, reason="Driver chose the serial path")
+        self.assertTrue(result["ready"])
+        self.assertTrue(result["all_terminal"])
+        self.assertFalse(result["all_integrated"])
+        tl.readiness_check(session, head)
+        self.assertEqual(tl.LaneStore(self.path).status()["disposition"]["reason"], "Driver chose the serial path")
+        with self.assertRaises(ValidationIssue) as caught:
+            self.register()
+        self.assertEqual(caught.exception.code, "team_lanes_run_abandoned")
+
+    def test_abandon_cannot_hide_registered_writers(self):
+        self.register()
+        self.assertIssue("team_lanes_abandon_invalid", self.store.abandon,
+                         actor=self.actor, reason="Switch to serial")
+
+    def test_public_cli_abandons_empty_ledger(self):
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "scripts/cobbler_agents.py"), "team-lanes", "abandon",
+             "--state", str(self.path), "--actor-session", self.actor["session"],
+             "--actor-kind", self.actor["kind"], "--actor-model", self.actor["model"],
+             "--reason", "Use the serial driver"], text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(json.loads(result.stdout)["result"]["ready"])
+
+    def test_linked_session_must_stay_inside_worktree_without_symlinks(self):
+        self.link_session()
+        outside = self.root / "outside-session.json"
+        original = self.session_path.read_text()
+        outside.write_text(original)
+        candidates = [outside]
+        linked = self.session_path.parent / "linked.json"
+        linked.symlink_to(outside)
+        candidates.append(linked)
+        directory = self.session_path.parent / "linked-dir"
+        directory.symlink_to(self.root, target_is_directory=True)
+        candidates.append(directory / "outside-session.json")
+        for index, candidate in enumerate(candidates):
+            with self.subTest(path=candidate):
+                self.assertIssue("team_lanes_session_path", tl.LaneStore(self.root / f"bad-{index}.sqlite").initialize,
+                                 repo=self.repo, run_id="run-one", driver=self.actor, session_path=candidate)
+        self.assertEqual(outside.read_text(), original)
+
+    def test_linked_transactions_share_reentrant_canonical_session_lock(self):
+        from cobbler_runtime.teams import session_lock
+        self.link_session()
+        with session_lock(self.session_path):
+            self.register()
+            self.assertEqual(self.store.status()["pending"], ["L1"])
+
+    def test_lane_registration_waits_for_team_session_writer_and_retains_both_contributors(self):
+        self.link_session()
+        worker_path = self.root / "L1"
+        self.git(self.repo, "worktree", "add", "-b", "writer/L1", str(worker_path))
+        ready = self.root / "session-lock-held"
+        release = self.root / "release-session-lock"
+        attempted = self.root / "writer-lock-requested"
+        helper_script = '''import json, sys, time
+from pathlib import Path
+from cobbler_runtime.teams import contributor, session_lock
+from cobbler_runtime.storage import atomic_write_json
+session_path, ready, release = map(Path, sys.argv[1:])
+with session_lock(session_path):
+    session = json.loads(session_path.read_text())
+    ready.write_text("locked")
+    deadline = time.monotonic() + 15
+    while not release.exists():
+        if time.monotonic() > deadline:
+            raise RuntimeError("Test release did not arrive")
+        time.sleep(0.01)
+    contributor(session, {"session_id":"brainstorm-helper", "kind":"grok", "model":"model-c"}, "proposer")
+    atomic_write_json(session_path, session)
+'''
+        writer_script = '''import sys
+from pathlib import Path
+from contextlib import contextmanager
+from cobbler_runtime import teams
+from cobbler_agents import main
+original = teams.session_lock
+@contextmanager
+def traced_lock(path):
+    Path(sys.argv[1]).write_text("requested")
+    with original(path):
+        yield
+teams.session_lock = traced_lock
+raise SystemExit(main(sys.argv[2:]))
+'''
+        env = {**os.environ, "PYTHONPATH": str(ROOT / "scripts")}
+        helper = subprocess.Popen([sys.executable, "-c", helper_script, str(self.session_path), str(ready), str(release)],
+                                  env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        writer = None
+        try:
+            import time
+            deadline = time.monotonic() + 10
+            while not ready.exists() and time.monotonic() < deadline and helper.poll() is None:
+                time.sleep(0.01)
+            self.assertTrue(ready.exists())
+            writer = subprocess.Popen(
+                [sys.executable, "-c", writer_script, str(attempted), "team-lanes", "register",
+                 "--state", str(self.path), "--actor-session", self.actor["session"],
+                 "--actor-kind", self.actor["kind"], "--actor-model", self.actor["model"],
+                 "--lane", "L1", "--worktree", str(worker_path), "--branch", "writer/L1",
+                 "--session", "writer-L1", "--kind", "claude", "--model", "model-b", "--owns", "src/"],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+            # Prove the writer waits on the canonical lock instead of reading
+            # and overwriting the helper's in-flight JSON session update.
+            deadline = time.monotonic() + 10
+            while not attempted.exists() and time.monotonic() < deadline and writer.poll() is None:
+                time.sleep(0.01)
+            self.assertTrue(attempted.exists(), "Lane CLI did not enter the canonical session lock")
+            with self.assertRaises(subprocess.TimeoutExpired):
+                writer.communicate(timeout=0.1)
+            release.write_text("release")
+            helper_output = helper.communicate(timeout=15)
+            writer_output = writer.communicate(timeout=15)
+            self.assertEqual(helper.returncode, 0, helper_output)
+            self.assertEqual(writer.returncode, 0, writer_output)
+            contributors = json.loads(self.session_path.read_text())["team"]["contributors"]
+            self.assertEqual({row["session_id"] for row in contributors},
+                             {self.actor["session"], "brainstorm-helper", "writer-L1"})
+        finally:
+            release.touch()
+            for process in (helper, writer):
+                if process is not None and process.poll() is None:
+                    process.kill()
+                    process.communicate()
 
     def test_parser_and_error_envelopes(self):
         parser = argparse.ArgumentParser()

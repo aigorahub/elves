@@ -894,7 +894,7 @@ def build_parser():
             self.assertEqual(snapshot.status, "degraded")
             self.assertIn("unknown mapping", snapshot.reason or "")
 
-    def test_imported_handler_source_marks_cli_inspection_incomplete(self) -> None:
+    def test_local_imported_handler_is_inspected_but_external_source_is_incomplete(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             scripts = root / "scripts"
@@ -916,6 +916,15 @@ def build_parser():
                 "    status.set_defaults(func=cmd_status)\n"
                 "    return parser\n",
             )
+            snapshot = capture_snapshot(root)
+            self.assertEqual(snapshot.status, "captured", snapshot.reason)
+            external = root / "external_handlers.py"
+            external.write_text((scripts / "handlers.py").read_text(), encoding="utf-8")
+            cli = scripts / "cobbler_agents.py"
+            cli.write_text(cli.read_text().replace(
+                "from handlers import cmd_status",
+                "import sys\nfrom pathlib import Path\nsys.path.insert(0, str(Path(__file__).resolve().parent.parent))\nfrom external_handlers import cmd_status",
+            ), encoding="utf-8")
             snapshot = capture_snapshot(root)
             self.assertEqual(snapshot.status, "degraded")
             self.assertIn("outside inspected CLI module", snapshot.reason or "")

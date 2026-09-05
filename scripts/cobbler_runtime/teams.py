@@ -1,11 +1,15 @@
 """Driver owned teams. No message or helper report grants execution authority."""
 from __future__ import annotations
 
+from contextlib import contextmanager
 import argparse
 from dataclasses import asdict, replace
 import hashlib
 import json
 from pathlib import Path
+import os
+import sqlite3
+import threading
 import subprocess
 import sys
 from typing import Any
@@ -16,6 +20,63 @@ from .team_callbacks import CallbackAdapter, CHECKPOINTS, validate_callback
 
 ROLES = ('lead', 'proposer', 'investigator', 'implementer', 'critic', 'reviewer')
 CONTRIBUTORS = frozenset(ROLES) - {'reviewer'}
+
+
+_SESSION_LOCKS = threading.local()
+
+
+@contextmanager
+def session_lock(path):
+    """Serialize canonical session changes across processes and nested callers."""
+    target = Path(os.path.abspath(path))
+    lock_key = str(target)
+    held = getattr(_SESSION_LOCKS, 'held', None)
+    if held is None:
+        held = {}
+        _SESSION_LOCKS.held = held
+    if lock_key in held:
+        held[lock_key] += 1
+        try:
+            yield
+        finally:
+            held[lock_key] -= 1
+        return
+    directory = target.parent / '.elves/runtime/team-session-locks'
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    lock_path = directory / (hashlib.sha256(lock_key.encode()).hexdigest() + '.sqlite3')
+    if lock_path.is_symlink():
+        issue('team_session_lock', 'Session lock must not be a symbolic link')
+    connection = sqlite3.connect(lock_path, timeout=5)
+    try:
+        connection.execute('CREATE TABLE IF NOT EXISTS owner (id INTEGER PRIMARY KEY)')
+        connection.execute('BEGIN IMMEDIATE')
+        os.chmod(lock_path, 0o600)
+        held[lock_key] = 1
+        yield
+        connection.commit()
+    except BaseException:
+        connection.rollback()
+        raise
+    finally:
+        held.pop(lock_key, None)
+        connection.close()
+
+
+def canonical_root(session, supplied=None):
+    value = session.get('worktree_path')
+    if not isinstance(value, str) or not value or not Path(value).is_absolute():
+        issue('team_worktree_missing', 'Team callback requires a staged absolute worktree_path; configure it from the run checkout')
+    root = Path(value).resolve()
+    if supplied is not None and Path(supplied).resolve() != root:
+        issue('team_worktree_mismatch', 'Command repository does not match the canonical team worktree')
+    return root
+
+
+def callback_authorization(session, root):
+    from .preferences import global_preferences_path
+    body = {'config':session['team_callback'], 'run_id':session.get('run_id'), 'worktree_path':str(root)}
+    digest = hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()
+    return global_preferences_path().parent / 'callback-endpoints' / (digest + '.json'), body
 
 
 def issue(code, message):
@@ -78,6 +139,8 @@ def reviewer_check(session, reviewer, *, head=None, require_report=False):
         issue('team_driver_missing', 'Contributor ledger must include the driver')
     if candidate.get('execution_id') and any(row.get('execution_id') == candidate['execution_id'] for row in team.get('contributor_executions', [])):
         issue('team_reviewer_contributor', 'A contributing execution cannot review its own work')
+    if candidate['session_id'] in team.get('unqualified_contributor_sessions', []):
+        issue('team_reviewer_contributor', 'A launched contributor session cannot be its independent reviewer')
     if any(key(row) == key(candidate) for row in authors):
         issue('team_reviewer_contributor', 'A contributor cannot be the independent landing reviewer')
     if require_report:
@@ -85,7 +148,7 @@ def reviewer_check(session, reviewer, *, head=None, require_report=False):
         if not isinstance(review, dict) or identity(review.get('identity')) != candidate or review.get('head') != head or review.get('clean') is not True:
             issue('team_review_incomplete', 'Team requires a clean independent review at the current commit')
         artifact = Path(review.get('artifact', ''))
-        if not artifact.is_file() or artifact.is_symlink() or hashlib.sha256(artifact.read_bytes()).hexdigest() != review.get('sha256'):
+        if not artifact.is_file() or artifact.is_symlink() or artifact.stat().st_size > 1024 * 1024 or hashlib.sha256(artifact.read_bytes()).hexdigest() != review.get('sha256'):
             issue('team_review_artifact', 'Independent review artifact is missing or changed')
     return {'independent': True, 'team_enabled': True,
             'different_family': all(family(row['model']) != family(candidate['model']) for row in authors),
@@ -96,7 +159,7 @@ def readiness_check(session, head):
     from .team_lanes import readiness_check as lane_readiness_check
     lane_readiness_check(session, head)
     if session.get('team_callback'):
-        checkpoint_guard(Path(session['worktree_path']), 'before-readiness', session=session)
+        checkpoint_guard(canonical_root(session), 'before-readiness', session=session)
     if 'team' not in session:
         return
     team = team_block(session)
@@ -109,13 +172,14 @@ def readiness_check(session, head):
         issue('team_helper_failed', 'Resolve failed helper outcomes before readiness')
     reviewer_check(session, team.get('review', {}).get('identity'), head=head, require_report=True)
     if session.get('team_callback'):
-        adapter = callback_for(session, Path(session['worktree_path']))
+        adapter = callback_for(session, canonical_root(session))
         states = adapter.status()
         if any(row['status'] != 'stored' for row in states['outbox']) or any(row['status'] != 'consumed' for row in states['inbox']):
             issue('team_callback_pending', 'Consume pending reports and reconcile outgoing reports before readiness')
 
 
 def callback_runtime(session, root):
+    root = canonical_root(session, root)
     run_id = session.get('run_id')
     if not isinstance(run_id, str) or not run_id:
         issue('team_run_id_missing', 'Callback requires the staged run ID')
@@ -126,6 +190,10 @@ def callback_for(session, root):
     config = session.get('team_callback')
     if not config:
         issue('team_callback_disabled', 'This standalone run has no Lantern callback')
+    root = canonical_root(session, root)
+    approval, expected = callback_authorization(session, root)
+    if not approval.is_file() or read_json(approval) != expected:
+        issue('team_callback_not_configured', 'Run team configure-callback from this checkout before automatic checkpoint calls')
     return CallbackAdapter(config, callback_runtime(session, root))
 
 
@@ -194,8 +262,20 @@ def driver_parked(session, root):
         return True
     for path in (Path(root) / '.elves/runtime/implement/full-run').glob('*/state.json'):
         state = read_json(path)
+        if state.get('start_head') != session.get('start_head'):
+            continue
+        if state.get('worktree') and Path(state['worktree']).resolve() != Path(root).resolve():
+            continue
         if state.get('status') == 'healthy' or state.get('next_action') == 'parked_monitor':
-            return True
+            sid = state.get('session_id')
+            if not isinstance(sid, str) or not sid:
+                issue('team_worker_identity_missing', 'Reconcile the full run with its exact session before consuming reports')
+            # Existing supervisor owns liveness and process identity checks.
+            # A stale JSON status alone cannot keep a dead worker parked.
+            from .full_run_monitor import monitor_full_run
+            observed = monitor_full_run(Path(root), session_id=sid)
+            if observed.get('state') == 'healthy' or observed.get('next_action') == 'parked_monitor':
+                return True
     return False
 
 
@@ -264,7 +344,7 @@ def helper_packet(session, task_id, root):
     return '\n'.join(lines) + '\n'
 
 
-def run(args):
+def _run(args):
     try:
         root = Path(args.repo_root).resolve()
         session_path = Path(args.session)
@@ -276,6 +356,11 @@ def run(args):
         save = False
         if action not in ('init', 'configure-callback', 'post', 'retry', 'checkpoint', 'consume', 'callback-status', 'reconcile', 'inspect', 'status', 'route'):
             checkpoint_guard(root, 'before-review' if action in ('check-reviewer','record-review','brainstorm') else 'batch-boundary', session=session)
+        if action in ('init', 'configure-callback'):
+            if session.get('worktree_path') is not None:
+                canonical_root(session, root)
+            else:
+                session['worktree_path'] = str(root)
         if action == 'init':
             if 'team' in session:
                 issue('team_exists', 'Team identity already exists; use status to resume it')
@@ -283,11 +368,13 @@ def run(args):
             session['team'] = {'version': 1, 'driver': agent, 'contributors': [{**agent, 'role': 'lead'}], 'helpers': {}}
             payload, save = session['team'], True
         elif action == 'configure-callback':
-            adapter = CallbackAdapter(data, callback_runtime(session, root))
-            payload = adapter.probe()
             if session.get('team_callback') and session['team_callback'] != data:
                 issue('team_callback_identity_drift', 'Callback identity cannot be replaced during a run')
+            adapter = CallbackAdapter(data, callback_runtime(session, root))
+            payload = adapter.probe()
             session['team_callback'] = data
+            approval, body = callback_authorization(session, root)
+            atomic_write_json(approval, body)
             save = True
         elif action == 'route':
             from .config import resolve_from_repo
@@ -320,7 +407,8 @@ def run(args):
             payload, save = team['helpers'][name], True
         elif action == 'helper-packet':
             packet = helper_packet(session, args.task_id, root)
-            target = Path(args.output).resolve()
+            target = Path(args.output)
+            target = (target if target.is_absolute() else root / target).absolute()
             # Packet text contains scoped config paths, never credential contents.
             from .storage import guard_repo_path
             guard_repo_path(root,target)
@@ -329,6 +417,7 @@ def run(args):
             target.write_text(packet)
             target.chmod(0o600)
             session['team']['helpers'][args.task_id]['packet_path'] = str(target)
+            session['team']['helpers'][args.task_id]['packet_sha256'] = hashlib.sha256(target.read_bytes()).hexdigest()
             payload, save = {'packet_path':str(target),'callback':bool(session['team']['helpers'][args.task_id].get('callback'))}, True
         elif action == 'helper-state':
             team = team_block(session)
@@ -337,6 +426,10 @@ def run(args):
                 issue('team_identity_drift', 'Helper transition requires its exact recorded identity')
             transitions = {'assigned': ('running', 'cancelled'), 'running': ('waiting-peer', 'complete', 'failed', 'cancelled'), 'waiting-peer': ('running', 'failed', 'cancelled'), 'failed': ('cancelled',)}
             state = data.get('state')
+            if state == 'running' and helper['state'] == 'assigned':
+                packet = Path(helper.get('packet_path', ''))
+                if not packet.is_file() or packet.is_symlink() or packet.stat().st_size > 1024 * 1024 or hashlib.sha256(packet.read_bytes()).hexdigest() != helper.get('packet_sha256'):
+                    issue('team_packet_missing', 'Generate and retain the original helper packet before launch')
             if state not in transitions.get(helper['state'], ()):
                 issue('team_transition', 'Invalid helper lifecycle transition')
             if state in ('complete', 'failed', 'cancelled') and not data.get('evidence'):
@@ -393,8 +486,12 @@ def run(args):
                 atomic_write_json(artifact, evidence, repo_root=root)
                 runs[discussion_id]['phases'][phase] = {'artifact':str(artifact), 'sha256':hashlib.sha256(artifact.read_bytes()).hexdigest(), 'ok':evidence.get('ok')}
                 for lane in evidence.get('lane_results', []):
-                    if lane.get('process_launched') and lane.get('native_session_id') and lane.get('actual_model'):
-                        contributor(session, {'kind': lane['adapter'], 'session_id': lane['native_session_id'], 'model': lane['actual_model']}, 'proposer' if phase == 'proposals' else 'critic')
+                    if lane.get('process_launched') and lane.get('native_session_id'):
+                        model = lane.get('actual_model') or lane.get('requested_model')
+                        if model:
+                            contributor(session, {'kind': lane['adapter'], 'session_id': lane['native_session_id'], 'model': model}, 'proposer' if phase == 'proposals' else 'critic')
+                        else:
+                            team.setdefault('unqualified_contributor_sessions', []).append(lane['native_session_id'])
                     if lane.get('process_launched') and lane.get('execution_id'):
                         team.setdefault('contributor_executions', []).append({'execution_id':lane['execution_id'], 'adapter':lane['adapter'], 'model':lane.get('actual_model'), 'artifact_dir':lane.get('artifact_dir')})
                 atomic_write_json(session_path, session, repo_root=root)
@@ -413,10 +510,25 @@ def run(args):
             else: issue('team_action', 'Unknown team action')
         if save:
             atomic_write_json(session_path, session, repo_root=root)
-        print(json.dumps({'ok': payload.get('ok', True), 'result': payload}, indent=2, sort_keys=True))
-        return 0 if payload.get('ok', True) else 1
+        return payload, (0 if payload.get('ok', True) else 1)
     except (ValidationIssue, OSError, ValueError, TypeError) as exc:
-        print(json.dumps({'ok': False, 'error': getattr(exc, 'code', 'team_failed'), 'message': str(exc)}))
+        return {'error': getattr(exc, 'code', 'team_failed'), 'message': str(exc)}, 1
+
+
+def run(args):
+    try:
+        root = Path(args.repo_root).resolve()
+        target = Path(args.session)
+        target = (target if target.is_absolute() else root / target).absolute()
+        from .storage import guard_repo_path
+        target = guard_repo_path(root, target)
+        args.session = str(target)
+        with session_lock(target):
+            payload, code = _run(args)
+        print(json.dumps({'ok':code == 0,'result':payload},sort_keys=True))
+        return code
+    except (ValidationIssue, OSError, sqlite3.Error, ValueError) as exc:
+        print(json.dumps({'ok':False,'error':getattr(exc,'code','team_session_failed'),'message':str(exc)}))
         return 1
 
 
@@ -433,7 +545,7 @@ def add_parser(sub):
         if action == 'discussion-resolve': p.add_argument('--discussion-id', required=True)
         if action in ('helper-state','helper-packet'): p.add_argument('--task-id', required=True)
         if action == 'helper-packet': p.add_argument('--output', required=True)
-        if action in ('retry','consume','reconcile','inspect','route','discussion-resolve','helper-packet'): p.add_argument('--message-id', required=True)
+        if action in ('retry','consume','reconcile','inspect'): p.add_argument('--message-id', required=True)
         if action == 'reconcile': p.add_argument('--outcome', required=True, choices=('consumed','retry'))
         if action == 'checkpoint': p.add_argument('--checkpoint', required=True, choices=CHECKPOINTS)
         if action == 'route':

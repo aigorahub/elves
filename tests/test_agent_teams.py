@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from cobbler_runtime.team_callbacks import CallbackAdapter
-from cobbler_runtime.teams import contributor, reviewer_check, readiness_check, brainstorm, resolved_team_lanes, helper_packet
+from cobbler_runtime.teams import contributor, reviewer_check, readiness_check, brainstorm, resolved_team_lanes, helper_packet, canonical_root, callback_for, driver_parked
 from cobbler_runtime.schema import ValidationIssue, ResolvedConfig
 from cobbler_runtime.dispatch_models import LaneSpec, CouncilResult
 from cobbler_runtime.delegated_git import reconcile_worker_report
@@ -134,6 +134,45 @@ class TeamTests(unittest.TestCase):
             helper_cred.write_text(json.dumps({'protocol':1,'actor':helper_actor,'token':'private-helper-token'}))
             with self.assertRaises(ValidationIssue): helper_packet(state,'task',root)
 
+    def test_public_parser_route_packet_and_resolution_need_no_message_id(self):
+        from cobbler_agents import build_parser
+        parser=build_parser()
+        self.assertEqual(parser.parse_args(['team','route','--role','proposer']).team_action,'route')
+        self.assertEqual(parser.parse_args(['team','helper-packet','--task-id','t','--output','packet.md']).team_action,'helper-packet')
+        self.assertEqual(parser.parse_args(['team','discussion-resolve','--discussion-id','d','--input','result.json']).team_action,'discussion-resolve')
+
+    def test_canonical_worktree_missing_and_wrong_root_fail_closed(self):
+        with self.assertRaises(ValidationIssue) as cm: canonical_root({})
+        self.assertEqual(cm.exception.code,'team_worktree_missing')
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(ValidationIssue): canonical_root({'worktree_path':tmp},Path(tmp)/'other')
+
+    def test_unqualified_model_session_still_cannot_review(self):
+        state=session()
+        state['team']['unqualified_contributor_sessions']=[HELPER['session_id']]
+        with self.assertRaises(ValidationIssue): reviewer_check(state,HELPER)
+
+    def test_unconfigured_session_cannot_execute_callback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            state={'run_id':'r','worktree_path':str(root),'team_callback':{'protocol':1,'executable':str(root/'bad.py'),'state_dir':str(root/'state'),'actor_credential':str(root/'actor')}}
+            with patch('cobbler_runtime.teams.CallbackAdapter') as adapter:
+                with self.assertRaises(ValidationIssue) as cm: callback_for(state,root)
+                self.assertEqual(cm.exception.code,'team_callback_not_configured')
+                adapter.assert_not_called()
+
+    def test_stale_healthy_state_reconciles_through_existing_supervisor(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); path=root/'.elves/runtime/implement/full-run/id/state.json';path.parent.mkdir(parents=True)
+            state={'session_id':'exact-worker','status':'healthy','next_action':'parked_monitor','start_head':'a'*40,'worktree':str(root)}
+            path.write_text(json.dumps(state))
+            with patch('cobbler_runtime.full_run_monitor.monitor_full_run',return_value={'state':'failed','next_action':'driver_wake_error'}) as monitor:
+                self.assertFalse(driver_parked({'start_head':'a'*40},root))
+                monitor.assert_called_once_with(root,session_id='exact-worker')
+            with patch('cobbler_runtime.full_run_monitor.monitor_full_run') as monitor:
+                self.assertFalse(driver_parked({'start_head':'b'*40},root))
+                monitor.assert_not_called()
+
 
 class CallbackTests(unittest.TestCase):
     def setUp(self):
@@ -190,6 +229,42 @@ class CallbackTests(unittest.TestCase):
     def test_protocol_mismatch(self):
         with patch.object(self.adapter,'call',return_value={'protocol':2,'delivery':'checkpoint','automatic_wake':False}):
             with self.assertRaises(ValidationIssue): self.adapter.probe()
+
+    def test_failed_probe_does_not_poison_config(self):
+        with patch.object(self.adapter,'call',side_effect=ValidationIssue('bad','failed')):
+            with self.assertRaises(ValidationIssue): self.adapter.probe()
+        corrected={**self.config,'executable':str(self.root/'correct.py')}
+        recovered=CallbackAdapter(corrected,self.root/'runtime')
+        with patch.object(recovered,'call',return_value={'protocol':1,'delivery':'checkpoint','automatic_wake':False}): recovered.probe()
+        with self.assertRaises(ValidationIssue): CallbackAdapter(self.config,self.root/'runtime')
+
+    def test_expired_or_unresolved_outbox_remains_blocked(self):
+        for status in ('expired','unresolved','retired'):
+            def call(*args):
+                if args[0]=='capabilities': return {'protocol':1,'delivery':'checkpoint','automatic_wake':False}
+                return {'message_id':status,'status':status}
+            with patch.object(self.adapter,'call',side_effect=call):
+                with self.assertRaises(ValidationIssue): self.adapter.post({**self.msg,'message_id':status})
+        self.assertEqual({row['status'] for row in self.adapter.status()['outbox']},{'expired','unresolved','retired'})
+
+    def test_subprocess_does_not_inherit_provider_secrets(self):
+        script=Path(self.config['executable'])
+        script.write_text('import os,json\nassert "XAI_API_KEY" not in os.environ\nassert "ANTHROPIC_API_KEY" not in os.environ\nprint(json.dumps({"protocol":1,"delivery":"checkpoint","automatic_wake":False}))\n')
+        self.adapter.config['timeout_seconds']=10
+        with patch.dict(os.environ,{'XAI_API_KEY':'private-test-value','ANTHROPIC_API_KEY':'private-test-value'}): self.adapter.probe()
+
+    def test_reclaimed_consumed_message_only_acknowledges(self):
+        incoming={**self.msg,'receipt':'first','sender':HELPER,'status':'claimed'}
+        receipts=[]
+        def call(*args):
+            if args[0]=='capabilities': return {'protocol':1,'delivery':'checkpoint','automatic_wake':False}
+            if args[0]=='receive': return {'messages':[incoming],'unresolved':[]}
+            receipts.append(args[-1]); return {'status':'consumed'}
+        with patch.object(self.adapter,'call',side_effect=call):
+            self.adapter.checkpoint('before-review'); self.adapter.consume('m1',{'done':True})
+            incoming['receipt']='second'
+            self.assertEqual(self.adapter.checkpoint('before-review')['messages'],[])
+            self.assertEqual(receipts,['first','second'])
 
 
 class CallbackConcurrencyTests(unittest.TestCase):

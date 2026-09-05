@@ -138,3 +138,8 @@ checks the live store, exact Git head, integrated ancestry, contributor retentio
 and terminal dispositions. Without `--session`, the store remains a standalone
 instrument and does not attest canonical run readiness. Use linked mode for an
 Elves team run.
+
+If the driver creates a linked ledger but then chooses no writer lanes, use
+`team-lanes abandon --state PATH --actor-session SESSION --actor-kind KIND
+--actor-model MODEL --reason TEXT`. This records an explicit empty run disposition
+and prevents later registration. It does not discard an existing lane.

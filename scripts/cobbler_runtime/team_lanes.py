@@ -8,7 +8,7 @@ registered feature branch, and never launches or resumes a worker.
 from __future__ import annotations
 
 import argparse
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 import json
 import os
 from pathlib import Path
@@ -81,13 +81,22 @@ def _checkout(path: str | Path, branch: str, common: str | None = None,
 
 
 def _feature_branch(path: str | Path, branch: str) -> None:
+    from .full_run import _protected_branch_names
     _git(path, "check-ref-format", "--branch", branch)
-    protected = {"main", "master", "HEAD"}
-    for ref in _git(path, "for-each-ref", "--format=%(symref)", "refs/remotes").splitlines():
-        if ref.startswith("refs/remotes/"):
-            protected.add(ref.split("/", 3)[-1])
+    protected = _protected_branch_names(Path(path)) | {"HEAD"}
     _require(branch not in protected, "protected_branch",
              "Writer integration requires an assigned feature branch.")
+
+
+def _canonical_session(path: str | Path, worktree: str | Path) -> Path:
+    from .storage import StorageError, guard_repo_path
+    try:
+        target = guard_repo_path(Path(worktree), Path(path))
+    except StorageError as exc:
+        raise ValidationIssue("team_lanes_session_path", str(exc)) from exc
+    _require(target.is_file() and not target.is_symlink(), "session_path",
+             "The canonical session must be a regular file inside the driver worktree.")
+    return target
 
 
 def _owned(path: str, surfaces: list[str]) -> bool:
@@ -103,7 +112,40 @@ class LaneStore:
         self.path = Path(path).absolute()
 
     @contextmanager
-    def _transaction(self, *, create: bool = False) -> Iterator[tuple[sqlite3.Connection, dict[str, Any] | None]]:
+    def _transaction(self, *, create: bool = False, session_path: Path | None = None
+                     ) -> Iterator[tuple[sqlite3.Connection, dict[str, Any] | None]]:
+        _require(not self.path.is_symlink(), "state_invalid", "The lane database cannot be a symlink.")
+        if session_path is None and self.path.is_file():
+            # Read immutable lock-routing metadata and close this connection
+            # before acquiring any lock. The write transaction rechecks it.
+            probe = sqlite3.connect(self.path.as_uri() + "?mode=ro", uri=True, timeout=10)
+            try:
+                row = probe.execute("SELECT payload FROM run WHERE singleton=1").fetchone()
+                metadata = json.loads(row[0]) if row else None
+                if isinstance(metadata, dict) and metadata.get("session_path"):
+                    _require(isinstance(metadata["session_path"], str) and
+                             isinstance(metadata.get("driver"), dict) and
+                             isinstance(metadata["driver"].get("worktree"), str),
+                             "state_invalid", "The lane database has invalid session metadata.")
+                    session_path = _canonical_session(metadata["session_path"], metadata["driver"]["worktree"])
+            finally:
+                probe.close()
+        if session_path is not None:
+            from .teams import session_lock
+            lock = session_lock(session_path)
+        else:
+            lock = nullcontext()
+        # One order everywhere, including teams.run -> readiness: canonical
+        # session lock first, then lane database. session_lock is reentrant.
+        with lock:
+            with self._database_transaction(create=create) as (connection, state):
+                _require(state is None or state.get("session_path") ==
+                         (str(session_path) if session_path is not None else None),
+                         "session_mismatch", "Lane session binding changed during lock acquisition.")
+                yield connection, state
+
+    @contextmanager
+    def _database_transaction(self, *, create: bool = False) -> Iterator[tuple[sqlite3.Connection, dict[str, Any] | None]]:
         _require(not self.path.is_symlink(), "state_invalid", "The lane database cannot be a symlink.")
         _require(create or self.path.is_file(), "state_missing", "Initialize the lane database first.")
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -123,6 +165,12 @@ class LaneStore:
                 _require(isinstance(state.get("driver"), dict) and isinstance(state.get("lanes"), dict)
                          and isinstance(state.get("run_id"), str),
                          "state_invalid", "The lane database has an invalid run record.")
+                if "disposition" in state:
+                    disposition = state["disposition"]
+                    _require(isinstance(disposition, dict) and disposition.get("status") == "abandoned" and
+                             isinstance(disposition.get("reason"), str) and bool(disposition["reason"].strip()) and
+                             disposition.get("actor") == state["driver"].get("identity") and not state["lanes"],
+                             "state_invalid", "The lane database has an invalid empty-run disposition.")
                 for record in [state["driver"], *state["lanes"].values()]:
                     _require(isinstance(record, dict) and all(isinstance(record.get(key), str) and record[key]
                              for key in ("worktree", "branch", "common", "head")),
@@ -169,7 +217,8 @@ class LaneStore:
         if not state.get("session_path"):
             return None
         from .teams import read_json, team_block
-        session = read_json(state["session_path"])
+        path = _canonical_session(state["session_path"], state["driver"]["worktree"])
+        session = read_json(path)
         team = team_block(session)
         _require(session.get("run_id") == state["run_id"] and
                  session.get("team_lanes") == {"state_path": str(self.path), "run_id": state["run_id"]},
@@ -199,7 +248,7 @@ class LaneStore:
         contributor(session, agent, "implementer")
         # Persist before the lane enters the ledger. A crash can leave an extra
         # excluded reviewer, but cannot omit the identity of a registered writer.
-        atomic_write_json(Path(state["session_path"]), session)
+        atomic_write_json(Path(state["session_path"]), session, repo_root=Path(state["driver"]["worktree"]))
 
     @staticmethod
     def _lane(state: dict[str, Any], lane_id: str) -> dict[str, Any]:
@@ -210,17 +259,18 @@ class LaneStore:
                    driver: dict[str, str], session_path: str | Path | None = None) -> dict[str, Any]:
         identity(**driver)
         _require(bool(run_id.strip()), "run_id_required", "A run ID is required.")
+        if session_path is not None:
+            session_path = _canonical_session(session_path, repo)
         branch = _git(repo, "symbolic-ref", "--short", "HEAD")
         _feature_branch(repo, branch)
         checkout = _checkout(repo, branch)
-        with self._transaction(create=True) as (db, state):
+        with self._transaction(create=True, session_path=session_path) as (db, state):
             _require(state is None, "already_initialized", "A run already owns this lane database.")
             state = {"version": SCHEMA_VERSION, "run_id": run_id,
                      "driver": {**checkout, "identity": driver}, "lanes": {}}
             if session_path is not None:
                 from .teams import read_json, team_block
                 from .storage import atomic_write_json
-                session_path = Path(session_path).absolute()
                 session = read_json(session_path)
                 team = team_block(session)
                 binding = {"state_path": str(self.path), "run_id": run_id}
@@ -234,7 +284,7 @@ class LaneStore:
                          "worktree_invalid", "The canonical session worktree differs from the driver worktree.")
                 state["session_path"] = str(session_path)
                 session["team_lanes"] = binding
-                atomic_write_json(session_path, session)
+                atomic_write_json(session_path, session, repo_root=Path(checkout["worktree"]))
             self._save(db, state)
         return self.status()
 
@@ -244,6 +294,7 @@ class LaneStore:
         identity(**worker)
         with self._transaction() as (db, state):
             self._driver(state, actor)
+            _require(not state.get("disposition"), "run_abandoned", "An abandoned lane ledger cannot register writers.")
             _require(lane_id not in state["lanes"], "lane_exists", "This lane is already registered.")
             _require(worker != actor and worker["session"] != actor["session"],
                      "recursive_helper", "A driver cannot register itself as a helper.")
@@ -357,6 +408,16 @@ class LaneStore:
             self._save(db, state)
         return self.status()
 
+    def abandon(self, *, actor: dict[str, str], reason: str) -> dict[str, Any]:
+        _require(bool(reason.strip()), "reason_required", "Record why the empty writer plan was abandoned.")
+        with self._transaction() as (db, state):
+            self._driver(state, actor)
+            _require(not state["lanes"] and not state.get("disposition"), "abandon_invalid",
+                     "Only an empty, active lane ledger can be abandoned.")
+            state["disposition"] = {"status": "abandoned", "reason": reason, "actor": actor}
+            self._save(db, state)
+        return self.status()
+
     def _gate(self, state: dict[str, Any], lane_id: str) -> dict[str, Any]:
         lane = self._lane(state, lane_id)
         _require(lane["status"] == "completed", "integration_state", "Integration requires a completed, unintegrated lane.")
@@ -434,13 +495,15 @@ class LaneStore:
         with self._transaction() as (_, state):
             _require(state is not None, "state_missing", "Initialize the lane database first.")
             lanes = state["lanes"]
+            abandoned = not lanes and state.get("disposition", {}).get("status") == "abandoned"
             groups = {status: [lid for lid, lane in lanes.items() if lane["status"] == status]
                       for status in ("pending", "running", "completed", "failed", "cancelled", "integrating", "integrated")}
             return {"ok": True, "version": state["version"], "run_id": state["run_id"],
                     "driver": state["driver"], "session_path": state.get("session_path"), "lanes": lanes, **groups,
-                    "all_terminal": bool(lanes) and all(l["status"] in TERMINAL for l in lanes.values()),
+                    "disposition": state.get("disposition"),
+                    "all_terminal": abandoned or (bool(lanes) and all(l["status"] in TERMINAL for l in lanes.values())),
                     "all_integrated": bool(lanes) and all(l["status"] == "integrated" for l in lanes.values()),
-                    "ready": bool(lanes) and all(l["status"] in {"integrated", "cancelled"} for l in lanes.values()),
+                    "ready": abandoned or (bool(lanes) and all(l["status"] in {"integrated", "cancelled"} for l in lanes.values())),
                     "launch_authorized": False, "model_calls_made": False}
 
 
@@ -463,7 +526,8 @@ def readiness_check(session: dict[str, Any], head: str) -> None:
         _require(current["head"] == head, "branch_drift", "Readiness must inspect the actual current driver commit.")
         _require(_ancestor(driver["worktree"], driver["head"], head), "branch_drift",
                  "The current driver commit lost its registered base.")
-        _require(bool(lanes) and all(lane["status"] in {"integrated", "cancelled"} for lane in lanes.values()),
+        abandoned = not lanes and state.get("disposition", {}).get("status") == "abandoned"
+        _require(abandoned or (bool(lanes) and all(lane["status"] in {"integrated", "cancelled"} for lane in lanes.values())),
                  "not_ready", "Integrate completed lanes and resolve pending, active, or failed lanes before readiness.")
         for lane in lanes.values():
             if lane["status"] == "integrated":
@@ -507,6 +571,8 @@ def _command(args: argparse.Namespace) -> int:
                 result = store.stop(actor=actor, lane_id=args.lane, reason=args.reason, cancelled=action == "cancel")
             elif action == "reconcile":
                 result = store.reconcile(actor=actor, lane_id=args.lane, outcome=args.outcome)
+            elif action == "abandon":
+                result = store.abandon(actor=actor, reason=args.reason)
             else:
                 result = getattr(store, action)(actor=actor, lane_id=args.lane)
         print(json.dumps({"ok": True, "result": result}, sort_keys=True))
@@ -522,7 +588,7 @@ def _command(args: argparse.Namespace) -> int:
 def add_parser(subparsers: Any) -> None:
     parser = subparsers.add_parser("team-lanes", help="Track writer lanes and integrate exact completed results")
     actions = parser.add_subparsers(dest="lane_action", required=True)
-    for action in ("init", "register", "start", "complete", "fail", "cancel", "gate", "integrate", "reconcile", "status"):
+    for action in ("init", "register", "start", "complete", "fail", "cancel", "gate", "integrate", "reconcile", "abandon", "status"):
         command = actions.add_parser(action)
         command.add_argument("--state", required=True, type=Path)
         command.add_argument("--json", action="store_true", help="Output is always JSON")
@@ -535,6 +601,9 @@ def add_parser(subparsers: Any) -> None:
             command.add_argument("--repo", required=True, type=Path)
             command.add_argument("--run-id", required=True)
             command.add_argument("--session", type=Path, help="Canonical session with an initialized team")
+            continue
+        if action == "abandon":
+            command.add_argument("--reason", required=True)
             continue
         command.add_argument("--lane", required=True)
         if action in {"register", "start", "complete"}:

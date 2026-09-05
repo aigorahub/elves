@@ -12,6 +12,9 @@ Use natural requests such as:
 
 The driver stages an Elves run and opens a draft PR at the first useful commit.
 It preserves the current model, permission, worktree, review, and landing rules.
+Team initialization records the canonical worktree path. All callback commands
+check that path. Canonical session changes share a process lock with writer lane
+registration, so concurrent updates cannot remove contributors.
 A request to implement stops at a landable PR unless the user authorizes merge.
 
 ## Saved choices
@@ -69,7 +72,8 @@ alone does not start a process or prove that work ran.
 
 `team helper-state --task-id ID --input result.json` checks the exact recorded
 identity on each transition. States are assigned, running, waiting-peer, complete,
-failed, and cancelled. Terminal states require evidence. A waiting peer must be a
+failed, and cancelled. The first running transition requires the original packet and its recorded
+digest. Terminal states require evidence. A waiting peer must be a
 registered helper. Cyclic peer waits fail. A parked driver remains assigned to its
 worker. Reports do not make it available for a second task.
 
@@ -124,6 +128,10 @@ The driver configures `team configure-callback --input callback.json` with:
 Lantern exports `LANTERN_TEAM_MAILBOX` and `LANTERN_TEAM_STATE_DIR` when available.
 The driver registers actors through Lantern and passes only each actor's own
 credential. The configuration is driver owned. Worker reports cannot replace it.
+Explicit configuration qualifies the endpoint and records a private local
+authorization outside the checkout. A checked out session alone cannot execute
+a callback. Failed qualification permits a corrected configuration. Callback
+subprocesses receive a minimal environment without provider API keys.
 Python executables run through the current Python interpreter, including Windows.
 Commands use argument arrays, closed stdin, and a timeout of at most 60 seconds.
 
@@ -131,7 +139,9 @@ Use `team post --input message.json` for assignment, progress, question, answer,
 decision, PR opened, review requested, review result, blocked, completion, or
 cancellation reports. The protocol message has `schema_version`, `message_id`,
 `run_id`, `task_id`, `recipient`, `kind`, and a JSON object `body`.
-The sender stores the message ID and content before calling Lantern. A timeout
+The sender stores the message ID and content before calling Lantern. Messages
+are limited to 64 KiB. Expired, unresolved, or retired deliveries remain blocked
+until the driver inspects and resolves the outcome. A timeout
 keeps that ID. `team callback-status` lists pending IDs. `team retry --message-id ID`
 reuses the exact message. A storage receipt proves storage only.
 
@@ -140,7 +150,9 @@ packet boundaries, before review, before readiness, and before landing. CLI name
 are `after-staging`, `batch-boundary`, `packet-boundary`, `before-review`,
 `before-readiness`, and `before-landing`. Full run prepare, review dispatch, and
 final readiness also enforce the relevant checkpoint. A healthy or parked full
-run blocks driver consumption. Do not add a packet to a prewalk transition.
+run blocks driver consumption. The existing exact session supervisor checks
+process identity before a stored healthy flag blocks a checkpoint. Records from
+a different start commit do not park the current driver. Do not add a packet to a prewalk transition.
 
 Record the decision and external result first. Then use
 `team consume --message-id ID --input result.json`. The adapter stores the result

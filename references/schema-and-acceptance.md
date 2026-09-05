@@ -330,3 +330,8 @@ discussion evidence, and independent review identity, commit, path, and digest.
 Worker reports cannot replace these fields. Callback protocol 1 points to a local
 Lantern executable, state directory, and scoped credential. These are run state,
 not model preferences or product files. See `agent-teams.md`.
+
+`team init` and successful callback configuration record the canonical absolute
+`worktree_path`. Commands reject a different checkout. Session updates and linked
+lane registration share one process lock. A callback requires explicit local
+endpoint qualification; a checked out session file alone cannot run it.

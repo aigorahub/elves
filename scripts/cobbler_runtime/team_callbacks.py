@@ -48,7 +48,6 @@ class CallbackAdapter:
             prior = db.execute("SELECT value FROM metadata WHERE key='config'").fetchone()
             if prior and prior[0] != encoded_config:
                 raise fail('team_callback_identity_drift', 'Callback storage belongs to a different endpoint identity')
-            db.execute("INSERT OR IGNORE INTO metadata VALUES ('config',?)", (encoded_config,))
             db.execute('CREATE TABLE IF NOT EXISTS outbox (id TEXT PRIMARY KEY, message TEXT NOT NULL, status TEXT NOT NULL)')
             db.execute('CREATE TABLE IF NOT EXISTS inbox (id TEXT PRIMARY KEY, message TEXT NOT NULL, status TEXT NOT NULL, result TEXT)')
         os.chmod(self.path, 0o600)
@@ -69,7 +68,8 @@ class CallbackAdapter:
         with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
             try:
                 result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=out, stderr=err,
-                                        timeout=self.config.get('timeout_seconds', 10), check=False)
+                                        timeout=self.config.get('timeout_seconds', 10), check=False,
+                                        env={key:value for key,value in os.environ.items() if key in {'PATH','HOME','USERPROFILE','SYSTEMROOT','WINDIR','TEMP','TMP','TMPDIR','LANG','LC_ALL','PYTHONUTF8'}})
             except subprocess.TimeoutExpired as exc:
                 raise fail('team_callback_ambiguous', 'Callback timed out; retain its message ID and reconcile') from exc
             except OSError as exc:
@@ -78,6 +78,8 @@ class CallbackAdapter:
             raw = out.read(MAX_BYTES + 1)
         if len(raw) > MAX_BYTES:
             raise fail('team_callback_output', 'Callback output exceeded the size limit')
+        if result.returncode and not raw.strip():
+            raise fail('team_callback_failed', 'Callback executable returned failure without a JSON result')
         try:
             data = json.loads(raw)
         except (ValueError, UnicodeDecodeError) as exc:
@@ -92,6 +94,12 @@ class CallbackAdapter:
         data = self.call('capabilities')
         if data.get('protocol') != 1 or data.get('delivery') != 'checkpoint' or data.get('automatic_wake') is not False:
             raise fail('team_callback_incompatible', 'Lantern callback requires protocol 1 checkpoint delivery without automatic wake')
+        with self.db() as db:
+            encoded = json.dumps(self.config,sort_keys=True)
+            prior = db.execute("SELECT value FROM metadata WHERE key='config'").fetchone()
+            if prior and prior[0] != encoded:
+                raise fail('team_callback_identity_drift', 'Callback endpoint changed after qualification')
+            db.execute("INSERT OR IGNORE INTO metadata VALUES ('config',?)", (encoded,))
         return data
 
     def post(self, message: dict[str, Any]) -> dict[str, Any]:
@@ -137,8 +145,11 @@ class CallbackAdapter:
             result = self.call('post', '--actor', self.config['actor_credential'], '--input', filename)
             if result.get('message_id') != mid or result.get('status') not in ('stored', 'queued', 'claimed', 'consumed', 'expired', 'unresolved', 'retired'):
                 raise fail('team_callback_receipt', 'Callback did not return a storage receipt for the expected message')
+            delivery = result['status']
             with self.db() as db:
-                db.execute('UPDATE outbox SET status=? WHERE id=?', ('stored', mid))
+                db.execute('UPDATE outbox SET status=? WHERE id=?', ('stored' if delivery in ('queued','claimed','stored','consumed') else delivery, mid))
+            if delivery in ('expired','unresolved','retired'):
+                raise fail('team_callback_delivery_incomplete', 'Message is ' + delivery + '; inspect and resolve it before readiness')
             return result
         finally:
             Path(filename).unlink(missing_ok=True)
