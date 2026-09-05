@@ -36,3 +36,7 @@ Update canonical skill, host adapter, guide, references, changelog, and version 
 
 - [x] M-A1: One driver coordinates helpers through public runtime commands without weakening existing execution or landing gates.
 - [x] M-A2: Independent review and required checks pass at the final PR commit.
+
+Initial M-A2 proof: PR #275 passed all 13 checks at f74a9cb. Independent review
+passed at f97c0d1, with unchanged source and tests through f74a9cb. Any later
+source change requires a new review and checks before landing.

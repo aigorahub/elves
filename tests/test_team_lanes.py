@@ -334,6 +334,18 @@ class WriterLanesTests(unittest.TestCase):
         self.assertIssue("team_lanes_not_ready", tl.readiness_check,
                          session=session, head=self.git(self.repo, "rev-parse", "HEAD"))
 
+    def test_integrated_readiness_survives_writer_cleanup_and_branch_reuse(self):
+        self.link_session()
+        path, _, _ = self.completed()
+        self.store.integrate(actor=self.actor, lane_id="L1")
+        session = json.loads(self.session_path.read_text())
+        head = self.git(self.repo, "rev-parse", "HEAD")
+        self.commit(path, "L1/later.txt", "new work\n")
+        tl.readiness_check(session, head)
+        self.git(self.repo, "worktree", "remove", str(path))
+        self.git(self.repo, "branch", "-D", "writer/L1")
+        tl.readiness_check(session, head)
+
     def test_linked_readiness_rejects_removed_contributor(self):
         self.link_session()
         self.completed()

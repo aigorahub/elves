@@ -16,6 +16,11 @@ All notable changes to the Elves skill are documented here.
   final readiness.
 - Persist writer lane identities, dependencies, and integration state. Check actual
   Git changes and ownership before driver integration. Pending lanes are not terminal.
+  Integrated lanes retain their proof after writer worktree cleanup.
+- Validate proposals before recording a discussion. Reject supplied helper packet
+  proof and mismatched callback epochs. Report invalid team JSON and missing
+  review evidence without a traceback. Keep onboarding usable when saved team
+  preferences need repair.
 
 ## [2.36.1] - 2026-09-05
 

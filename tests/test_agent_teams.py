@@ -46,8 +46,9 @@ class TeamTests(unittest.TestCase):
 
     def test_readiness_requires_report_exact_head_and_artifact(self):
         state = session()
-        with self.assertRaises(ValidationIssue):
+        with self.assertRaises(ValidationIssue) as missing:
             readiness_check(state, 'a'*40)
+        self.assertEqual(missing.exception.code, 'team_review_incomplete')
         with tempfile.TemporaryDirectory() as tmp:
             import hashlib
             artifact = Path(tmp) / 'review.md'
@@ -115,8 +116,8 @@ class TeamTests(unittest.TestCase):
             root=Path(tmp)
             state=session(); state['run_id']='run'; state['worktree_path']=str(root)
             driver_cred=root/'driver-credential.json'; helper_cred=root/'helper-credential.json'
-            driver_actor={**DRIVER,'actor_id':'driver','role':'driver','run_id':'run','task_ids':['task'],'peers':['helper']}
-            helper_actor={**HELPER,'actor_id':'helper','role':'helper','run_id':'run','task_ids':['task'],'peers':['driver']}
+            driver_actor={**DRIVER,'actor_id':'driver','role':'driver','run_id':'run','server_id':'server','generation':'shared-run','task_ids':['task'],'peers':['helper']}
+            helper_actor={**HELPER,'actor_id':'helper','role':'helper','run_id':'run','server_id':'server','generation':'shared-run','task_ids':['task'],'peers':['driver']}
             driver_cred.write_text(json.dumps({'protocol':1,'actor':driver_actor,'token':'private-driver-token'}))
             helper_cred.write_text(json.dumps({'protocol':1,'actor':helper_actor,'token':'private-helper-token'}))
             state['team_callback']={'protocol':1,'executable':str(root/'mailbox.py'),'state_dir':str(root),'actor_credential':str(driver_cred)}
@@ -127,12 +128,65 @@ class TeamTests(unittest.TestCase):
             self.assertNotIn('private-driver-token',packet)
             self.assertNotIn('private-helper-token',packet)
             self.assertNotIn(str(driver_cred),packet)
+            for field in ('run_id','server_id','generation'):
+                changed={**helper_actor,field:'other'}
+                helper_cred.write_text(json.dumps({'protocol':1,'actor':changed,'token':'private-helper-token'}))
+                with self.assertRaises(ValidationIssue) as mismatch: helper_packet(state,'task',root)
+                self.assertEqual(mismatch.exception.code,'team_helper_scope')
+            helper_cred.write_text(json.dumps({'protocol':1,'actor':helper_actor,'token':'private-helper-token'}))
             state['team']['helpers']['task']['callback']['actor_credential']=str(driver_cred)
             with self.assertRaises(ValidationIssue): helper_packet(state,'task',root)
             state['team']['helpers']['task']['callback']['actor_credential']=str(helper_cred)
             helper_actor['session_id']='changed'
             helper_cred.write_text(json.dumps({'protocol':1,'actor':helper_actor,'token':'private-helper-token'}))
             with self.assertRaises(ValidationIssue): helper_packet(state,'task',root)
+
+    def test_public_validation_does_not_persist_phantom_discussion_or_packet_proof(self):
+        cli=Path(__file__).resolve().parents[1]/'scripts/cobbler_agents.py'
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp).resolve(); path=root/'.elves-session.json'
+            state={**session(),'run_id':'r','worktree_path':str(root)}
+            path.write_text(json.dumps(state))
+            command=[sys.executable,str(cli),'team']
+            result=subprocess.run(command+['brainstorm','--repo-root',str(root),'--roles','planning','--task','x'],capture_output=True,text=True)
+            self.assertIn('team_size_invalid',result.stdout)
+            self.assertNotIn('discussion_runs',json.loads(path.read_text())['team'])
+            packet=root/'fake.md'; packet.write_text('not an original packet')
+            import hashlib
+            data=root/'helper.json'; data.write_text(json.dumps({'task_id':'t','task':'Read code','role':'investigator','identity':HELPER,'packet_path':str(packet),'packet_sha256':hashlib.sha256(packet.read_bytes()).hexdigest()}))
+            result=subprocess.run(command+['add-helper','--repo-root',str(root),'--input',str(data)],capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            saved=json.loads(path.read_text())['team']['helpers']['t']
+            self.assertNotIn('packet_path',saved); self.assertNotIn('packet_sha256',saved)
+            data.write_text(json.dumps({'identity':HELPER,'state':'running'}))
+            result=subprocess.run(command+['helper-state','--repo-root',str(root),'--task-id','t','--input',str(data)],capture_output=True,text=True)
+            self.assertNotEqual(result.returncode,0)
+            self.assertIn('team_packet_missing',result.stdout)
+
+    def test_malformed_optional_session_and_missing_reviewer_fail_without_traceback(self):
+        cli=Path(__file__).resolve().parents[1]/'scripts/cobbler_agents.py'
+        from cobbler_runtime.teams import checkpoint_guard
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); path=root/'.elves-session.json'; path.write_text('{')
+            command=[sys.executable,str(cli),'review-route','--repo-root',str(root),'--host','codex','--json']
+            result=subprocess.run(command,capture_output=True,text=True)
+            self.assertIn('team_input_invalid',result.stdout)
+            self.assertNotIn('Traceback',result.stderr)
+            with self.assertRaises(ValidationIssue) as caught: checkpoint_guard(root,'before-review')
+            self.assertEqual(caught.exception.code,'team_input_invalid')
+            path.write_text(json.dumps(session()))
+            result=subprocess.run(command+['--reviewer-identity',str(root/'missing.json')],capture_output=True,text=True)
+            self.assertIn('team_input_invalid',result.stdout)
+            self.assertNotIn('Traceback',result.stderr)
+
+    def test_onboard_reports_bad_preferences_without_losing_inventory(self):
+        from cobbler_runtime.onboard import build_onboarding_packet
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch('cobbler_runtime.onboard.preference_snapshot',side_effect=ValidationIssue('invalid_global_preferences','Bad JSON')):
+                packet=build_onboarding_packet(Path(tmp),fake_presence={})
+            self.assertEqual(packet.team_roles,{})
+            self.assertTrue(any('Saved team preferences' in warning for warning in packet.warnings))
+            self.assertTrue(packet.inventory)
 
     def test_public_parser_route_packet_and_resolution_need_no_message_id(self):
         from cobbler_agents import build_parser

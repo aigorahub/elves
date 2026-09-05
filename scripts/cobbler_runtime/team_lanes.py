@@ -365,18 +365,23 @@ class LaneStore:
     @staticmethod
     def _result(lane: dict[str, Any], common: str) -> tuple[str, list[str]]:
         current = _checkout(lane["worktree"], lane["branch"], common)
-        base, head = lane["base_head"], current["head"]
-        _require(_ancestor(lane["worktree"], base, head), "branch_drift", "The lane lost its registered base.")
+        head = current["head"]
         if lane["result_head"] is not None:
             _require(head == lane["result_head"], "branch_drift", "The completed lane commit changed.")
-        commits = _git(lane["worktree"], "rev-list", "--reverse", f"{base}..{head}").splitlines()
+        return LaneStore._result_history(lane, lane["worktree"], head)
+
+    @staticmethod
+    def _result_history(lane: dict[str, Any], repo: str, head: str) -> tuple[str, list[str]]:
+        base = lane["base_head"]
+        _require(_ancestor(repo, base, head), "branch_drift", "The lane lost its registered base.")
+        commits = _git(repo, "rev-list", "--reverse", f"{base}..{head}").splitlines()
         _require(0 < len(commits) <= MAX_COMMITS, "result_empty_or_large",
                  f"A writer result requires 1-{MAX_COMMITS} commits.")
-        _require(not _git(lane["worktree"], "rev-list", "--merges", f"{base}..{head}"),
+        _require(not _git(repo, "rev-list", "--merges", f"{base}..{head}"),
                  "result_merge_commit", "Writer results must have linear history from their registered base.")
         touched: set[str] = set()
         for commit in commits:
-            touched.update(p for p in _git(lane["worktree"], "diff-tree", "--no-commit-id", "--name-only",
+            touched.update(p for p in _git(repo, "diff-tree", "--no-commit-id", "--name-only",
                                           "--no-renames", "-r", "-z", commit).split("\0") if p)
         _require(bool(touched) and all(_owned(p, lane["owned_surfaces"]) for p in touched),
                  "ownership_violation", "Writer history changed a path outside its assigned surfaces, or has no changes.")
@@ -531,7 +536,7 @@ def readiness_check(session: dict[str, Any], head: str) -> None:
                  "not_ready", "Integrate completed lanes and resolve pending, active, or failed lanes before readiness.")
         for lane in lanes.values():
             if lane["status"] == "integrated":
-                store._result(lane, driver["common"])
+                store._result_history(lane, driver["worktree"], lane["result_head"])
                 _require(_ancestor(driver["worktree"], lane["integration"]["merged_head"], head) and
                          _ancestor(driver["worktree"], lane["result_head"], head),
                          "branch_drift", "The current driver commit lost an integrated lane result.")

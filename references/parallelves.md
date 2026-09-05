@@ -135,7 +135,10 @@ removes a contributor from the review exclusion ledger.
 A linked session records `team_lanes` with the state path and run ID. Registration
 records writer contributors before committing its lane record. Final readiness
 checks the live store, exact Git head, integrated ancestry, contributor retention,
-and terminal dispositions. Without `--session`, the store remains a standalone
+and terminal dispositions. After integration, these checks use the recorded
+commits in the driver checkout. The writer worktree can be removed or reused.
+Before integration, its worktree must still match the registered result.
+Without `--session`, the store remains a standalone
 instrument and does not attest canonical run readiness. Use linked mode for an
 Elves team run.
 

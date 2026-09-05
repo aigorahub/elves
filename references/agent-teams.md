@@ -53,6 +53,9 @@ bounded files. Keep them and credentials out of Git.
 `team init --input driver.json` records version 1 team state in the canonical
 session. Driver identity requires `kind`, `model`, and exact `session_id`. When
 Herdr is present, also record actor, server, pane, and generation identity.
+The generation is one shared coordination epoch for the run. Driver and helper
+credentials must share the run ID, server ID, and generation. It is not a
+separate pane or model session generation.
 The driver enters the contributor ledger immediately.
 
 `team add-helper --input helper.json` records `task_id`, a concrete `task`, `role`,
@@ -90,9 +93,13 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" team brainstorm \
 
 This uses existing read only council dispatch. All initial proposals finish before
 any critique starts. Critique receives the completed proposals as evidence. It
-uses fresh dispatch executions. A failed proposal phase does not start critique.
+uses fresh dispatch executions on the same routes as the proposal lanes.
+Without `--roles`, the saved proposer and critic routes supply the two proposal
+lanes. Both routes then receive the critique task in fresh sessions. A failed
+proposal phase does not start critique.
 The driver produces the final recommendation with evidence and unresolved dissent.
-The command saves its discussion identity before launch and records each completed
+The command validates lane count and freshness before it saves a discussion.
+It saves its discussion identity before launch and records each completed
 phase before the next phase starts. Retrying the same discussion blocks until the
 driver reconciles the stored evidence and exact adapter sessions. After stopping
 or resolving the recorded executions, `team discussion-resolve --discussion-id ID

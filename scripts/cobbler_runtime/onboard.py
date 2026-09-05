@@ -32,6 +32,7 @@ from .setup import (
 )
 from .toml_compat import loads as load_toml_text
 from .preferences import preference_snapshot
+from .schema import ValidationIssue
 
 
 # Purposes the user assigns tools to. Core map to setup role slots.
@@ -557,6 +558,12 @@ def build_onboarding_packet(
     if shutil.which("gcloud"):
         notes.append("gcloud present: AlphaEvolve may be available if the project has a runner.")
 
+    preference_warnings = []
+    try:
+        team_roles = preference_snapshot().values.get("team", {})
+    except ValidationIssue as exc:
+        team_roles = {}
+        preference_warnings.append(f"Saved team preferences are unavailable: {exc}")
     return OnboardPacket(
         generated_at=_utc_now(),
         host_hints={
@@ -572,12 +579,12 @@ def build_onboarding_packet(
         inventory=[i.to_dict() for i in inventory],
         env_present=env_present,
         current_roles=current,
-        team_roles=preference_snapshot().values.get("team", {}),
+        team_roles=team_roles,
         purposes=list(PURPOSE_CATALOG),
         questions=questions,
         recommendations=recommend_routes(inventory),
         notes=notes,
-        warnings=list(state.warnings),
+        warnings=list(state.warnings) + preference_warnings,
     )
 
 

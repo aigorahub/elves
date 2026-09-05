@@ -170,7 +170,10 @@ def readiness_check(session, head):
         issue('team_discussion_pending', 'Reconcile incomplete proposal or critique executions before readiness')
     if any(h.get('state') == 'failed' for h in team.get('helpers', {}).values()):
         issue('team_helper_failed', 'Resolve failed helper outcomes before readiness')
-    reviewer_check(session, team.get('review', {}).get('identity'), head=head, require_report=True)
+    review = team.get('review')
+    if not isinstance(review, dict) or not review.get('identity'):
+        issue('team_review_incomplete', 'Team requires a clean independent review at the current commit')
+    reviewer_check(session, review['identity'], head=head, require_report=True)
     if session.get('team_callback'):
         adapter = callback_for(session, canonical_root(session))
         states = adapter.status()
@@ -199,22 +202,29 @@ def callback_for(session, root):
 
 def read_json(path):
     target = Path(path)
-    if target.is_symlink() or target.stat().st_size > 1024 * 1024:
-        issue('team_input_invalid', 'Team input must be a bounded regular JSON file')
-    value = json.loads(target.read_text())
+    try:
+        if target.is_symlink() or not target.is_file() or target.stat().st_size > 1024 * 1024:
+            issue('team_input_invalid', 'Team input must be a bounded regular JSON file')
+        value = json.loads(target.read_text())
+    except (OSError, ValueError) as exc:
+        issue('team_input_invalid', f'Cannot read team JSON input {target}: {exc}')
     if not isinstance(value, dict):
         issue('team_input_invalid', 'Team input must be a JSON object')
     return value
+
+
+def validate_proposal_lanes(lanes):
+    if not 2 <= len(lanes) <= 8:
+        issue('team_size_invalid', 'Brainstorming requires 2 to 8 independently dispatched lanes')
+    if len({lane.lane_id for lane in lanes}) != len(lanes) or any(lane.session_id for lane in lanes):
+        issue('team_proposals_not_fresh', 'Initial proposals require unique lanes and fresh sessions')
 
 
 def brainstorm(lanes, *, repo_root, task, dispatch=None, progress=None):
     """Fresh proposals, then fresh critique. Existing dispatch owns each process."""
     from .dispatch import run_council_sync
     dispatch = dispatch or run_council_sync
-    if not 2 <= len(lanes) <= 8:
-        issue('team_size_invalid', 'Brainstorming requires 2 to 8 independently dispatched lanes')
-    if len({lane.lane_id for lane in lanes}) != len(lanes) or any(lane.session_id for lane in lanes):
-        issue('team_proposals_not_fresh', 'Initial proposals require unique lanes and fresh sessions')
+    validate_proposal_lanes(lanes)
     proposals = dispatch(lanes, repo_root=repo_root,
                          task='Develop an independent proposal. Read the relevant files and documentation. Cite evidence and uncertainties.\n\n' + task,
                          phase='planning', phase_required=True, required_quorum=len(lanes))
@@ -322,6 +332,8 @@ def helper_packet(session, task_id, root):
             issue('team_helper_credential', 'Helper callback identity must match the exact assignment')
         if driver_actor.get('role') != 'driver' or any(driver_actor.get(field) != team['driver'][field] for field in ('kind','model','session_id')):
             issue('team_driver_credential', 'Callback return address must identify this exact driver')
+        if any(not actor.get(field) or actor.get(field) != driver_actor.get(field) for field in ('run_id','server_id','generation')):
+            issue('team_helper_scope', 'Helper and driver must share the run, server, and coordination generation')
         recipient = driver_actor.get('actor_id')
         if actor.get('run_id') != session.get('run_id') or task_id not in actor.get('task_ids', []) or not recipient or recipient not in actor.get('peers', []):
             issue('team_helper_scope', 'Helper callback must match the run, task, and driver return address')
@@ -403,7 +415,8 @@ def _run(args):
             if not isinstance(data.get('task'), str) or not data['task'].strip():
                 issue('team_task_missing', 'Helper assignment needs a concrete task')
             contributor(session, agent, data.get('role'))
-            team['helpers'][name] = {**data, 'identity': agent, 'state': 'assigned'}
+            assignment = {field: data[field] for field in ('task','role','intent','build_on','owned_surfaces','forbidden_surfaces','acceptance','callback') if field in data}
+            team['helpers'][name] = {**assignment, 'identity': agent, 'state': 'assigned'}
             payload, save = team['helpers'][name], True
         elif action == 'helper-packet':
             packet = helper_packet(session, args.task_id, root)
@@ -474,6 +487,7 @@ def _run(args):
             prefs = preference_snapshot().values.get('team', {})
             selections = (args.roles or ','.join(prefs.get(r, 'planning' if r == 'proposer' else 'review') for r in ('proposer','critic'))).split(',')
             lanes = resolved_team_lanes(resolved, selections, args.timeout)
+            validate_proposal_lanes(lanes)
             team = team_block(session)
             discussion_id = args.discussion_id or hashlib.sha256(json.dumps([args.task, selections]).encode()).hexdigest()
             runs = team.setdefault('discussion_runs', {})
