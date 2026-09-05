@@ -293,6 +293,7 @@ _RESERVED_CONTROL_FLAGS: dict[str, frozenset[str]] = {
             "--agent",
             "--add-dir",
             "--print-timeout",
+            "--disable-slash-commands",
         }
     ),
     "opencode-cli": frozenset(
@@ -1075,7 +1076,15 @@ def build_readonly_invocation(
             if exact_session:
                 # Exact conversation resume — planning context for later review.
                 argv_list.extend(["--conversation", exact_session])
-            argv_list.extend(["--print", full_prompt, "--mode", "plan"])
+            # Every review, including a lightweight or resumed review, uses Boost.
+            # Do not infer a review role from words in a planning task.
+            review_role = str(role or profile).strip().lower()
+            agy_prompt = (
+                "/boost " + full_prompt
+                if review_role in {"review", "lightweight_review"}
+                else full_prompt
+            )
+            argv_list.extend(["--print", agy_prompt, "--mode", "plan"])
             if requested_model:
                 argv_list.extend(["--model", str(requested_model)])
             argv_list.extend(extras)
@@ -1087,8 +1096,8 @@ def build_readonly_invocation(
                 tool_scope="read-only",
                 sandbox_scope="ephemeral",
                 notes=(
-                    "Antigravity CLI (agy) headless --print; pin latest Gemini model "
-                    "(3.1 Pro plan/review, 3.5 Flash optional labor). Not Lane A / not "
+                    "Antigravity CLI (agy) headless --print; reviews require /boost. "
+                    "Pin the selected model from the live agy catalog. Not Lane A / not "
                     "host-import write-lease qualified. Experimental implement: host "
                     "launches agy with --dangerously-skip-permissions separately. "
                     "Pass exact session_id/--conversation so review resumes planning chat."

@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Grok Build, Oh My Pi (omp), Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.36.0"
+  version: "2.36.1"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -84,7 +84,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.36.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.36.1):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
@@ -112,6 +112,8 @@ opt-in for the current PR.
    Otherwise, record the skipped Fugu review and its reason. Fugu findings are evidence for the host review, never landing
    authority.
 4. Host review: independent review of `git diff <default-branch>...HEAD`.
+   Every Agy review and re-review requires `/boost` in plan mode. No plain
+   Agy fallback. See `references/review-subagent.md` for the evidence rules.
 5. Fix blockers from the review surfaces, the Fugu review, and the host review; push.
 6. Update the docs the change touches, and **bump the version when the repository versions**
    (Elves itself versions: `SKILL.md` metadata, `AGENTS.md`, the `CHANGELOG.md` release heading, and

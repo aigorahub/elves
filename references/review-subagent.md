@@ -92,6 +92,28 @@ blocker for a native-first run; it is a warning only when the fallback changes r
 It is blocking only when the survival guide explicitly made that phase route required and the
 coordinator could not satisfy it. Do not infer route authority from model prestige.
 
+## Agy review requirements
+
+Every Agy review and re-review uses `/boost`, including lightweight reviews.
+Keep plan mode and slash command expansion enabled. Never pass
+`--disable-slash-commands` or retry the review without Boost. Prefer
+`gemini-3.8-flash-high` when the live Agy catalog lists it and the user did
+not name another model. This preference does not authorize a model change
+on an exact session resume.
+
+The review session must be separate from every agent that wrote code.
+Require the reviewed commit, file and line evidence, failure conditions,
+and checks that could disprove each finding. Separate unsupported concerns
+from confirmed defects. `/grill-me` remains optional planning input.
+
+Confirm Boost activation from the actual CLI output or events. If Boost
+fails, is unavailable, or cannot be confirmed active, mark the Agy route
+unavailable. Use an independent fallback only within existing user route
+authority. A plain Agy response cannot satisfy required review. The host
+still needs a completed report at the exact commit before landing.
+
+See [Google's Boost guide](https://www.antigravity.google/docs/boost/).
+
 ## Review Route Context
 
 Fugu is optional. When a review route is unavailable because of quota, authentication, catalog,

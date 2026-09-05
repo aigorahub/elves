@@ -2112,6 +2112,24 @@ class AdapterBuilderTests(unittest.TestCase):
                 role="review",
                 repo_root=Path(tmp),
             )
+            self.assertTrue(agy.argv[agy.argv.index("--print") + 1].startswith("/boost "))
+            for review_role in ("review", "lightweight_review", "planning"):
+                invocation = build_readonly_invocation(
+                    adapter="antigravity-cli", profile="review", role=review_role,
+                    packet_path=packet, prompt_path=prompt, executable="agy",
+                    task="review the patch", repo_root=Path(tmp),
+                )
+                self.assertEqual(
+                    invocation.argv[invocation.argv.index("--print") + 1].startswith("/boost "),
+                    review_role != "planning",
+                )
+            for disabled in ("--disable-slash-commands", "--disable-slash-commands=true"):
+                with self.assertRaises(ValidationIssue):
+                    build_readonly_invocation(
+                        adapter="antigravity-cli", profile="review", role="review",
+                        packet_path=packet, prompt_path=prompt, executable="agy",
+                        extra_args=(disabled,), repo_root=Path(tmp),
+                    )
             self.assertTrue(agy.read_only)
             self.assertEqual(agy.input_mode, "none")
             self.assertIsNone(agy.stdin_text)
@@ -2159,6 +2177,7 @@ class AdapterBuilderTests(unittest.TestCase):
                 role="review",
                 repo_root=Path(tmp),
             )
+            self.assertTrue(agy_resume.argv[agy_resume.argv.index("--print") + 1].startswith("/boost "))
             self.assertIn("--conversation", agy_resume.argv)
             self.assertIn("11111111-2222-3333-4444-555555555555", agy_resume.argv)
 

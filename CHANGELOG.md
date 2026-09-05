@@ -4,6 +4,17 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.36.1] - 2026-09-05
+
+### Fixed
+
+- Agy review and lightweight review calls now start with `/boost`, including
+  exact session resumes. Plan mode remains set. Extra arguments cannot
+  disable slash command expansion.
+- The review rules reject plain Agy fallback after Boost failure. Reviewers
+  must use a separate session from code writers and return evidence for the
+  exact commit. Updated the skill, README, and guide.
+
 ## [2.36.0] - 2026-09-02
 
 ### Fixed
