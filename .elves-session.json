@@ -1,0 +1,98 @@
+{
+  "batches": [
+    {
+      "acceptance": [
+        {
+          "criterion": "Optional callbacks persist message IDs, use bounded subprocess calls, negotiate protocol, and consume only at named checkpoints.",
+          "evidence": "tests/test_agent_teams.py: callback persistence, timeout, receipt recovery, protocol, scoped helper packet, and checkpoint tests passed; actual Lantern source protocol received and consumed 20 near-limit reports.",
+          "id": "B1-A1",
+          "met": true
+        },
+        {
+          "criterion": "Saved team roles resolve through existing preferences and public team commands run independent proposals before critique with existing dispatch.",
+          "evidence": "Public team route and brainstorm dispatch resolve existing role profiles; proposal-before-critique and unavailable profile tests passed.",
+          "id": "B1-A2",
+          "met": true
+        },
+        {
+          "criterion": "Driver owned contributor identities block contributor review in route selection and final readiness while accepting a fresh same family reviewer.",
+          "evidence": "Contributor exclusion, unqualified session, same-family fresh reviewer, exact artifact/head, public review-route, and immutable worker report tests passed.",
+          "id": "B1-A3",
+          "met": true
+        }
+      ],
+      "id": "B1",
+      "status": "complete"
+    },
+    {
+      "acceptance": [
+        {
+          "criterion": "Lane state survives restart and pending lanes are not terminal.",
+          "evidence": "40 tests/test_team_lanes.py tests passed for durable state, pending status, restart, and process concurrency.",
+          "id": "B2-A1",
+          "met": true
+        },
+        {
+          "criterion": "Overlap, unmet dependencies, branch drift, and repeated integration block unsafe writer integration.",
+          "evidence": "Real Git integration tests passed for ownership, ancestry, dependency, dirty worktrees, branch drift, duplicate/ambiguous integration, and empty run disposition.",
+          "id": "B2-A2",
+          "met": true
+        }
+      ],
+      "id": "B2",
+      "status": "complete"
+    },
+    {
+      "acceptance": [
+        {
+          "criterion": "Tests cover callback failures, identity checks, reviewer exclusion, standalone compatibility, and persistent lane recovery.",
+          "evidence": "Full local unit suite and installed bundle smokes passed. GitHub Linux Python 3.10 passed 1805 unit tests, installed smokes, release, API, links and secrets at 7260851. Its sole final failure was guide trailing whitespace, corrected and verified with cumulative git diff --check. Forty real writer tests and 28 focused team tests passed; actual Lantern scoped helper kickoff/report trial passed.",
+          "id": "B3-A1",
+          "met": true
+        },
+        {
+          "criterion": "Documentation and version surfaces describe supported behavior and limits consistently.",
+          "evidence": "SKILL, AGENTS, README, guide, canonical references, CHANGELOG, and version surfaces updated to 2.37.0; documented WSL2 limit.",
+          "id": "B3-A2",
+          "met": true
+        }
+      ],
+      "id": "B3",
+      "status": "complete"
+    }
+  ],
+  "branch": "feat/lantern-agent-teams",
+  "cobbler": {
+    "default_for_session": true
+  },
+  "master_acceptance": [
+    {
+      "criterion": "One driver coordinates helpers through public runtime commands without weakening existing execution or landing gates.",
+      "evidence": "Public team/team-report/team-lanes commands, exact identity and contributor exclusion, durable callback recovery and real Git integration gates verified by focused suites and actual Lantern CLI trial.",
+      "id": "M-A1",
+      "met": true
+    },
+    {
+      "criterion": "Independent review and required checks pass at the final PR commit.",
+      "evidence": "Independent Claude Fable 5.1 review clean at f97c0d1; later product changes are release/docs/whitespace only. Required local test, installed, release, API, secret, link, and cumulative whitespace proof passed; final GitHub aggregate remains an external readiness gate pending the cleanup tip. Product proof is reused for operational cleanup per canonical contract.",
+      "id": "M-A2",
+      "met": true
+    }
+  ],
+  "plan_path": "docs/plans/agent-teams.md",
+  "run_id": "d130d52b-9437-4b8a-bf19-fb9e3f2fbc82",
+  "run_mode": "finite",
+  "start_head": "3d313e02ea8a82e1637f2b574b71d1aea9316abc",
+  "status": "complete",
+  "work_driver": "host-native",
+  "worktree_path": "/Users/john/aigora/dev/elves-agent-teams",
+  "pr_number": 275,
+  "pr_url": "https://github.com/aigorahub/elves/pull/275",
+  "execution_log_path": "execution-log.md",
+  "review_evidence": {
+    "head": "f97c0d14015640c072f6c051ab0298a996cd7fcd",
+    "artifact": "/tmp/elves-teams-claude-final-review.md",
+    "result": "clean",
+    "model": "claude-fable-5-1"
+  }
+}

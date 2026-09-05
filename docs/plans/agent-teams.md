@@ -10,9 +10,9 @@ Build on the Cobbler CLI, preferences, dispatch, and session acceptance records.
 
 **Acceptance criteria:**
 
-- [ ] B1-A1: Optional callbacks persist message IDs, use bounded subprocess calls, negotiate protocol, and consume only at named checkpoints.
-- [ ] B1-A2: Saved team roles resolve through existing preferences and public team commands run independent proposals before critique with existing dispatch.
-- [ ] B1-A3: Driver owned contributor identities block contributor review in route selection and final readiness while accepting a fresh same family reviewer.
+- [x] B1-A1: Optional callbacks persist message IDs, use bounded subprocess calls, negotiate protocol, and consume only at named checkpoints.
+- [x] B1-A2: Saved team roles resolve through existing preferences and public team commands run independent proposals before critique with existing dispatch.
+- [x] B1-A3: Driver owned contributor identities block contributor review in route selection and final readiness while accepting a fresh same family reviewer.
 
 ## Batch 2: Persistent writer supervision
 
@@ -20,8 +20,8 @@ Build on parallel lane validation. Bind worktrees, branches, sessions, dependenc
 
 **Acceptance criteria:**
 
-- [ ] B2-A1: Lane state survives restart and pending lanes are not terminal.
-- [ ] B2-A2: Overlap, unmet dependencies, branch drift, and repeated integration block unsafe writer integration.
+- [x] B2-A1: Lane state survives restart and pending lanes are not terminal.
+- [x] B2-A2: Overlap, unmet dependencies, branch drift, and repeated integration block unsafe writer integration.
 
 ## Batch 3: Validation and release preparation
 
@@ -29,10 +29,10 @@ Update canonical skill, host adapter, guide, references, changelog, and version 
 
 **Acceptance criteria:**
 
-- [ ] B3-A1: Tests cover callback failures, identity checks, reviewer exclusion, standalone compatibility, and persistent lane recovery.
-- [ ] B3-A2: Documentation and version surfaces describe supported behavior and limits consistently.
+- [x] B3-A1: Tests cover callback failures, identity checks, reviewer exclusion, standalone compatibility, and persistent lane recovery.
+- [x] B3-A2: Documentation and version surfaces describe supported behavior and limits consistently.
 
 ## Master Acceptance
 
-- [ ] M-A1: One driver coordinates helpers through public runtime commands without weakening existing execution or landing gates.
-- [ ] M-A2: Independent review and required checks pass at the final PR commit.
+- [x] M-A1: One driver coordinates helpers through public runtime commands without weakening existing execution or landing gates.
+- [x] M-A2: Independent review and required checks pass at the final PR commit.
