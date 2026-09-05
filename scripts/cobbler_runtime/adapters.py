@@ -1096,7 +1096,20 @@ def build_readonly_invocation(
                     "Do not assume shell commands are permitted. Wait for the investigation "
                     "and verification results before returning the final structured role report. "
                     "A delegation notice is not a completed review. Report denied reads or "
-                    "missing evidence as a block. Include the reviewed commit in evidence.\n\n"
+                    "missing evidence as a block. Include the reviewed commit in evidence. "
+                    "Read every changed file and the relevant callers, tests, repository "
+                    "instructions, and task documentation before giving a verdict. Trace each "
+                    "finding through those files and check for evidence that disproves it. "
+                    "Return {role_report, review_coverage}. review_coverage must contain full "
+                    "head_sha and base_sha, changed_files and read_files lists, context_files "
+                    "with callers/tests/instructions/task_docs lists, missing_context list, "
+                    "context_exclusions mapping each empty context category to a specific "
+                    "not-applicable reason, and exclusions list of {path, reason}. "
+                    "List only reads actually performed. Explain each exclusion; the host must "
+                    "approve omissions. Do not return pass while required context is missing. "
+                    "The host will compare this declaration with its independent diff and "
+                    "tool-read evidence; this declaration alone does not prove coverage.\n"
+                    f"Expected reviewed head from the context packet: {packet_obj.get('head_sha') or 'not supplied; report missing context rather than guessing'}\n\n"
                     + full_prompt
                 )
             agy_prompt = (
@@ -1579,6 +1592,59 @@ def decode_codex_jsonl(
     )
 
 
+def _validate_agy_review_coverage(coverage: Any, *, verdict: str) -> dict[str, Any]:
+    """Validate declared coverage, not whether files were actually read."""
+    def fail(detail: str) -> None:
+        raise ValidationIssue(
+            "agy_incomplete_review_coverage", detail,
+            hint="The host must compare coverage with the exact diff and tool-read evidence.",
+        )
+
+    if not isinstance(coverage, dict):
+        fail("Agy review requires a review_coverage object")
+    for key in ("head_sha", "base_sha"):
+        value = coverage.get(key)
+        if not isinstance(value, str) or re.fullmatch(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", value) is None:
+            fail(f"Agy coverage requires an exact full {key}")
+
+    def paths(value: Any, label: str) -> list[str]:
+        if not isinstance(value, list) or any(not isinstance(path, str) or not path.strip() for path in value):
+            fail(f"Agy coverage {label} must be a list of nonempty strings")
+        return value
+
+    changed = paths(coverage.get("changed_files"), "changed_files")
+    reads = set(paths(coverage.get("read_files"), "read_files"))
+    missing = paths(coverage.get("missing_context"), "missing_context")
+    context = coverage.get("context_files")
+    if not isinstance(context, dict):
+        fail("Agy coverage requires context_files")
+    context_exclusions = coverage.get("context_exclusions", {})
+    if not isinstance(context_exclusions, dict):
+        fail("Agy context_exclusions must map empty categories to reasons")
+    required = set(changed)
+    for category in ("callers", "tests", "instructions", "task_docs"):
+        category_paths = paths(context.get(category), f"context_files.{category}")
+        if not category_paths and verdict == "pass":
+            reason = context_exclusions.get(category)
+            if not isinstance(reason, str) or not reason.strip():
+                fail(f"Empty Agy context category {category} requires a not-applicable reason")
+        required.update(category_paths)
+    exclusions = coverage.get("exclusions")
+    if not isinstance(exclusions, list):
+        fail("Agy coverage requires exclusions with path and reason")
+    excluded = set()
+    for item in exclusions:
+        if not isinstance(item, dict) or any(
+            not isinstance(item.get(key), str) or not item[key].strip()
+            for key in ("path", "reason")
+        ):
+            fail("Each Agy coverage exclusion requires a path and reason")
+        excluded.add(item["path"])
+    if verdict == "pass" and (missing or required - reads - excluded):
+        fail("Agy cannot pass review with missing required context or uncovered declared files")
+    return coverage
+
+
 def decode_agy_jsonl(
     stdout: str,
     *,
@@ -1625,11 +1691,20 @@ def decode_agy_jsonl(
         body = result.get("structured_output")
         if body is None:
             body = _parse_json_object(result.get("response", ""))
+        coverage = body.get("review_coverage") if isinstance(body, dict) else None
         if isinstance(body, dict) and "role_report" in body:
             body = body["role_report"]
         report = validate_role_report(body, expected_role=expected_role)
     except (ValidationIssue, AttributeError, TypeError) as exc:
         raise ValidationIssue("agy_missing_review_report", "Agy returned no valid final role report", hint=guidance) from exc
+    if review:
+        coverage = _validate_agy_review_coverage(coverage, verdict=report["verdict"])
+        # Keep model declarations in the redacted report path. Transport notes
+        # carry no model-authored paths or explanations.
+        report["evidence"].append(
+            "Model-reported review coverage; host verification required: "
+            + json.dumps(coverage, sort_keys=True)
+        )
     return TransportDecodeResult(
         role_report=report,
         actual_model=model,

@@ -106,6 +106,48 @@ Require the reviewed commit, file and line evidence, failure conditions,
 and checks that could disprove each finding. Separate unsupported concerns
 from confirmed defects. `/grill-me` remains optional planning input.
 
+### Context coverage before conclusions
+
+The host records the exact head, base, and changed paths from Git before
+review starts. Agy must read each changed file and trace relevant callers,
+tests, configuration, repository instructions, and task documentation. Read
+the full relevant functions and document sections. A filename match, diff
+hunk, or search snippet is not proof that the surrounding contract was read.
+Use current primary documentation for external behavior when local evidence
+does not define it. Do not infer an API contract from its name.
+
+Before a verdict, list the paths read, the relevant context paths, missing
+context, and each exclusion with its reason. Read the context before forming
+conclusions. For each finding, state the expected behavior from code or docs,
+the failure path, and the evidence that could disprove it. The Boost verifier
+must check those claims and the coverage gaps independently.
+
+Headless review output uses an envelope with `role_report` and
+`review_coverage`. The role report keeps the existing schema. Coverage has:
+
+```text
+head_sha, base_sha: full commit IDs
+changed_files, read_files: path lists
+context_files: {callers: [...], tests: [...], instructions: [...], task_docs: [...]}
+context_exclusions: {<empty context category>: <specific reason it does not apply>}
+missing_context: remaining required context
+exclusions: [{path: <path>, reason: <specific reason>}]
+```
+
+The decoder rejects a pass without coverage, with missing context, or with
+declared files absent from reads and exclusions. Empty context categories
+need a specific reason. A blocked report can retain gaps. The saved evidence
+labels this coverage as model reported. It is not tool evidence.
+
+The host must compare the declaration with its own diff inventory and actual
+read results or the complete context supplied to the reviewer. It must check
+head and base identity and approve each exclusion. A model cannot exclude
+required context merely to pass. Deleted files need base content; generated
+or binary files need relevant source or another suitable check. Missing
+required evidence blocks a clean review even when Agy reports high confidence.
+Apply the same coverage checks to supervised terminal reports. Never count
+a list of file names as proof that those files were read.
+
 Confirm Boost activation from the actual CLI output or events. If Boost
 fails, is unavailable, or cannot be confirmed active, mark the Agy route
 unavailable. Use an independent fallback only within existing user route
@@ -171,6 +213,10 @@ failure remains a transport block.
    after the previous workers have stopped. Preserve the reviewer session
    with `agy --conversation <exact-id> --model <same-id> --effort <same-effort>
    --mode plan` after a process stop. Do not start a competing reviewer.
+   Bind the parent ID from root CLI events or the launch record. Herdr can
+   report a Boost child ID as `agent_session`; do not adopt it as the parent.
+   Check the recorded resume argv with
+   `herdr pane process-info --pane <pane-id>` before recovery.
 
 The live CLI test on 2026-09-05 used Gemini 3.8 Flash High and confirmed
 Boost investigation plus a separate verification worker. Initial print mode

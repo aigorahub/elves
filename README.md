@@ -634,6 +634,11 @@ Keep required isolation. Approve scoped review actions and wait for child
 completion plus a final report at the exact commit. Headless success alone
 does not prove a review. See [the review rules](references/review-subagent.md).
 
+A clean Agy review also needs context coverage. Read changed files, relevant
+callers, tests, instructions, and task docs. The host checks the coverage
+record against the diff and read evidence. Missing required context blocks
+a clean result.
+
 ## Contributing
 
 Issues and pull requests are welcome. If you find a bug, have a feature idea, or want to add

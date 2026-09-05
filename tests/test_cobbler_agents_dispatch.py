@@ -2115,6 +2115,8 @@ class AdapterBuilderTests(unittest.TestCase):
             self.assertTrue(agy.argv[agy.argv.index("--print") + 1].startswith("/boost "))
             self.assertIn(f"Admitted review workspace: {tmp}", agy.argv[agy.argv.index("--print") + 1])
             self.assertIn("Give this absolute workspace path", agy.argv[agy.argv.index("--print") + 1])
+            self.assertIn("review_coverage", agy.argv[agy.argv.index("--print") + 1])
+            self.assertIn("repository instructions", agy.argv[agy.argv.index("--print") + 1])
             self.assertEqual(agy.argv[agy.argv.index("--output-format") + 1], "stream-json")
             self.assertEqual(agy.decoder, "agy-jsonl")
             for review_role in ("review", "lightweight_review", "planning"):
@@ -2702,13 +2704,24 @@ class RemediationBlockerTests(unittest.TestCase):
             "key_findings": [], "evidence": ["Reviewed commit abc123"],
             "risks": [], "recommended_actions": [], "open_questions": [],
         }
+        coverage = {
+            "head_sha": "a" * 40, "base_sha": "b" * 40,
+            "changed_files": ["README.md"],
+            "read_files": ["README.md", "AGENTS.md", "docs/task.md"],
+            "context_files": {"callers": [], "tests": [], "instructions": ["AGENTS.md"],
+                              "task_docs": ["docs/task.md"]},
+            "context_exclusions": {"callers": "Documentation-only change has no code callers",
+                                   "tests": "Documentation-only change has no executable behavior"},
+            "missing_context": [], "exclusions": [],
+        }
+        envelope = {"role_report": report, "review_coverage": coverage}
         def events():
             return [
                 {"event": "init", "conversation_id": "parent-session", "init": {
                     "model": "gemini-3.8-flash-high",
                     "expanded_commands": [{"name": "boost", "type": "system"}]}},
                 {"event": "result", "result": {"conversation_id": "parent-session",
-                    "status": "SUCCESS", "response": json.dumps(report)}},
+                    "status": "SUCCESS", "response": json.dumps(envelope)}},
             ]
         def decode(rows, **kwargs):
             return decode_adapter_output(
@@ -2718,9 +2731,10 @@ class RemediationBlockerTests(unittest.TestCase):
         decoded = decode(events(), requested_model="gemini-3.8-flash-high")
         self.assertEqual(decoded.session_id, "parent-session")
         self.assertEqual(decoded.model_evidence_source, "agy.init.model")
-        self.assertEqual(decoded.role_report["evidence"], report["evidence"])
+        self.assertEqual(decoded.role_report["evidence"][:-1], report["evidence"])
+        self.assertIn("Model-reported review coverage; host verification required", decoded.role_report["evidence"][-1])
         rows = events()
-        rows[-1]["result"]["structured_output"] = {"role_report": report}
+        rows[-1]["result"]["structured_output"] = envelope
         rows[-1]["result"]["response"] = ""
         self.assertEqual(decode(rows).role_report["verdict"], "pass")
         for change, code in (
@@ -2749,6 +2763,32 @@ class RemediationBlockerTests(unittest.TestCase):
         with self.assertRaises(ValidationIssue) as caught:
             decode(rows)
         self.assertEqual(caught.exception.code, "agy_missing_review_report")
+
+        for change in (
+            lambda e: e.pop("review_coverage"),
+            lambda e: e["review_coverage"].update(head_sha="main"),
+            lambda e: e["review_coverage"]["read_files"].remove("README.md"),
+            lambda e: e["review_coverage"]["read_files"].remove("docs/task.md"),
+            lambda e: e["review_coverage"].update(missing_context=["Need API callers"]),
+            lambda e: e["review_coverage"]["context_files"].pop("instructions"),
+            lambda e: e["review_coverage"].update(context_exclusions={}),
+            lambda e: e["review_coverage"].update(exclusions=[{"path": "README.md", "reason": ""}]),
+        ):
+            modified = json.loads(json.dumps(envelope))
+            change(modified)
+            rows = events()
+            rows[-1]["result"]["response"] = json.dumps(modified)
+            with self.assertRaises(ValidationIssue) as caught:
+                decode(rows)
+            self.assertEqual(caught.exception.code, "agy_incomplete_review_coverage")
+        # A gap is reportable as blocked; it must never become a clean pass.
+        modified = json.loads(json.dumps(envelope))
+        modified["role_report"]["verdict"] = "blocked"
+        modified["review_coverage"]["missing_context"] = ["docs/task.md is not readable"]
+        modified["review_coverage"]["read_files"].remove("docs/task.md")
+        rows = events()
+        rows[-1]["result"]["response"] = json.dumps(modified)
+        self.assertEqual(decode(rows).role_report["verdict"], "blocked")
 
     def test_decoder_claude_and_grok_and_codex_fixtures(self) -> None:
         report = {

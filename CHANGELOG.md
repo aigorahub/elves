@@ -8,6 +8,9 @@ All notable changes to the Elves skill are documented here.
 
 ### Fixed
 
+- Agy reviews require context coverage before a clean verdict. The host
+  checks changed files, callers, tests, instructions, and task docs against
+  read evidence. Missing context blocks a pass.
 - Agy review and lightweight review calls now start with `/boost`, including
   exact session resumes. Plan mode remains set. Extra arguments cannot
   disable slash command expansion.
