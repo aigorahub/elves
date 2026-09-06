@@ -110,6 +110,26 @@ class InstallDoctorCacheTests(unittest.TestCase):
 
             self.assertEqual(self.install_doctor.read_version(root), "1.15.0")
 
+    def test_read_version_decodes_utf8_when_cp1252_cannot(self) -> None:
+        # aigorahub/elves#272: native Windows locale encoding cannot decode
+        # SKILL.md's UTF-8 curly quotes; the doctor must not use the locale codec.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            skill = root / "SKILL.md"
+            skill.write_bytes(b'---\nversion: "2.35.0"\n---\n\xe2\x80\x9cquoted\xe2\x80\x9d\n')
+            with self.assertRaises(UnicodeDecodeError):
+                skill.read_text(encoding="cp1252")
+            self.assertEqual(self.install_doctor.read_version(root), "2.35.0")
+
+    def test_skill_and_cache_io_request_utf8(self) -> None:
+        src = SCRIPT_PATH.read_text(encoding="utf-8")
+        self.assertIn('skill_path.read_text(encoding="utf-8")', src)
+        self.assertIn('CACHE_PATH.read_text(encoding="utf-8")', src)
+        self.assertIn(
+            'CACHE_PATH.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")',
+            src,
+        )
+
     def test_discover_installs_finds_global_project_local_and_legacy_installs(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

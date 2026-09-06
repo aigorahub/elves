@@ -4,6 +4,22 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.37.1] - 2026-09-05
+
+### Fixed
+
+- `install_doctor.py` now decodes `SKILL.md` and its release cache as UTF-8, so
+  native Windows no longer crashes on cp1252 before printing WSL setup guidance
+  (`#272`).
+- The README Optional provider shortcuts section is split into commands, Fugu,
+  Manus/Devin/Oh My Pi, and Grok so the contract text is scannable (`#265`).
+- Trusted full-run supervision canary scales its observe window to the first
+  scan cost, retries once on timeout, and distinguishes a timed-out scan from a
+  completed miss (`#263`).
+- Learnings ledger scanners share one digest-marker validator: no pair or
+  exactly one ordered begin/end pair. Nested or unterminated markers refuse
+  before any mutation or history write (`#262`).
+
 ## [2.37.0] - 2026-09-05
 
 - Add driver and helper team commands, saved role preferences, and independent

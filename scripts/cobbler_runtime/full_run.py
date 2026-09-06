@@ -249,6 +249,14 @@ DEFAULT_STALE_SECONDS = 300
 # Darwin process-group reaping is slower under CI load; give the exact recorded
 # supervisor a little longer to leave the group before failing closed.
 EXIT_RECORD_SETTLE_SECONDS = 0.75 if sys.platform == "darwin" else 0.25
+# aigorahub/elves#263: the supervision canary used to share one 0.75s wall
+# budget for hang detection and capability proof. Scale the observe window to
+# the first scan's cost so a loaded Darwin `ps e` cannot fail a working
+# supervisor. Floor keeps the original budget; ceiling bounds a hang.
+SUPERVISION_CANARY_FLOOR_SECONDS = 0.75
+SUPERVISION_CANARY_CEILING_SECONDS = 8.0
+SUPERVISION_CANARY_SCAN_MULTIPLE = 4.0
+SUPERVISION_CANARY_POLL_SECONDS = 0.03
 _SHA1_RE = re.compile(r"^[0-9a-f]{40}$", re.IGNORECASE)
 _REPORT_STATUSES = frozenset({"running", "complete", "blocked", "failed", "stopped"})
 _ACCEPTANCE_ID_RE = STABLE_ACCEPTANCE_ID_RE
@@ -3586,7 +3594,22 @@ def _scan_supervision_pids(executable: str | Path, marker_value: str) -> set[int
     return _scan_bsd_ps_supervision_pids(qualified, marker_value)
 
 
-def _run_supervision_canary(executable: Path) -> bool:
+def _supervision_canary_budget(first_scan_seconds: float) -> float:
+    """Wall budget from the first completed scan, clamped to floor/ceiling."""
+
+    cost = max(0.0, float(first_scan_seconds))
+    return min(
+        SUPERVISION_CANARY_CEILING_SECONDS,
+        max(
+            SUPERVISION_CANARY_FLOOR_SECONDS,
+            cost * SUPERVISION_CANARY_SCAN_MULTIPLE,
+        ),
+    )
+
+
+def _observe_supervision_canary(executable: Path) -> bool:
+    """One canary attempt. Distinguishes scan timeout from a completed miss."""
+
     marker_value = secrets.token_hex(32)
     # The canary needs only process discovery, not provider/user state.  On
     # Darwin the qualified `ps e` backend necessarily observes its environment,
@@ -3599,8 +3622,9 @@ def _run_supervision_canary(executable: Path) -> bool:
     }
     env.setdefault("PATH", os.defpath)
     env["ELVES_FULL_RUN_SUPERVISION_MARKER"] = marker_value
+    child_sleep = SUPERVISION_CANARY_CEILING_SECONDS + 1.0
     proc = subprocess.Popen(
-        [sys.executable, "-c", "import time; time.sleep(1)"],
+        [sys.executable, "-c", f"import time; time.sleep({child_sleep:.3f})"],
         env=env,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
@@ -3609,14 +3633,30 @@ def _run_supervision_canary(executable: Path) -> bool:
         close_fds=True,
     )
     try:
-        deadline = time.monotonic() + 0.75
+        started = time.monotonic()
+        scan_started = time.monotonic()
+        pids = _scan_supervision_pids(executable, marker_value)
+        first_scan = time.monotonic() - scan_started
+        deadline = started + _supervision_canary_budget(first_scan)
+        completed_scans = 1
+        if proc.pid in pids:
+            return True
         while time.monotonic() < deadline:
-            if proc.pid in _scan_supervision_pids(executable, marker_value):
+            time.sleep(SUPERVISION_CANARY_POLL_SECONDS)
+            if time.monotonic() >= deadline:
+                break
+            pids = _scan_supervision_pids(executable, marker_value)
+            completed_scans += 1
+            if proc.pid in pids:
                 return True
-            time.sleep(0.03)
+        if completed_scans >= 2:
+            raise ValidationIssue(
+                "full_run_supervision_canary_failed",
+                "Trusted recursive supervisor completed its marker scan and the canary was absent",
+            )
         raise ValidationIssue(
-            "full_run_supervision_canary_failed",
-            "Trusted recursive supervisor could not observe its marker canary",
+            "full_run_supervision_canary_timeout",
+            "Trusted recursive supervisor timed out before it could observe its marker canary",
         )
     finally:
         try:
@@ -3630,6 +3670,15 @@ def _run_supervision_canary(executable: Path) -> bool:
             proc.wait(timeout=1.0)
         except (OSError, subprocess.TimeoutExpired):
             pass
+
+
+def _run_supervision_canary(executable: Path) -> bool:
+    try:
+        return _observe_supervision_canary(executable)
+    except ValidationIssue as exc:
+        if exc.code != "full_run_supervision_canary_timeout":
+            raise
+        return _observe_supervision_canary(executable)
 
 
 def _protected_branch_names(repo_root: Path) -> set[str]:

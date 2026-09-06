@@ -8,7 +8,7 @@ Oh My Pi (omp) driver plans and reviews; a subscription-native (or optional exte
 implements; durable run files let the work survive context compaction. You write the plan and own
 the merge decision. The agent does the middle.
 
-**Current release: v2.37.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.37.1**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 Implementation runs get a draft PR at the first useful pushed commit,
@@ -143,49 +143,98 @@ accepts `xhigh` and `max` and passes those levels unchanged to `omp --thinking`.
 
 ### Optional provider shortcuts
 
-Focused provider tasks do not require a full Elves run. Claude Code gets
-`/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] [--include PATH] <planning-task>` and
-`/fugu [--deep|--cyber|--ultra|--max] [--max-wait SECONDS] [--preflight] review <scope>`,
-`/manus <topic>`, `/grok <instructions>`, `/devin <instructions>`, and `/omp <instructions>`;
-Codex uses the equivalent `$elves fugu|manus|grok|devin|omp …` forms or natural language. Plain Fugu supports planning and analysis. `fugu review` keeps the read-only P0-P3 review
+Focused provider tasks do not require a full Elves run. The contracts below
+are unchanged; this section is the readable index. Full requirements, auth
+environment names, timeouts, and follow behavior live in
+[`references/provider-shortcuts.md`](references/provider-shortcuts.md).
+
+#### Commands
+
+Claude Code:
+
+- `/fugu [--deep|--ultra|--max] [--max-wait SECONDS] [--preflight] [--include PATH] <planning-task>`
+- `/fugu [--deep|--cyber|--ultra|--max] [--max-wait SECONDS] [--preflight] review <scope>`
+- `/manus <topic>`
+- `/grok <instructions>`
+- `/devin <instructions>`
+- `/omp <instructions>`
+
+Codex uses the equivalent `$elves fugu|manus|grok|devin|omp …` forms or natural language.
+
+#### Fugu
+
+Plain Fugu supports planning and analysis. `fugu review` keeps the read-only P0-P3 review
 contract. Both receive a bounded snapshot of policy-admitted tracked and non-ignored untracked
-files. `--include` records an exact host-selected path but cannot override exclusions for ignored
+files. Fugu is limited to planning and read-only review. The runner rejects `--write`.
+
+Profiles:
+
+- regular `fugu/high` (default)
+- `--deep` → `fugu/xhigh`
+- `--cyber` → `fugu-cyber/xhigh`
+- `--ultra` → `fugu-ultra-v1.1/high`
+- `--max` → `fugu-ultra-v1.1/max` for one narrow high-stakes gate on a 60-minute default wall budget
+
+Plain regular Fugu is the default. The host may select Cyber only for explicit security review or threat-model intent after a successful Cyber call in the current session. Only a user-explicit Cyber request may establish that proof. Otherwise, it uses regular Fugu. The user must explicitly select Ultra or Max.
+
+`--include` records an exact host-selected path but cannot override exclusions for ignored
 trees, credentials, operational state, executable agent configuration, unsafe links/file types, or
 repository escapes; the exact path must actually be admitted and copied, and gitignored includes
 fail closed before the provider launches (use `--preflight` to check). Both `.env.*` and
-`*.env` dotenv-name families plus host-owned internal namespaces are always excluded. Fugu is limited to planning and read-only review. The runner rejects `--write`. macOS read-only cleanup is best-effort,
+`*.env` dotenv-name families plus host-owned internal namespaces are always excluded. macOS read-only cleanup is best-effort,
 not proof of recursive descendant absence.
-Profiles remain regular `fugu/high`, `fugu/xhigh` with `--deep`, `fugu-cyber/xhigh` with `--cyber`, `fugu-ultra-v1.1/high` with
-`--ultra`, and `fugu-ultra-v1.1/max` with `--max` for one narrow high-stakes gate on a 60-minute
-default wall budget. Plain regular Fugu is the default. The host may select Cyber only for explicit security review or threat-model intent after a successful Cyber call in the current session. Only a user-explicit Cyber request may establish that proof. Otherwise, it uses regular Fugu. The user must explicitly select Ultra or Max. Use
-`--max-wait` before automatic `--deep`; if any `--include`, run `--preflight` first; prefer
+
+Use `--max-wait` before automatic `--deep`; if any `--include`, run `--preflight` first; prefer
 redirect to a log (never `| tail`).
+
 **Host Fugu routing:** when the user says “use Fugu” without an explicit
 profile flag, the host agent uses plain by default. It may select deep for regular Fugu xhigh work, or Cyber for explicit security intent. It must not select Ultra or Max without an explicit user flag. It chooses planning vs review and optional `--include` paths
 before launch, and states a short `Fugu route: …` line;
 explicit flags always win. The isolation snapshot is always on; the host only adds exact admitted
 context via `--include`. See `references/provider-shortcuts.md`
 (**Host routing when the user says "use Fugu"**) and `references/fugu-calling-guide.md`.
+
 Regular/deep calls are ephemeral; Ultra and max reserve synthesis time and resume only the
 exact isolated session with further tools forbidden. Session state and raw events never leave the
 lane; events cross a bounded host-owned pipe, final output remains pinned to a no-follow
 descriptor, and every settled phase receives a final descriptor-safe writable-state audit. Codex's documented externally-sandboxed mode avoids an invalid nested macOS sandbox while
-Elves' required outer boundary remains authoritative. Manus supports a normal private
+Elves' required outer boundary remains authoritative.
+
+Fugu's Linux boundary likewise omits procfs around its credential-bearing
+launcher and exposes only a synthetic `/proc/self/exe` symlink to the qualified real Codex
+executable.
+
+#### Manus, Devin, and Oh My Pi
+
+Manus supports a normal private
 task plus Cobbler-managed `--wide` and deterministic `--fanout` rosters, explicit `--file`
 attachments, and duplicate-safe `--resume` that retries only known-failed steps; roster manifests
 are validated and exclusively reserved before any upload. A durable pre-create marker prevents
-resume from duplicating a paid Manus task when task-ID persistence was interrupted. Devin creates
+resume from duplicating a paid Manus task when task-ID persistence was interrupted. Manus requests nest empty connector, enabled-skill, and forced-skill lists under
+`message`, so the wrapper grants no connector or forced-skill IDs explicitly; the documented API
+still loads account-default enabled skills when `enable_skills` is empty, and this route therefore
+does not claim skill isolation.
+
+Devin creates
 a bounded remote task, including its creation request, without granting stored secrets or knowledge
-by default. Oh My Pi (`/omp` / `$elves omp`) runs headless `omp` over the shared isolation
+by default.
+
+Oh My Pi (`/omp` / `$elves omp`) runs headless `omp` over the shared isolation
 snapshot with a single provider-matched API key and never modifies the live checkout from the
-shortcut (use parked `omp-cli` full-run for implementation labor). Grok uses
+shortcut (use parked `omp-cli` full-run for implementation labor).
+
+#### Grok
+
+Grok uses
 headless mode at `high` reasoning by default, without approval bypass over a disposable tracked-source snapshot in
 Elves' required outer kernel sandbox, plus Grok's built-in inner `strict` profile, provider-documented
 isolated `dontAsk` settings, and bypass mode locked off. The shortcut requires an explicit
 `XAI_API_KEY`; a dedicated Grok tool shell removes both supported key names before any
 model-directed command runs, and the Linux boundary omits procfs to prevent parent-environment
 inspection. It does not expose a shared OAuth file because Grok applies the same sandbox to
-provider and tool reads. The runner builds argv from the flags the installed Grok Build CLI advertises: an absent safety
+provider and tool reads.
+
+The runner builds argv from the flags the installed Grok Build CLI advertises: an absent safety
 flag (isolated `--cwd`, inner `--sandbox strict`, headless `--single`, `--output-format`,
 explicit reasoning effort) fails closed, while a quality flag the installed version dropped is
 simply not passed. Auto-update is disabled through the isolated `[cli] auto_update` config key
@@ -193,20 +242,13 @@ rather than a removed flag. Reasoning effort defaults to `high`; `ELVES_GROK_EFF
 `low`, `medium`, `high`, or `xhigh`, and `ELVES_GROK_MODEL` pins a model only when the
 authenticated live catalog lists it. The runner reports the CLI version, effort, model, the
 authentication route the CLI itself names, and any omitted flags.
+
 On a host that cannot nest sandboxes (macOS Seatbelt refuses a second profile inside Elves'
 required outer `sandbox-exec` boundary), the runner fails closed with
 `grok_inner_sandbox_unavailable` before it builds a snapshot, rather than launching with the
 inner profile silently missing. Elves does not drop the inner profile to make a launch succeed,
 and the outer boundary is not optional; use a Linux host with the bwrap backend or select
 another review route.
-Fugu's Linux boundary likewise omits procfs around its credential-bearing
-launcher and exposes only a synthetic `/proc/self/exe` symlink to the qualified real Codex
-executable. Manus requests nest empty connector, enabled-skill, and forced-skill lists under
-`message`, so the wrapper grants no connector or forced-skill IDs explicitly; the documented API
-still loads account-default enabled skills when `enable_skills` is empty, and this route therefore
-does not claim skill isolation. See
-[`references/provider-shortcuts.md`](references/provider-shortcuts.md) for requirements, auth
-environment names, timeouts, and follow behavior.
 
 **Review snapshot media policy (all harnesses and hosts).** Read-only review snapshots omit
 oversized binary media instead of failing the whole review. Video, audio, presentation, archive,

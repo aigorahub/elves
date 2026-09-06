@@ -605,3 +605,58 @@ class LedgerDigestInteriorSectionTests(unittest.TestCase):
             restored = doc.entries[1]
             self.assertEqual(restored.section, "Repo Conventions")
             self.assertFalse(restored.retired, path.read_text(encoding="utf-8"))
+
+
+class LedgerDigestMarkerValidationTests(unittest.TestCase):
+    """aigorahub/elves#262: refuse nested or unterminated digest markers."""
+
+    def test_parse_accepts_no_markers_or_one_ordered_pair(self) -> None:
+        ll.parse_text("# Project Learnings\n\n## Repo Conventions\n\n- [L1] x (evidence: a)\n")
+        ll.parse_text(SAMPLE)
+
+    def test_parse_refuses_unterminated_and_nested_markers(self) -> None:
+        unterminated = (
+            "# Project Learnings\n\n## Repo Conventions\n\n"
+            f"{ll.DIGEST_BEGIN}\n- [L1] x (evidence: a)\n"
+        )
+        nested = (
+            "# Project Learnings\n\n"
+            f"{ll.DIGEST_BEGIN}\n{ll.DIGEST_BEGIN}\n{ll.DIGEST_END}\n\n"
+            "## Repo Conventions\n\n- [L1] x (evidence: a)\n"
+        )
+        reversed_pair = (
+            "# Project Learnings\n\n"
+            f"{ll.DIGEST_END}\n{ll.DIGEST_BEGIN}\n\n"
+            "## Repo Conventions\n\n- [L1] x (evidence: a)\n"
+        )
+        for text in (unterminated, nested, reversed_pair):
+            with self.subTest(text=text[:40]):
+                with self.assertRaises(ll.LedgerError) as ctx:
+                    ll.parse_text(text)
+                self.assertEqual(ctx.exception.code, "learnings_digest_markers_invalid")
+
+    def test_unterminated_markers_refuse_create_before_history(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "learnings.md"
+            path.write_text(
+                "# Project Learnings\n\n## Repo Conventions\n\n"
+                f"{ll.DIGEST_BEGIN}\n- [L1] existing (evidence: a)\n",
+                encoding="utf-8",
+            )
+            before = path.read_bytes()
+            with self.assertRaises(ll.LedgerError) as ctx:
+                ll.apply_edits(
+                    path,
+                    [
+                        {
+                            "action": "create",
+                            "category": "Repo Conventions",
+                            "text": "new lesson",
+                            "evidence": "commit abc",
+                            "reason": "r",
+                        }
+                    ],
+                )
+            self.assertEqual(ctx.exception.code, "learnings_digest_markers_invalid")
+            self.assertEqual(path.read_bytes(), before)
+            self.assertFalse(ll.history_path(path).exists())

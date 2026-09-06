@@ -102,7 +102,7 @@ def read_version(root: Path) -> str | None:
     skill_path = root / "SKILL.md"
     if not skill_path.exists():
         return None
-    match = VERSION_RE.search(skill_path.read_text())
+    match = VERSION_RE.search(skill_path.read_text(encoding="utf-8"))
     return match.group(1) if match else None
 
 
@@ -134,7 +134,7 @@ def load_cache(max_age_hours: int, minimum_version: str | None = None) -> dict[s
     if not CACHE_PATH.exists():
         return None
     try:
-        payload = json.loads(CACHE_PATH.read_text())
+        payload = json.loads(CACHE_PATH.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
 
@@ -162,7 +162,7 @@ def load_cache(max_age_hours: int, minimum_version: str | None = None) -> dict[s
 
 def save_cache(payload: dict[str, Any]) -> None:
     CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    CACHE_PATH.write_text(json.dumps(payload, indent=2, sort_keys=True))
+    CACHE_PATH.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
 def fetch_json_with_gh(endpoint: str) -> dict[str, Any] | list[Any] | None:
