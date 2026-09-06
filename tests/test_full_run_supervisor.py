@@ -8295,6 +8295,93 @@ class FullRunLifecycleTests(unittest.TestCase):
         self.assertNotIn("UNRELATED_SENTINEL", env)
         self.assertNotIn("HOME", env)
 
+    def test_supervision_canary_budget_scales_to_scan_cost(self) -> None:
+        self.assertEqual(full_run_module._supervision_canary_budget(0.05), 0.75)
+        self.assertEqual(full_run_module._supervision_canary_budget(0.4), 1.6)
+        self.assertEqual(full_run_module._supervision_canary_budget(3.0), 8.0)
+
+    def test_supervision_canary_absent_marker_does_not_retry(self) -> None:
+        captured = {"popen": 0}
+
+        class FakeProcess:
+            pid = 4242
+
+            def poll(self):
+                return None
+
+            def kill(self):
+                return None
+
+            def wait(self, timeout=None):
+                return -signal.SIGKILL
+
+        clock = {"now": 0.0}
+
+        def fake_popen(*args, **kwargs):
+            captured["popen"] += 1
+            return FakeProcess()
+
+        def fake_monotonic():
+            return clock["now"]
+
+        def fake_sleep(seconds):
+            clock["now"] += seconds
+
+        def fake_scan(executable, marker_value):
+            clock["now"] += 0.01
+            return set()
+
+        with (
+            mock.patch.object(full_run_module.subprocess, "Popen", side_effect=fake_popen),
+            mock.patch.object(full_run_module.time, "monotonic", side_effect=fake_monotonic),
+            mock.patch.object(full_run_module.time, "sleep", side_effect=fake_sleep),
+            mock.patch.object(full_run_module, "_scan_supervision_pids", side_effect=fake_scan),
+        ):
+            with self.assertRaises(ValidationIssue) as ctx:
+                full_run_module._run_supervision_canary(Path("/usr/bin/ps"))
+        self.assertEqual(ctx.exception.code, "full_run_supervision_canary_failed")
+        self.assertIn("absent", ctx.exception.message)
+        self.assertEqual(captured["popen"], 1)
+
+    def test_supervision_canary_retries_once_after_timeout(self) -> None:
+        captured = {"scans": 0}
+
+        class FakeProcess:
+            pid = 4242
+
+            def poll(self):
+                return None
+
+            def kill(self):
+                return None
+
+            def wait(self, timeout=None):
+                return -signal.SIGKILL
+
+        clock = {"now": 0.0}
+
+        def fake_monotonic():
+            return clock["now"]
+
+        def fake_sleep(seconds):
+            clock["now"] += seconds
+
+        def fake_scan(executable, marker_value):
+            captured["scans"] += 1
+            if captured["scans"] == 1:
+                clock["now"] += full_run_module.SUPERVISION_CANARY_CEILING_SECONDS
+                return set()
+            return {FakeProcess.pid}
+
+        with (
+            mock.patch.object(full_run_module.subprocess, "Popen", return_value=FakeProcess()),
+            mock.patch.object(full_run_module.time, "monotonic", side_effect=fake_monotonic),
+            mock.patch.object(full_run_module.time, "sleep", side_effect=fake_sleep),
+            mock.patch.object(full_run_module, "_scan_supervision_pids", side_effect=fake_scan),
+        ):
+            self.assertTrue(full_run_module._run_supervision_canary(Path("/usr/bin/ps")))
+        self.assertEqual(captured["scans"], 2)
+
     def test_embedded_supervisor_tracks_start_identity_and_uses_pidfd_on_linux(self) -> None:
         source = full_run_module._provider_supervisor_script()
         self.assertIn("known_identities", source)

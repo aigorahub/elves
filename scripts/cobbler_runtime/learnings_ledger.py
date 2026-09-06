@@ -91,6 +91,35 @@ def _lock_path(path: Path) -> Path:
     return path.with_name(f".{path.name}.lock")
 
 
+def _digest_span(lines: list[str]) -> tuple[int, int] | None:
+    """Return ``(begin, end)`` for the one valid digest pair, or ``None``.
+
+    aigorahub/elves#262: accept no markers, or exactly one begin followed later
+    by exactly one end. Nested, unmatched, unterminated, or reversed sequences
+    are refused before any scanner treats digest interiors as structure.
+    """
+
+    begins: list[int] = []
+    ends: list[int] = []
+    for index, line in enumerate(lines):
+        if line == DIGEST_BEGIN:
+            begins.append(index)
+        elif line == DIGEST_END:
+            ends.append(index)
+    if not begins and not ends:
+        return None
+    if len(begins) == 1 and len(ends) == 1 and begins[0] < ends[0]:
+        return (begins[0], ends[0])
+    raise LedgerError(
+        "learnings_digest_markers_invalid",
+        "digest markers must be absent or exactly one ordered begin/end pair",
+    )
+
+
+def _digest_interior(index: int, span: tuple[int, int] | None) -> bool:
+    return span is not None and span[0] < index < span[1]
+
+
 def parse_text(text: str) -> ParsedDoc:
     lines = text.split("\n")
     trailing_newline = text.endswith("\n")
@@ -100,15 +129,11 @@ def parse_text(text: str) -> ParsedDoc:
     sections: list[str] = []
     current_section = ""
     freehand = 0
-    in_digest = False
+    span = _digest_span(lines)
     for index, line in enumerate(lines):
-        if line == DIGEST_BEGIN:
-            in_digest = True
+        if line == DIGEST_BEGIN or line == DIGEST_END:
             continue
-        if line == DIGEST_END:
-            in_digest = False
-            continue
-        if in_digest:
+        if _digest_interior(index, span):
             # Digest lines mirror real entries; they are generated output,
             # never entries themselves.
             continue
@@ -176,21 +201,14 @@ def _body_index(lines: list[str], absolute: int) -> int:
     which is what makes rollback byte-identical for mid-section entries.
     """
 
+    span = _digest_span(lines)
     body = 0
-    in_digest = False
     for index, line in enumerate(lines):
         if index == absolute:
             return body
-        if line == DIGEST_BEGIN:
-            in_digest = True
-            body += 1
+        if _digest_interior(index, span):
             continue
-        if line == DIGEST_END:
-            in_digest = False
-            body += 1
-            continue
-        if not in_digest:
-            body += 1
+        body += 1
     return body
 
 
@@ -204,18 +222,14 @@ def _section_at(lines: list[str], index: int) -> str:
     restore.
     """
 
+    span = _digest_span(lines)
     section = ""
-    in_digest = False
     for position, line in enumerate(lines):
         if position >= index:
             break
-        if line == DIGEST_BEGIN:
-            in_digest = True
+        if line == DIGEST_BEGIN or line == DIGEST_END:
             continue
-        if line == DIGEST_END:
-            in_digest = False
-            continue
-        if in_digest:
+        if _digest_interior(position, span):
             continue
         heading = HEADING_RE.match(line)
         if heading:
@@ -224,21 +238,14 @@ def _section_at(lines: list[str], index: int) -> str:
 
 
 def _absolute_index(lines: list[str], body_target: int) -> int:
+    span = _digest_span(lines)
     body = 0
-    in_digest = False
     for index, line in enumerate(lines):
-        if not in_digest and body == body_target:
+        if not _digest_interior(index, span) and body == body_target:
             return index
-        if line == DIGEST_BEGIN:
-            in_digest = True
-            body += 1
+        if _digest_interior(index, span):
             continue
-        if line == DIGEST_END:
-            in_digest = False
-            body += 1
-            continue
-        if not in_digest:
-            body += 1
+        body += 1
     return len(lines)
 
 
@@ -325,18 +332,17 @@ def _section_insert_index(doc: ParsedDoc, section: str) -> int:
     section content, as they were before.
     """
 
+    span = _digest_span(doc.lines)
     in_section = False
-    in_digest = False
     heading_index = None
     last_content = None
     boundary = len(doc.lines)
     for index, line in enumerate(doc.lines):
         if line == DIGEST_BEGIN or line == DIGEST_END:
-            in_digest = line == DIGEST_BEGIN
             if in_section:
                 last_content = index
             continue
-        if in_digest:
+        if _digest_interior(index, span):
             continue
         heading = HEADING_RE.match(line)
         if heading:
@@ -379,13 +385,10 @@ def _atomic_write(path: Path, text: str) -> None:
 def _regenerate_digest(lines: list[str]) -> list[str]:
     """Regenerate the digest strictly between its markers, if present."""
 
-    try:
-        begin = lines.index(DIGEST_BEGIN)
-        end = lines.index(DIGEST_END)
-    except ValueError:
+    span = _digest_span(lines)
+    if span is None:
         return lines
-    if end < begin:
-        raise LedgerError("learnings_digest_markers_invalid", "digest end precedes begin")
+    begin, end = span
     doc = parse_text(_serialize(lines, True))
     active = [e for e in sorted(doc.entries.values(), key=lambda e: e.entry_id) if not e.retired]
     digest_lines = []
@@ -602,15 +605,13 @@ def apply_edits(
 def _remove_exact_line(lines: list[str], line: str, code: str) -> None:
     """Remove the first verbatim occurrence OUTSIDE the digest block."""
 
-    in_digest = False
+    span = _digest_span(lines)
     for index, candidate in enumerate(lines):
-        if candidate == DIGEST_BEGIN:
-            in_digest = True
+        if candidate == DIGEST_BEGIN or candidate == DIGEST_END:
             continue
-        if candidate == DIGEST_END:
-            in_digest = False
+        if _digest_interior(index, span):
             continue
-        if not in_digest and candidate == line:
+        if candidate == line:
             del lines[index]
             return
     raise LedgerError(
