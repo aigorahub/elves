@@ -143,8 +143,8 @@ section.
 - **Average batch time so far:** [Xm] _(update after each batch)_
 - **Batches remaining:** [N of M]
 - **Observed usage so far:** [totals from `cobbler_agents.py usage status`, or the literal
-  `unobserved`] _(observed transport reports only; observed ≠ billed; cache reads excluded from
-  ceilings; unknown is never a number)_
+  `unobserved`] _(filled only by `usage aggregate --records-file`; observed transport reports
+  only; observed ≠ billed; cache reads excluded from ceilings; unknown is never a number)_
 - **Usage ceiling (advisory):** [N tokens, or "none"] — crossing is a checkpoint and a
   notification, never a stop and never a routing input
 

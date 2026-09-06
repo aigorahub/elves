@@ -1,5 +1,5 @@
 ---
-version: "2.37.1"
+version: "2.37.2"
 ---
 
 # Elves: Codex repository adapter
@@ -35,7 +35,9 @@ Code, Codex, Grok Build, and Oh My Pi: invoke them as
 advisory instruments (never landing, merge, credential, or routing authority), there are **no
 per-host slash surfaces for them** — do not invent top-level Codex or Grok commands — and the
 workflow contracts that mandate them (SKILL.md worker-failure recovery, labor completeness,
-Skill Memory) apply to all four hosts unchanged. See the guide's "v2.24 run tools" section.
+Skill Memory) apply to all four hosts unchanged. Usage is filled only by
+`usage aggregate --records-file`; close and reconcile do not write `usage_observed`.
+See the guide's "v2.24 run tools" section.
 
 `review-route` joins them as a host-neutral helper on the same CLI surface and the same honesty
 boundary: it selects an available review route and records requested route, actual route, and

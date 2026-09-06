@@ -512,7 +512,7 @@
     <div class="masthead-inner">
       <div class="brand-row">
         <a class="wordmark" href="https://github.com/aigorahub/elves">Elves</a>
-        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.37.1 source and releases on GitHub</a>
+        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.37.2 source and releases on GitHub</a>
       </div>
       <h1>Using Elves</h1>
       <p class="intro">Plan with the main agent, hand implementation to a separate worker, then
@@ -1307,7 +1307,7 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" learnings validate --file 
 python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" learnings apply --file learnings.md --edits-file edits.json
 python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" learnings rollback --file learnings.md
 
-# Observed usage: morning cost visibility; unknown stays "unobserved", never zero
+# Observed usage: driver supplies the records file; close/reconcile do not fill it
 python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" usage aggregate --records-file usage.jsonl --session .elves-session.json
 
 # Salvage: bounded redacted tail of a dead worker's follow log (never a completion report)
@@ -1323,7 +1323,8 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" review-route --host claude
         </div>
 
         <p>Honesty boundaries: the re-drive guard fails toward <em>changed</em> (a fingerprint
-          error can never manufacture futility); usage ceilings are advisory checkpoints, never
+          error can never manufacture futility); usage is filled only by
+          <code>usage aggregate --records-file</code> and ceilings are advisory checkpoints, never
           stops and never routing inputs; salvage text is untrusted observed output; the
           continuity watchdog only writes templates — Elves never activates the timer, defaults
           to detect-and-report, and never resumes a terminal run; <code>review-route</code> selects
