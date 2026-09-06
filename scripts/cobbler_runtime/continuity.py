@@ -9,8 +9,9 @@ unverifiable run refuses byte-for-byte unchanged (v2.23 semantics), and only
 a genuinely resumable run proceeds. Default posture is **detect-and-report**
 (`--check` dry validation + notification); actually relaunching requires the
 explicit ``auto_resume`` opt-in in the config. Claim-before-act: a
-non-blocking flock makes overlapping timer fires safe, and missed fires
-coalesce because every fire is a stateless check.
+non-blocking flock makes overlapping timer fires safe. A coalesced or
+delayed OS timer is still a full check because every fire is stateless;
+launchd StartInterval coalescing after sleep has not been live-trialed.
 
 Design adapted, with attribution and without vendored code, from
 prime-agent's daemon continuity and claim-before-deliver scheduling (MIT).

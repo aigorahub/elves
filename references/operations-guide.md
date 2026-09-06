@@ -15,12 +15,13 @@ writes the watchdog config plus launchd/systemd user-timer **templates** and pri
 activation commands — Elves never runs `launchctl` or `systemctl` and activates nothing itself;
 the OS owns the timer. Default posture is detect-and-report (`--check` + notification);
 relaunching requires the explicit `--auto-resume` opt-in. Every fire is a stateless
-claim-before-act check (overlapping fires are single-flight; missed fires coalesce), and every
-safety decision belongs to `full-run-prepare --resume`: a possibly-live run refuses, and the
-watchdog **never resumes a terminal run** — terminal or unverifiable event logs refuse
-byte-for-byte unchanged (v2.23 semantics). It holds no landing, merge, or credential authority,
-and cannot revive host-native driver sessions (those need the recovery read order in a fresh
-session). `continuity status|remove` manage it; removal is idempotent.
+claim-before-act check (overlapping fires are single-flight). A coalesced or delayed OS
+timer is still a full check; launchd `StartInterval` coalescing after sleep has not been
+live-trialed. Every safety decision belongs to `full-run-prepare --resume`: a possibly-live
+run refuses, and the watchdog **never resumes a terminal run** — terminal or unverifiable
+event logs refuse byte-for-byte unchanged (v2.23 semantics). It holds no landing, merge, or
+credential authority, and cannot revive host-native driver sessions (those need the recovery
+read order in a fresh session). `continuity status|remove` manage it; removal is idempotent.
 
 ### macOS
 
