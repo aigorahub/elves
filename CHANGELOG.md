@@ -4,12 +4,6 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
-### Changed
-
-- Continuity watchdog docs no longer treat launchd `StartInterval` coalescing
-  after sleep as observed fact. Fires stay stateless and single-flight; the
-  coalesce behavior has not been live-trialed (`#246`).
-
 ## [2.37.1] - 2026-09-05
 
 ### Fixed
