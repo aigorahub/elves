@@ -115,8 +115,10 @@ the working directory, on every host. No per-host slash aliases exist for them a
 be invented; Grok Build reaches them through natural language or direct CLI exactly like the
 other hosts. Their honesty boundaries are host-invariant: advisory-only signals, never landing,
 merge, credential, or routing authority; the continuity watchdog never activates OS timers on
-any host; `HostProfile.reports_usage` records each transport's usage surface honestly, with
-absence staying the literal `unobserved` everywhere.
+any host; `HostProfile.reports_usage` names each transport's usage surface as
+capability metadata, not an extractor. The ledger is filled only by
+`usage aggregate --records-file`; a transport without extracted reports stays
+the literal `unobserved` everywhere.
 
 ## Do not confuse
 

@@ -48,7 +48,10 @@ when a delegable session lacks the recorded path. Host-native runs legitimately 
 ## Observed usage (optional, additive)
 
 A session may carry a `usage_observed` block written by
-`cobbler_agents.py usage aggregate --records-file <observations.jsonl> --session <path>`:
+`cobbler_agents.py usage aggregate --records-file <observations.jsonl> --session <path>`.
+Native-worker close and full-run reconcile do not write this block. The driver
+supplies the records file. Absent or empty records stay `unobserved`.
+`HostProfile.reports_usage` is capability metadata, not an extractor.
 
 ```json
 {

@@ -4,6 +4,17 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.37.2] - 2026-09-06
+
+### Changed
+
+- Observed-usage stays a driver CLI (`usage aggregate --records-file`). Close
+  and reconcile do not write the session block, calibration row, or report
+  panel. Claude and Codex extractors are not invented. Unknown stays the
+  literal `unobserved` (`#243`).
+- Continuity watchdog docs no longer treat launchd `StartInterval` coalescing
+  after sleep as observed fact (`#246`).
+
 ## [2.37.1] - 2026-09-05
 
 ### Fixed

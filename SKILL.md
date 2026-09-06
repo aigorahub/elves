@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Grok Build, Oh My Pi (omp), Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.37.1"
+  version: "2.37.2"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -84,7 +84,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.37.1):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.37.2):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
@@ -916,7 +916,8 @@ Code, Codex, Grok Build, and Oh My Pi. Invoke as
 `python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" <verb> …` from any host; do **not** invent
 per-host slash surfaces for them. They are advisory instruments (never landing, merge,
 credential, or routing authority). Continuity only writes OS timer templates — Elves never
-activates them. Usage ceilings are checkpoints, never stops. See the guide's "v2.24 run tools"
+activates them. Usage is filled only by `usage aggregate --records-file`; close and reconcile
+do not write `usage_observed`. Usage ceilings are checkpoints, never stops. See the guide's "v2.24 run tools"
 section, `references/host-parity.md`, and `AGENTS.md` (Codex adapter pointer).
 
 `review-route` joins them as a host-neutral helper on the same CLI surface and the same honesty
