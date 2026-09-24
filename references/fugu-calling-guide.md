@@ -133,7 +133,8 @@ true wall-clock bound, not an idle timeout, so a run that keeps emitting heartbe
 bounded (see the "Wall limits here are wall limits" note in `provider-shortcuts.md`).
 
 Use `--preflight` to validate launcher, profile, wall, read-only policy, and `--include`
-paths and print the launch plan without calling the provider. Cheap way to confirm the call
+paths and print the launch plan without calling the provider. The plan names the
+catalog-resolved Ultra or Max model. Cheap way to confirm the call
 is shaped the way you meant before spending a budget on it.
 
 ## 4. Write the prompt against the budget

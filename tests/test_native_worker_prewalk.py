@@ -21,6 +21,7 @@ SCRIPTS = REPO_ROOT / "scripts"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
+from cobbler_runtime.worker_routing import GROK_WORKER_MODEL  # noqa: E402
 from cobbler_runtime.prewalk import (  # noqa: E402
     GROK_PREWALK_QUALIFICATION_ARTIFACT_TYPE,
     PREWALK_CONTINUATION_INPUT,
@@ -954,7 +955,7 @@ def write_grok_qualification_artifact(
         "installed_build_commit": "c1b5909ec707",
         "session_id": GOLDEN_GROK_SESSION,
         "guide_route": {"model": "guide-model", "effort": "high"},
-        "execution_route": {"model": "grok-4.5", "effort": "high"},
+        "execution_route": {"model": GROK_WORKER_MODEL, "effort": "high"},
         "create_exit_code": 0,
         "resume_exit_code": 0,
         "same_session_id": True,
@@ -1000,14 +1001,14 @@ class GrokPrewalkQualificationLoaderTests(unittest.TestCase):
         self.assertEqual(capabilities.qualified_guide_model, "guide-model")
         self.assertEqual(capabilities.qualified_guide_effort, "high")
         self.assertEqual(
-            capabilities.qualified_execution_model, "grok-4.5"
+            capabilities.qualified_execution_model, GROK_WORKER_MODEL
         )
         self.assertEqual(capabilities.qualified_execution_effort, "high")
         self.assertTrue(
             capabilities.route_matches(
                 guide_model="guide-model",
                 guide_effort="high",
-                execution_model="grok-4.5",
+                execution_model=GROK_WORKER_MODEL,
                 execution_effort="high",
             )
         )
@@ -1015,7 +1016,7 @@ class GrokPrewalkQualificationLoaderTests(unittest.TestCase):
             capabilities.route_matches(
                 guide_model="other-guide",
                 guide_effort="high",
-                execution_model="grok-4.5",
+                execution_model=GROK_WORKER_MODEL,
                 execution_effort="high",
             )
         )

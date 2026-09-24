@@ -1404,6 +1404,59 @@ class LocalCliRunnerTests(unittest.TestCase):
         self.assertEqual(both.returncode, 2, both.stdout)
         self.assertIn("choose only one Fugu profile", both.stderr)
 
+    def test_fugu_preflight_reports_the_resolved_ultra_model(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            self.make_fugu_capture_fake(bin_dir)
+            self.make_fake(bin_dir, "codex")
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            codex_home = root / "codexhome"
+            codex_home.mkdir()
+            (codex_home / "fugu.json").write_text(
+                json.dumps(
+                    {
+                        "models": [
+                            {
+                                "slug": "fugu-ultra-v2.0",
+                                "supported_reasoning_levels": [
+                                    {"effort": "high"},
+                                    {"effort": "xhigh"},
+                                ],
+                            },
+                            {
+                                "slug": "fugu-ultra-v1.1",
+                                "supported_reasoning_levels": [
+                                    {"effort": "high"},
+                                    {"effort": "xhigh"},
+                                    {"effort": "max"},
+                                ],
+                            },
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            env = {
+                "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                "SAKANA_API_KEY": "test-sakana-key",
+                "CODEX_HOME": str(codex_home),
+            }
+            ultra = run_script(
+                "run_fugu.sh", "--ultra", "--preflight", "review parser", env=env, cwd=repo
+            )
+            maxed = run_script(
+                "run_fugu.sh", "--max", "--preflight", "review parser", env=env, cwd=repo
+            )
+        self.assertEqual(ultra.returncode, 0, ultra.stderr)
+        self.assertIn("model/effort: fugu-ultra-v2.0/high", ultra.stdout)
+        self.assertNotIn("arg=<", ultra.stdout)
+        self.assertEqual(maxed.returncode, 0, maxed.stderr)
+        self.assertIn("model/effort: fugu-ultra-v1.1/max", maxed.stdout)
+
     @unittest.skipUnless(HAS_FS_SANDBOX, "qualified filesystem sandbox unavailable")
     def test_fugu_ultra_selects_the_ultra_slug_the_installed_catalog_publishes(self) -> None:
         # Sakana renamed the ultra slug to `fugu-ultra-v1.1` and older bundles ship
