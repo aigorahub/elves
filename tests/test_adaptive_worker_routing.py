@@ -48,6 +48,8 @@ from cobbler_runtime.worker_routing import (  # noqa: E402
     GROK_COMPLEX_MODEL,
     GROK_RETIRED_COMPOSER_MODEL,
     GROK_WORKER_MODEL,
+    GROK_WORKER_PREFERENCE,
+    select_preferred_grok_worker_model,
     GrokCapabilityEvidence,
     GrokCapabilities,
     decide_worker_route,
@@ -389,6 +391,30 @@ class RouteDecisionMatrixTests(unittest.TestCase):
         self.assertEqual(
             explicit_effort.provenance["worker_effort"],
             "explicit_run_intent",
+        )
+
+    def test_grok_preference_walks_current_catalog(self) -> None:
+        self.assertEqual(GROK_WORKER_PREFERENCE, ("grok-4.7", "grok-4.6", "grok-4.5"))
+
+        def choose(models: tuple[str, ...], default: str | None) -> str | None:
+            return select_preferred_grok_worker_model(
+                GrokCapabilities(
+                    installed=True,
+                    authenticated=True,
+                    models=models,
+                    default_model=default,
+                )
+            )
+
+        self.assertEqual(
+            choose(("grok-4.7-build-fast", "grok-4.7", "grok-4.6", "grok-4.5"), "grok-4.7-build-fast"),
+            "grok-4.7",
+        )
+        self.assertEqual(choose(("grok-4.6", "grok-4.5"), "grok-4.6"), "grok-4.6")
+        self.assertEqual(choose(("grok-4.5",), "grok-4.5"), "grok-4.5")
+        self.assertEqual(
+            choose(("grok-4.7-build-fast",), "grok-4.7-build-fast"),
+            "grok-4.7-build-fast",
         )
 
     def test_unavailable_and_repo_prohibited_fall_back_honestly(self) -> None:

@@ -88,7 +88,8 @@ assume `./scripts` belongs to the target repository and do not execute mappings 
   best-effort and non-authoritative. No Linux procfs is mounted; only a synthetic `/proc/self/exe`
   link to the qualified real Codex binary is exposed. Codex external-sandbox mode runs
   inside the mandatory outer boundary. Profiles remain `fugu/high`, `fugu/xhigh` for `--deep`,
-  `fugu-cyber/xhigh` for `--cyber`, `fugu-ultra-v1.1/high` for `--ultra`, and
+  `fugu-cyber/xhigh` for `--cyber`, `fugu-ultra-v2.0/high` for `--ultra`
+  (then `fugu-ultra`, then `fugu-ultra-v1.1`), and
   `fugu-ultra-v1.1/max` for `--max` (60-minute default
   wall budget, one narrow high-stakes gate); Ultra uses exact-session staged synthesis and bounded incremental
   event parsing through a host-owned pipe, pins final output to a no-follow descriptor, and runs a

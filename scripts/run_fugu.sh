@@ -16,9 +16,11 @@ Profiles:
   default   fugu at high effort (10m wall) — prefer this first
   --deep    fugu at xhigh effort (20m wall)
   --cyber   fugu-cyber at xhigh effort for read-only security review (20m)
-  --ultra   fugu-ultra-v1.1 at high effort with exact-session synthesis (30m)
-  --max     fugu-ultra-v1.1 at max effort with exact-session synthesis and a
-            long wall budget (60m), for one narrow high-stakes gate
+  --ultra   Fugu Ultra v2 (fugu-ultra-v2.0, else fugu-ultra, else
+            fugu-ultra-v1.1) at high effort with exact-session synthesis (30m)
+  --max     effort max on the first preferred ultra slug that lists it,
+            otherwise the same ultra preference, with exact-session synthesis
+            and a long wall budget (60m), for one narrow high-stakes gate
 
 Modes:
   task      The default. Follow the requested task without a review-only rubric.

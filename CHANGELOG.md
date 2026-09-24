@@ -4,6 +4,11 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- Permitted Grok workers prefer `grok-4.7` at `high`, then `grok-4.6`, then `grok-4.5`. The CLI default `grok-4.7-build-fast` stays a speed route. Native delegation examples now name GPT-6 Astra (`gpt-6-astra`), Fable 5.1 (`claude-fable-5-1`), and Opus 5.5 (`claude-opus-5-5`). GPT-5.6 remains a same-model lower-effort route while that catalog row is listed.
+- `--ultra` prefers `fugu-ultra-v2.0`, then `fugu-ultra`, then `fugu-ultra-v1.1`. `--max` stays on the first preferred ultra slug that lists effort `max`. That is still `fugu-ultra-v1.1` on catalogs that have not published `max` for v2. `--max` does not select the Fugu Max model `fugu-max`. `fugu-ultra-v1.0` is never selected. Plain `fugu/high` remains the default.
+
 ## [2.37.2] - 2026-09-06
 
 ### Changed

@@ -1338,7 +1338,7 @@ def humanize_grok_failure(
     if re.search(r"model .+ not found|unknown model|invalid model", blob, re.I):
         return (
             "Grok rejected the model id. Use a valid live-catalog model "
-            "(e.g. `grok-4.5`) or omit --model for the preferred worker default."
+            "(e.g. `grok-4.7`) or omit --model for the preferred worker default."
         )
 
     first_useful = None
@@ -2083,7 +2083,7 @@ def launch_payload(
                     raise ValidationIssue(
                         "grok_model_retired",
                         f"Grok model `{GROK_RETIRED_COMPOSER_MODEL}` is retired; "
-                        "use grok-4.5 when the live catalog offers it",
+                        "use grok-4.7 when the live catalog offers it",
                     )
                 raise ValidationIssue(
                     "grok_model_not_in_live_catalog",
@@ -2093,7 +2093,7 @@ def launch_payload(
         elif requested == GROK_RETIRED_COMPOSER_MODEL:
             raise ValidationIssue(
                 "grok_model_retired",
-                f"Grok model `{requested}` is retired; use grok-4.5",
+                f"Grok model `{requested}` is retired; use grok-4.7",
             )
         elif requested not in capabilities.models:
             raise ValidationIssue(

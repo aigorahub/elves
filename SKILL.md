@@ -40,7 +40,7 @@ check. OMP prewalk accepts `xhigh` and `max` and passes them unchanged to `omp -
 never spends on qualification, but it reuses successful cached proof.
 
 Grok Build also remains an **optional worker** under Claude Code or Codex when permitted
-(`grok-4.5` at `high` when the live catalog offers it). Grok host and worker prewalk use the same
+(`grok-4.7` at `high` when the live catalog offers it, then `grok-4.6`, then `grok-4.5`). Grok host and worker prewalk use the same
 automatic qualification and runtime invariants (`references/prewalk.md`).
 
 Managed install targets are `~/.claude/skills/elves`, `~/.codex/skills/elves`,
@@ -56,10 +56,11 @@ never a squash.
 
 **Default user path: one kickoff.** Ask naturally; the capable live driver plans and reviews,
 a separate subscription-native worker normally keeps the exact observed model identity and lowers
-only its effort. The named delegation defaults are: GPT-5.6 at `xhigh`/extra-high/`ultra` → the
+only its effort. The named delegation defaults are: GPT-6 Astra at `ultra`/`max`/`xhigh` → the
+same GPT-6 Astra model at `medium`; GPT-5.6 at `xhigh`/extra-high/`ultra` → the
 same GPT-5.6 model at `medium`; GPT-4.8 Max/UltraCode → the same GPT-4.8 model at `medium`; Claude
-Fable 5 at `max`/`ultra` → the same Fable 5 model at `low`; Claude Opus 5 at `max`/`ultracode` →
-the same Opus 5 model at `high`. Native delegation stays inside one model family and lowers effort
+Fable 5.1 at `max`/`ultra` → the same Fable 5.1 model at `low`; Claude Opus 5.5 at `max`/`ultracode` →
+the same Opus 5.5 model at `high`. Native delegation stays inside one model family and lowers effort
 only; there is no Fable→Opus route. Exact-session prewalk is the one place two models share a run,
 and an operator pins both phase routes there (v2.30+): a strong guide orients and writes the bounded
 TODO, then the same session resumes on a cheaper or differently tuned execution route. Elves stores
@@ -68,7 +69,7 @@ usable at a reasoning level when the installed host publishes that level for tha
 models and new reasoning levels need no Elves edit. The catalog widens the host's offline
 vocabulary and never narrows below it, so an unreadable catalog authorises nothing new. Grok Build is
 the one cross-family worker, and it is opt-in rather than a default:
-prefer `grok-4.5` at explicit `high` when the authenticated live catalog returns it.
+prefer `grok-4.7` at explicit `high` when the authenticated live catalog returns it, then `grok-4.6`, then `grok-4.5`. The CLI default `grok-4.7-build-fast` is not this worker preference.
 Composer 2.5 is retired and is never selected. Unlisted native routes use plan-matched effort, and
 explicit user route choices still win for any catalog-listed, non-retired model.
 Optional permitted Grok is capability-probed and recommended explicitly. The user makes at most one
@@ -222,7 +223,7 @@ separate native worker lifecycle is unavailable.
 Optional Grok Build is selected only when available **and permitted**. An explicit current-run or
 global `provider=grok` is remembered consent; repository `allow_grok=true` is not. Repository
 `allow_grok=false` remains an absolute veto. Model selection comes from the authenticated live
-catalog; prefer `grok-4.5` when present. An explicit model is valid only when that catalog returns
+catalog; prefer `grok-4.7` when present, then `grok-4.6`, then `grok-4.5`. An explicit model is valid only when that catalog returns
 it. Composer 2.5 (`grok-composer-2.5-fast`) is retired and is never selected. Installed-binary
 capability evidence is launch authority. Provider qualification is independent from `/goal`:
 behaviorally proven headless goal mode is an enhancement, while an unavailable goal capability uses
@@ -289,10 +290,11 @@ required capability, then execute it without an extra confirmation prompt:
   closed on other traversal errors. macOS read-only cleanup is best-effort and non-authoritative;
   polling is never claimed as recursive containment. The default runner profile is regular
   `fugu/high` when the host intentionally selects plain; `--deep` selects `fugu/xhigh`; `--cyber` selects `fugu-cyber/xhigh` for read-only security review after an exact installed-catalog check; and
-  `--ultra` selects `fugu-ultra-v1.1/high`, resolved against the installed catalog so a legacy
-  bundle publishing only the `fugu-ultra` alias still launches and `fugu-ultra-v1.0` is never
-  substituted. `--max` selects `fugu-ultra-v1.1/max` with a 60-minute default wall budget for one
-  narrow high-stakes gate; profiles are mutually exclusive.
+  `--ultra` selects `fugu-ultra-v2.0/high` when that slug is listed, then `fugu-ultra/high`, then
+  `fugu-ultra-v1.1/high`. `fugu-ultra-v1.0` is never substituted. `--max` selects effort `max` on
+  the first of those slugs that lists it, which remains `fugu-ultra-v1.1/max` until a newer catalog
+  row lists `max`, with a 60-minute default wall budget for one narrow high-stakes gate. `--max` is
+  not the Fugu Max model (`fugu-max`). Profiles are mutually exclusive.
   Regular and deep are ephemeral one-shot sessions. Ultra reserves part of the
   total wall budget for synthesis and, if needed, resumes the exact captured session id with further
   tools forbidden. It never guesses a “last” session; raw events are parsed incrementally under a

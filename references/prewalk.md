@@ -131,11 +131,12 @@ repository. Fugu is an external provider on that route and stays `off` under `au
 every unqualified provider. An explicit required-mode canary must prove the exact serving gateway
 and route before use; Claude-shaped CLI syntax alone is never enough. Whenever a Fugu route is
 pinned, for either phase or for an ordinary worker, name a current catalog slug: `fugu`,
-`fugu-ultra-v1.1`, or `fugu-cyber`
+`fugu-ultra-v2.0`, `fugu-ultra-v1.1`, `fugu-max`, or `fugu-cyber`
 on the `codex-fugu` lane, and the `[1m]` tier names on the Claude Code-compatible interface. Prefer
-the exact versioned `fugu-ultra-v1.1` over the floating `fugu-ultra` alias: a route recorded in a
+the exact versioned `fugu-ultra-v2.0` over the floating `fugu-ultra` alias: a route recorded in a
 qualification artifact has to keep meaning one model, and an alias that follows the vendor's latest
-ultra release does not.
+ultra release does not. `fugu-ultra-v1.1` is the previous Ultra. `fugu-max` is Fugu Max, not the
+`--max` effort lane.
 
 Configure or inspect the preference from the active Elves skill root:
 

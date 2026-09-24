@@ -767,7 +767,7 @@ python3 ~/.omp/agent/skills/elves/scripts/install_doctor.py --startup</code></pr
             <code>fugu/high</code> when the host chooses plain,
             <code>fugu/xhigh</code> with
             <code>--deep</code>, <code>fugu-cyber/xhigh</code> with
-            <code>--cyber</code>, <code>fugu-ultra-v1.1/high</code> with
+            <code>--cyber</code>, <code>fugu-ultra-v2.0/high</code> with
             <code>--ultra</code>, or <code>fugu-ultra-v1.1/max</code> with <code>--max</code> for
             one narrow high-stakes gate on a 60-minute budget. Plain regular Fugu is the default.
             The host may select Cyber only for explicit security review or threat-model intent
@@ -971,9 +971,10 @@ python3 ~/.omp/agent/skills/elves/scripts/install_doctor.py --startup</code></pr
             </tr>
             <tr>
               <td data-label="Situation">Grok Build is available and allowed</td>
-              <td data-label="Usual choice"><code>grok-4.5</code> at <code>high</code></td>
-              <td data-label="Why">Composer 2.5 is retired. Elves prefers <code>grok-4.5</code> when
-                the live catalog returns it and requests Grok's highest supported effort.</td>
+              <td data-label="Usual choice"><code>grok-4.7</code> at <code>high</code></td>
+              <td data-label="Why">Composer 2.5 is retired. Elves prefers <code>grok-4.7</code> when
+                the live catalog returns it, then <code>grok-4.6</code>, then <code>grok-4.5</code>,
+                and requests Grok's highest supported effort.</td>
             </tr>
             <tr>
               <td data-label="Situation">The implementation is genuinely complex</td>
@@ -998,18 +999,20 @@ python3 ~/.omp/agent/skills/elves/scripts/install_doctor.py --startup</code></pr
           </tbody>
         </table>
 
-        <p>“Inherit” means the exact same model, with only effort lowered: GPT-5.6
+        <p>“Inherit” means the exact same model, with only effort lowered: GPT-6 Astra
+          <code>ultra</code>/<code>max</code>/<code>xhigh</code> → GPT-6 Astra <code>medium</code>;
+          GPT-5.6
           <code>xhigh</code>/extra-high/<code>ultra</code> → GPT-5.6 <code>medium</code>;
-          GPT-4.8 Max/UltraCode → GPT-4.8 <code>medium</code>; Fable 5
-          <code>max</code>/<code>ultra</code> → Fable 5 <code>low</code>; Opus 5
-          <code>max</code>/<code>ultracode</code> → Opus 5 <code>high</code>. Native delegation
+          GPT-4.8 Max/UltraCode → GPT-4.8 <code>medium</code>; Fable 5.1
+          <code>max</code>/<code>ultra</code> → Fable 5.1 <code>low</code>; Opus 5.5
+          <code>max</code>/<code>ultracode</code> → Opus 5.5 <code>high</code>. Native delegation
           stays inside one model family, so a Fable driver hands off to
-          <code>claude-fable-5</code> at <code>low</code> instead of routing to Opus.
+          <code>claude-fable-5-1</code> at <code>low</code> instead of routing to Opus.
           Unlisted native routes remain plan-matched. The live driver is not
           downgraded. Devin CLI, Oh My Pi (<code>omp-cli</code>), and other configured adapters remain optional routes, not required setup.
           Grok provider availability is independent from goal support: proven headless
           <code>/goal</code> is an enhancement, and a compatible one-packet prompt is the recorded
-          fallback. Permitted Grok workers use <code>grok-4.5</code> at explicit <code>high</code>
+          fallback. Permitted Grok workers use <code>grok-4.7</code> at explicit <code>high</code>
           when the live catalog offers it. Composer 2.5 is retired and is never selected.</p>
 
         <h3>Machine-check a cold handoff when needed</h3>

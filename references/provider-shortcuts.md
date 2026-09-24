@@ -86,8 +86,8 @@ A successful `bwrap` probe does not make that separate council boundary ready.
   | plain profile (host may choose after routing) | `fugu` / `high` | 10 minutes | routine planning or explicit review |
   | `--deep` | `fugu` / `xhigh` | 20 minutes | harder planning, analysis, or review |
   | `--cyber` | `fugu-cyber` / `xhigh` | 20 minutes | read-only security review or threat model |
-  | `--ultra` | `fugu-ultra-v1.1` / `high` | 30 minutes total; at most 20 minutes exploring by default | compact high-stakes task with a reserved synthesis phase |
-  | `--max` | `fugu-ultra-v1.1` / `max` | 60 minutes total; at most 20 minutes exploring by default | one narrow, high-stakes gate worth the deepest reasoning tier |
+  | `--ultra` | `fugu-ultra-v2.0` / `high` when listed, else `fugu-ultra`, else `fugu-ultra-v1.1` / `high` | 30 minutes total; at most 20 minutes exploring by default | compact high-stakes task with a reserved synthesis phase |
+  | `--max` | `fugu-ultra-v1.1` / `max` until a preferred ultra row lists effort `max` | 60 minutes total; at most 20 minutes exploring by default | one narrow, high-stakes gate worth the deepest reasoning tier |
 
   This table is the **runner flag → model/effort map**. Plain regular Fugu is the default for a
   flagless call. The host may select `--cyber` only when the user asks for a security review or
@@ -98,19 +98,17 @@ A successful `bwrap` probe does not make that separate council boundary ready.
   when the user says "use Fugu"** below. The runner does not score complexity; it only executes
   the selected profile.
 
-  Sakana's Fugu-Ultra v1.1 release (2026-07-24) ships at the same price as v1.0 and changes two
-  facts the shortcut depends on. The published catalog slug is now `fugu-ultra-v1.1`, and plain
-  `fugu-ultra` — the only ultra slug older bundles listed — survives just as an accepted API alias.
-  Because the runner hands the installed `fugu.json` to the isolated launcher, the `--ultra` lane
-  resolves its model against that catalog instead of hard-coding one spelling: it prefers
-  `fugu-ultra-v1.1`, accepts the equivalent `fugu-ultra` alias when a legacy bundle publishes only
-  that, and otherwise keeps `fugu-ultra-v1.1` so the provider stays authoritative over its own
-  aliases. `fugu-ultra-v1.0` is deliberately never selected — it is a different model, and silently
-  running it would misreport the lane. And `max` is a genuinely distinct third effort level **on
-  `fugu-ultra-v1.1` only** — `fugu`,
-  `fugu-ultra-v1.0`, and `fugu-cyber` still accept `max` purely as a compatibility alias that maps
-  to `xhigh`. `--deep` therefore keeps naming `xhigh` explicitly. A general invocation with no task
-  is rejected; use `review` with no scope to review the current repository changes.
+  Sakana's 2026-09-11 release adds Fugu Ultra v2 and Fugu Max. The Ultra v2 catalog slug is
+  `fugu-ultra-v2.0`. Plain `fugu-ultra` now defaults to that v2 model. `fugu-max` defaults to
+  `fugu-max-v1.0`. Fugu Max is a separate cost-performance model. The `--max` flag does not select
+  it. Because the runner hands the installed `fugu.json` to the isolated launcher, the `--ultra`
+  lane resolves its model against that catalog: it prefers `fugu-ultra-v2.0`, then the `fugu-ultra`
+  alias, then `fugu-ultra-v1.1` when the installed file has not published v2. `fugu-ultra-v1.0` is
+  never selected. It is a different model. The public API treats effort `max` as an alias of
+  `xhigh`. The Codex catalog still lists `max` as its own level only on some rows. `--max` therefore
+  stays on the first preferred ultra slug that lists `max`. On a pre-v2 catalog that remains
+  `fugu-ultra-v1.1` / `max`. `--deep` keeps naming `xhigh` explicitly. A general invocation with no
+  task is rejected; use `review` with no scope to review the current repository changes.
 
   **The `--max` lane.** v2.16.0 documented v1.1's third effort level but deliberately exposed no
   lane for it, on the reasoning that `--ultra`'s value is its reserved exact-session synthesis
@@ -118,17 +116,17 @@ A successful `bwrap` probe does not make that separate council boundary ready.
   Field use since then argues the other way: `fugu-ultra` at `max` is worth the wall time for a
   single narrow, high-stakes gate — a proof step, a security-sensitive review, a decision that has
   to be right the first time — provided the prompt is narrow and the timeout is long. `--max`
-  therefore keeps everything that makes `--ultra` useful (the same versioned model, catalog
-  resolution, the reserved synthesis phase, the same context and audit rules) and changes only the
-  effort level and the default wall budget, which doubles to 60 minutes. It is deliberately not the
+  therefore keeps the reserved synthesis phase, the catalog resolution, and the same context and
+  audit rules, and changes the effort level and the default wall budget, which doubles to 60
+  minutes. It is not the
   default for anything: at this tier the useful question is whether one specific answer is worth an
   hour, and a broad task is the wrong shape for it. Profiles remain mutually exclusive, so
   `--ultra --max` is rejected rather than silently resolved.
 
-  Because `max` is real only on `fugu-ultra-v1.1`, a legacy bundle whose catalog publishes only the
-  floating `fugu-ultra` alias will have the provider map `max` down to `xhigh`. That is the
-  provider's documented compatibility behavior, not a silent Elves downgrade, and the lane still
-  reports the effort it asked for.
+  When the installed catalog lists `max` only on `fugu-ultra-v1.1`, `--max` stays on that slug. A
+  catalog that lists `max` on `fugu-ultra-v2.0` or `fugu-ultra` uses that newer slug. A catalog
+  that lists no `max` level still asks for `max` on the preferred ultra slug. Sakana documents
+  `max` as an alias of `xhigh` on the public API. The lane still reports the effort it asked for.
 
   **Wall limits here are wall limits.** Sakana tooling elsewhere exposes a `--stream` timeout that
   is an idle/SSE timeout rather than a wall-clock bound, so a Max or Ultra call that keeps emitting
@@ -141,7 +139,7 @@ A successful `bwrap` probe does not make that separate council boundary ready.
   endpoints and a `claude-fugu` launcher alongside `codex-fugu`. Claude Code points at it through
   `ANTHROPIC_BASE_URL="https://api.sakana.ai"` plus `ANTHROPIC_AUTH_TOKEN` (a `fish_…` bearer
   token, **not** `ANTHROPIC_API_KEY`), and maps Anthropic tiers onto Fugu models:
-  `ANTHROPIC_DEFAULT_OPUS_MODEL="fugu-ultra[1m]"`, `ANTHROPIC_DEFAULT_SONNET_MODEL="fugu[1m]"`,
+  `ANTHROPIC_DEFAULT_OPUS_MODEL="fugu-ultra-v2.0[1m]"`, `ANTHROPIC_DEFAULT_SONNET_MODEL="fugu[1m]"`,
   `ANTHROPIC_DEFAULT_HAIKU_MODEL="fugu[1m]"`, the access-gated
   `ANTHROPIC_DEFAULT_FABLE_MODEL="fugu-cyber[1m]"`, and `CLAUDE_CODE_SUBAGENT_MODEL="fugu[1m]"`.
   The `[1m]` suffix is that interface's 1M-context model naming and belongs only there; the
@@ -197,7 +195,7 @@ State one short `Fugu route: …` line before every launch.
    | Default for almost everything; first paid call; narrow Q&A that finishes inside the wall | plain (no flag) | `fugu` / `high` | 10m | killed; **nothing returned** |
    | After plain failed or returned a thin answer; multi-module planning that needs xhigh effort | `--deep` | `fugu` / `xhigh` | 20m | killed; **nothing returned** |
    | Explicit security review or threat model | `--cyber` | `fugu-cyber` / `xhigh` | 20m | killed; **nothing returned** |
-   | User explicitly asks for Ultra | `--ultra` | `fugu-ultra-v1.1` / `high` | 30m | synthesis phase still runs |
+   | User explicitly asks for Ultra | `--ultra` | `fugu-ultra-v2.0` / `high` | 30m | synthesis phase still runs |
    | User explicitly asks for Max | `--max` | `fugu-ultra-v1.1` / `max` | 60m | synthesis phase still runs |
 
    **Hard rules.** Explicit user flags always win. Only the host-selected Cyber exception may
@@ -211,8 +209,9 @@ State one short `Fugu route: …` line before every launch.
    Sakana/Codex operator notes, and Elves dogfood): Ultra/Max often take 20–60+ minutes and hit
    subscription limits mid-flight when prompts are open-ended; keep those lanes narrow. Day-1
    mistake: do not crank effort to max for everything. The host cannot pick an arbitrary model
-   slug: the profile table is the map; Ultra/max resolve `fugu-ultra-v1.1` from the installed
-   catalog (never silent `fugu-ultra-v1.0`).
+   slug: the profile table is the map; Ultra resolves `fugu-ultra-v2.0` from the installed
+   catalog when listed (never silent `fugu-ultra-v1.0`). Max stays on the ultra row that lists
+   effort `max`.
 
 4. **Write mode.** Fugu is limited to planning and read-only review. The runner rejects `--write`.
 

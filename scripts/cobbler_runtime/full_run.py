@@ -4910,7 +4910,7 @@ def launch_full_run(
                         raise ValidationIssue(
                             "grok_model_retired",
                             f"Grok model `{GROK_RETIRED_COMPOSER_MODEL}` is retired; "
-                            "use grok-4.5 when the live catalog offers it",
+                            "use grok-4.7 when the live catalog offers it",
                         )
                     raise ValidationIssue(
                         "grok_live_default_model_unavailable",
@@ -4920,7 +4920,7 @@ def launch_full_run(
             elif requested_model == GROK_RETIRED_COMPOSER_MODEL:
                 raise ValidationIssue(
                     "grok_model_retired",
-                    f"Grok model `{requested_model}` is retired; use grok-4.5",
+                    f"Grok model `{requested_model}` is retired; use grok-4.7",
                 )
             elif requested_model not in grok_capabilities.models:
                 raise ValidationIssue(

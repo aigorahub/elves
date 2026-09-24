@@ -96,8 +96,8 @@ not the one the names suggest.
 | plain | `fugu` / high | 600s | killed, **nothing returned** |
 | `--deep` | `fugu` / xhigh | 1200s | killed, **nothing returned** |
 | `--cyber` | `fugu-cyber` / xhigh | 1200s | killed, **nothing returned** |
-| `--ultra` | `fugu-ultra-v1.1` / high | 1800s | synthesis phase still runs |
-| `--max` | `fugu-ultra-v1.1` / max | 3600s | synthesis phase still runs |
+| `--ultra` | `fugu-ultra-v2.0` / high, else `fugu-ultra`, else `fugu-ultra-v1.1` | 1800s | synthesis phase still runs |
+| `--max` | effort `max` on the first preferred ultra slug that lists it; current catalogs keep `fugu-ultra-v1.1` / max | 3600s | synthesis phase still runs |
 
 (Walls are `DEFAULT_MAX_WAIT` in `scripts/run_fugu.sh`.)
 

@@ -1411,6 +1411,7 @@ class LocalCliRunnerTests(unittest.TestCase):
         # catalog instead of hard-pinning one spelling. `fugu-ultra-v1.0` is a
         # different model and must never be chosen for the caller.
         cases = (
+            (["fugu", "fugu-ultra-v2.0", "fugu-ultra", "fugu-ultra-v1.1", "fugu-ultra-v1.0"], "fugu-ultra-v2.0"),
             (["fugu", "fugu-ultra-v1.1", "fugu-ultra-v1.0"], "fugu-ultra-v1.1"),
             (["fugu", "fugu-ultra"], "fugu-ultra"),
             (["fugu", "fugu-ultra-v1.0"], "fugu-ultra-v1.1"),
