@@ -96,8 +96,8 @@ not the one the names suggest.
 | plain | `fugu` / high | 600s | killed, **nothing returned** |
 | `--deep` | `fugu` / xhigh | 1200s | killed, **nothing returned** |
 | `--cyber` | `fugu-cyber` / xhigh | 1200s | killed, **nothing returned** |
-| `--ultra` | `fugu-ultra-v1.1` / high | 1800s | synthesis phase still runs |
-| `--max` | `fugu-ultra-v1.1` / max | 3600s | synthesis phase still runs |
+| `--ultra` | `fugu-ultra-v2.0` / high, else `fugu-ultra`, else `fugu-ultra-v1.1` | 1800s | synthesis phase still runs |
+| `--max` | effort `max` on the first preferred ultra slug that lists it; current catalogs keep `fugu-ultra-v1.1` / max | 3600s | synthesis phase still runs |
 
 (Walls are `DEFAULT_MAX_WAIT` in `scripts/run_fugu.sh`.)
 
@@ -133,7 +133,8 @@ true wall-clock bound, not an idle timeout, so a run that keeps emitting heartbe
 bounded (see the "Wall limits here are wall limits" note in `provider-shortcuts.md`).
 
 Use `--preflight` to validate launcher, profile, wall, read-only policy, and `--include`
-paths and print the launch plan without calling the provider. Cheap way to confirm the call
+paths and print the launch plan without calling the provider. The plan names the
+catalog-resolved Ultra or Max model. Cheap way to confirm the call
 is shaped the way you meant before spending a budget on it.
 
 ## 4. Write the prompt against the budget

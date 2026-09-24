@@ -3489,7 +3489,7 @@ def build_parser() -> argparse.ArgumentParser:
     i_fr_prepare.add_argument(
         "--model",
         default="auto",
-        help="Catalog-returned model id, or auto for preferred grok-4.5 / non-retired live default",
+        help="Catalog-returned model id, or auto for preferred grok-4.7 / non-retired live default",
     )
     i_fr_prepare.add_argument("--permission-mode", default="auto")
     i_fr_prepare.add_argument(
@@ -3717,7 +3717,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--model",
         default=None,
         help=(
-            "Default model (Grok: auto for preferred grok-4.5 when live, or an exact catalog id; "
+            "Default model (Grok: auto for preferred grok-4.7 when live, or an exact catalog id; "
             "OpenCode: provider/model e.g. openrouter/qwen/qwen3-max)"
         ),
     )

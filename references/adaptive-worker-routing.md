@@ -78,16 +78,19 @@ the same provider label. The worker route is always described as a `(model, effo
 
 | Live driver route | Default implementation-worker route | What changed |
 |---|---|---|
+| GPT-6 Astra at `ultra`/`max`/`xhigh` | same observed `gpt-6-astra` model ID at `medium` | effort only |
 | GPT-5.6 at `xhigh`/extra-high/`ultra` | same observed GPT-5.6 model ID at `medium` | effort only |
 | GPT-4.8 Max/UltraCode | same observed GPT-4.8 model ID at `medium` | effort only |
-| Claude Fable 5 at `max`/`ultra` | same observed `claude-fable-5` model ID at `low` | effort only |
-| Claude Opus 5 at `max`/`ultracode` | same observed `claude-opus-5` model ID at `high` | effort only |
-| permitted Grok Build handoff | `grok-4.5` at `high` when present in the live catalog | cross-family; explicitly opted in; Composer 2.5 is retired |
+| Claude Fable 5.1 at `max`/`ultra` | same observed `claude-fable-5-1` model ID at `low` | effort only |
+| Claude Opus 5.5 at `max`/`ultracode` | same observed `claude-opus-5-5` model ID at `high` | effort only |
+| permitted Grok Build handoff | `grok-4.7` at `high` when present in the live catalog, then `grok-4.6`, then `grok-4.5` | cross-family; explicitly opted in; Composer 2.5 is retired |
 
 **Native delegation stays inside one model family.** Every native row above lowers effort on the
 exact observed driver model and never substitutes a sibling. Elves no longer defines a
-Fable→Opus route: a driver planning at Fable 5 `max`/`ultra` hands off to `claude-fable-5` at
-`low`, which is a capable implementation worker, rather than crossing into the Opus family.
+Fable→Opus route: a driver planning at Fable 5.1 `max`/`ultra` hands off to `claude-fable-5-1` at
+`low`, which is a capable implementation worker, rather than crossing into the Opus family. The live
+Opus resolved id can carry a context badge such as `claude-opus-5-5[1m]`. Codex also lists
+`gpt-6-sol` and `gpt-6-luna` beside Astra. Bare `gpt-6`, bare `sol`, and bare `luna` stay ambiguous.
 
 **Two-route prewalk (v2.30+).** Automatic delegation stays same-family, but an operator running
 exact-session prewalk pins both phase routes explicitly, and the two may be different models:
@@ -116,8 +119,9 @@ which a user opts into rather than receiving as a default.
 
 These named defaults apply to a separate worker and to the execution phase of an exact-session
 prewalk. An explicit user route still wins. Unlisted native routes use the plan's low/medium/high
-execution classification. Permitted Grok workers prefer **`grok-4.5`** when the authenticated live
-catalog returns it, at effort **`high`**. xAI retired Composer 2.5 (`grok-composer-2.5-fast`);
+execution classification. Permitted Grok workers prefer **`grok-4.7`** when the authenticated live
+catalog returns it, then `grok-4.6`, then `grok-4.5`, at effort **`high`**. The CLI default
+`grok-4.7-build-fast` is a speed route and is not this preference. xAI retired Composer 2.5 (`grok-composer-2.5-fast`);
 Elves never selects that identifier. An explicit catalog pin of any non-retired id still wins
 when that exact id is returned live. The live driver itself is never downgraded. High review risk may advise a stronger
 terminal-review driver without changing it in place.
@@ -163,11 +167,12 @@ request. See the normative [`prewalk.md`](prewalk.md) contract.
 
 When Grok Build is explicitly permitted and silently qualifies:
 
-- prefer `grok-4.5` when the authenticated live `grok models` catalog returns it; otherwise use a
+- prefer `grok-4.7` when the authenticated live `grok models` catalog returns it, then `grok-4.6`,
+  then `grok-4.5`; otherwise use a
   non-retired live default (never `grok-composer-2.5-fast`);
 - pass `--effort high` by default because `high` is Grok Build's highest supported effort; an
   explicit operator effort override remains authoritative;
-- never invent an unavailable model: an explicit identifier (including `grok-4.5` or
+- never invent an unavailable model: an explicit identifier (including `grok-4.7`, `grok-4.5`, or
   `grok-code-fast-1`) is valid only when the authenticated live catalog returns that exact
   identifier;
 - missing install, auth, live catalog, supported session grammar, consent, or another core launch

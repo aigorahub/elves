@@ -80,7 +80,7 @@ class ConsistencyPhraseTests(unittest.TestCase):
             errors,
             [
                 "guide/index.html: missing Fugu shortcut profiles phrase "
-                "`<code>fugu-ultra-v1.1/high</code>`"
+                "`<code>fugu-ultra-v2.0/high</code>`"
             ],
         )
 

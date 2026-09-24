@@ -8,7 +8,7 @@ Oh My Pi (omp) driver plans and reviews; a subscription-native (or optional exte
 implements; durable run files let the work survive context compaction. You write the plan and own
 the merge decision. The agent does the middle.
 
-**Current release: v2.37.2**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.38.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 Implementation runs get a draft PR at the first useful pushed commit,
@@ -172,8 +172,8 @@ Profiles:
 - regular `fugu/high` (default)
 - `--deep` → `fugu/xhigh`
 - `--cyber` → `fugu-cyber/xhigh`
-- `--ultra` → `fugu-ultra-v1.1/high`
-- `--max` → `fugu-ultra-v1.1/max` for one narrow high-stakes gate on a 60-minute default wall budget
+- `--ultra` → `fugu-ultra-v2.0/high` when listed, then `fugu-ultra`, then `fugu-ultra-v1.1`
+- `--max` → `fugu-ultra-v1.1/max` for one narrow high-stakes gate on a 60-minute default wall budget. This is effort `max`, not the Fugu Max model `fugu-max`.
 
 Plain regular Fugu is the default. The host may select Cyber only for explicit security review or threat-model intent after a successful Cyber call in the current session. Only a user-explicit Cyber request may establish that proof. Otherwise, it uses regular Fugu. The user must explicitly select Ultra or Max.
 
@@ -183,7 +183,6 @@ repository escapes; the exact path must actually be admitted and copied, and git
 fail closed before the provider launches (use `--preflight` to check). Both `.env.*` and
 `*.env` dotenv-name families plus host-owned internal namespaces are always excluded. macOS read-only cleanup is best-effort,
 not proof of recursive descendant absence.
-
 Use `--max-wait` before automatic `--deep`; if any `--include`, run `--preflight` first; prefer
 redirect to a log (never `| tail`).
 
@@ -363,13 +362,14 @@ Parallel implementation lanes are optional and never the default: serial stays t
 Trusted Grok implementation launches use `--always-approve` alone: Grok Build treats an explicit
 `--permission-mode auto` as an override, so the two flags must not be combined.
 
-Native delegation names both model and effort, and stays inside one model family. GPT-5.6
+Native delegation names both model and effort, and stays inside one model family. GPT-6 Astra
+`ultra`/`max`/`xhigh` hands off to the same GPT-6 Astra model at `medium`; GPT-5.6
 `xhigh`/extra-high/`ultra` hands off to the same GPT-5.6 model at `medium`; GPT-4.8 Max/UltraCode to
-the same GPT-4.8 model at `medium`; Fable 5 `max`/`ultra` to the same Fable 5 model at `low`; Opus 5
-`max`/`ultracode` to the same Opus 5 model at `high`. There is no Fable→Opus route — a Fable driver
-hands off to `claude-fable-5` at `low` rather than crossing families. The one cross-family worker is
-the opt-in Grok handoff, which prefers `grok-4.5` at explicit `high` when the live catalog returns
-it. Composer 2.5 (`grok-composer-2.5-fast`) is retired and is never selected.
+the same GPT-4.8 model at `medium`; Fable 5.1 `max`/`ultra` to the same Fable 5.1 model at `low`; Opus 5.5
+`max`/`ultracode` to the same Opus 5.5 model at `high`. There is no Fable→Opus route. A Fable driver
+hands off to `claude-fable-5-1` at `low` rather than crossing families. The one cross-family worker is
+the opt-in Grok handoff, which prefers `grok-4.7` at explicit `high` when the live catalog returns
+it, then `grok-4.6`, then `grok-4.5`. Composer 2.5 (`grok-composer-2.5-fast`) is retired and is never selected.
 
 ### Optional exact-session prewalk
 
