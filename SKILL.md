@@ -127,7 +127,8 @@ opt-in for the current PR.
    both landing questions pass on the exact head. **Can it merge?** Every required check passed or
    was skipped, and GitHub does not report the PR as `BLOCKED`. **Was it tested?** An ordinary PR
    (base is the default branch) has a `Local tests passed on <head SHA>` PR comment for that head;
-   a Dependabot PR has its full-suite jobs passed instead.
+   a Dependabot PR has its full-suite jobs passed instead (Elves checks those against the repo's
+   `.github/ci-suite.json`; without that file a person lands Dependabot PRs).
    A release or hotfix PR (base is `main` while `main` is not the default branch) carries the
    `release` label, has `release-gate` and `full-tests` concluded `success` on that head, has `main`
    up to date, and needs the user's explicit release authority. Socket, Vercel, and skipped checks

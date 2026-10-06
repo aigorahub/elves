@@ -288,7 +288,8 @@ otherwise record the skip and its reason); get a fresh
 subagent host review of `git diff <default-branch>...HEAD`; fix blockers; update the docs the change
 touches and bump the version when the repository versions (Elves itself versions, an unversioned
 repository skips the bump); run sensible tests; wait for asynchronous review/CI updates; re-read the
-feedback queue; and then use `gh pr merge --merge` only when everything is green. Never squash.
+feedback queue; and then use `gh pr merge --merge` pinned with `--match-head-commit <sha>` only
+when the PR can merge and was tested on that head (see step 6 below). Never squash.
 
 **Check in with `ra:`**
 You don't have to disappear completely. If you want to give context or change priorities during
@@ -396,8 +397,9 @@ Elves E2E: chat-to-land (merge when green).
    unresolved high-impact review question remains (`/fugu review <scope>` or `$elves fugu review
    <scope>`; never a raw Fugu call; otherwise record the skip and its reason); fresh cumulative host review of
    `git diff <default-branch>...HEAD`; fix blockers; update docs and bump the version when the
-   repository versions; re-poll async review/CI; then `gh pr merge --merge` only when not draft,
-   the PR can merge (required checks passed or skipped, not `BLOCKED`), it was tested (a
+   repository versions; re-poll async review/CI; then `gh pr merge --merge` pinned with
+   `--match-head-commit <sha>` only when not draft, the PR can merge
+   (required checks passed or skipped, `MERGEABLE`, not `BLOCKED` or `BEHIND`), it was tested (a
    `Local tests passed on <head SHA>` PR comment, or on a release PR `release-gate` and
    `full-tests` succeeded on the head), no blocking review, clean worktree. Never squash or rebase.
 

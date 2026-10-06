@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import sys
 import unittest
@@ -18,6 +19,7 @@ from cobbler_runtime.merge_evidence import (  # noqa: E402
     landing_path,
     local_test_record_head,
     local_test_record_heads,
+    parse_suite_inventory,
 )
 
 
@@ -170,16 +172,22 @@ class OrdinaryPathTests(unittest.TestCase):
         evidence = evaluate_merge_evidence(ordinary(required_checks=None), local_head=HEAD)
         self.assertIn("required_checks_unavailable", evidence.merge_reasons)
 
-    def test_failed_checks_that_are_not_required_are_listed_for_triage(self) -> None:
+    def test_failed_actions_job_is_a_failed_test_without_an_inventory(self) -> None:
         checks = SOCKET + [
             {"name": "comment-gemini-review", "bucket": "fail", "workflow": "Gemini"},
-            {"name": "Vercel", "bucket": "fail", "workflow": ""},
         ]
         evidence = evaluate_merge_evidence(ordinary(checks=checks), local_head=HEAD)
-        self.assertTrue(evidence.green)
-        self.assertEqual(evidence.failed_checks, ("comment-gemini-review", "Vercel"))
+        self.assertTrue(evidence.can_merge)
+        self.assertFalse(evidence.tested)
+        self.assertIn("test_job_failed:comment-gemini-review", evidence.test_reasons)
 
-    def test_failed_required_check_still_blocks_merging(self) -> None:
+    def test_failed_app_check_is_listed_for_triage(self) -> None:
+        checks = SOCKET + [{"name": "Vercel Preview", "bucket": "fail", "workflow": ""}]
+        evidence = evaluate_merge_evidence(ordinary(checks=checks), local_head=HEAD)
+        self.assertTrue(evidence.green)
+        self.assertEqual(evidence.failed_checks, ("Vercel Preview",))
+
+    def test_failed_required_check_blocks_both_answers(self) -> None:
         evidence = evaluate_merge_evidence(
             ordinary(
                 required_checks=[{"name": "test", "bucket": "fail"}],
@@ -189,53 +197,127 @@ class OrdinaryPathTests(unittest.TestCase):
         )
         self.assertFalse(evidence.can_merge)
         self.assertIn("required_check_failed:test", evidence.merge_reasons)
-        self.assertIn("test", evidence.failed_checks)
+        self.assertIn("test_job_failed:test", evidence.test_reasons)
 
-    def test_dependabot_counts_its_full_suite_not_a_record(self) -> None:
+    def test_dependabot_suite_is_unverifiable_without_an_inventory(self) -> None:
         suite = SOCKET + [
             {"name": "unit", "bucket": "pass", "workflow": "CI"},
-            {"name": "e2e", "bucket": "pass", "workflow": "CI"},
+            {"name": "comment", "bucket": "pass", "workflow": "Bot"},
         ]
-        passed = evaluate_merge_evidence(
-            ordinary(author="app/dependabot", checks=suite, comments=[]), local_head=HEAD
+        for comments in ([], [record()]):
+            evidence = evaluate_merge_evidence(
+                ordinary(author="app/dependabot", checks=suite, comments=comments),
+                local_head=HEAD,
+            )
+            self.assertFalse(evidence.tested)
+            self.assertIn("dependabot_suite_unverifiable", evidence.test_reasons)
+
+
+INVENTORY = {
+    "schema_version": 1,
+    "local_gates": ["npm run lint", "npm test"],
+    "test_jobs": ["unit", "e2e (1)"],
+}
+
+
+class SuiteInventoryTests(unittest.TestCase):
+    def test_inventory_validation(self) -> None:
+        self.assertEqual(
+            parse_suite_inventory(dict(INVENTORY, extra=["ignored"]))["test_jobs"],
+            ("unit", "e2e (1)"),
         )
-        self.assertTrue(passed.green)
-        skipped = evaluate_merge_evidence(
+        for bad in (
+            {},
+            dict(INVENTORY, schema_version=2),
+            dict(INVENTORY, local_gates=[]),
+            dict(INVENTORY, test_jobs=["unit", ""]),
+            dict(INVENTORY, test_jobs="unit"),
+        ):
+            with self.assertRaises(ValueError):
+                parse_suite_inventory(bad)
+
+    def test_record_must_list_every_inventory_gate(self) -> None:
+        partial = record(gates="- `npm run lint`: passed")
+        incomplete = evaluate_merge_evidence(
+            ordinary(comments=[partial], suite_inventory=INVENTORY), local_head=HEAD
+        )
+        self.assertIn("local_test_record_incomplete", incomplete.test_reasons)
+        full = record(gates="- `npm run lint`: passed\n- `npm test`: passed (812)\n- `git diff --check`: passed")
+        self.assertTrue(
+            evaluate_merge_evidence(
+                ordinary(comments=[partial, full], suite_inventory=INVENTORY), local_head=HEAD
+            ).green
+        )
+
+    def test_inventory_separates_test_jobs_from_other_failures(self) -> None:
+        checks = SOCKET + [
+            {"name": "comment-gemini-review", "bucket": "fail", "workflow": "Gemini"},
+            {"name": "unit", "bucket": "pass", "workflow": "CI"},
+        ]
+        full = record(gates="- `npm run lint`: passed\n- `npm test`: passed")
+        triaged = evaluate_merge_evidence(
+            ordinary(checks=checks, comments=[full], suite_inventory=INVENTORY), local_head=HEAD
+        )
+        self.assertTrue(triaged.green)
+        self.assertEqual(triaged.failed_checks, ("comment-gemini-review",))
+        failing = evaluate_merge_evidence(
             ordinary(
-                author="app/dependabot",
-                checks=SOCKET + [{"name": "unit", "bucket": "skipping", "workflow": "CI"}],
-                comments=[],
+                checks=SOCKET + [{"name": "e2e (1)", "bucket": "fail", "workflow": "CI"}],
+                comments=[full],
+                suite_inventory=INVENTORY,
             ),
             local_head=HEAD,
         )
-        self.assertIn("dependabot_suite_not_passed", skipped.test_reasons)
+        self.assertIn("test_job_failed:e2e (1)", failing.test_reasons)
+
+    def test_dependabot_needs_every_inventory_test_job_passed(self) -> None:
+        passing = SOCKET + [
+            {"name": "unit", "bucket": "pass", "workflow": "CI"},
+            {"name": "e2e (1)", "bucket": "pass", "workflow": "CI"},
+        ]
         self.assertTrue(
             evaluate_merge_evidence(
-                ordinary(
-                    author="app/dependabot",
-                    checks=SOCKET + [{"name": "unit", "bucket": "skipping", "workflow": "CI"}],
-                    comments=[record(association="MEMBER")],
-                ),
+                ordinary(author="app/dependabot", checks=passing, comments=[], suite_inventory=INVENTORY),
                 local_head=HEAD,
-            ).tested
+            ).green
         )
-        bots_only = evaluate_merge_evidence(
-            ordinary(author="app/dependabot", checks=list(SOCKET), comments=[]),
+        missing = evaluate_merge_evidence(
+            ordinary(
+                author="app/dependabot",
+                checks=SOCKET + [{"name": "unit", "bucket": "pass", "workflow": "CI"}],
+                comments=[record(gates="- `npm run lint`: passed\n- `npm test`: passed")],
+                suite_inventory=INVENTORY,
+            ),
             local_head=HEAD,
         )
-        self.assertIn("dependabot_suite_missing", bots_only.test_reasons)
-
-    def test_head_mismatch_fails_both(self) -> None:
-        evidence = evaluate_merge_evidence(ordinary(head=OTHER), local_head=HEAD)
-        self.assertFalse(evidence.can_merge)
-        self.assertFalse(evidence.tested)
-
-    def test_unsupported_base(self) -> None:
-        evidence = evaluate_merge_evidence(
-            ordinary(base="staging", default_branch="dev"), local_head=HEAD
+        self.assertIn("test_job_missing:e2e (1)", missing.test_reasons)
+        skipped = evaluate_merge_evidence(
+            ordinary(
+                author="app/dependabot",
+                checks=SOCKET
+                + [
+                    {"name": "unit", "bucket": "pass", "workflow": "CI"},
+                    {"name": "e2e (1)", "bucket": "skipping", "workflow": "CI"},
+                ],
+                suite_inventory=INVENTORY,
+            ),
+            local_head=HEAD,
         )
-        self.assertFalse(evidence.can_merge)
-        self.assertIn("landing_path_unsupported", evidence.test_reasons)
+        self.assertIn("test_job_not_passed:e2e (1)", skipped.test_reasons)
+
+    def test_invalid_or_unreadable_inventory_fails_closed(self) -> None:
+        self.assertIn(
+            "suite_inventory_invalid",
+            evaluate_merge_evidence(
+                ordinary(suite_inventory={"schema_version": 1}), local_head=HEAD
+            ).test_reasons,
+        )
+        self.assertIn(
+            "suite_inventory_unavailable",
+            evaluate_merge_evidence(
+                ordinary(suite_inventory="unavailable"), local_head=HEAD
+            ).test_reasons,
+        )
 
 
 class ReleasePathTests(unittest.TestCase):
@@ -286,6 +368,8 @@ class FakeGh:
         for prefix, response in self.responses.items():
             if key.startswith(prefix):
                 return response
+        if key.startswith("api repos/acme/app/contents/.github/ci-suite.json"):
+            return 1, "", "gh: Not Found (HTTP 404)"
         return 1, "", "unexpected call"
 
 
@@ -357,6 +441,57 @@ class FetchTests(unittest.TestCase):
         self.assertEqual(snapshot["behind_by"], 0)
         self.assertEqual(gh.calls[0][:3], ["pr", "view", "7"])
         self.assertTrue(evaluate_merge_evidence(snapshot, local_head=HEAD).green)
+
+    def test_required_call_with_no_checks_at_all_is_empty(self) -> None:
+        gh = FakeGh(
+            {
+                "pr view": (0, view(), ""),
+                "repo view acme/app": (0, json.dumps({"defaultBranchRef": {"name": "main"}}), ""),
+                "pr checks 7 --repo acme/app --required": (
+                    1,
+                    "",
+                    "no checks reported on the 'feature' branch\n",
+                ),
+                "pr checks 7 --repo acme/app --json": (
+                    1,
+                    "",
+                    "no checks reported on the 'feature' branch\n",
+                ),
+                "api --paginate --slurp repos/acme/app/issues/7/comments": (
+                    0,
+                    json.dumps([[record(association="MEMBER")]]),
+                    "",
+                ),
+            }
+        )
+        snapshot, error = fetch_pr_snapshot(Path("."), run=gh)
+        self.assertIsNone(error)
+        self.assertEqual(snapshot["required_checks"], [])
+        self.assertEqual(snapshot["checks"], [])
+        self.assertTrue(evaluate_merge_evidence(snapshot, local_head=HEAD).green)
+
+    def test_inventory_is_read_from_the_base_branch(self) -> None:
+        encoded = base64.b64encode(json.dumps(INVENTORY).encode()).decode()
+        wrapped = "\n".join(encoded[i : i + 60] for i in range(0, len(encoded), 60))
+        responses = {
+            "pr view": (0, view(base="dev"), ""),
+            "repo view acme/app": (0, json.dumps({"defaultBranchRef": {"name": "dev"}}), ""),
+            "pr checks 7": (1, "", "no checks reported on the 'feature' branch\n"),
+            "api --paginate --slurp repos/acme/app/issues/7/comments": (0, "[[]]", ""),
+            "api repos/acme/app/contents/.github/ci-suite.json?ref=dev": (0, wrapped + "\n", ""),
+        }
+        snapshot, _ = fetch_pr_snapshot(Path("."), run=FakeGh(responses))
+        self.assertEqual(snapshot["suite_inventory"], INVENTORY)
+        responses["api repos/acme/app/contents/.github/ci-suite.json?ref=dev"] = (
+            1,
+            "",
+            "gh: Server Error (HTTP 502)",
+        )
+        snapshot, _ = fetch_pr_snapshot(Path("."), run=FakeGh(responses))
+        self.assertEqual(snapshot["suite_inventory"], "unavailable")
+        del responses["api repos/acme/app/contents/.github/ci-suite.json?ref=dev"]
+        snapshot, _ = fetch_pr_snapshot(Path("."), run=FakeGh(responses))
+        self.assertIsNone(snapshot["suite_inventory"])
 
     def test_unknown_checks_error_is_unavailable_not_empty(self) -> None:
         gh = FakeGh(

@@ -21,14 +21,26 @@ and the strict landing check uses them instead of a typed `required_checks_green
   `Local tests passed on <head SHA>`, followed by one ``- `<command>`: passed`` line per gate, all
   passed, posted by the repository owner, a member, or a collaborator. Release path (base is `main`
   while `main` is not the default branch): the `release` label, the PR's own latest `release-gate`
-  and `full-tests` results passed on the head, and `main` up to date. Dependabot PRs run the full
-  suite instead of local tests: their GitHub Actions jobs all passed, none skipped (a valid local
-  record also counts). Socket, Vercel, and skipped checks never count as tested. Check results
-  belong to the commit, as they do for branch protection.
-- **Failed checks to triage.** A failed required check blocks "can it merge?". Any other failed
-  check is reported as `failed_checks_to_triage`: only the repository's suite inventory says which
-  jobs are tests, so the driver decides whether it is a failed test (not landable) or a bot or
-  preview failure.
+  and `full-tests` results passed on the head, and `main` up to date. Socket, Vercel, and skipped
+  checks never count as tested. Check results belong to the commit, as they do for branch
+  protection.
+- **Suite inventory.** A repository lists its tests in `.github/ci-suite.json`, read from the PR's
+  base branch so a PR cannot change its own list:
+
+  ```json
+  {"schema_version": 1,
+   "local_gates": ["npm run lint", "npm test"],
+   "test_jobs": ["Lint, typecheck, test, build"]}
+  ```
+
+  `local_gates` are the commands a local test record must list as passed. `test_jobs` are the PR
+  check names that run tests. Other keys are ignored. With an inventory, a failed `test_jobs`
+  check means not tested, any other failed check is reported as `failed_checks_to_triage`, and a
+  Dependabot PR (which runs the full suite instead of local tests) is tested when every
+  `test_jobs` check passed. Without one, Elves stays strict: any failed GitHub Actions job means not
+  tested, the record is trusted as written, and Dependabot PRs are not tested here, so a person
+  lands them. A failed app check (Socket, a Vercel preview) is always triaged. An invalid or
+  unreadable inventory fails closed.
 
 Unreadable GitHub state fails closed. Pass `--pr` when the current branch has no unique PR.
 
