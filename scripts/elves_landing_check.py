@@ -1431,6 +1431,12 @@ def _check_host_landing_control(
             "Session landing.readiness.required_checks_green disagrees with the "
             "computed merge evidence and is ignored.",
         )
+    if evidence.failed_checks:
+        report.warn(
+            "failed_checks_to_triage",
+            "Failed checks on the pull request to triage (required ones also block "
+            "merging): " + ", ".join(evidence.failed_checks),
+        )
     if not evidence.can_merge:
         report.error(
             "merge_evidence_cannot_merge",

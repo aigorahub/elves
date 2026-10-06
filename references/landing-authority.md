@@ -22,10 +22,13 @@ and the strict landing check uses them instead of a typed `required_checks_green
   passed, posted by the repository owner, a member, or a collaborator. Release path (base is `main`
   while `main` is not the default branch): the `release` label, the PR's own latest `release-gate`
   and `full-tests` results passed on the head, and `main` up to date. Dependabot PRs run the full
-  suite instead of local tests: their GitHub Actions jobs all passed, none skipped. A failed Actions
-  job is never tested; a failed app check (Socket, a Vercel preview) is left to review. Socket,
-  Vercel, and skipped checks never count as tested. Check results belong to the commit, as they do
-  for branch protection.
+  suite instead of local tests: their GitHub Actions jobs all passed, none skipped (a valid local
+  record also counts). Socket, Vercel, and skipped checks never count as tested. Check results
+  belong to the commit, as they do for branch protection.
+- **Failed checks to triage.** A failed required check blocks "can it merge?". Any other failed
+  check is reported as `failed_checks_to_triage`: only the repository's suite inventory says which
+  jobs are tests, so the driver decides whether it is a failed test (not landable) or a bot or
+  preview failure.
 
 Unreadable GitHub state fails closed. Pass `--pr` when the current branch has no unique PR.
 

@@ -170,17 +170,26 @@ class OrdinaryPathTests(unittest.TestCase):
         evidence = evaluate_merge_evidence(ordinary(required_checks=None), local_head=HEAD)
         self.assertIn("required_checks_unavailable", evidence.merge_reasons)
 
-    def test_failed_test_job_is_not_tested_even_when_not_required(self) -> None:
-        checks = SOCKET + [{"name": "test", "bucket": "fail", "workflow": "CI"}]
-        evidence = evaluate_merge_evidence(ordinary(checks=checks), local_head=HEAD)
-        self.assertTrue(evidence.can_merge)
-        self.assertFalse(evidence.tested)
-        self.assertIn("check_failed:test", evidence.test_reasons)
-
-    def test_failed_app_check_is_not_a_test_result(self) -> None:
-        checks = [{"name": "Vercel", "bucket": "fail", "workflow": ""}]
+    def test_failed_checks_that_are_not_required_are_listed_for_triage(self) -> None:
+        checks = SOCKET + [
+            {"name": "comment-gemini-review", "bucket": "fail", "workflow": "Gemini"},
+            {"name": "Vercel", "bucket": "fail", "workflow": ""},
+        ]
         evidence = evaluate_merge_evidence(ordinary(checks=checks), local_head=HEAD)
         self.assertTrue(evidence.green)
+        self.assertEqual(evidence.failed_checks, ("comment-gemini-review", "Vercel"))
+
+    def test_failed_required_check_still_blocks_merging(self) -> None:
+        evidence = evaluate_merge_evidence(
+            ordinary(
+                required_checks=[{"name": "test", "bucket": "fail"}],
+                checks=SOCKET + [{"name": "test", "bucket": "fail", "workflow": "CI"}],
+            ),
+            local_head=HEAD,
+        )
+        self.assertFalse(evidence.can_merge)
+        self.assertIn("required_check_failed:test", evidence.merge_reasons)
+        self.assertIn("test", evidence.failed_checks)
 
     def test_dependabot_counts_its_full_suite_not_a_record(self) -> None:
         suite = SOCKET + [
@@ -195,13 +204,24 @@ class OrdinaryPathTests(unittest.TestCase):
             ordinary(
                 author="app/dependabot",
                 checks=SOCKET + [{"name": "unit", "bucket": "skipping", "workflow": "CI"}],
-                comments=[record()],
+                comments=[],
             ),
             local_head=HEAD,
         )
         self.assertIn("dependabot_suite_not_passed", skipped.test_reasons)
+        self.assertTrue(
+            evaluate_merge_evidence(
+                ordinary(
+                    author="app/dependabot",
+                    checks=SOCKET + [{"name": "unit", "bucket": "skipping", "workflow": "CI"}],
+                    comments=[record(association="MEMBER")],
+                ),
+                local_head=HEAD,
+            ).tested
+        )
         bots_only = evaluate_merge_evidence(
-            ordinary(author="app/dependabot", checks=list(SOCKET)), local_head=HEAD
+            ordinary(author="app/dependabot", checks=list(SOCKET), comments=[]),
+            local_head=HEAD,
         )
         self.assertIn("dependabot_suite_missing", bots_only.test_reasons)
 

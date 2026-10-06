@@ -16,8 +16,11 @@ Two landing paths:
 
 Dependabot pull requests run the full suite in CI instead of local tests:
 their GitHub Actions jobs all passed on the head, none skipped, count as
-tested. A failed Actions job is never tested, required or not; a failed app
-check (Socket, a Vercel preview) is left to review, not read as a test.
+tested; a valid local record also counts. Required checks are enforced by
+"can it merge?". A failed check that is not required is listed in
+``failed_checks`` for the driver to triage: only the repository's suite
+inventory says which jobs are tests, so a failed bot comment workflow or
+Vercel preview is not read as a failed test here.
 
 Evaluation is pure. ``fetch_pr_snapshot`` makes bounded ``gh`` reads with
 closed stdin and explicit timeouts. Nothing here grants merge authority.
@@ -61,6 +64,7 @@ class MergeEvidence:
     tested: bool
     merge_reasons: tuple[str, ...] = ()
     test_reasons: tuple[str, ...] = ()
+    failed_checks: tuple[str, ...] = ()
 
     @property
     def green(self) -> bool:
@@ -175,22 +179,27 @@ def evaluate_merge_evidence(
         tested.append("checks_unavailable")
         checks = []
     checks = [check for check in checks if isinstance(check, Mapping)]
+    failed = tuple(
+        dict.fromkeys(
+            str(check.get("name") or "?")
+            for check in checks
+            if check.get("bucket") == "fail"
+        )
+    )
     # GitHub Actions jobs carry a workflow name; app checks (Socket, Vercel) do not.
     jobs = [check for check in checks if check.get("workflow")]
-    for check in jobs:
-        if check.get("bucket") == "fail":
-            tested.append(f"check_failed:{check.get('name') or '?'}")
 
-    if path == "ordinary" and snapshot.get("author") in DEPENDABOT_LOGINS:
-        if not jobs:
-            tested.append("dependabot_suite_missing")
-        elif any(check.get("bucket") != "pass" for check in jobs):
-            tested.append("dependabot_suite_not_passed")
-    elif path == "ordinary":
+    if path == "ordinary":
         comments = snapshot.get("comments")
-        if not isinstance(comments, list):
+        recorded = isinstance(comments, list) and local in local_test_record_heads(comments)
+        if snapshot.get("author") in DEPENDABOT_LOGINS and not recorded:
+            if not jobs:
+                tested.append("dependabot_suite_missing")
+            elif any(check.get("bucket") != "pass" for check in jobs):
+                tested.append("dependabot_suite_not_passed")
+        elif not isinstance(comments, list):
             tested.append("local_test_record_unavailable")
-        elif local not in local_test_record_heads(comments):
+        elif not recorded:
             tested.append("local_test_record_missing")
     elif path == "release":
         labels = snapshot.get("labels")
@@ -217,6 +226,7 @@ def evaluate_merge_evidence(
         tested=not tested,
         merge_reasons=tuple(dict.fromkeys(merge)),
         test_reasons=tuple(dict.fromkeys(tested)),
+        failed_checks=failed,
     )
 
 
