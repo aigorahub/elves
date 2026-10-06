@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Grok Build, Oh My Pi (omp), Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.38.0"
+  version: "2.39.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -85,7 +85,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.38.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.39.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
@@ -122,9 +122,20 @@ opt-in for the current PR.
    (Elves itself versions: `SKILL.md` metadata, `AGENTS.md`, the `CHANGELOG.md` release heading, and
    the pinned version narration). Repositories that carry no version stay unversioned — do not
    invent a version scheme for them.
-7. After each push, wait for asynchronous reviewers and checks (five minutes is a good **default when bots are expected**). Re-read comments before deciding green.
-8. Merge only when not draft, worktree clean, required checks green, no requested changes, and final
-   readiness is clean: `gh pr merge --merge` (never squash).
+7. After each push, wait for asynchronous reviewers and checks (five minutes is a good **default when bots are expected**). Re-read comments before deciding.
+8. Merge only when not draft, worktree clean, no requested changes, final readiness is clean, and
+   both landing questions pass on the exact head. **Can it merge?** Every required check passed or
+   was skipped, and GitHub does not report the PR as `BLOCKED`. **Was it tested?** An ordinary PR
+   (base is the default branch) has a `Local tests passed on <head SHA>` PR comment for that head;
+   a Dependabot PR has its full-suite jobs passed instead (Elves checks those against the repo's
+   `.github/ci-suite.json`; without that file a person lands Dependabot PRs).
+   A release or hotfix PR (base is `main` while `main` is not the default branch) carries the
+   `release` label, has `release-gate` and `full-tests` concluded `success` on that head, has `main`
+   up to date, and needs the user's explicit release authority. Socket, Vercel, and skipped checks
+   never count as tested. The strict landing check computes both answers from GitHub. Then
+   `gh pr merge --merge --match-head-commit <sha>` (never squash). On a release PR, review the diff
+   against the PR base (`main`), and after it lands open the same-day back-merge PR from `main` into
+   the default branch.
 9. Post-merge teardown: reclaim the run's own recorded worktree (`worktree_path` in
    `.elves-session.json`) with `./scripts/preflight.sh --gc-worktrees --path <worktree_path>` —
    report first, add `--apply` to remove. The gc helper is separate from the create helper and

@@ -39,6 +39,7 @@ WORKER_IMMUTABLE_HOST_FIELDS: frozenset[str] = frozenset(
         "driver_merge_authorized",
         "project_landing_checks_green",
         "project_landing_checks_digest",
+        "required_checks_green",
     }
 )
 
@@ -55,6 +56,9 @@ class LandingControl:
     acceptance_complete: bool = False
     blockers_resolved: bool = False
     exact_tip_review_clean: bool = False
+    # Host-computed by merge_evidence: the pull request can merge (required
+    # checks passed or skipped, not BLOCKED) and was tested (a local test
+    # record for the exact HEAD, or passed release checks). Never typed.
     required_checks_green: bool = False
     project_landing_checks_green: bool = False
     project_landing_checks_digest: str | None = None
@@ -273,6 +277,9 @@ def attest_readiness(
 
     Changed inputs invalidate only affected proof scopes; readiness requires
     all gates true at this HEAD. Authorization is untouched.
+    ``required_checks_green`` must come from ``merge_evidence``, which reads
+    GitHub and the pull request's local test record; skipped and bot-only
+    checks never count as tested.
     """
     if not isinstance(head, str) or EXACT_COMMIT_RE.fullmatch(head) is None:
         raise ValueError("readiness requires an exact 40-character commit HEAD")

@@ -14,10 +14,12 @@ Exit codes:
   1 — blocking failures
   2 — usage / IO error
 
-This script is intentionally narrow. It does not run tests or inspect PR checks.
-It verifies that self-certified batch completion is backed by one-to-one
-acceptance evidence in session JSON and the authoritative plan. Execution-log
-and evidence-directory checks remain optional additional surfaces.
+This script is intentionally narrow. It does not run tests. It verifies that
+self-certified batch completion is backed by one-to-one acceptance evidence in
+session JSON and the authoritative plan. Execution-log and evidence-directory
+checks remain optional additional surfaces. With --repo-root, readiness also
+reads the pull request from GitHub to answer "can it merge?" and "was it
+tested?" for the exact HEAD; a typed required_checks_green value is ignored.
 """
 
 from __future__ import annotations
@@ -55,6 +57,7 @@ from cobbler_runtime.landing_authority import (
     terminal_action,
 )
 from cobbler_runtime.landing_profile import evaluate_landing_profile
+from cobbler_runtime.merge_evidence import compute_merge_evidence
 from cobbler_runtime.schema import ValidationIssue
 
 
@@ -129,6 +132,7 @@ class Report:
     findings: list[Finding] = field(default_factory=list)
     landing: dict[str, Any] | None = None
     project_landing: dict[str, Any] | None = None
+    merge_evidence: dict[str, Any] | None = None
 
     def error(self, code: str, message: str) -> None:
         self.findings.append(Finding("ERROR", code, message))
@@ -205,6 +209,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help=(
             "Optional project-profile base ref. Defaults to session project_base_ref "
             "and then origin/main; it is resolved once to an exact commit."
+        ),
+    )
+    parser.add_argument(
+        "--pr",
+        default=None,
+        help=(
+            "Pull request number or URL for computed merge evidence. Defaults to "
+            "the pull request for the current branch."
         ),
     )
     parser.add_argument(
@@ -1283,7 +1295,11 @@ def _check_project_landing_profile(
 
 
 def _check_host_landing_control(
-    session: dict[str, Any], repo_root: Path, report: Report
+    session: dict[str, Any],
+    repo_root: Path,
+    report: Report,
+    *,
+    pr: str | None = None,
 ) -> None:
     """Bind declared v2.3 landing control to a required exact-HEAD attestation."""
 
@@ -1390,18 +1406,49 @@ def _check_host_landing_control(
         )
         project_green = False
 
+    # "Can it merge?" and "was it tested?" come from GitHub and the pull
+    # request's local test record for this exact HEAD, never from a typed flag.
+    evidence = compute_merge_evidence(repo_root, local_head=current_head, pr=pr)
+    report.merge_evidence = evidence.to_dict()
+    acceptance_complete = not report.errors and readiness.get("acceptance_complete") is True
     updated, attestation = attest_readiness(
         control,
         head=current_head,
-        acceptance_complete=not report.errors and readiness.get("acceptance_complete") is True,
+        acceptance_complete=acceptance_complete,
         blockers_resolved=readiness.get("blockers_resolved") is True,
         exact_tip_review_clean=readiness.get("exact_tip_review_clean") is True,
-        required_checks_green=readiness.get("required_checks_green") is True,
+        required_checks_green=evidence.green,
         worktree_clean=readiness.get("worktree_clean") is True,
         inputs_digest=inputs_digest,
         project_landing_checks_green=project_green,
         project_landing_checks_digest=project_digest,
     )
+    if "required_checks_green" in readiness and (
+        readiness.get("required_checks_green") is True
+    ) != evidence.green:
+        report.warn(
+            "typed_required_checks_green_ignored",
+            "Session landing.readiness.required_checks_green disagrees with the "
+            "computed merge evidence and is ignored.",
+        )
+    if evidence.failed_checks:
+        report.warn(
+            "failed_checks_to_triage",
+            "Failed checks on the pull request to triage (required ones also block "
+            "merging): " + ", ".join(evidence.failed_checks),
+        )
+    if not evidence.can_merge:
+        report.error(
+            "merge_evidence_cannot_merge",
+            f"GitHub does not allow this {evidence.path} pull request to merge: "
+            + ", ".join(evidence.merge_reasons),
+        )
+    if not evidence.tested:
+        report.error(
+            "merge_evidence_not_tested",
+            f"No test proof for {current_head} on the {evidence.path} path: "
+            + ", ".join(evidence.test_reasons),
+        )
     if not attestation.ready:
         report.error(
             "readiness_incomplete",
@@ -1554,7 +1601,7 @@ def run_checks(args: argparse.Namespace) -> Report:
             report,
             base_ref=args.project_base,
         )
-        _check_host_landing_control(session, repo_root, report)
+        _check_host_landing_control(session, repo_root, report, pr=args.pr)
 
     # One-line policy reminder when anything failed
     if report.errors:
@@ -1599,6 +1646,7 @@ def print_json(report: Report, session_path: Path) -> None:
         ),
         "landing": report.landing,
         "project_landing": report.project_landing,
+        "merge_evidence": report.merge_evidence,
     }
     print(json.dumps(payload, indent=2, sort_keys=True))
 

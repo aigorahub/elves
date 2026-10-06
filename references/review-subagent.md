@@ -47,7 +47,10 @@ Review the current state of PR #[NUMBER] for repo [OWNER/REPO].
 1. **The commit history for this batch.** Run `git log` for the batch's commits and read the messages carefully — both subject lines and bodies. The coding agent communicates through commit messages: design decisions, justifications for non-obvious choices, reasons for hardcoded values, explanations for pattern deviations. Before flagging something, check whether the commit message already justifies it. A choice that is explained and reasoned in the commit is an intentional design decision, not a finding (unless the reasoning is actually wrong).
 2. All PR review threads (focus on **unresolved** threads — resolved threads have already been addressed)
 3. All issue comments (focus on comments **without a reply from the agent** — replied comments have been addressed)
-4. CI check status: gh api "repos/OWNER/REPO/commits/HEAD/check-runs"
+4. CI check status on the PR's own head commit, not `commits/HEAD` (GitHub resolves that to the
+   default branch): `gh api "repos/OWNER/REPO/commits/<PR head SHA>/check-runs?per_page=100"`.
+   Required checks that passed or were skipped allow a merge; skipped and bot-only checks (Socket,
+   Vercel) never show that tests ran. Look for the `Local tests passed on <head SHA>` PR comment.
 5. The plan at [PLAN_PATH] — full batch list and Acceptance, not only the current batch narrative
 6. The batch contract in the execution log at [EXECUTION_LOG_PATH] under the current batch heading,
    or every delegated batch contract for a cumulative trusted full-run review
@@ -77,8 +80,10 @@ gh api "repos/OWNER/REPO/pulls/NUMBER/comments" --paginate
 gh api "repos/OWNER/REPO/pulls/NUMBER/reviews" --paginate
 # Fetch issue comments — check which have agent replies
 gh api "repos/OWNER/REPO/issues/NUMBER/comments" --paginate
-# CI status
-gh api "repos/OWNER/REPO/commits/HEAD/check-runs"
+# CI status on the PR head (commits/HEAD would read the default branch)
+HEAD_SHA=$(gh pr view NUMBER --json headRefOid -q .headRefOid)
+gh api "repos/OWNER/REPO/commits/${HEAD_SHA}/check-runs?per_page=100"
+gh pr checks NUMBER --required   # exits 1 with "no required checks reported" when none exist
 ```
 
 **Skip comments already recorded as handled in `.elves-session.json`.** Only evaluate new and unresolved findings. This prevents re-litigating settled issues across review cycles.
@@ -662,9 +667,12 @@ Ceremony order:
    green.
 8. Merge, then tear down the run's own recorded worktree.
 
-The coordinator may merge only after the review is clean, the PR is not draft, required checks are
-green, no unresolved requested changes remain, and comments/checks have been polled after the final
-push. Use `gh pr merge --merge`; never squash or rebase for this command.
+The coordinator may merge only after the review is clean, the PR is not draft, every required check
+passed or was skipped, the PR is not `BLOCKED`, the change was tested (a `Local tests passed on
+<head SHA>` PR comment for the exact head, or on a release PR into `main`, `release-gate` and
+`full-tests` concluded `success` on it), no unresolved requested changes remain, and comments/checks
+have been polled after the final push. Use `gh pr merge --merge --match-head-commit <sha>`; never
+squash or rebase for this command.
 
 ## When Subagents Aren't Available
 
