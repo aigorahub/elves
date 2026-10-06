@@ -42,7 +42,8 @@ and the strict landing check uses them instead of a typed `required_checks_green
   lands them. A failed app check (Socket, a Vercel preview) is always triaged. An invalid or
   unreadable inventory fails closed.
 
-Unreadable GitHub state fails closed. Pass `--pr` when the current branch has no unique PR.
+Unreadable GitHub state fails closed. Pass `--pr` when the current branch has no unique PR; the PR
+must belong to this checkout's repository, so a fork PR on the same commit cannot stand in for it.
 
 ## Hostile worker fields (ignored)
 

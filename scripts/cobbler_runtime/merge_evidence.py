@@ -422,6 +422,15 @@ def fetch_pr_snapshot(
     if match is None:
         return None, "pull_request_url_invalid"
     repo, number = match.group(1), match.group(2)
+    # The PR must belong to this checkout's repository: a URL for another
+    # repository (a fork sharing the commit) must not stand in for it.
+    code, out, _ = run(["repo", "view", "--json", "nameWithOwner"], repo_root)
+    local_view = _json(out) if code == 0 else None
+    local_repo = local_view.get("nameWithOwner") if isinstance(local_view, dict) else None
+    if not isinstance(local_repo, str) or not local_repo:
+        return None, "local_repository_unavailable"
+    if local_repo.lower() != repo.lower():
+        return None, "pull_request_repository_mismatch"
     head = str(view.get("headRefOid") or "")
 
     code, out, _ = run(["repo", "view", repo, "--json", "defaultBranchRef"], repo_root)

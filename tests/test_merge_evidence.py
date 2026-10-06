@@ -213,6 +213,20 @@ class OrdinaryPathTests(unittest.TestCase):
             self.assertIn("dependabot_suite_unverifiable", evidence.test_reasons)
 
 
+class ExactTargetTests(unittest.TestCase):
+    def test_head_mismatch_fails_both(self) -> None:
+        evidence = evaluate_merge_evidence(ordinary(head=OTHER), local_head=HEAD)
+        self.assertFalse(evidence.can_merge)
+        self.assertFalse(evidence.tested)
+
+    def test_unsupported_base(self) -> None:
+        evidence = evaluate_merge_evidence(
+            ordinary(base="staging", default_branch="dev"), local_head=HEAD
+        )
+        self.assertFalse(evidence.can_merge)
+        self.assertIn("landing_path_unsupported", evidence.test_reasons)
+
+
 INVENTORY = {
     "schema_version": 1,
     "local_gates": ["npm run lint", "npm test"],
@@ -370,6 +384,8 @@ class FakeGh:
                 return response
         if key.startswith("api repos/acme/app/contents/.github/ci-suite.json"):
             return 1, "", "gh: Not Found (HTTP 404)"
+        if key == "repo view --json nameWithOwner":
+            return 0, json.dumps({"nameWithOwner": "acme/app"}), ""
         return 1, "", "unexpected call"
 
 
@@ -509,6 +525,20 @@ class FetchTests(unittest.TestCase):
         evidence = evaluate_merge_evidence(snapshot, local_head=HEAD)
         self.assertFalse(evidence.can_merge)
         self.assertFalse(evidence.tested)
+
+    def test_pull_request_from_another_repository_is_rejected(self) -> None:
+        gh = FakeGh(
+            {
+                "pr view": (0, view(), ""),
+                "repo view --json nameWithOwner": (0, json.dumps({"nameWithOwner": "acme/fork"}), ""),
+            }
+        )
+        evidence = compute_merge_evidence(
+            Path("."), local_head=HEAD, pr="https://github.com/acme/app/pull/7", run=gh
+        )
+        self.assertFalse(evidence.green)
+        self.assertEqual(evidence.merge_reasons, ("pull_request_repository_mismatch",))
+        self.assertFalse(any(call[:2] == ["pr", "checks"] for call in gh.calls))
 
     def test_no_pull_request_is_unavailable(self) -> None:
         gh = FakeGh({"pr view": (1, "", "no pull requests found")})
