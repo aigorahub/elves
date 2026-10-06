@@ -16,6 +16,8 @@ All notable changes to the Elves skill are documented here.
 
 - The review subagent read `commits/HEAD/check-runs`, which GitHub resolves to the default branch, not the PR. It now reads the PR's own head commit.
 
+## [2.38.0] - 2026-09-24
+
 ### Changed
 
 - Permitted Grok workers prefer `grok-4.7` at `high`, then `grok-4.6`, then `grok-4.5`. The CLI default `grok-4.7-build-fast` stays a speed route. Native delegation examples now name GPT-6 Astra (`gpt-6-astra`), Fable 5.1 (`claude-fable-5-1`), and Opus 5.5 (`claude-opus-5-5`). GPT-5.6 remains a same-model lower-effort route while that catalog row is listed.
