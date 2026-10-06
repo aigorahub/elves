@@ -19,10 +19,10 @@ and the strict landing check uses them instead of a typed `required_checks_green
   `MERGEABLE`, and not `BLOCKED`, `BEHIND`, or `DIRTY`.
 - **Was it tested?** Ordinary path (base is the default branch): a PR comment whose first line is
   `Local tests passed on <head SHA>`, followed by one ``- `<command>`: passed`` line per gate,
-  posted by the repository owner, a member, or a collaborator. Every ``- `<command>`: …`` bullet
-  anywhere in the record is a gate and its result must be exactly `passed`; put counts and remarks
-  in prose notes, never in that shape. A labeled bullet whose result starts with a failure word
-  (``- npm run build: skipped``) rejects the record wherever it appears. Release path (base is `main`
+  posted by the repository owner, a member, or a collaborator. The record holds nothing else:
+  every other non-blank line must read exactly ``- `<command>`: passed`` with a non-empty command.
+  Counts, notes, and explanations go in a separate comment; a comment with any other line is not
+  a record, so a failed or skipped gate cannot hide in it. Release path (base is `main`
   while `main` is not the default branch): the `release` label, the PR's own latest `release-gate`
   and `full-tests` results passed on the head, and `main` up to date. Socket, Vercel, and skipped
   checks never count as tested. Check results belong to the commit, as they do for branch

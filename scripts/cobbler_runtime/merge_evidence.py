@@ -49,17 +49,12 @@ from typing import Any, Callable, Mapping, Sequence
 
 EXACT_COMMIT_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 LOCAL_TEST_RECORD_RE = re.compile(r"^Local tests passed on ([0-9a-fA-F]{40})$")
-# Every ``- `<command>`: <result>`` bullet anywhere in a record is a gate, and
-# its result must be exactly ``passed``. Counts and remarks belong in prose
-# notes. Any other bullet whose result starts with a failure word rejects the
-# record too, so a failed or skipped gate cannot hide below a blank line or a
-# heading.
-GATE_RE = re.compile(r"^ {0,3}[-*]\s+`([^`]+)`:(.*)$")
-LABELED_BULLET_RE = re.compile(r"^ {0,3}[-*]\s+([^:`]{1,80}):\s*(.*)$")
-NEGATIVE_RESULT_RE = re.compile(
-    r"^(?:fail\w*|skip\w*|error\w*|cancel\w*|time[sd]?\s*out|timeout|not\s+run|did\s+not)\b",
-    re.IGNORECASE,
-)
+# A record holds only its first line and gate lines, each exactly
+# ``- `<command>`: passed`` (``*`` bullets, any case, and a trailing period are
+# fine; blank lines are ignored). Any other line makes it not a record, so a
+# failed or skipped gate cannot hide in notes, and notes go in a separate
+# comment.
+STRICT_GATE_RE = re.compile(r"^[-*][ \t]+`([^`\n]*[^`\s][^`\n]*)`:[ \t]+passed\.?$", re.IGNORECASE)
 TRUSTED_AUTHOR_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
 DEPENDABOT_LOGINS = frozenset({"app/dependabot", "dependabot[bot]", "dependabot"})
 RELEASE_BRANCH = "main"
@@ -132,11 +127,10 @@ def parse_suite_inventory(raw: Any) -> dict[str, tuple[str, ...]]:
 def _parse_record(body: Any) -> tuple[str, frozenset[str]] | None:
     """``(head, passed commands)`` for a valid record, or ``None``.
 
-    The first line is ``Local tests passed on <sha>``. Every
-    ``- `<command>`: <result>`` bullet in the record is a gate whose result is
-    exactly ``passed``, and there is at least one. A labeled bullet such as
-    ``- npm run build: skipped`` whose result starts with a failure word
-    rejects the record wherever it appears. Other lines are prose.
+    The first line is ``Local tests passed on <sha>``. Every other non-blank
+    line is a gate line ``- `<command>`: passed`` with a non-empty command,
+    and there is at least one. Anything else (notes, counts, indented or
+    wrapped lines, another result) means the comment is not a record.
     """
 
     if not isinstance(body, str) or not body.strip():
@@ -147,15 +141,12 @@ def _parse_record(body: Any) -> tuple[str, frozenset[str]] | None:
         return None
     commands: set[str] = set()
     for line in lines[1:]:
-        gate = GATE_RE.match(line)
-        if gate is not None:
-            if gate.group(2).strip().rstrip(".").strip().lower() != "passed":
-                return None
-            commands.add(gate.group(1).strip())
+        if not line.strip():
             continue
-        labeled = LABELED_BULLET_RE.match(line)
-        if labeled is not None and NEGATIVE_RESULT_RE.match(labeled.group(2).strip()):
+        gate = STRICT_GATE_RE.fullmatch(line)
+        if gate is None:
             return None
+        commands.add(gate.group(1).strip())
     if not commands:
         return None
     return match.group(1).lower(), frozenset(commands)
