@@ -7,14 +7,33 @@ Machine source: `scripts/cobbler_runtime/landing_authority.py`.
 1. Landing outcome is host control, not worker evidence.
 2. Complete-without-merge and complete-and-merge share one implement → review → revise → readiness pipeline.
 3. Active-run `/land-pr` (or `\land-pr`) grants `driver_authorized` without setting `ready` or restarting readiness.
-4. Merge guard requires: completed acceptance, resolved blockers, clean exact-tip review evidence, required checks, distinct green project landing checks, clean worktree, not draft, `ready`, `driver_authorized`, `landing_outcome=complete_and_merge`, and `current_head == readiness_head`.
+4. Merge guard requires: completed acceptance, resolved blockers, clean exact-tip review evidence, computed merge evidence, distinct green project landing checks, clean worktree, not draft, `ready`, `driver_authorized`, `landing_outcome=complete_and_merge`, and `current_head == readiness_head`.
 5. Merge method is a regular merge commit only — never squash or rebase for Elves landing.
+
+## Computed merge evidence
+
+`scripts/cobbler_runtime/merge_evidence.py` answers two questions for the exact HEAD from GitHub,
+and the strict landing check uses them instead of a typed `required_checks_green`:
+
+- **Can it merge?** Every required check passed or was skipped, the PR is open, not draft,
+  `MERGEABLE`, and not `BLOCKED`, `BEHIND`, or `DIRTY`.
+- **Was it tested?** Ordinary path (base is the default branch): a PR comment whose first line is
+  `Local tests passed on <head SHA>`, followed by one ``- `<command>`: passed`` line per gate, all
+  passed, posted by the repository owner, a member, or a collaborator. Release path (base is `main`
+  while `main` is not the default branch): the `release` label, the PR's own latest `release-gate`
+  and `full-tests` results passed on the head, and `main` up to date. Dependabot PRs run the full
+  suite instead of local tests: their GitHub Actions jobs all passed, none skipped. A failed Actions
+  job is never tested; a failed app check (Socket, a Vercel preview) is left to review. Socket,
+  Vercel, and skipped checks never count as tested. Check results belong to the commit, as they do
+  for branch protection.
+
+Unreadable GitHub state fails closed. Pass `--pr` when the current branch has no unique PR.
 
 ## Hostile worker fields (ignored)
 
 `landing_outcome`, `driver_authorized`, `merge_authority`, `ready`, `readiness_head`,
 `readiness_attested_at`, `host_merge_authorized`, `driver_merge_authorized`,
-`project_landing_checks_green`, `project_landing_checks_digest`.
+`project_landing_checks_green`, `project_landing_checks_digest`, `required_checks_green`.
 
 ## Exact-HEAD readiness
 

@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -16,6 +17,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 from cobbler_runtime.delegated_git import parse_plan_acceptance  # noqa: E402
+from cobbler_runtime.merge_evidence import evaluate_merge_evidence  # noqa: E402
 
 
 def load_module():
@@ -37,6 +39,40 @@ class ElvesLandingCheckTests(unittest.TestCase):
         path = tmp / ".elves-session.json"
         path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         return path
+
+    def _use_pr_snapshot(self, *, record: bool = True, **overrides) -> None:
+        """Answer computed merge evidence from a fixed ordinary-path snapshot."""
+
+        def fake(repo_root, *, local_head, pr=None):
+            snapshot = {
+                "head": local_head,
+                "base": "main",
+                "default_branch": "main",
+                "state": "OPEN",
+                "is_draft": False,
+                "mergeable": "MERGEABLE",
+                "merge_state_status": "CLEAN",
+                "labels": [],
+                "required_checks": [],
+                "checks": [{"name": "Socket Security: Pull Request Alerts", "bucket": "pass"}],
+                "comments": (
+                    [
+                        {
+                            "body": f"Local tests passed on {local_head}\n- `make test`: passed",
+                            "author_association": "MEMBER",
+                        }
+                    ]
+                    if record
+                    else []
+                ),
+                "behind_by": None,
+            }
+            snapshot.update(overrides)
+            return evaluate_merge_evidence(snapshot, local_head=local_head)
+
+        patcher = mock.patch.object(self.mod, "compute_merge_evidence", fake)
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def test_complete_with_acceptance_passes(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
@@ -1266,6 +1302,7 @@ class ElvesLandingCheckTests(unittest.TestCase):
             self.assertFalse(updated["landing"]["worker_merge_authority"])
 
     def test_strict_landing_attestation_is_bound_to_exact_current_head(self) -> None:
+        self._use_pr_snapshot()
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw) / "repo"
             root.mkdir()
@@ -1372,6 +1409,75 @@ class ElvesLandingCheckTests(unittest.TestCase):
             stale = self.mod.run_checks(args)
             self.assertIn("readiness_head_changed", {item.code for item in stale.errors})
 
+    def test_typed_green_never_replaces_computed_merge_evidence(self) -> None:
+        self._use_pr_snapshot(record=False)
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw) / "repo"
+            root.mkdir()
+            subprocess.run(["git", "init", "-q", "-b", "feature"], cwd=root, check=True)
+            subprocess.run(["git", "config", "user.email", "tests@example.invalid"], cwd=root, check=True)
+            subprocess.run(["git", "config", "user.name", "Elves Tests"], cwd=root, check=True)
+            (root / "plan.md").write_text(
+                "### Batch 0: Staging\n\n**Acceptance criteria:**\n- [x] B0-A1: Done\n\n"
+                "## Master Acceptance\n\n- [x] M-A1: Ready\n",
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "add", "plan.md"], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-qm", "plan"], cwd=root, check=True)
+            session = {
+                "plan_path": "plan.md",
+                "batches": [
+                    {
+                        "id": "B0",
+                        "status": "complete",
+                        "acceptance": [
+                            {"id": "B0-A1", "criterion": "Done", "met": True, "evidence": "proof"}
+                        ],
+                    }
+                ],
+                "master_acceptance": [
+                    {"id": "M-A1", "criterion": "Ready", "met": True, "evidence": "proof"}
+                ],
+                "landing": {
+                    "outcome": "complete_and_merge",
+                    "driver_authorized": True,
+                    "worker_merge_authority": False,
+                },
+            }
+            session_path = self._write_session(root, session)
+            subprocess.run(["git", "add", ".elves-session.json"], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-qm", "session"], cwd=root, check=True)
+            head = subprocess.run(
+                ["git", "rev-parse", "HEAD"], cwd=root, text=True, capture_output=True, check=True
+            ).stdout.strip()
+            session["landing"]["readiness"] = {
+                "head": head,
+                "inputs_digest": "d" * 64,
+                "acceptance_complete": True,
+                "blockers_resolved": True,
+                "exact_tip_review_clean": True,
+                "required_checks_green": True,
+                "worktree_clean": True,
+            }
+            session_path.write_text(json.dumps(session), encoding="utf-8")
+
+            report = self.mod.run_checks(
+                self.mod.parse_args(["--repo-root", str(root), "--session", str(session_path)])
+            )
+
+            codes = {item.code for item in report.errors}
+            self.assertIn("merge_evidence_not_tested", codes)
+            self.assertNotIn("merge_evidence_cannot_merge", codes)
+            self.assertIn(
+                "typed_required_checks_green_ignored",
+                {item.code for item in report.warnings},
+            )
+            self.assertFalse(report.landing["ready"])
+            self.assertFalse(report.landing["merge"])
+            self.assertEqual(report.merge_evidence["path"], "ordinary")
+            self.assertTrue(report.merge_evidence["can_merge"])
+            self.assertFalse(report.merge_evidence["tested"])
+
     def test_worker_landing_authority_claim_is_rejected_and_ignored(self) -> None:
         report = self.mod.Report()
         control, _ = self.mod._landing_control_from_session(
@@ -1395,6 +1501,7 @@ class ElvesLandingCheckTests(unittest.TestCase):
         self.assertIn("worker_authority_claims_ignored", {item.code for item in report.warnings})
 
     def test_project_landing_profile_is_live_digest_bound_and_host_owned(self) -> None:
+        self._use_pr_snapshot()
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw) / "repo"
             root.mkdir()

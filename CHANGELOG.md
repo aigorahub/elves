@@ -4,7 +4,17 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
-## [2.38.0] - 2026-09-24
+## [2.39.0] - 2026-10-06
+
+### Changed
+
+- Landing asks two separate questions on the exact head. **Can it merge?** Every required check passed or was skipped and GitHub does not report `BLOCKED`. **Was it tested?** An ordinary PR into the default branch has a `Local tests passed on <head SHA>` PR comment; a release or hotfix PR into `main` (while `main` is not the default branch) has the `release` label, `release-gate` and `full-tests` concluded `success`, and `main` up to date. Socket, Vercel, and skipped checks never count as tested.
+- The strict landing check computes both answers from GitHub (`scripts/cobbler_runtime/merge_evidence.py`) and ignores a typed `required_checks_green`. A local test record counts only when every gate line says passed and the repository owner, a member, or a collaborator posted it. Dependabot PRs count their passed full-suite jobs instead. Only a failed GitHub Actions job means untested; a failed app check such as a Vercel preview is left to review. Release checks are the latest results on the head. Unreadable GitHub state fails closed. `--pr` names the PR when the branch has none of its own.
+- Release PRs need explicit release authority, review against the PR base, and a same-day back-merge PR from `main` into the default branch. Merges pin the head with `--match-head-commit`.
+
+### Fixed
+
+- The review subagent read `commits/HEAD/check-runs`, which GitHub resolves to the default branch, not the PR. It now reads the PR's own head commit.
 
 ### Changed
 

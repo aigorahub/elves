@@ -397,7 +397,9 @@ Elves E2E: chat-to-land (merge when green).
    <scope>`; never a raw Fugu call; otherwise record the skip and its reason); fresh cumulative host review of
    `git diff <default-branch>...HEAD`; fix blockers; update docs and bump the version when the
    repository versions; re-poll async review/CI; then `gh pr merge --merge` only when not draft,
-   checks green, no blocking review, clean worktree. Never squash or rebase.
+   the PR can merge (required checks passed or skipped, not `BLOCKED`), it was tested (a
+   `Local tests passed on <head SHA>` PR comment, or on a release PR `release-gate` and
+   `full-tests` succeeded on the head), no blocking review, clean worktree. Never squash or rebase.
 
 **Continuation:** Prefer `/goal` (Codex) or host long-run continuation once staging is ready.
 Authority remains Stop Gate until Readiness; then landing rules above.

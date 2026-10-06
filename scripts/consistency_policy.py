@@ -520,6 +520,11 @@ REVIEWED_PR_LANDING_PHRASES = {
         "Never invent a raw Fugu call",
         "A landing request alone does not authorize a paid Fugu call",
         "bump the version when the repository versions",
+        "**Can it merge?**",
+        "**Was it tested?**",
+        "Local tests passed on <head SHA>",
+        "never count as tested",
+        "same-day back-merge PR",
     ],
     "references/review-subagent.md": [
         "### Reviewed PR Landing Command",
@@ -532,6 +537,8 @@ REVIEWED_PR_LANDING_PHRASES = {
         "Hosts must not invent a raw Fugu call",
         "A landing request alone does not authorize Fugu",
         "bump the version when the repository versions",
+        "Local tests passed on <head SHA>",
+        "commits/${HEAD_SHA}/check-runs",
     ],
     "references/e2e-chat-to-land.md": [
         "\\land-pr",
@@ -579,6 +586,9 @@ REVIEWED_PR_LANDING_FORBIDDEN_PHRASES = {
     "references/kickoff-prompt-template.md": [
         "merge policy (default: you never merge; opt-in: merge-commit-on-green)",
         "only if the user explicitly set a merge-on-green preference",
+    ],
+    "references/review-subagent.md": [
+        'gh api "repos/OWNER/REPO/commits/HEAD/check-runs"',
     ],
 }
 
@@ -2233,7 +2243,7 @@ if isinstance(PUBLIC_API_SURFACE_SNAPSHOT_PHRASES, dict) and 'SKILL.md' in PUBLI
     PUBLIC_API_SURFACE_SNAPSHOT_PHRASES['SKILL.md'] = ['Public API surface snapshots are optional regression evidence.', 'Use existing structured sources before inventing scanners', 'If no credible source exists, record `unavailable` with the reason instead of fabricating', 'A missing snapshot source is not blocking unless `required: true` was explicitly set in the survival guide.', '`required: true` is valid only when explicitly set by the user or project survival guide.', 'Do not infer required mode from project type, provider config, framework choice, or the presence of API files.', 'Snapshot artifacts are run artifacts, not product docs', 'Temporary snapshot artifacts should not remain in final product PR diffs unless the user explicitly', 'Record shapes and field names, not secrets, bearer tokens, cookies, customer payloads, or production sample data.', 'A snapshot proves public surface shape only; it is not a substitute for tests, E2E checks, review, or the human-owned constitution.', 'public API surface delta when configured']
 if isinstance(REVIEWED_PR_LANDING_PHRASES, dict) and 'SKILL.md' in REVIEWED_PR_LANDING_PHRASES:
     REVIEWED_PR_LANDING_PHRASES = dict(REVIEWED_PR_LANDING_PHRASES)
-    REVIEWED_PR_LANDING_PHRASES['SKILL.md'] = ['## Reviewed PR Landing Command', 'gh pr merge --merge', '\\land-pr', '/land-pr', 'default when bots are expected', 'Fugu review of the current PR diff, when needed and authorized', '$elves fugu review', 'Never invent a raw Fugu call', 'A landing request alone does not authorize a paid Fugu call', 'bump the version when the repository versions']
+    REVIEWED_PR_LANDING_PHRASES['SKILL.md'] = ['## Reviewed PR Landing Command', 'gh pr merge --merge', '\\land-pr', '/land-pr', 'default when bots are expected', 'Fugu review of the current PR diff, when needed and authorized', '$elves fugu review', 'Never invent a raw Fugu call', 'A landing request alone does not authorize a paid Fugu call', 'bump the version when the repository versions', '**Can it merge?**', '**Was it tested?**', 'Local tests passed on <head SHA>', 'never count as tested', 'same-day back-merge PR']
 if isinstance(RISK_TIER_PHRASES, dict) and 'SKILL.md' in RISK_TIER_PHRASES:
     RISK_TIER_PHRASES = dict(RISK_TIER_PHRASES)
     RISK_TIER_PHRASES['SKILL.md'] = ['Thin safety kernel', 'validate once, verify changes, attest final', 'low | standard | high', 'trusted | untrusted', 'touched surfaces', 'risk checkpoints', 'terminal readiness', 'exact HEAD', 'impact-selected']
