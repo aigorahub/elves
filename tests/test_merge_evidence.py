@@ -92,7 +92,7 @@ class LandingPathTests(unittest.TestCase):
             local_test_record_head(f"Local tests passed on {HEAD.upper()}\n- `x`: passed"), HEAD
         )
         self.assertEqual(
-            local_test_record_head(f"  Local tests passed on {OTHER}  \n* `x`: passed (12)"), OTHER
+            local_test_record_head(f"  Local tests passed on {OTHER}  \n* `x`: passed."), OTHER
         )
         self.assertIsNone(local_test_record_head(f"Notes\nLocal tests passed on {OTHER}"))
         self.assertIsNone(local_test_record_head("Local tests passed on abc123\n- `x`: passed"))
@@ -105,33 +105,44 @@ class LandingPathTests(unittest.TestCase):
         )
         self.assertIsNone(local_test_record_head(None))
 
-    def test_record_notes_after_the_gate_list_are_ignored(self) -> None:
+    def test_prose_notes_are_ignored(self) -> None:
         gates = f"Local tests passed on {HEAD}\n- `npm test`: passed\n"
         for notes in (
             "\nNotes:\n- `GEMINI_API_KEY` was set to a placeholder, not a real key.",
-            "\nNotes:\n- `GEMINI_API_KEY`: placeholder was used",
-            "Notes:\n- `npm run build`: skipped on this machine",
-            "\n- GitHub shows only Socket checks on this head.",
+            "\n- Results: Python 157 tests OK; interactive-feedback 211 pass, 0 fail.",
+            "Notes:\n- GitHub shows only Socket checks on this head.",
+            "\nThe installer ran against an empty temporary home.",
         ):
             self.assertEqual(local_test_record_head(gates + notes), HEAD, notes)
 
-    def test_every_bullet_in_the_gate_list_must_pass(self) -> None:
+    def test_every_gate_bullet_anywhere_must_be_exactly_passed(self) -> None:
         first = f"Local tests passed on {HEAD}\n- `npm run lint`: passed\n"
-        for gate in (
+        for rest in (
             "- `npm test`: 812 passed, 1 failed",
             "- `npm test`: failed",
             "- `npm test`:",
             "- `npm test`:   ",
             "- `npm test`:\n    failed",
             "- `npm test`:\n    skipped",
+            "- `npm test`: passed (812 of 813; 1 failed)",
+            "- `npm test`: passed, except one failed",
+            "- `npm test`: passed; build skipped",
+            "\n- `npm test`: failed",
+            "\nNotes:\n- `npm test`: failed",
+            "\nNotes:\n- `npm run build`: skipped on this machine",
+            "\nNotes:\n- `GEMINI_API_KEY`: placeholder was used",
             "- npm run build: skipped",
-            "- just a note",
+            "\nNotes:\n- npm run build: failed to start",
+            "- e2e: not run",
         ):
-            self.assertIsNone(local_test_record_head(first + gate), gate)
+            self.assertIsNone(local_test_record_head(first + rest), rest)
+        self.assertIsNone(local_test_record_head(f"Local tests passed on {HEAD}\n- just a note"))
         self.assertEqual(
             local_test_record_head(f"Local tests passed on {HEAD}\n\n- `npm test`: passed"), HEAD
         )
-        self.assertIsNone(local_test_record_head(f"Local tests passed on {HEAD}\nNotes:\n- `npm test`: passed"))
+        self.assertEqual(
+            local_test_record_head(first + "\n- `npm test`: PASSED."), HEAD
+        )
 
     def test_record_author_must_be_owner_member_or_collaborator(self) -> None:
         heads = local_test_record_heads(
@@ -284,7 +295,7 @@ class SuiteInventoryTests(unittest.TestCase):
             ordinary(comments=[partial], suite_inventory=INVENTORY), local_head=HEAD
         )
         self.assertIn("local_test_record_incomplete", incomplete.test_reasons)
-        full = record(gates="- `npm run lint`: passed\n- `npm test`: passed (812)\n- `git diff --check`: passed")
+        full = record(gates="- `npm run lint`: passed\n\n- `npm test`: passed\n- `git diff --check`: passed")
         self.assertTrue(
             evaluate_merge_evidence(
                 ordinary(comments=[partial, full], suite_inventory=INVENTORY), local_head=HEAD

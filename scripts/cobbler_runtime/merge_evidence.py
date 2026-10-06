@@ -49,11 +49,17 @@ from typing import Any, Callable, Mapping, Sequence
 
 EXACT_COMMIT_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 LOCAL_TEST_RECORD_RE = re.compile(r"^Local tests passed on ([0-9a-fA-F]{40})$")
-# The gate list is the run of bullets right after the first line. Each one
-# must read ``- `<command>`: passed``. A blank line or a heading such as
-# ``Notes:`` ends the list; what follows is prose.
-BULLET_RE = re.compile(r"^ {0,3}[-*]\s")
-PASSED_GATE_RE = re.compile(r"^[-*]\s+`([^`]+)`:\s+passed\b", re.IGNORECASE)
+# Every ``- `<command>`: <result>`` bullet anywhere in a record is a gate, and
+# its result must be exactly ``passed``. Counts and remarks belong in prose
+# notes. Any other bullet whose result starts with a failure word rejects the
+# record too, so a failed or skipped gate cannot hide below a blank line or a
+# heading.
+GATE_RE = re.compile(r"^ {0,3}[-*]\s+`([^`]+)`:(.*)$")
+LABELED_BULLET_RE = re.compile(r"^ {0,3}[-*]\s+([^:`]{1,80}):\s*(.*)$")
+NEGATIVE_RESULT_RE = re.compile(
+    r"^(?:fail\w*|skip\w*|error\w*|cancel\w*|time[sd]?\s*out|timeout|not\s+run|did\s+not)\b",
+    re.IGNORECASE,
+)
 TRUSTED_AUTHOR_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
 DEPENDABOT_LOGINS = frozenset({"app/dependabot", "dependabot[bot]", "dependabot"})
 RELEASE_BRANCH = "main"
@@ -126,11 +132,11 @@ def parse_suite_inventory(raw: Any) -> dict[str, tuple[str, ...]]:
 def _parse_record(body: Any) -> tuple[str, frozenset[str]] | None:
     """``(head, passed commands)`` for a valid record, or ``None``.
 
-    The first line is ``Local tests passed on <sha>``. The bullets that follow
-    it form the gate list: there is at least one, each reads
-    ``- `<command>`: passed``, and an indented continuation line inside the
-    list makes the record invalid. A blank line or a non-bullet line such as
-    ``Notes:`` ends the list, and anything after it is ignored.
+    The first line is ``Local tests passed on <sha>``. Every
+    ``- `<command>`: <result>`` bullet in the record is a gate whose result is
+    exactly ``passed``, and there is at least one. A labeled bullet such as
+    ``- npm run build: skipped`` whose result starts with a failure word
+    rejects the record wherever it appears. Other lines are prose.
     """
 
     if not isinstance(body, str) or not body.strip():
@@ -139,22 +145,17 @@ def _parse_record(body: Any) -> tuple[str, frozenset[str]] | None:
     match = LOCAL_TEST_RECORD_RE.fullmatch(lines[0].strip())
     if match is None:
         return None
-    rest = lines[1:]
-    while rest and not rest[0].strip():
-        rest = rest[1:]
     commands: set[str] = set()
-    for line in rest:
-        if not line.strip():
-            break
-        if BULLET_RE.match(line):
-            passed = PASSED_GATE_RE.match(line.strip())
-            if passed is None:
+    for line in lines[1:]:
+        gate = GATE_RE.match(line)
+        if gate is not None:
+            if gate.group(2).strip().rstrip(".").strip().lower() != "passed":
                 return None
-            commands.add(passed.group(1).strip())
-        elif line[:1].isspace():
+            commands.add(gate.group(1).strip())
+            continue
+        labeled = LABELED_BULLET_RE.match(line)
+        if labeled is not None and NEGATIVE_RESULT_RE.match(labeled.group(2).strip()):
             return None
-        else:
-            break
     if not commands:
         return None
     return match.group(1).lower(), frozenset(commands)
