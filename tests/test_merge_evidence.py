@@ -105,6 +105,19 @@ class LandingPathTests(unittest.TestCase):
         )
         self.assertIsNone(local_test_record_head(None))
 
+    def test_record_notes_are_not_gate_lines(self) -> None:
+        body = (
+            f"Local tests passed on {HEAD}\n"
+            "- `npm test`: passed\n"
+            "\nNotes:\n"
+            "- `GEMINI_API_KEY` was set to a placeholder, not a real key.\n"
+            "- GitHub shows only Socket checks on this head."
+        )
+        self.assertEqual(local_test_record_head(body), HEAD)
+        failed_gate = body.replace("- `npm test`: passed", "- `npm test`: 812 passed, 1 failed")
+        self.assertIsNone(local_test_record_head(failed_gate))
+        self.assertIsNone(local_test_record_head(f"Local tests passed on {HEAD}\n- just a note"))
+
     def test_record_author_must_be_owner_member_or_collaborator(self) -> None:
         heads = local_test_record_heads(
             [

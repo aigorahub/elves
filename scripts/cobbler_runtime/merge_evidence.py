@@ -49,7 +49,9 @@ from typing import Any, Callable, Mapping, Sequence
 
 EXACT_COMMIT_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 LOCAL_TEST_RECORD_RE = re.compile(r"^Local tests passed on ([0-9a-fA-F]{40})$")
-GATE_LINE_RE = re.compile(r"^[-*]\s")
+# A gate line is ``- `<command>`: <result>``; other lines, bulleted notes
+# included, are prose and ignored.
+GATE_LINE_RE = re.compile(r"^[-*]\s+`[^`]+`:\s*\S")
 PASSED_GATE_RE = re.compile(r"^[-*]\s+`([^`]+)`:\s+passed\b", re.IGNORECASE)
 TRUSTED_AUTHOR_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
 DEPENDABOT_LOGINS = frozenset({"app/dependabot", "dependabot[bot]", "dependabot"})
@@ -124,7 +126,8 @@ def _parse_record(body: Any) -> tuple[str, frozenset[str]] | None:
     """``(head, passed commands)`` for a valid record, or ``None``.
 
     The first line is ``Local tests passed on <sha>``. Every gate line
-    (``- `<command>`: passed``) says passed, and there is at least one.
+    (``- `<command>`: <result>``) says passed, and there is at least one.
+    Other lines, such as bulleted notes, are ignored.
     """
 
     if not isinstance(body, str) or not body.strip():
