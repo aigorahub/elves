@@ -49,9 +49,10 @@ from typing import Any, Callable, Mapping, Sequence
 
 EXACT_COMMIT_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 LOCAL_TEST_RECORD_RE = re.compile(r"^Local tests passed on ([0-9a-fA-F]{40})$")
-# A gate line is ``- `<command>`: <result>``; other lines, bulleted notes
-# included, are prose and ignored.
-GATE_LINE_RE = re.compile(r"^[-*]\s+`[^`]+`:\s*\S")
+# The gate list is the run of bullets right after the first line. Each one
+# must read ``- `<command>`: passed``. A blank line or a heading such as
+# ``Notes:`` ends the list; what follows is prose.
+BULLET_RE = re.compile(r"^ {0,3}[-*]\s")
 PASSED_GATE_RE = re.compile(r"^[-*]\s+`([^`]+)`:\s+passed\b", re.IGNORECASE)
 TRUSTED_AUTHOR_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
 DEPENDABOT_LOGINS = frozenset({"app/dependabot", "dependabot[bot]", "dependabot"})
@@ -125,22 +126,38 @@ def parse_suite_inventory(raw: Any) -> dict[str, tuple[str, ...]]:
 def _parse_record(body: Any) -> tuple[str, frozenset[str]] | None:
     """``(head, passed commands)`` for a valid record, or ``None``.
 
-    The first line is ``Local tests passed on <sha>``. Every gate line
-    (``- `<command>`: <result>``) says passed, and there is at least one.
-    Other lines, such as bulleted notes, are ignored.
+    The first line is ``Local tests passed on <sha>``. The bullets that follow
+    it form the gate list: there is at least one, each reads
+    ``- `<command>`: passed``, and an indented continuation line inside the
+    list makes the record invalid. A blank line or a non-bullet line such as
+    ``Notes:`` ends the list, and anything after it is ignored.
     """
 
     if not isinstance(body, str) or not body.strip():
         return None
-    lines = [line.strip() for line in body.lstrip(_BOM).strip().splitlines()]
-    match = LOCAL_TEST_RECORD_RE.fullmatch(lines[0])
+    lines = [line.rstrip() for line in body.lstrip(_BOM).strip().splitlines()]
+    match = LOCAL_TEST_RECORD_RE.fullmatch(lines[0].strip())
     if match is None:
         return None
-    gates = [line for line in lines[1:] if GATE_LINE_RE.match(line)]
-    passed = [PASSED_GATE_RE.match(line) for line in gates]
-    if not gates or not all(passed):
+    rest = lines[1:]
+    while rest and not rest[0].strip():
+        rest = rest[1:]
+    commands: set[str] = set()
+    for line in rest:
+        if not line.strip():
+            break
+        if BULLET_RE.match(line):
+            passed = PASSED_GATE_RE.match(line.strip())
+            if passed is None:
+                return None
+            commands.add(passed.group(1).strip())
+        elif line[:1].isspace():
+            return None
+        else:
+            break
+    if not commands:
         return None
-    return match.group(1).lower(), frozenset(m.group(1).strip() for m in passed if m)
+    return match.group(1).lower(), frozenset(commands)
 
 
 def local_test_record_head(body: Any) -> str | None:

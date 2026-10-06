@@ -105,18 +105,33 @@ class LandingPathTests(unittest.TestCase):
         )
         self.assertIsNone(local_test_record_head(None))
 
-    def test_record_notes_are_not_gate_lines(self) -> None:
-        body = (
-            f"Local tests passed on {HEAD}\n"
-            "- `npm test`: passed\n"
-            "\nNotes:\n"
-            "- `GEMINI_API_KEY` was set to a placeholder, not a real key.\n"
-            "- GitHub shows only Socket checks on this head."
+    def test_record_notes_after_the_gate_list_are_ignored(self) -> None:
+        gates = f"Local tests passed on {HEAD}\n- `npm test`: passed\n"
+        for notes in (
+            "\nNotes:\n- `GEMINI_API_KEY` was set to a placeholder, not a real key.",
+            "\nNotes:\n- `GEMINI_API_KEY`: placeholder was used",
+            "Notes:\n- `npm run build`: skipped on this machine",
+            "\n- GitHub shows only Socket checks on this head.",
+        ):
+            self.assertEqual(local_test_record_head(gates + notes), HEAD, notes)
+
+    def test_every_bullet_in_the_gate_list_must_pass(self) -> None:
+        first = f"Local tests passed on {HEAD}\n- `npm run lint`: passed\n"
+        for gate in (
+            "- `npm test`: 812 passed, 1 failed",
+            "- `npm test`: failed",
+            "- `npm test`:",
+            "- `npm test`:   ",
+            "- `npm test`:\n    failed",
+            "- `npm test`:\n    skipped",
+            "- npm run build: skipped",
+            "- just a note",
+        ):
+            self.assertIsNone(local_test_record_head(first + gate), gate)
+        self.assertEqual(
+            local_test_record_head(f"Local tests passed on {HEAD}\n\n- `npm test`: passed"), HEAD
         )
-        self.assertEqual(local_test_record_head(body), HEAD)
-        failed_gate = body.replace("- `npm test`: passed", "- `npm test`: 812 passed, 1 failed")
-        self.assertIsNone(local_test_record_head(failed_gate))
-        self.assertIsNone(local_test_record_head(f"Local tests passed on {HEAD}\n- just a note"))
+        self.assertIsNone(local_test_record_head(f"Local tests passed on {HEAD}\nNotes:\n- `npm test`: passed"))
 
     def test_record_author_must_be_owner_member_or_collaborator(self) -> None:
         heads = local_test_record_heads(
