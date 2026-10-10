@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import fcntl
 import hashlib
 import os
 import re
@@ -1231,6 +1232,42 @@ def native_worker_paths(repo_root: Path, run_id: str) -> tuple[Path, Path]:
     return root / "state.json", root / "follow.jsonl"
 
 
+def _git_common_dir(checkout: Path) -> Path | None:
+    result = subprocess.run(
+        ["git", "rev-parse", "--git-common-dir"], cwd=checkout,
+        capture_output=True, text=True, timeout=30, check=False,
+    )
+    return (checkout / result.stdout.strip()).resolve() if result.returncode == 0 else None
+
+
+@contextmanager
+def _native_worker_launch_lock(repo_root: Path, worktree: Path, *, fixture: bool = False):
+    common = _git_common_dir(worktree)
+    state_common = _git_common_dir(repo_root)
+    if common is None and state_common is None and fixture:
+        # Non-Git fixtures have no shared repository refs.
+        yield
+        return
+    registered = subprocess.run(
+        ["git", "worktree", "list", "--porcelain", "-z"], cwd=worktree,
+        capture_output=True, text=True, timeout=30, check=False,
+    )
+    checkouts = {Path(field[len("worktree "):]).resolve()
+                 for field in registered.stdout.split("\0") if field.startswith("worktree ")}
+    if common is None or common != state_common or repo_root.resolve() not in checkouts:
+        raise ValidationIssue(
+            "native_worker_state_repository_mismatch",
+            "Native worker --repo-root must be a registered checkout of the same "
+            "repository as --worktree (sharing its Git common directory)",
+        )
+    with (common / "elves-native-worker-launch.lock").open("a") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+
 def _repository_native_worker_runs(worktree: Path) -> list[dict[str, Any]]:
     """Read recorded runs across checkouts that share this repository's refs."""
     result = subprocess.run(
@@ -1263,7 +1300,7 @@ def _check_shared_refs_active_run(worktree: Path, run_id: str) -> None:
         "transition_ready", "launching_execution", "executing", "execution_backoff",
     }
     for other in _repository_native_worker_runs(worktree):
-        if other.get("run_id") == run_id or other.get("status") not in active:
+        if other.get("status") not in active:
             continue
         raise ValidationIssue(
             "native_worker_shared_refs_active_run",
@@ -1296,9 +1333,9 @@ def _authority_failure_detail(worktree: Path, state: dict[str, Any], errors: lis
         if not branch or other.get("run_id") == state.get("run_id"):
             continue
         if any(ref in {f"refs/heads/{branch}", f"refs/remotes/origin/{branch}"} for ref in moved):
-            return (f"Another native worker run ({other.get('run_id')}) moved its own branch "
+            return (f"The branch of another native worker run ({other.get('run_id')}) moved "
                     "in this repository. Two native workers cannot share one repository.")
-    return (f"A process other than this worker moved {moved[0]}. "
+    return (f"{moved[0]} moved outside this worker's assigned branch. "
             "A running worker treats every other ref in the repository as protected. "
             "Do not commit, branch, fetch, or push in this repository while it runs.")
 
@@ -2134,121 +2171,127 @@ def launch_native_worker(
         environment=os.environ,
     )
     worktree = Path(launch_spec.cwd).resolve()
-    _check_shared_refs_active_run(worktree, run_id)
-    if prewalk_spec and not _worktree_clean(worktree):
-        raise ValidationIssue(
-            "prewalk_worktree_continuity_violation",
-            "Prewalk requires a clean registered worktree at the exact starting HEAD",
-            path=str(worktree),
-        )
-    if launch_spec.host == "fixture" and not prewalk_spec:
-        git_contract = {
-            "assigned_branch": None,
-            "start_head": None,
-            "protected_refs": {},
-            "origin_config_digest": None,
+    with _native_worker_launch_lock(
+        repo_root, worktree, fixture=launch_spec.host == "fixture",
+    ):
+        # Recheck under the lock to protect simultaneous relaunches as well.
+        if state_path.exists():
+            raise ValidationIssue("native_worker_run_exists", f"Native worker run `{run_id}` already exists")
+        _check_shared_refs_active_run(worktree, run_id)
+        if prewalk_spec and not _worktree_clean(worktree):
+            raise ValidationIssue(
+                "prewalk_worktree_continuity_violation",
+                "Prewalk requires a clean registered worktree at the exact starting HEAD",
+                path=str(worktree),
+            )
+        if launch_spec.host == "fixture" and not prewalk_spec:
+            git_contract = {
+                "assigned_branch": None,
+                "start_head": None,
+                "protected_refs": {},
+                "origin_config_digest": None,
+            }
+        else:
+            git_contract = _native_git_contract(worktree)
+        packet_path = packet.resolve(strict=True)
+        base_state: dict[str, Any] = {
+            "run_id": run_id,
+            "host": launch_spec.host,
+            "worktree": launch_spec.cwd,
+            "argv": list(launch_spec.argv),
+            "requested_model": launch_spec.requested_model,
+            "session_id": launch_spec.session_id,
+            "session_id_source": launch_spec.session_id_source,
+            "pid": None,
+            "pid_start": None,
+            "follow_log": str(log_path),
+            "visibility_ready": True,
+            "visibility_mode": "follow_log",
+            "watcher_command": watcher,
+            "exit_code": None,
+            "commit_mode": launch_spec.commit_mode,
+            "provider_event_count": 0,
+            "stderr_tail": None,
+            "git_write_roots": list(launch_spec.git_write_roots),
+            "prompt_file_flag": launch_spec.prompt_file_flag,
+            "positional_input": launch_spec.positional_input,
+            "input_file_prefix": launch_spec.input_file_prefix,
+            "git_network_push": "disabled",
+            "git_authority_mode": "fixture" if launch_spec.host == "fixture" else "feature_only",
+            **git_contract,
         }
-    else:
-        git_contract = _native_git_contract(worktree)
-    packet_path = packet.resolve(strict=True)
-    base_state: dict[str, Any] = {
-        "run_id": run_id,
-        "host": launch_spec.host,
-        "worktree": launch_spec.cwd,
-        "argv": list(launch_spec.argv),
-        "requested_model": launch_spec.requested_model,
-        "session_id": launch_spec.session_id,
-        "session_id_source": launch_spec.session_id_source,
-        "pid": None,
-        "pid_start": None,
-        "follow_log": str(log_path),
-        "visibility_ready": True,
-        "visibility_mode": "follow_log",
-        "watcher_command": watcher,
-        "exit_code": None,
-        "commit_mode": launch_spec.commit_mode,
-        "provider_event_count": 0,
-        "stderr_tail": None,
-        "git_write_roots": list(launch_spec.git_write_roots),
-        "prompt_file_flag": launch_spec.prompt_file_flag,
-        "positional_input": launch_spec.positional_input,
-        "input_file_prefix": launch_spec.input_file_prefix,
-        "git_network_push": "disabled",
-        "git_authority_mode": "fixture" if launch_spec.host == "fixture" else "feature_only",
-        **git_contract,
-    }
-    if prewalk_spec:
-        paths = prewalk_paths(worktree, run_id)
-        state = {
-            **base_state,
-            "version": PREWALK_STATE_VERSION,
-            "mode": "prewalk",
-            "status": "launching_prewalk",
-            "status_history": [
-                {"status": "staged", "at": datetime_now()},
-                {"status": "launching_prewalk", "at": datetime_now()},
-            ],
-            "starting_worktree_clean": True,
-            "packet": {
-                "path": str(packet_path),
-                "sha256": packet_digest(packet_path),
-                "sent_count": 0,
-            },
-            "prewalk": {
-                "model": prewalk_spec.guide.requested_model,
-                "effort": prewalk_spec.guide.effort,
-                "instruction_strategy": (
-                    "experimental_unqualified_persisted_instruction"
-                    if prewalk_spec.requested_mode == "experimental"
-                    else "retained_safe_host_instruction"
-                ),
-                "instruction_fidelity": prewalk_spec.instruction_fidelity,
-                "instruction_pruned": prewalk_spec.instruction_fidelity == "pruned",
-                "todo_limit": prewalk_spec.todo_limit,
-                "paths": paths.to_dict(),
-                "argv": list(prewalk_spec.guide.argv),
-                "prompt_file_flag": prewalk_spec.guide.prompt_file_flag,
-                "positional_input": prewalk_spec.guide.positional_input,
-                "input_file_prefix": prewalk_spec.guide.input_file_prefix,
-                "fixture_script": (
-                    prewalk_spec.guide.argv[1]
-                    if prewalk_spec.guide.host == "fixture"
-                    else None
-                ),
-                "recovery_attempts": 0,
-            },
-            "execution": {
-                "model": prewalk_spec.execution_model,
-                "effort": prewalk_spec.execution_effort,
-                "resume_input": PREWALK_CONTINUATION_INPUT,
-                "argv": None,
-                "prompt_file_flag": (
-                    prewalk_spec.execution_spec(
-                        prewalk_spec.guide.session_id or "prewalk-session-preview"
-                    ).prompt_file_flag
-                ),
-                "positional_input": (
-                    prewalk_spec.execution_spec(
-                        prewalk_spec.guide.session_id or "prewalk-session-preview"
-                    ).positional_input
-                ),
-                "input_file_prefix": (
-                    prewalk_spec.execution_spec(
-                        prewalk_spec.guide.session_id or "prewalk-session-preview"
-                    ).input_file_prefix
-                ),
-                "fixture_script": prewalk_spec.execution_fixture_script,
-                "transient_retries": 0,
-                "retry_backoff_seconds": [],
-            },
-            "transition": {"status": "pending"},
-            "requested_prewalk_mode": prewalk_spec.requested_mode,
-            "capabilities": prewalk_spec.capabilities.to_dict(),
-            "forbidden_paths": list(prewalk_spec.forbidden_paths),
-        }
-    else:
-        state = {**base_state, "version": 2, "status": "launching"}
-    _write_private_json(state_path, state)
+        if prewalk_spec:
+            paths = prewalk_paths(worktree, run_id)
+            state = {
+                **base_state,
+                "version": PREWALK_STATE_VERSION,
+                "mode": "prewalk",
+                "status": "launching_prewalk",
+                "status_history": [
+                    {"status": "staged", "at": datetime_now()},
+                    {"status": "launching_prewalk", "at": datetime_now()},
+                ],
+                "starting_worktree_clean": True,
+                "packet": {
+                    "path": str(packet_path),
+                    "sha256": packet_digest(packet_path),
+                    "sent_count": 0,
+                },
+                "prewalk": {
+                    "model": prewalk_spec.guide.requested_model,
+                    "effort": prewalk_spec.guide.effort,
+                    "instruction_strategy": (
+                        "experimental_unqualified_persisted_instruction"
+                        if prewalk_spec.requested_mode == "experimental"
+                        else "retained_safe_host_instruction"
+                    ),
+                    "instruction_fidelity": prewalk_spec.instruction_fidelity,
+                    "instruction_pruned": prewalk_spec.instruction_fidelity == "pruned",
+                    "todo_limit": prewalk_spec.todo_limit,
+                    "paths": paths.to_dict(),
+                    "argv": list(prewalk_spec.guide.argv),
+                    "prompt_file_flag": prewalk_spec.guide.prompt_file_flag,
+                    "positional_input": prewalk_spec.guide.positional_input,
+                    "input_file_prefix": prewalk_spec.guide.input_file_prefix,
+                    "fixture_script": (
+                        prewalk_spec.guide.argv[1]
+                        if prewalk_spec.guide.host == "fixture"
+                        else None
+                    ),
+                    "recovery_attempts": 0,
+                },
+                "execution": {
+                    "model": prewalk_spec.execution_model,
+                    "effort": prewalk_spec.execution_effort,
+                    "resume_input": PREWALK_CONTINUATION_INPUT,
+                    "argv": None,
+                    "prompt_file_flag": (
+                        prewalk_spec.execution_spec(
+                            prewalk_spec.guide.session_id or "prewalk-session-preview"
+                        ).prompt_file_flag
+                    ),
+                    "positional_input": (
+                        prewalk_spec.execution_spec(
+                            prewalk_spec.guide.session_id or "prewalk-session-preview"
+                        ).positional_input
+                    ),
+                    "input_file_prefix": (
+                        prewalk_spec.execution_spec(
+                            prewalk_spec.guide.session_id or "prewalk-session-preview"
+                        ).input_file_prefix
+                    ),
+                    "fixture_script": prewalk_spec.execution_fixture_script,
+                    "transient_retries": 0,
+                    "retry_backoff_seconds": [],
+                },
+                "transition": {"status": "pending"},
+                "requested_prewalk_mode": prewalk_spec.requested_mode,
+                "capabilities": prewalk_spec.capabilities.to_dict(),
+                "forbidden_paths": list(prewalk_spec.forbidden_paths),
+            }
+        else:
+            state = {**base_state, "version": 2, "status": "launching"}
+        _write_private_json(state_path, state)
     supervisor_log = state_path.parent / "supervisor.log"
     with supervisor_log.open("a", encoding="utf-8") as supervisor_output:
         os.chmod(supervisor_log, 0o600)

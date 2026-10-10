@@ -42,9 +42,18 @@ supervised session. Host-by-host invocation parity lives in the Parallelves pari
    Its origin is the lane's bare mirror; worker progress must reach that mirror before integration.
 4. While a worker runs, no other process commits, branches, tags, fetches, or pushes in
    that repository. This includes the driver and every linked worktree.
-5. Bring the lane back between worker runs: in the integration repository, run
+5. After the lane worker ends, push its branch to the bare mirror with
+   `git -C <lanes>/<lane> push origin <lane-branch>`.
+   Bring the lane back between worker runs: in the integration repository, run
    `git fetch <lanes>/<lane>.git <lane-branch>`, then `git merge --no-ff FETCH_HEAD`.
    Use a regular merge commit, and wait until any worker in the integration repository has ended.
+
+Launches serialize the active-run scan and initial state registration with a lock in the
+Git common directory. `--repo-root` must be a registered checkout of the same repository
+as `--worktree`; a matching run ID in another checkout still blocks launch.
+Protected-ref failure details report observed movement without identifying its actor:
+"The branch of another native worker run (<run id>) moved in this repository. Two native workers cannot share one repository."
+For other refs: "<ref> moved outside this worker's assigned branch. A running worker treats every other ref in the repository as protected. Do not commit, branch, fetch, or push in this repository while it runs."
 
 ## The width test
 
