@@ -21,8 +21,9 @@ The shape is trunk -> lanes -> integration.
 
 - **Trunk batches** build shared foundations serially, before any lane forks. Anything two lanes
   would both need lives in a trunk batch.
-- **Lanes** run on pairwise-disjoint owned surfaces, each in a dedicated worktree on its own
-  feature branch. Disjointness uses path-prefix semantics: a lane owning a directory conflicts
+- **Lanes** run on pairwise-disjoint owned surfaces, each on its own feature branch.
+  A lane running a native worker needs its own clone with its own origin; a second worktree of the same repository is not enough, because
+  worktrees share refs. Disjointness uses path-prefix semantics: a lane owning a directory conflicts
   with any lane owning a path inside it.
 - **Integration** merges lanes into an integration branch with regular merge commits (never
   rebase), in a driver-owned order, and produces one PR for the whole run.
@@ -31,6 +32,19 @@ Phase-1 operation composes existing per-session worker runs (native or trusted f
 per lane, per each host's documented grammar; the driver stages and reviews each lane as its own
 supervised session. Host-by-host invocation parity lives in the Parallelves parity section of
 [`host-parity.md`](host-parity.md).
+
+## Operator recipe for parallel native workers
+
+1. Make a bare mirror for each lane: `git clone --bare <origin-url> <lanes>/<lane>.git`.
+2. Clone it: `git clone <lanes>/<lane>.git <lanes>/<lane>`, then create the lane branch
+   with `git -C <lanes>/<lane> switch -c <lane-branch>`.
+3. Launch the native worker with `--repo-root` and `--worktree` set to that clone.
+   Its origin is the lane's bare mirror; worker progress must reach that mirror before integration.
+4. While a worker runs, no other process commits, branches, tags, fetches, or pushes in
+   that repository. This includes the driver and every linked worktree.
+5. Bring the lane back between worker runs: in the integration repository, run
+   `git fetch <lanes>/<lane>.git <lane-branch>`, then `git merge --no-ff FETCH_HEAD`.
+   Use a regular merge commit, and wait until any worker in the integration repository has ended.
 
 ## The width test
 

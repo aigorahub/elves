@@ -1231,6 +1231,78 @@ def native_worker_paths(repo_root: Path, run_id: str) -> tuple[Path, Path]:
     return root / "state.json", root / "follow.jsonl"
 
 
+def _repository_native_worker_runs(worktree: Path) -> list[dict[str, Any]]:
+    """Read recorded runs across checkouts that share this repository's refs."""
+    result = subprocess.run(
+        ["git", "worktree", "list", "--porcelain", "-z"], cwd=worktree,
+        capture_output=True, text=True, timeout=30, check=False,
+    )
+    if result.returncode:
+        # Fixture workers may run outside Git; real workers validate Git separately.
+        return []
+    runs: list[dict[str, Any]] = []
+    for field in result.stdout.split("\0"):
+        if not field.startswith("worktree "):
+            continue
+        checkout = Path(field[len("worktree "):])
+        for path in sorted((checkout / ".elves/runtime/native-worker").glob("*/state.json")):
+            try:
+                state = json.loads(path.read_text(encoding="utf-8"))
+                if not isinstance(state, dict):
+                    raise ValueError("state is not an object")
+            except (OSError, ValueError) as error:
+                print(f"Warning: cannot read native worker state {path}: {error}", file=sys.stderr)
+                continue
+            runs.append({**state, "recorded_worktree": str(checkout)})
+    return runs
+
+
+def _check_shared_refs_active_run(worktree: Path, run_id: str) -> None:
+    active = {
+        "staged", "launching", "running", "launching_prewalk", "prewalking",
+        "transition_ready", "launching_execution", "executing", "execution_backoff",
+    }
+    for other in _repository_native_worker_runs(worktree):
+        if other.get("run_id") == run_id or other.get("status") not in active:
+            continue
+        raise ValidationIssue(
+            "native_worker_shared_refs_active_run",
+            f"Cannot launch native worker run `{run_id}`: another active run "
+            f"`{other.get('run_id')}` shares this repository's refs "
+            f"(worktree {other.get('worktree') or other['recorded_worktree']}, "
+            f"branch {other.get('assigned_branch') or '<unknown>'}). "
+            "Use a separate clone with its own origin: git clone --bare <origin-url> "
+            "<lanes>/<lane>.git; git clone <lanes>/<lane>.git <lanes>/<lane>; "
+            "create the lane branch, then launch with --repo-root and --worktree set "
+            "to that clone. Integrate from the bare mirror between worker runs "
+            "with a regular merge commit. Do not commit, branch, tag, fetch, or push "
+            "in this repository while a worker runs. See references/parallelves.md.",
+        )
+
+
+def _authority_failure_detail(worktree: Path, state: dict[str, Any], errors: list[str]) -> str | None:
+    moved = [error.split("protected ref moved: ", 1)[1].split(" was ", 1)[0]
+             for error in errors if error.startswith("protected ref moved: ")]
+    if not moved:
+        return None
+    try:
+        recorded_runs = _repository_native_worker_runs(worktree)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        # Diagnostic enrichment must never prevent the terminal failure write.
+        print(f"Warning: cannot inspect sibling native worker runs: {error}", file=sys.stderr)
+        recorded_runs = []
+    for other in recorded_runs:
+        branch = other.get("assigned_branch")
+        if not branch or other.get("run_id") == state.get("run_id"):
+            continue
+        if any(ref in {f"refs/heads/{branch}", f"refs/remotes/origin/{branch}"} for ref in moved):
+            return (f"Another native worker run ({other.get('run_id')}) moved its own branch "
+                    "in this repository. Two native workers cannot share one repository.")
+    return (f"A process other than this worker moved {moved[0]}. "
+            "A running worker treats every other ref in the repository as protected. "
+            "Do not commit, branch, fetch, or push in this repository while it runs.")
+
+
 def _write_private_json(path: Path, data: dict[str, Any]) -> None:
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     os.chmod(path.parent, 0o700)
@@ -1964,6 +2036,9 @@ def _terminalize_native_worker(
     state["exit_code"] = exit_code
     state["authority_verified"] = not errors
     state["authority_errors"] = errors
+    detail = _authority_failure_detail(worktree, state, errors)
+    if detail:
+        state["failure_detail"] = detail
     try:
         state["final_head"] = _final_head(worktree)
     except subprocess.TimeoutExpired:
@@ -2059,6 +2134,7 @@ def launch_native_worker(
         environment=os.environ,
     )
     worktree = Path(launch_spec.cwd).resolve()
+    _check_shared_refs_active_run(worktree, run_id)
     if prewalk_spec and not _worktree_clean(worktree):
         raise ValidationIssue(
             "prewalk_worktree_continuity_violation",

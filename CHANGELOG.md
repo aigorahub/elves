@@ -4,6 +4,14 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.40.0] - 2026-10-10
+
+### Fixed
+
+- Native workers refuse launch when another active recorded run shares the repository's refs, including runs in linked worktrees. Unreadable state files warn without blocking; terminal runs do not block.
+- Protected-ref authority failures explain whether another recorded worker's feature branch or another process moved the ref. The failure code and protected-ref safety checks remain unchanged.
+- Parallel native-worker lane documentation requires separate clones with separate origins and provides the bare-mirror integration recipe (#284).
+
 ## [2.39.0] - 2026-10-06
 
 ### Changed

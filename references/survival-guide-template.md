@@ -40,7 +40,7 @@ session-cookie approach. All existing auth tests must pass. The public API surfa
 - **Checkpoint semantics:** [delivery target only | hard stop boundary | none]
 - **May continue after checkpoint:** [yes | no]
 - **Actual stop conditions:** [one short sentence]
-- **Workspace ownership:** [owned branch + main checkout | dedicated worktree created with `./scripts/preflight.sh --create-worktree <branch> --base origin/main`] — never shared with another active agent; use `--dry-run` to inspect first
+- **Workspace ownership:** [owned branch + main checkout | dedicated worktree created with `./scripts/preflight.sh --create-worktree <branch> --base origin/main`] — never shared with another active agent; use `--dry-run` to inspect first. A dedicated worktree does not isolate refs from another active native worker in the same repository; each native-worker lane needs its own clone with its own origin (see `references/parallelves.md`).
 - **Branch tip at start (collision tripwire):** [`git rev-parse HEAD` recorded at staging; an advance is expected only when the exact registered trusted full-run session advances its assigned feature branch to a descendant of the last observed tip and the supervisor verifies its process fingerprint and protected refs unchanged; every other move is a collision]
 - **Merge policy:** The user owns whether Elves may merge: [user-merges (default — you never merge) | merge-commit-on-green (opt-in: regular merge commit after the final readiness review passes, never squash) | reviewed-pr-landing-command / `\land-pr` / `/land-pr` (one-off explicit merge opt-in for the current PR)]
 - **Final-response policy:** [allowed | disallowed until stop]
@@ -288,7 +288,7 @@ plan, the codebase, or good engineering practice.
 - [ ] Learnings file initialized or refreshed
 - [ ] Execution log initialized with batch breakdown and preflight notes
 - [ ] Branch created or confirmed
-- [ ] Branch and checkout ownership confirmed (dedicated worktree if other agents may touch the repo); no other agent shares this branch
+- [ ] Branch and checkout ownership confirmed (dedicated worktree if other agents may touch the repo); no other agent shares this branch. A dedicated worktree does not isolate refs from another active native worker in the same repository; each native-worker lane needs its own clone with its own origin (see `references/parallelves.md`).
 - [ ] PR opened or existing PR recorded
 - [ ] Preflight run and critical failures cleared
 - [ ] Run mode, return time, and non-negotiables recorded

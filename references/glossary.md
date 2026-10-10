@@ -105,8 +105,10 @@ in this file, it is not project vocabulary — plain English wins.
 - **Parallelves** — Cobbler-coordinated parallel implementation lanes within one run: serial by
   default, recommend-only `auto`, no runtime orchestrator, no authority change
   (`references/parallelves.md`).
-- **Lane** — one Cobbler-routed writer agent in a Parallelves run: a dedicated worktree and
+- **Lane** — one Cobbler-routed writer agent in a Parallelves run: a dedicated checkout and
   feature branch on pairwise-disjoint owned surfaces, under the existing worker authority model.
+  A lane running a native worker needs its own clone with its own origin; a second worktree
+  of the same repository does not isolate refs (see `references/parallelves.md`).
 - **Trunk batch** — a serial batch that builds shared foundations before lanes fork (or after a
   reclassification pause); anything two lanes would both need lives in a trunk batch.
 - **Integration review** — the mandatory cross-lane entropy review before the integration PR is
