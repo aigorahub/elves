@@ -1254,7 +1254,10 @@ def _native_worker_launch_lock(repo_root: Path, worktree: Path, *, fixture: bool
     )
     checkouts = {Path(field[len("worktree "):]).resolve()
                  for field in registered.stdout.split("\0") if field.startswith("worktree ")}
-    if common is None or common != state_common or repo_root.resolve() not in checkouts:
+    # Every registered checkout has its own .git entry; this also guards against an
+    # inherited GIT_DIR making an unrelated directory look like a checkout.
+    if (common is None or common != state_common or repo_root.resolve() not in checkouts
+            or not (repo_root / ".git").exists()):
         raise ValidationIssue(
             "native_worker_state_repository_mismatch",
             "Native worker --repo-root must be a registered checkout of the same "

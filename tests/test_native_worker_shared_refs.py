@@ -91,10 +91,11 @@ class SharedRefsTests(unittest.TestCase):
         self.git(self.root, 'init', str(unrelated))
         for state_root in (unrelated, self.root, self.repo / '.elves'):
             state_root.mkdir(exist_ok=True)
-            with self.subTest(state_root=state_root), self.assertRaises(ValidationIssue) as caught:
-                self.launch(self.repo, 'outside', repo_root=state_root)
-            self.assertEqual(caught.exception.code, 'native_worker_state_repository_mismatch')
-            self.assertFalse(worker.native_worker_paths(state_root, 'outside')[0].exists())
+            with self.subTest(state_root=state_root):
+                with self.assertRaises(ValidationIssue) as caught:
+                    self.launch(self.repo, 'outside', repo_root=state_root)
+                self.assertEqual(caught.exception.code, 'native_worker_state_repository_mismatch')
+                self.assertFalse(worker.native_worker_paths(state_root, 'outside')[0].exists())
 
     def test_launch_holds_common_lock_through_first_state_write(self):
         write = worker._write_private_json
