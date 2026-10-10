@@ -78,7 +78,8 @@ class SharedRefsTests(unittest.TestCase):
     def test_same_run_id_from_linked_worktree_is_refused(self):
         linked = self.root / 'linked'
         self.git(self.repo, 'worktree', 'add', '-b', 'feature/b', str(linked))
-        self.launch(self.repo, 'same')
+        # Record the active run directly; a mocked fixture launch's status is host-timing dependent.
+        self.record(self.repo, 'same', 'executing')
         with self.assertRaises(ValidationIssue) as caught:
             self.launch(linked, 'same')
         self.assertEqual(caught.exception.code, 'native_worker_shared_refs_active_run')
