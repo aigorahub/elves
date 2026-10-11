@@ -1,5 +1,5 @@
 ---
-version: "2.39.0"
+version: "2.40.0"
 ---
 
 # Elves: Codex repository adapter

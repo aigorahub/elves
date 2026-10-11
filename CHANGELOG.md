@@ -4,6 +4,15 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.40.0] - 2026-10-10
+
+### Fixed
+
+- Native workers refuse launch when another active recorded run shares the repository's refs, including runs in linked worktrees. An unreadable or malformed state file blocks launch with `native_worker_shared_refs_unreadable_state`, including a state object without a string `status` or string `run_id`, a `.elves/runtime/native-worker` directory that exists but cannot be listed, a run directory whose `state.json` is missing, and a Git checkout whose `git worktree list` fails during the active-run scan. Inspect and repair that state file, or remove it only if no worker is running. A missing `state.json` is reported on the run directory: inspect the run directory, or remove it only if no worker is running. The launching run's own directory is excluded. A non-Git fixture has no shared refs, so a failed worktree listing does not block it. A stale active run whose supervisor and worker processes are both gone does not block. Runs with no recorded pid info yet, such as staged or launching, still block. Only the terminal statuses `complete` and `failed` are exempt; any other status blocks launch.
+- Protected-ref authority failures describe a moved ref and any recorded worker branch association without attributing who moved it. The failure code and protected-ref safety checks remain unchanged.
+- Native-worker launches serialize the shared-ref scan and initial registration in the Git common directory, reject same-ID sibling runs and state roots outside registered checkouts, and describe ref movement without attributing an actor (#284).
+- Parallel native-worker lane documentation requires separate clones with separate origins and provides the bare-mirror integration recipe, including the post-worker lane push (#284). `team-lanes register` requires lanes in the same Git common directory (worktrees). Separate-clone native-worker lanes are integrated manually per that operator recipe, outside team-lanes, and team-lanes worktree lanes must not run concurrent native workers.
+
 ## [2.39.0] - 2026-10-06
 
 ### Changed

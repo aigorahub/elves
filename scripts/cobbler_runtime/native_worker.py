@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import fcntl
 import hashlib
 import os
 import re
@@ -1231,6 +1232,491 @@ def native_worker_paths(repo_root: Path, run_id: str) -> tuple[Path, Path]:
     return root / "state.json", root / "follow.jsonl"
 
 
+def _git_common_dir(checkout: Path) -> Path | None:
+    result = subprocess.run(
+        ["git", "rev-parse", "--git-common-dir"], cwd=checkout,
+        capture_output=True, text=True, timeout=30, check=False,
+    )
+    return (checkout / result.stdout.strip()).resolve() if result.returncode == 0 else None
+
+
+# Newline porcelain keys. Anything else can be a worktree path that contained
+# a newline, so the listing is ambiguous. ``-z`` output is NUL-delimited and
+# does not need this check.
+_PORCELAIN_EXACT_LINES = frozenset({"bare", "detached", "locked", "prunable"})
+_PORCELAIN_PREFIXES = ("worktree ", "HEAD ", "branch ", "locked ", "prunable ")
+_PORCELAIN_Z_UNSUPPORTED = re.compile(
+    r"unknown (?:switch|option) [`']-?z['`]|unrecognized argument: -z",
+    re.IGNORECASE,
+)
+
+
+def _porcelain_line_is_recognized(line: str) -> bool:
+    return line == "" or line in _PORCELAIN_EXACT_LINES or line.startswith(_PORCELAIN_PREFIXES)
+
+
+def _paths_from_nul_porcelain(stdout: str) -> list[Path]:
+    return [
+        Path(field[len("worktree "):])
+        for field in stdout.split("\0")
+        if field.startswith("worktree ")
+    ]
+
+
+def _porcelain_z_unsupported(result: subprocess.CompletedProcess[str]) -> bool:
+    """True when Git rejected ``-z`` itself (Git older than 2.36)."""
+    if result.returncode == 0:
+        return False
+    text = f"{result.stderr or ''}\n{result.stdout or ''}"
+    return _PORCELAIN_Z_UNSUPPORTED.search(text) is not None
+
+
+def _git_worktree_list(worktree: Path) -> tuple[subprocess.CompletedProcess[str], list[Path] | None]:
+    """List registered checkouts.
+
+    Prefer ``git worktree list --porcelain -z`` so each path is exact. Git
+    older than 2.36 rejects ``-z``; only that failure falls back to newline
+    porcelain. Newline output with a line that is not a recognized porcelain
+    key is ambiguous and comes back as ``None``. Any other nonzero exit is
+    returned unchanged so callers still fail closed.
+    """
+    z_result = subprocess.run(
+        ["git", "worktree", "list", "--porcelain", "-z"], cwd=worktree,
+        capture_output=True, text=True, timeout=30, check=False,
+    )
+    if z_result.returncode == 0:
+        return z_result, _paths_from_nul_porcelain(z_result.stdout)
+    if not _porcelain_z_unsupported(z_result):
+        return z_result, []
+    result = subprocess.run(
+        ["git", "worktree", "list", "--porcelain"], cwd=worktree,
+        capture_output=True, text=True, timeout=30, check=False,
+    )
+    if result.returncode != 0:
+        return result, []
+    lines = result.stdout.splitlines()
+    if any(not _porcelain_line_is_recognized(line) for line in lines):
+        return result, None
+    paths = [
+        Path(line[len("worktree "):])
+        for line in lines
+        if line.startswith("worktree ")
+    ]
+    return result, paths
+
+
+def _reject_ambiguous_worktree_porcelain(
+    worktree: Path,
+    *,
+    fail_closed: bool,
+    launch_run_id: str | None,
+) -> None:
+    """Fail closed when newline porcelain may have split a registered path."""
+    _reject_unreadable_native_worker_state(
+        worktree,
+        RuntimeError("git worktree list --porcelain output contains an unrecognized line"),
+        fail_closed=fail_closed,
+        launch_run_id=launch_run_id,
+        summary=(
+            f"cannot list worktrees of {worktree} "
+            "(git worktree list --porcelain output contains an unrecognized line; "
+            "a registered path may contain a newline)"
+        ),
+        advice=(
+            "Inspect the Git checkout and retry after git worktree list --porcelain succeeds."
+        ),
+    )
+
+
+@contextmanager
+def _native_worker_launch_lock(
+    repo_root: Path,
+    worktree: Path,
+    *,
+    fixture: bool = False,
+    launch_run_id: str | None = None,
+):
+    common = _git_common_dir(worktree)
+    state_common = _git_common_dir(repo_root)
+    if common is None and state_common is None and fixture:
+        # Non-Git fixtures have no shared repository refs.
+        yield
+        return
+    registered, listed = _git_worktree_list(worktree)
+    # Ambiguous newline porcelain cannot prove which checkouts are registered.
+    # Treat that as unreadable state before the membership check, including
+    # fixture hosts, so it does not surface as a repository mismatch.
+    if listed is None:
+        _reject_ambiguous_worktree_porcelain(
+            worktree, fail_closed=True, launch_run_id=launch_run_id,
+        )
+        listed = []
+    # A nonzero exit cannot prove registration. Falling through would treat
+    # empty stdout as a repository mismatch. Non-fixture Git launches fail
+    # closed; non-Git fixtures returned above.
+    if registered.returncode and not fixture and not _worktree_list_failure_is_non_git(
+        worktree, registered,
+    ):
+        _reject_failed_worktree_list(
+            worktree,
+            registered,
+            fail_closed=True,
+            launch_run_id=launch_run_id,
+        )
+    checkouts = {path.resolve() for path in listed}
+    # Every registered checkout has its own .git entry; this also guards against an
+    # inherited GIT_DIR making an unrelated directory look like a checkout.
+    if (common is None or common != state_common or repo_root.resolve() not in checkouts
+            or not (repo_root / ".git").exists()):
+        raise ValidationIssue(
+            "native_worker_state_repository_mismatch",
+            "Native worker --repo-root must be a registered checkout of the same "
+            "repository as --worktree (sharing its Git common directory)",
+        )
+    with (common / "elves-native-worker-launch.lock").open("a") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+
+_UNREADABLE_STATE_FILE_ADVICE = (
+    "Inspect and repair that state file, or remove it only if no worker is running."
+)
+_MISSING_RUN_DIRECTORY_ADVICE = (
+    "Inspect the run directory, or remove it only if no worker is running."
+)
+# Statuses this module writes while a worker may still hold the shared refs.
+# `staged` and `launching` are included because pid info is not recorded yet.
+_NATIVE_WORKER_ACTIVE_STATUSES = frozenset({
+    "staged",
+    "launching",
+    "running",
+    "launching_prewalk",
+    "prewalking",
+    "transition_ready",
+    "launching_execution",
+    "executing",
+    "execution_backoff",
+})
+# The only terminal statuses `_set_status` / `native_worker_status` write.
+_NATIVE_WORKER_TERMINAL_STATUSES = frozenset({"complete", "failed"})
+
+
+def _reject_unreadable_native_worker_state(
+    path: Path,
+    error: Exception,
+    *,
+    fail_closed: bool,
+    launch_run_id: str | None,
+    summary: str | None = None,
+    advice: str = _UNREADABLE_STATE_FILE_ADVICE,
+) -> None:
+    """Fail closed, or warn, when recorded native-worker state cannot be trusted."""
+    if not fail_closed:
+        print(
+            f"Warning: cannot read native worker state {path}: {error}",
+            file=sys.stderr,
+        )
+        return
+    prefix = (
+        f"Cannot launch native worker run `{launch_run_id}`: "
+        if launch_run_id is not None
+        else ""
+    )
+    body = summary or f"native worker state {path} is unreadable or malformed ({error})"
+    raise ValidationIssue(
+        "native_worker_shared_refs_unreadable_state",
+        f"{prefix}{body}. {advice}",
+        path=str(path),
+    ) from error
+
+
+def _is_launch_run_directory(run_dir: Path, own_run_dir: Path | None) -> bool:
+    if own_run_dir is None:
+        return False
+    try:
+        return run_dir.resolve() == own_run_dir.resolve()
+    except OSError:
+        return False
+
+
+def _worktree_list_failure_is_non_git(
+    worktree: Path, result: subprocess.CompletedProcess[str],
+) -> bool:
+    """True when a failed worktree listing is a fixture with no shared refs.
+
+    A checkout with a ``.git`` entry is a real Git launch even if Git's error
+    text says it is not a repository. Those scans fail closed. A directory with
+    no ``.git`` entry is the non-Git fixture path.
+    """
+    if os.path.lexists(worktree / ".git"):
+        return False
+    if "not a git repository" in (result.stderr or "").lower():
+        return True
+    return _git_common_dir(worktree) is None
+
+
+def _reject_failed_worktree_list(
+    worktree: Path,
+    result: subprocess.CompletedProcess[str],
+    *,
+    fail_closed: bool,
+    launch_run_id: str | None,
+) -> None:
+    """Report a failed ``git worktree list`` on a real Git checkout."""
+    detail = " ".join((result.stderr or result.stdout or "git worktree list failed").split())
+    if len(detail) > 300:
+        detail = detail[:300] + "..."
+    _reject_unreadable_native_worker_state(
+        worktree,
+        RuntimeError(f"git worktree list --porcelain exited {result.returncode}: {detail}"),
+        fail_closed=fail_closed,
+        launch_run_id=launch_run_id,
+        summary=(
+            f"cannot list worktrees of {worktree} "
+            f"(git worktree list --porcelain exited {result.returncode}: {detail})"
+        ),
+        advice=(
+            "Inspect the Git checkout and retry after git worktree list --porcelain succeeds."
+        ),
+    )
+
+
+def _repository_native_worker_runs(
+    worktree: Path,
+    *,
+    fail_closed: bool = True,
+    launch_run_id: str | None = None,
+    own_run_dir: Path | None = None,
+) -> list[dict[str, Any]]:
+    """Read recorded runs across checkouts that share this repository's refs.
+
+    Unreadable or malformed ``state.json`` fails closed so a launch cannot share
+    refs with a worker whose state cannot be inspected. A run directory whose
+    ``state.json`` is missing fails closed the same way, except the launching
+    run's own directory. A ``.elves/runtime/native-worker`` directory that exists
+    but cannot be listed fails closed the same way. A symlink at that directory,
+    a symlinked run directory, or a symlinked ``state.json`` fails closed the
+    same way; the launching run's own directory keeps its previous handling.
+    On a Git checkout, ``git worktree list`` failure fails closed, and newline
+    porcelain with an unrecognized line is ambiguous and fails closed. A non-Git
+    fixture has no shared refs and contributes no runs. Pass ``fail_closed=False``
+    only for diagnostic enrichment that must not block a terminal write.
+    """
+    result, listed = _git_worktree_list(worktree)
+    if listed is None:
+        _reject_ambiguous_worktree_porcelain(
+            worktree, fail_closed=fail_closed, launch_run_id=launch_run_id,
+        )
+        return []
+    if result.returncode:
+        if _worktree_list_failure_is_non_git(worktree, result):
+            return []
+        _reject_failed_worktree_list(
+            worktree,
+            result,
+            fail_closed=fail_closed,
+            launch_run_id=launch_run_id,
+        )
+        return []
+    runs: list[dict[str, Any]] = []
+    for checkout in listed:
+        # Path.glob swallows scandir OSError and would hide every run here.
+        root = checkout / ".elves" / "runtime" / "native-worker"
+        try:
+            # exists() is false for a broken symlink and follows a live one,
+            # which would skip or redirect this tree.
+            runtime_is_symlink = root.is_symlink()
+            exists = root.exists()
+        except OSError as error:
+            _reject_unreadable_native_worker_state(
+                root, error, fail_closed=fail_closed, launch_run_id=launch_run_id,
+            )
+            continue
+        if runtime_is_symlink:
+            _reject_unreadable_native_worker_state(
+                root,
+                OSError(f"{root} is a symlink"),
+                fail_closed=fail_closed,
+                launch_run_id=launch_run_id,
+                summary=f"native worker runtime directory {root} is a symlink",
+            )
+            continue
+        if not exists:
+            continue
+        try:
+            if not root.is_dir() or not os.access(root, os.R_OK | os.X_OK):
+                raise OSError(f"{root} exists but cannot be listed")
+            with os.scandir(root) as scan:
+                entries = list(scan)
+        except OSError as error:
+            _reject_unreadable_native_worker_state(
+                root, error, fail_closed=fail_closed, launch_run_id=launch_run_id,
+            )
+            continue
+        state_paths: list[Path] = []
+        for entry in entries:
+            entry_path = Path(entry.path)
+            try:
+                symlinked = entry.is_symlink()
+            except OSError:
+                symlinked = False
+            if symlinked:
+                # follow_symlinks=False used to skip these entirely, including a
+                # link that hides another run. The launching run's own directory
+                # stays skipped, which is the previous handling.
+                if not _is_launch_run_directory(entry_path, own_run_dir):
+                    _reject_unreadable_native_worker_state(
+                        entry_path,
+                        OSError(f"{entry_path} is a symlink"),
+                        fail_closed=fail_closed,
+                        launch_run_id=launch_run_id,
+                        summary=f"native worker run directory {entry_path} is a symlink",
+                    )
+                continue
+            try:
+                is_run_dir = entry.is_dir(follow_symlinks=False)
+            except OSError:
+                is_run_dir = True
+            if is_run_dir:
+                state_paths.append(entry_path / "state.json")
+        for path in sorted(state_paths):
+            try:
+                state_is_symlink = path.is_symlink()
+            except OSError:
+                # An unreadable directory still fails when state.json is read.
+                state_is_symlink = False
+            if state_is_symlink and not _is_launch_run_directory(path.parent, own_run_dir):
+                _reject_unreadable_native_worker_state(
+                    path,
+                    OSError(f"{path} is a symlink"),
+                    fail_closed=fail_closed,
+                    launch_run_id=launch_run_id,
+                    summary=f"native worker state {path} is a symlink",
+                )
+                continue
+            try:
+                state = json.loads(path.read_text(encoding="utf-8"))
+                if not isinstance(state, dict):
+                    raise ValueError("state is not an object")
+                if not isinstance(state.get("status"), str) or not isinstance(state.get("run_id"), str):
+                    raise ValueError("state object requires a string status and run_id")
+            except FileNotFoundError as error:
+                # A leftover directory for this launch has no other worker to hide.
+                # Any other run directory with no state.json can still hide a worker.
+                if _is_launch_run_directory(path.parent, own_run_dir):
+                    continue
+                _reject_unreadable_native_worker_state(
+                    path.parent,
+                    error,
+                    fail_closed=fail_closed,
+                    launch_run_id=launch_run_id,
+                    summary=f"native worker run directory {path.parent} has no state.json ({error})",
+                    advice=_MISSING_RUN_DIRECTORY_ADVICE,
+                )
+                continue
+            except (OSError, ValueError) as error:
+                # A run directory whose state.json exists but cannot be read is
+                # unreadable state, not an unlistable native-worker directory.
+                _reject_unreadable_native_worker_state(
+                    path, error, fail_closed=fail_closed, launch_run_id=launch_run_id,
+                )
+                continue
+            runs.append({
+                **state,
+                "recorded_worktree": str(checkout),
+                "state_path": str(path),
+            })
+    return runs
+
+
+def _check_shared_refs_active_run(
+    worktree: Path, run_id: str, *, repo_root: Path | None = None,
+) -> None:
+    state_root = worktree if repo_root is None else repo_root
+    own_run_dir = native_worker_paths(state_root, run_id)[0].parent
+    for other in _repository_native_worker_runs(
+        worktree, launch_run_id=run_id, own_run_dir=own_run_dir,
+    ):
+        status = other.get("status")
+        if status in _NATIVE_WORKER_TERMINAL_STATUSES:
+            continue
+        # A crashed supervisor can leave an active status on disk forever.
+        # Missing pid info (for example staged or launching) is not dead.
+        # An unrecognized status is not exempt, even when both processes are gone.
+        if status in _NATIVE_WORKER_ACTIVE_STATUSES:
+            try:
+                # None (absent pid info) is not dead. Only a positive int is a pid.
+                # Reject bools (an int subclass), floats, numeric strings, negatives,
+                # and containers here so they never reach int() truncation.
+                for pid_value in (other.get("supervisor_pid"), other.get("pid")):
+                    if pid_value is None:
+                        continue
+                    if isinstance(pid_value, bool) or not isinstance(pid_value, int):
+                        raise TypeError(f"malformed pid: {type(pid_value).__name__}")
+                    if pid_value <= 0:
+                        raise ValueError(f"malformed pid: {pid_value}")
+                supervisor_gone = _process_identity_matches(
+                    other.get("supervisor_pid"), other.get("supervisor_pid_start"),
+                ) is False
+                worker_gone = _process_identity_matches(
+                    other.get("pid"), other.get("pid_start"),
+                ) is False
+            except (ValueError, TypeError) as error:
+                _reject_unreadable_native_worker_state(
+                    Path(other["state_path"]),
+                    error,
+                    fail_closed=True,
+                    launch_run_id=run_id,
+                )
+            if supervisor_gone and worker_gone:
+                print(
+                    f"Warning: native worker run `{other.get('run_id')}` is recorded as "
+                    f"{other.get('status')} but its supervisor and worker processes are gone; "
+                    "not blocking launch.",
+                    file=sys.stderr,
+                )
+                continue
+        raise ValidationIssue(
+            "native_worker_shared_refs_active_run",
+            f"Cannot launch native worker run `{run_id}`: another active run "
+            f"`{other.get('run_id')}` shares this repository's refs "
+            f"(worktree {other.get('worktree') or other['recorded_worktree']}, "
+            f"branch {other.get('assigned_branch') or '<unknown>'}). "
+            "Use a separate clone with its own origin: git clone --bare <origin-url> "
+            "<lanes>/<lane>.git; git clone <lanes>/<lane>.git <lanes>/<lane>; "
+            "create the lane branch, then launch with --repo-root and --worktree set "
+            "to that clone. Integrate from the bare mirror between worker runs "
+            "with a regular merge commit. Do not commit, branch, tag, fetch, or push "
+            "in this repository while a worker runs. See references/parallelves.md.",
+        )
+
+
+def _authority_failure_detail(worktree: Path, state: dict[str, Any], errors: list[str]) -> str | None:
+    moved = [error.split("protected ref moved: ", 1)[1].split(" was ", 1)[0]
+             for error in errors if error.startswith("protected ref moved: ")]
+    if not moved:
+        return None
+    try:
+        recorded_runs = _repository_native_worker_runs(worktree, fail_closed=False)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        # Diagnostic enrichment must never prevent the terminal failure write.
+        print(f"Warning: cannot inspect sibling native worker runs: {error}", file=sys.stderr)
+        recorded_runs = []
+    for other in recorded_runs:
+        branch = other.get("assigned_branch")
+        if not branch or other.get("run_id") == state.get("run_id"):
+            continue
+        if any(ref in {f"refs/heads/{branch}", f"refs/remotes/origin/{branch}"} for ref in moved):
+            return (f"The branch of another native worker run ({other.get('run_id')}) moved "
+                    "in this repository. Two native workers cannot share one repository.")
+    return (f"{moved[0]} moved outside this worker's assigned branch. "
+            "A running worker treats every other ref in the repository as protected. "
+            "Do not commit, branch, fetch, or push in this repository while it runs.")
+
+
 def _write_private_json(path: Path, data: dict[str, Any]) -> None:
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     os.chmod(path.parent, 0o700)
@@ -1964,6 +2450,9 @@ def _terminalize_native_worker(
     state["exit_code"] = exit_code
     state["authority_verified"] = not errors
     state["authority_errors"] = errors
+    detail = _authority_failure_detail(worktree, state, errors)
+    if detail:
+        state["failure_detail"] = detail
     try:
         state["final_head"] = _final_head(worktree)
     except subprocess.TimeoutExpired:
@@ -2059,120 +2548,130 @@ def launch_native_worker(
         environment=os.environ,
     )
     worktree = Path(launch_spec.cwd).resolve()
-    if prewalk_spec and not _worktree_clean(worktree):
-        raise ValidationIssue(
-            "prewalk_worktree_continuity_violation",
-            "Prewalk requires a clean registered worktree at the exact starting HEAD",
-            path=str(worktree),
-        )
-    if launch_spec.host == "fixture" and not prewalk_spec:
-        git_contract = {
-            "assigned_branch": None,
-            "start_head": None,
-            "protected_refs": {},
-            "origin_config_digest": None,
+    with _native_worker_launch_lock(
+        repo_root,
+        worktree,
+        fixture=launch_spec.host == "fixture",
+        launch_run_id=run_id,
+    ):
+        # Recheck under the lock to protect simultaneous relaunches as well.
+        if state_path.exists():
+            raise ValidationIssue("native_worker_run_exists", f"Native worker run `{run_id}` already exists")
+        _check_shared_refs_active_run(worktree, run_id, repo_root=repo_root)
+        if prewalk_spec and not _worktree_clean(worktree):
+            raise ValidationIssue(
+                "prewalk_worktree_continuity_violation",
+                "Prewalk requires a clean registered worktree at the exact starting HEAD",
+                path=str(worktree),
+            )
+        if launch_spec.host == "fixture" and not prewalk_spec:
+            git_contract = {
+                "assigned_branch": None,
+                "start_head": None,
+                "protected_refs": {},
+                "origin_config_digest": None,
+            }
+        else:
+            git_contract = _native_git_contract(worktree)
+        packet_path = packet.resolve(strict=True)
+        base_state: dict[str, Any] = {
+            "run_id": run_id,
+            "host": launch_spec.host,
+            "worktree": launch_spec.cwd,
+            "argv": list(launch_spec.argv),
+            "requested_model": launch_spec.requested_model,
+            "session_id": launch_spec.session_id,
+            "session_id_source": launch_spec.session_id_source,
+            "pid": None,
+            "pid_start": None,
+            "follow_log": str(log_path),
+            "visibility_ready": True,
+            "visibility_mode": "follow_log",
+            "watcher_command": watcher,
+            "exit_code": None,
+            "commit_mode": launch_spec.commit_mode,
+            "provider_event_count": 0,
+            "stderr_tail": None,
+            "git_write_roots": list(launch_spec.git_write_roots),
+            "prompt_file_flag": launch_spec.prompt_file_flag,
+            "positional_input": launch_spec.positional_input,
+            "input_file_prefix": launch_spec.input_file_prefix,
+            "git_network_push": "disabled",
+            "git_authority_mode": "fixture" if launch_spec.host == "fixture" else "feature_only",
+            **git_contract,
         }
-    else:
-        git_contract = _native_git_contract(worktree)
-    packet_path = packet.resolve(strict=True)
-    base_state: dict[str, Any] = {
-        "run_id": run_id,
-        "host": launch_spec.host,
-        "worktree": launch_spec.cwd,
-        "argv": list(launch_spec.argv),
-        "requested_model": launch_spec.requested_model,
-        "session_id": launch_spec.session_id,
-        "session_id_source": launch_spec.session_id_source,
-        "pid": None,
-        "pid_start": None,
-        "follow_log": str(log_path),
-        "visibility_ready": True,
-        "visibility_mode": "follow_log",
-        "watcher_command": watcher,
-        "exit_code": None,
-        "commit_mode": launch_spec.commit_mode,
-        "provider_event_count": 0,
-        "stderr_tail": None,
-        "git_write_roots": list(launch_spec.git_write_roots),
-        "prompt_file_flag": launch_spec.prompt_file_flag,
-        "positional_input": launch_spec.positional_input,
-        "input_file_prefix": launch_spec.input_file_prefix,
-        "git_network_push": "disabled",
-        "git_authority_mode": "fixture" if launch_spec.host == "fixture" else "feature_only",
-        **git_contract,
-    }
-    if prewalk_spec:
-        paths = prewalk_paths(worktree, run_id)
-        state = {
-            **base_state,
-            "version": PREWALK_STATE_VERSION,
-            "mode": "prewalk",
-            "status": "launching_prewalk",
-            "status_history": [
-                {"status": "staged", "at": datetime_now()},
-                {"status": "launching_prewalk", "at": datetime_now()},
-            ],
-            "starting_worktree_clean": True,
-            "packet": {
-                "path": str(packet_path),
-                "sha256": packet_digest(packet_path),
-                "sent_count": 0,
-            },
-            "prewalk": {
-                "model": prewalk_spec.guide.requested_model,
-                "effort": prewalk_spec.guide.effort,
-                "instruction_strategy": (
-                    "experimental_unqualified_persisted_instruction"
-                    if prewalk_spec.requested_mode == "experimental"
-                    else "retained_safe_host_instruction"
-                ),
-                "instruction_fidelity": prewalk_spec.instruction_fidelity,
-                "instruction_pruned": prewalk_spec.instruction_fidelity == "pruned",
-                "todo_limit": prewalk_spec.todo_limit,
-                "paths": paths.to_dict(),
-                "argv": list(prewalk_spec.guide.argv),
-                "prompt_file_flag": prewalk_spec.guide.prompt_file_flag,
-                "positional_input": prewalk_spec.guide.positional_input,
-                "input_file_prefix": prewalk_spec.guide.input_file_prefix,
-                "fixture_script": (
-                    prewalk_spec.guide.argv[1]
-                    if prewalk_spec.guide.host == "fixture"
-                    else None
-                ),
-                "recovery_attempts": 0,
-            },
-            "execution": {
-                "model": prewalk_spec.execution_model,
-                "effort": prewalk_spec.execution_effort,
-                "resume_input": PREWALK_CONTINUATION_INPUT,
-                "argv": None,
-                "prompt_file_flag": (
-                    prewalk_spec.execution_spec(
-                        prewalk_spec.guide.session_id or "prewalk-session-preview"
-                    ).prompt_file_flag
-                ),
-                "positional_input": (
-                    prewalk_spec.execution_spec(
-                        prewalk_spec.guide.session_id or "prewalk-session-preview"
-                    ).positional_input
-                ),
-                "input_file_prefix": (
-                    prewalk_spec.execution_spec(
-                        prewalk_spec.guide.session_id or "prewalk-session-preview"
-                    ).input_file_prefix
-                ),
-                "fixture_script": prewalk_spec.execution_fixture_script,
-                "transient_retries": 0,
-                "retry_backoff_seconds": [],
-            },
-            "transition": {"status": "pending"},
-            "requested_prewalk_mode": prewalk_spec.requested_mode,
-            "capabilities": prewalk_spec.capabilities.to_dict(),
-            "forbidden_paths": list(prewalk_spec.forbidden_paths),
-        }
-    else:
-        state = {**base_state, "version": 2, "status": "launching"}
-    _write_private_json(state_path, state)
+        if prewalk_spec:
+            paths = prewalk_paths(worktree, run_id)
+            state = {
+                **base_state,
+                "version": PREWALK_STATE_VERSION,
+                "mode": "prewalk",
+                "status": "launching_prewalk",
+                "status_history": [
+                    {"status": "staged", "at": datetime_now()},
+                    {"status": "launching_prewalk", "at": datetime_now()},
+                ],
+                "starting_worktree_clean": True,
+                "packet": {
+                    "path": str(packet_path),
+                    "sha256": packet_digest(packet_path),
+                    "sent_count": 0,
+                },
+                "prewalk": {
+                    "model": prewalk_spec.guide.requested_model,
+                    "effort": prewalk_spec.guide.effort,
+                    "instruction_strategy": (
+                        "experimental_unqualified_persisted_instruction"
+                        if prewalk_spec.requested_mode == "experimental"
+                        else "retained_safe_host_instruction"
+                    ),
+                    "instruction_fidelity": prewalk_spec.instruction_fidelity,
+                    "instruction_pruned": prewalk_spec.instruction_fidelity == "pruned",
+                    "todo_limit": prewalk_spec.todo_limit,
+                    "paths": paths.to_dict(),
+                    "argv": list(prewalk_spec.guide.argv),
+                    "prompt_file_flag": prewalk_spec.guide.prompt_file_flag,
+                    "positional_input": prewalk_spec.guide.positional_input,
+                    "input_file_prefix": prewalk_spec.guide.input_file_prefix,
+                    "fixture_script": (
+                        prewalk_spec.guide.argv[1]
+                        if prewalk_spec.guide.host == "fixture"
+                        else None
+                    ),
+                    "recovery_attempts": 0,
+                },
+                "execution": {
+                    "model": prewalk_spec.execution_model,
+                    "effort": prewalk_spec.execution_effort,
+                    "resume_input": PREWALK_CONTINUATION_INPUT,
+                    "argv": None,
+                    "prompt_file_flag": (
+                        prewalk_spec.execution_spec(
+                            prewalk_spec.guide.session_id or "prewalk-session-preview"
+                        ).prompt_file_flag
+                    ),
+                    "positional_input": (
+                        prewalk_spec.execution_spec(
+                            prewalk_spec.guide.session_id or "prewalk-session-preview"
+                        ).positional_input
+                    ),
+                    "input_file_prefix": (
+                        prewalk_spec.execution_spec(
+                            prewalk_spec.guide.session_id or "prewalk-session-preview"
+                        ).input_file_prefix
+                    ),
+                    "fixture_script": prewalk_spec.execution_fixture_script,
+                    "transient_retries": 0,
+                    "retry_backoff_seconds": [],
+                },
+                "transition": {"status": "pending"},
+                "requested_prewalk_mode": prewalk_spec.requested_mode,
+                "capabilities": prewalk_spec.capabilities.to_dict(),
+                "forbidden_paths": list(prewalk_spec.forbidden_paths),
+            }
+        else:
+            state = {**base_state, "version": 2, "status": "launching"}
+        _write_private_json(state_path, state)
     supervisor_log = state_path.parent / "supervisor.log"
     with supervisor_log.open("a", encoding="utf-8") as supervisor_output:
         os.chmod(supervisor_log, 0o600)

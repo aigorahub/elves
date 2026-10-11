@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Grok Build, Oh My Pi (omp), Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.39.0"
+  version: "2.40.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -85,7 +85,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.39.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.40.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
@@ -473,7 +473,8 @@ routing outcome, never a mode switch. The deterministic width test (`cobbler_age
 gates the recommendation: `worker.parallel=auto` may only recommend lanes, every decline records a
 concrete `parallel_declined:<gate>:<detail>` reason, and nothing auto-launches. The topology is
 trunk -> lanes -> integration: trunk batches build shared foundations serially, lanes run as
-ordinary workers on pairwise-disjoint owned surfaces in dedicated worktrees, and the driver merges
+ordinary workers on pairwise-disjoint owned surfaces in dedicated checkouts (a native-worker lane
+needs its own clone with its own origin), and the driver merges
 them behind a mandatory cross-lane entropy review. Full contract: `references/parallelves.md`.
 
 ## Git History as Operator UI
@@ -676,6 +677,8 @@ python3 "$ELVES_SKILL_ROOT/scripts/acceptance_contract.py" validate \
 **One run owns one branch and one checkout.** Prefer a dedicated worktree when other agents may
 touch the repo (`./scripts/preflight.sh --create-worktree <branch> --base origin/main`; `--dry-run`
 first). The helper prints the branch, worktree path, base ref, and collision tripwire, and does not reuse, delete, or repair existing worktrees. `START_TIP` is the collision tripwire.
+
+A parallel native-worker lane needs its own clone with its own origin; a second worktree shares refs, and launching another native worker there is refused with `native_worker_shared_refs_active_run` — see `references/parallelves.md` for the operator recipe.
 
 ## Trusted full-run path (normal happy path)
 

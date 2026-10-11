@@ -21,8 +21,9 @@ The shape is trunk -> lanes -> integration.
 
 - **Trunk batches** build shared foundations serially, before any lane forks. Anything two lanes
   would both need lives in a trunk batch.
-- **Lanes** run on pairwise-disjoint owned surfaces, each in a dedicated worktree on its own
-  feature branch. Disjointness uses path-prefix semantics: a lane owning a directory conflicts
+- **Lanes** run on pairwise-disjoint owned surfaces, each on its own feature branch.
+  A lane running a native worker needs its own clone with its own origin; a second worktree of the same repository is not enough, because
+  worktrees share refs. Disjointness uses path-prefix semantics: a lane owning a directory conflicts
   with any lane owning a path inside it.
 - **Integration** merges lanes into an integration branch with regular merge commits (never
   rebase), in a driver-owned order, and produces one PR for the whole run.
@@ -31,6 +32,44 @@ Phase-1 operation composes existing per-session worker runs (native or trusted f
 per lane, per each host's documented grammar; the driver stages and reviews each lane as its own
 supervised session. Host-by-host invocation parity lives in the Parallelves parity section of
 [`host-parity.md`](host-parity.md).
+
+## Operator recipe for parallel native workers
+
+1. Make a bare mirror for each lane: `git clone --bare <origin-url> <lanes>/<lane>.git`.
+2. Clone it: `git clone <lanes>/<lane>.git <lanes>/<lane>`, then create the lane branch
+   from the completed trunk-batch tip with
+   `git -C <lanes>/<lane> switch -c <lane-branch> origin/<trunk-branch>` (push the trunk branch to
+   the mirror first if it is not on origin yet).
+3. Launch the native worker with `--repo-root` and `--worktree` set to that clone.
+   Its origin is the lane's bare mirror; worker progress must reach that mirror before integration.
+4. While a worker runs, no other process commits, branches, tags, fetches, or pushes in
+   that repository. This includes the driver and every linked worktree.
+5. After the lane worker ends, push its branch to the bare mirror with
+   `git -C <lanes>/<lane> push origin <lane-branch>`.
+   Bring the lane back between worker runs: in the integration repository, run
+   `git fetch <lanes>/<lane>.git <lane-branch>`, then `git merge --no-ff FETCH_HEAD`.
+   Use a regular merge commit, and wait until any worker in the integration repository has ended.
+
+Launching another native worker in a repository that already has an active recorded run (including one
+in a linked worktree) is refused with `native_worker_shared_refs_active_run`; use a separate clone.
+An unreadable or malformed native-worker state file blocks launch with
+`native_worker_shared_refs_unreadable_state`. A state object without a string `status` or string
+`run_id` is malformed, and a `.elves/runtime/native-worker` directory that exists but cannot be
+listed blocks the same way. A run directory under that tree whose `state.json` is missing blocks
+the same way: inspect the run directory, or remove it only if no worker is running. The launching
+run's own directory is excluded. On a Git checkout, a failed `git worktree list` during the
+active-run scan blocks the same way; a non-Git fixture does not. Inspect and repair an unreadable
+state file, or remove it only if no worker is running. A recorded active run whose supervisor and
+worker processes are both gone is stale and does not block a new launch. A run that has not recorded
+pid info yet (for example while it is staged or launching) still blocks. Only the terminal statuses
+`complete` and `failed` are exempt; any other status blocks launch.
+
+Launches serialize the active-run scan and initial state registration with a lock in the
+Git common directory. `--repo-root` must be a registered checkout of the same repository
+as `--worktree`; a matching run ID in another checkout still blocks launch.
+Protected-ref failure details report observed movement without identifying its actor:
+"The branch of another native worker run (<run id>) moved in this repository. Two native workers cannot share one repository."
+For other refs: "<ref> moved outside this worker's assigned branch. A running worker treats every other ref in the repository as protected. Do not commit, branch, fetch, or push in this repository while it runs."
 
 ## The width test
 
@@ -108,6 +147,11 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" team-lanes init \
 
 Register each `L1`, `L2`, or later lane with `register --lane L1 --worktree PATH
 --branch BRANCH --session EXACT_SESSION --kind KIND --model MODEL --owns src/area`.
+`team-lanes register` requires lanes in the same Git common directory as the driver,
+so registered lanes are worktrees of that repository. Native-worker lanes that use
+the separate-clone recipe are integrated manually per the operator recipe, outside
+`team-lanes`. Worktree lanes registered with `team-lanes` must not run concurrent
+native workers, because those worktrees share refs.
 Repeat `--owns` for separate roots and `--depends-on` for earlier lane IDs. Every
 mutation and integration gate takes the recorded driver `--actor-session`,
 `--actor-kind`, and `--actor-model`, plus `--state`.
