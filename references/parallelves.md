@@ -52,6 +52,11 @@ supervised session. Host-by-host invocation parity lives in the Parallelves pari
 
 Launching another native worker in a repository that already has an active recorded run (including one
 in a linked worktree) is refused with `native_worker_shared_refs_active_run`; use a separate clone.
+An unreadable or malformed native-worker state file blocks launch with
+`native_worker_shared_refs_unreadable_state`. Inspect and repair that state file, or remove it only
+if no worker is running. A recorded active run whose supervisor and worker processes are both gone
+is stale and does not block a new launch. A run that has not recorded pid info yet (for example
+while it is staged or launching) still blocks. Terminal runs do not block.
 
 Launches serialize the active-run scan and initial state registration with a lock in the
 Git common directory. `--repo-root` must be a registered checkout of the same repository

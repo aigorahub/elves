@@ -36,10 +36,10 @@ class SharedRefsTests(unittest.TestCase):
     def git(self, cwd, *args):
         return subprocess.run(['git', *args], cwd=cwd, check=True, capture_output=True, text=True).stdout.strip()
 
-    def record(self, repo, run_id, status, branch='feature/a'):
+    def record(self, repo, run_id, status, branch='feature/a', **extra):
         path, _ = worker.native_worker_paths(repo, run_id)
         worker._write_private_json(path, {'run_id': run_id, 'status': status,
-            'assigned_branch': branch, 'worktree': str(repo)})
+            'assigned_branch': branch, 'worktree': str(repo), **extra})
         return path
 
     def launch(self, repo, run_id, repo_root=None):
@@ -161,14 +161,154 @@ class SharedRefsTests(unittest.TestCase):
                 self.assertEqual(self.launch(self.repo, f'after-{status}')['status'], 'running')
                 self.record(self.repo, f'after-{status}', 'complete')
 
-    def test_unreadable_state_warns_without_blocking(self):
-        path = self.record(self.repo, 'broken', 'executing')
+    def assert_unreadable_state_blocks(self, repo, path, run_id='new'):
+        with self.assertRaises(ValidationIssue) as caught:
+            self.launch(repo, run_id)
+        self.assertEqual(caught.exception.code, 'native_worker_shared_refs_unreadable_state')
+        message = str(caught.exception)
+        self.assertIn(str(path), message)
+        self.assertIn(run_id, message)
+        self.assertIn('Inspect and repair that state file, or remove it only if no worker is running.', message)
+        self.assertEqual(caught.exception.path, str(path))
+        self.assertFalse(worker.native_worker_paths(repo, run_id)[0].exists())
+        return message
+
+    def test_unreadable_or_malformed_state_blocks_launch(self):
+        cases = (
+            ('malformed json', '{broken', False),
+            ('non-object', '[]', False),
+            ('null', 'null', False),
+            ('directory', None, True),
+        )
+        for name, text, as_directory in cases:
+            with self.subTest(name=name):
+                path = self.record(self.repo, f'broken-{name}', 'executing')
+                if as_directory:
+                    path.unlink()
+                    path.mkdir()
+                else:
+                    path.write_text(text)
+                try:
+                    self.assert_unreadable_state_blocks(self.repo, path, f'new-{name}')
+                finally:
+                    if as_directory and path.is_dir():
+                        path.rmdir()
+                    elif path.exists():
+                        path.unlink()
+
+    def test_unreadable_state_in_linked_worktree_blocks(self):
+        linked = self.root / 'linked'
+        self.git(self.repo, 'worktree', 'add', '-b', 'feature/b', str(linked))
+        path = self.record(linked, 'broken', 'executing')
         path.write_text('{broken')
+        self.assert_unreadable_state_blocks(self.repo, path)
+
+    def test_non_git_checkout_skips_unreadable_state(self):
+        scratch = self.root / 'scratch'
+        scratch.mkdir()
+        planted = scratch / '.elves' / 'runtime' / 'native-worker' / 'not-a-run' / 'state.json'
+        planted.parent.mkdir(parents=True)
+        planted.write_text('{broken')
         output = io.StringIO()
         with contextlib.redirect_stderr(output):
-            self.assertEqual(self.launch(self.repo, 'new')['status'], 'running')
-        self.assertIn('Warning:', output.getvalue())
-        self.assertIn(str(path), output.getvalue())
+            worker._check_shared_refs_active_run(scratch, 'fixture-run')
+            self.assertEqual(self.launch(scratch, 'fixture-run')['status'], 'running')
+        self.assertNotIn('native_worker_shared_refs_unreadable_state', output.getvalue())
+        self.assertNotIn(str(planted), output.getvalue())
+
+    def record_dead_pair(self, repo, run_id, status='executing'):
+        return self.record(
+            repo, run_id, status, pid=4242, pid_start='worker-start',
+            supervisor_pid=4343, supervisor_pid_start='supervisor-start',
+        )
+
+    def test_stale_active_run_does_not_block(self):
+        linked = self.root / 'linked'
+        self.git(self.repo, 'worktree', 'add', '-b', 'feature/b', str(linked))
+        cases = (
+            ('same checkout', self.repo, 'crashed-same', 'new-same'),
+            ('linked worktree', linked, 'crashed-linked', 'new-linked'),
+        )
+        for name, home, stale_id, new_id in cases:
+            with self.subTest(name=name):
+                path = self.record_dead_pair(home, stale_id)
+                output = io.StringIO()
+                with mock.patch.object(worker, '_process_identity_matches', return_value=False), \
+                     contextlib.redirect_stderr(output):
+                    self.assertEqual(self.launch(self.repo, new_id)['status'], 'running')
+                warning = output.getvalue()
+                self.assertIn('Warning:', warning)
+                self.assertIn(stale_id, warning)
+                self.assertIn('supervisor and worker processes are gone', warning)
+                self.assertEqual(json.loads(path.read_text())['status'], 'executing')
+                self.record(self.repo, new_id, 'complete')
+
+    def test_stale_decision_uses_process_identity_helper(self):
+        path = self.record_dead_pair(self.repo, 'crashed')
+        seen = []
+
+        def match(pid, start):
+            seen.append((pid, start))
+            return False
+
+        output = io.StringIO()
+        with mock.patch.object(worker, '_process_identity_matches', side_effect=match), \
+             contextlib.redirect_stderr(output):
+            worker._check_shared_refs_active_run(self.repo, 'new')
+        self.assertEqual(seen, [(4343, 'supervisor-start'), (4242, 'worker-start')])
+        self.assertIn('crashed', output.getvalue())
+
+        seen.clear()
+        with mock.patch.object(worker, '_process_start', return_value=None), \
+             mock.patch.object(worker.os, 'kill', side_effect=ProcessLookupError), \
+             contextlib.redirect_stderr(output):
+            worker._check_shared_refs_active_run(self.repo, 'new')
+        self.assertEqual(json.loads(path.read_text())['status'], 'executing')
+
+    def test_partial_or_live_identity_still_blocks(self):
+        def identities(mapping):
+            def match(pid, start):
+                return mapping.get((pid, start))
+            return mock.patch.object(worker, '_process_identity_matches', side_effect=match)
+
+        both = ((4343, 'supervisor-start'), (4242, 'worker-start'))
+        cases = (
+            ('supervisor dead, worker alive', {'status': 'executing', 'pid': 4242, 'pid_start': 'worker-start',
+                'supervisor_pid': 4343, 'supervisor_pid_start': 'supervisor-start'},
+                {both[0]: False, both[1]: True}),
+            ('supervisor alive, worker dead', {'status': 'running', 'pid': 4242, 'pid_start': 'worker-start',
+                'supervisor_pid': 4343, 'supervisor_pid_start': 'supervisor-start'},
+                {both[0]: True, both[1]: False}),
+            ('identity unavailable', {'status': 'executing', 'pid': 4242, 'pid_start': 'worker-start',
+                'supervisor_pid': 4343, 'supervisor_pid_start': 'supervisor-start'},
+                {both[0]: None, both[1]: False}),
+            ('worker pid not recorded', {'status': 'running', 'supervisor_pid': 4343,
+                'supervisor_pid_start': 'supervisor-start'},
+                {both[0]: False, (None, None): None}),
+            ('no pid info', {'status': 'launching'}, {}),
+            ('staged without pids', {'status': 'staged'}, {}),
+        )
+        for name, fields, mapping in cases:
+            with self.subTest(name=name):
+                self.record(self.repo, 'run-a', fields.pop('status'), **fields)
+                with identities(mapping):
+                    with self.assertRaises(ValidationIssue) as caught:
+                        self.launch(self.repo, 'run-b')
+                self.assertEqual(caught.exception.code, 'native_worker_shared_refs_active_run')
+                self.assertFalse(worker.native_worker_paths(self.repo, 'run-b')[0].exists())
+                worker.native_worker_paths(self.repo, 'run-a')[0].unlink()
+
+    def test_unreadable_state_does_not_hide_authority_detail(self):
+        broken = self.record(self.repo, 'broken', 'executing')
+        broken.write_text('{broken')
+        output = io.StringIO()
+        with contextlib.redirect_stderr(output):
+            detail = self.terminalize_moved_branch('feature/b', sibling=True)
+        self.assertEqual(detail, 'The branch of another native worker run (other-run) moved in this repository. '
+            'Two native workers cannot share one repository.')
+        warning = output.getvalue()
+        self.assertIn('Warning: cannot read native worker state', warning)
+        self.assertIn(str(broken), warning)
 
     def terminalize_moved_branch(self, branch, sibling=False):
         self.git(self.repo, 'branch', branch)

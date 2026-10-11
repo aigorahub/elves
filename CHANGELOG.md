@@ -8,7 +8,7 @@ All notable changes to the Elves skill are documented here.
 
 ### Fixed
 
-- Native workers refuse launch when another active recorded run shares the repository's refs, including runs in linked worktrees. Unreadable state files warn without blocking; terminal runs do not block.
+- Native workers refuse launch when another active recorded run shares the repository's refs, including runs in linked worktrees. An unreadable or malformed state file blocks launch with `native_worker_shared_refs_unreadable_state`; inspect and repair it, or remove it only if no worker is running. A stale active run whose supervisor and worker processes are both gone does not block. Runs with no recorded pid info yet, such as staged or launching, still block. Terminal runs do not block.
 - Protected-ref authority failures describe a moved ref and any recorded worker branch association without attributing who moved it. The failure code and protected-ref safety checks remain unchanged.
 - Native-worker launches serialize the shared-ref scan and initial registration in the Git common directory, reject same-ID sibling runs and state roots outside registered checkouts, and describe ref movement without attributing an actor (#284).
 - Parallel native-worker lane documentation requires separate clones with separate origins and provides the bare-mirror integration recipe, including the post-worker lane push (#284).

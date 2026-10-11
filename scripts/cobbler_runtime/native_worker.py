@@ -1271,8 +1271,18 @@ def _native_worker_launch_lock(repo_root: Path, worktree: Path, *, fixture: bool
             fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
 
-def _repository_native_worker_runs(worktree: Path) -> list[dict[str, Any]]:
-    """Read recorded runs across checkouts that share this repository's refs."""
+def _repository_native_worker_runs(
+    worktree: Path,
+    *,
+    fail_closed: bool = True,
+    launch_run_id: str | None = None,
+) -> list[dict[str, Any]]:
+    """Read recorded runs across checkouts that share this repository's refs.
+
+    Unreadable or malformed ``state.json`` fails closed so a launch cannot share
+    refs with a worker whose state cannot be inspected. Pass ``fail_closed=False``
+    only for diagnostic enrichment that must not block a terminal write.
+    """
     result = subprocess.run(
         ["git", "worktree", "list", "--porcelain", "-z"], cwd=worktree,
         capture_output=True, text=True, timeout=30, check=False,
@@ -1291,8 +1301,23 @@ def _repository_native_worker_runs(worktree: Path) -> list[dict[str, Any]]:
                 if not isinstance(state, dict):
                     raise ValueError("state is not an object")
             except (OSError, ValueError) as error:
-                print(f"Warning: cannot read native worker state {path}: {error}", file=sys.stderr)
-                continue
+                if not fail_closed:
+                    print(
+                        f"Warning: cannot read native worker state {path}: {error}",
+                        file=sys.stderr,
+                    )
+                    continue
+                prefix = (
+                    f"Cannot launch native worker run `{launch_run_id}`: "
+                    if launch_run_id is not None
+                    else ""
+                )
+                raise ValidationIssue(
+                    "native_worker_shared_refs_unreadable_state",
+                    f"{prefix}native worker state {path} is unreadable or malformed ({error}). "
+                    "Inspect and repair that state file, or remove it only if no worker is running.",
+                    path=str(path),
+                ) from error
             runs.append({**state, "recorded_worktree": str(checkout)})
     return runs
 
@@ -1302,8 +1327,24 @@ def _check_shared_refs_active_run(worktree: Path, run_id: str) -> None:
         "staged", "launching", "running", "launching_prewalk", "prewalking",
         "transition_ready", "launching_execution", "executing", "execution_backoff",
     }
-    for other in _repository_native_worker_runs(worktree):
+    for other in _repository_native_worker_runs(worktree, launch_run_id=run_id):
         if other.get("status") not in active:
+            continue
+        # A crashed supervisor can leave an active status on disk forever.
+        # Missing pid info (for example staged or launching) is not dead.
+        supervisor_gone = _process_identity_matches(
+            other.get("supervisor_pid"), other.get("supervisor_pid_start"),
+        ) is False
+        worker_gone = _process_identity_matches(
+            other.get("pid"), other.get("pid_start"),
+        ) is False
+        if supervisor_gone and worker_gone:
+            print(
+                f"Warning: native worker run `{other.get('run_id')}` is recorded as "
+                f"{other.get('status')} but its supervisor and worker processes are gone; "
+                "not blocking launch.",
+                file=sys.stderr,
+            )
             continue
         raise ValidationIssue(
             "native_worker_shared_refs_active_run",
@@ -1326,7 +1367,7 @@ def _authority_failure_detail(worktree: Path, state: dict[str, Any], errors: lis
     if not moved:
         return None
     try:
-        recorded_runs = _repository_native_worker_runs(worktree)
+        recorded_runs = _repository_native_worker_runs(worktree, fail_closed=False)
     except (OSError, subprocess.TimeoutExpired) as error:
         # Diagnostic enrichment must never prevent the terminal failure write.
         print(f"Warning: cannot inspect sibling native worker runs: {error}", file=sys.stderr)
