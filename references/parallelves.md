@@ -55,10 +55,14 @@ in a linked worktree) is refused with `native_worker_shared_refs_active_run`; us
 An unreadable or malformed native-worker state file blocks launch with
 `native_worker_shared_refs_unreadable_state`. A state object without a string `status` or string
 `run_id` is malformed, and a `.elves/runtime/native-worker` directory that exists but cannot be
-listed blocks the same way. Inspect and repair that state file, or remove it only
-if no worker is running. A recorded active run whose supervisor and worker processes are both gone
-is stale and does not block a new launch. A run that has not recorded pid info yet (for example
-while it is staged or launching) still blocks. Terminal runs do not block.
+listed blocks the same way. A run directory under that tree whose `state.json` is missing blocks
+the same way: inspect the run directory, or remove it only if no worker is running. The launching
+run's own directory is excluded. On a Git checkout, a failed `git worktree list` during the
+active-run scan blocks the same way; a non-Git fixture does not. Inspect and repair an unreadable
+state file, or remove it only if no worker is running. A recorded active run whose supervisor and
+worker processes are both gone is stale and does not block a new launch. A run that has not recorded
+pid info yet (for example while it is staged or launching) still blocks. Only the terminal statuses
+`complete` and `failed` are exempt; any other status blocks launch.
 
 Launches serialize the active-run scan and initial state registration with a lock in the
 Git common directory. `--repo-root` must be a registered checkout of the same repository

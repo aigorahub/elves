@@ -1271,12 +1271,37 @@ def _native_worker_launch_lock(repo_root: Path, worktree: Path, *, fixture: bool
             fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
 
+_UNREADABLE_STATE_FILE_ADVICE = (
+    "Inspect and repair that state file, or remove it only if no worker is running."
+)
+_MISSING_RUN_DIRECTORY_ADVICE = (
+    "Inspect the run directory, or remove it only if no worker is running."
+)
+# Statuses this module writes while a worker may still hold the shared refs.
+# `staged` and `launching` are included because pid info is not recorded yet.
+_NATIVE_WORKER_ACTIVE_STATUSES = frozenset({
+    "staged",
+    "launching",
+    "running",
+    "launching_prewalk",
+    "prewalking",
+    "transition_ready",
+    "launching_execution",
+    "executing",
+    "execution_backoff",
+})
+# The only terminal statuses `_set_status` / `native_worker_status` write.
+_NATIVE_WORKER_TERMINAL_STATUSES = frozenset({"complete", "failed"})
+
+
 def _reject_unreadable_native_worker_state(
     path: Path,
     error: Exception,
     *,
     fail_closed: bool,
     launch_run_id: str | None,
+    summary: str | None = None,
+    advice: str = _UNREADABLE_STATE_FILE_ADVICE,
 ) -> None:
     """Fail closed, or warn, when recorded native-worker state cannot be trusted."""
     if not fail_closed:
@@ -1290,12 +1315,37 @@ def _reject_unreadable_native_worker_state(
         if launch_run_id is not None
         else ""
     )
+    body = summary or f"native worker state {path} is unreadable or malformed ({error})"
     raise ValidationIssue(
         "native_worker_shared_refs_unreadable_state",
-        f"{prefix}native worker state {path} is unreadable or malformed ({error}). "
-        "Inspect and repair that state file, or remove it only if no worker is running.",
+        f"{prefix}{body}. {advice}",
         path=str(path),
     ) from error
+
+
+def _is_launch_run_directory(run_dir: Path, own_run_dir: Path | None) -> bool:
+    if own_run_dir is None:
+        return False
+    try:
+        return run_dir.resolve() == own_run_dir.resolve()
+    except OSError:
+        return False
+
+
+def _worktree_list_failure_is_non_git(
+    worktree: Path, result: subprocess.CompletedProcess[str],
+) -> bool:
+    """True when a failed worktree listing is a fixture with no shared refs.
+
+    A checkout with a ``.git`` entry is a real Git launch even if Git's error
+    text says it is not a repository. Those scans fail closed. A directory with
+    no ``.git`` entry is the non-Git fixture path.
+    """
+    if os.path.lexists(worktree / ".git"):
+        return False
+    if "not a git repository" in (result.stderr or "").lower():
+        return True
+    return _git_common_dir(worktree) is None
 
 
 def _repository_native_worker_runs(
@@ -1303,13 +1353,17 @@ def _repository_native_worker_runs(
     *,
     fail_closed: bool = True,
     launch_run_id: str | None = None,
+    own_run_dir: Path | None = None,
 ) -> list[dict[str, Any]]:
     """Read recorded runs across checkouts that share this repository's refs.
 
     Unreadable or malformed ``state.json`` fails closed so a launch cannot share
-    refs with a worker whose state cannot be inspected. A
-    ``.elves/runtime/native-worker`` directory that exists but cannot be listed
-    fails closed the same way. Pass ``fail_closed=False`` only for diagnostic
+    refs with a worker whose state cannot be inspected. A run directory whose
+    ``state.json`` is missing fails closed the same way, except the launching
+    run's own directory. A ``.elves/runtime/native-worker`` directory that exists
+    but cannot be listed fails closed the same way. On a Git checkout, ``git
+    worktree list`` failure fails closed; a non-Git fixture has no shared refs
+    and contributes no runs. Pass ``fail_closed=False`` only for diagnostic
     enrichment that must not block a terminal write.
     """
     result = subprocess.run(
@@ -1317,7 +1371,24 @@ def _repository_native_worker_runs(
         capture_output=True, text=True, timeout=30, check=False,
     )
     if result.returncode:
-        # Fixture workers may run outside Git; real workers validate Git separately.
+        if _worktree_list_failure_is_non_git(worktree, result):
+            return []
+        detail = " ".join((result.stderr or result.stdout or "git worktree list failed").split())
+        if len(detail) > 300:
+            detail = detail[:300] + "..."
+        _reject_unreadable_native_worker_state(
+            worktree,
+            RuntimeError(f"git worktree list --porcelain exited {result.returncode}: {detail}"),
+            fail_closed=fail_closed,
+            launch_run_id=launch_run_id,
+            summary=(
+                f"cannot list worktrees of {worktree} "
+                f"(git worktree list --porcelain exited {result.returncode}: {detail})"
+            ),
+            advice=(
+                "Inspect the Git checkout and retry after git worktree list --porcelain succeeds."
+            ),
+        )
         return []
     runs: list[dict[str, Any]] = []
     for field in result.stdout.split("\0"):
@@ -1360,7 +1431,19 @@ def _repository_native_worker_runs(
                     raise ValueError("state is not an object")
                 if not isinstance(state.get("status"), str) or not isinstance(state.get("run_id"), str):
                     raise ValueError("state object requires a string status and run_id")
-            except FileNotFoundError:
+            except FileNotFoundError as error:
+                # A leftover directory for this launch has no other worker to hide.
+                # Any other run directory with no state.json can still hide a worker.
+                if _is_launch_run_directory(path.parent, own_run_dir):
+                    continue
+                _reject_unreadable_native_worker_state(
+                    path.parent,
+                    error,
+                    fail_closed=fail_closed,
+                    launch_run_id=launch_run_id,
+                    summary=f"native worker run directory {path.parent} has no state.json ({error})",
+                    advice=_MISSING_RUN_DIRECTORY_ADVICE,
+                )
                 continue
             except (OSError, ValueError) as error:
                 # A run directory whose state.json exists but cannot be read is
@@ -1373,30 +1456,35 @@ def _repository_native_worker_runs(
     return runs
 
 
-def _check_shared_refs_active_run(worktree: Path, run_id: str) -> None:
-    active = {
-        "staged", "launching", "running", "launching_prewalk", "prewalking",
-        "transition_ready", "launching_execution", "executing", "execution_backoff",
-    }
-    for other in _repository_native_worker_runs(worktree, launch_run_id=run_id):
-        if other.get("status") not in active:
+def _check_shared_refs_active_run(
+    worktree: Path, run_id: str, *, repo_root: Path | None = None,
+) -> None:
+    state_root = worktree if repo_root is None else repo_root
+    own_run_dir = native_worker_paths(state_root, run_id)[0].parent
+    for other in _repository_native_worker_runs(
+        worktree, launch_run_id=run_id, own_run_dir=own_run_dir,
+    ):
+        status = other.get("status")
+        if status in _NATIVE_WORKER_TERMINAL_STATUSES:
             continue
         # A crashed supervisor can leave an active status on disk forever.
         # Missing pid info (for example staged or launching) is not dead.
-        supervisor_gone = _process_identity_matches(
-            other.get("supervisor_pid"), other.get("supervisor_pid_start"),
-        ) is False
-        worker_gone = _process_identity_matches(
-            other.get("pid"), other.get("pid_start"),
-        ) is False
-        if supervisor_gone and worker_gone:
-            print(
-                f"Warning: native worker run `{other.get('run_id')}` is recorded as "
-                f"{other.get('status')} but its supervisor and worker processes are gone; "
-                "not blocking launch.",
-                file=sys.stderr,
-            )
-            continue
+        # An unrecognized status is not exempt, even when both processes are gone.
+        if status in _NATIVE_WORKER_ACTIVE_STATUSES:
+            supervisor_gone = _process_identity_matches(
+                other.get("supervisor_pid"), other.get("supervisor_pid_start"),
+            ) is False
+            worker_gone = _process_identity_matches(
+                other.get("pid"), other.get("pid_start"),
+            ) is False
+            if supervisor_gone and worker_gone:
+                print(
+                    f"Warning: native worker run `{other.get('run_id')}` is recorded as "
+                    f"{other.get('status')} but its supervisor and worker processes are gone; "
+                    "not blocking launch.",
+                    file=sys.stderr,
+                )
+                continue
         raise ValidationIssue(
             "native_worker_shared_refs_active_run",
             f"Cannot launch native worker run `{run_id}`: another active run "
@@ -2272,7 +2360,7 @@ def launch_native_worker(
         # Recheck under the lock to protect simultaneous relaunches as well.
         if state_path.exists():
             raise ValidationIssue("native_worker_run_exists", f"Native worker run `{run_id}` already exists")
-        _check_shared_refs_active_run(worktree, run_id)
+        _check_shared_refs_active_run(worktree, run_id, repo_root=repo_root)
         if prewalk_spec and not _worktree_clean(worktree):
             raise ValidationIssue(
                 "prewalk_worktree_continuity_violation",

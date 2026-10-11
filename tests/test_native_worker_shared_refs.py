@@ -49,9 +49,13 @@ class SharedRefsTests(unittest.TestCase):
         spec = worker.NativeWorkerSpec(host='fixture', profile='fixture', effort='low',
             model_policy='exact', requested_model='fixture', separate_session=True,
             cwd=str(repo), argv=(sys.executable,), stdin_packet=True, session_id_source='stream')
-        def publish_identity(_):
-            path, _ = worker.native_worker_paths(repo, run_id)
-            state = json.loads(path.read_text())
+        def publish_identity(_delay=None):
+            path, _ = worker.native_worker_paths(repo_root or repo, run_id)
+            # time.sleep is patched for the whole launch, including Git's own waits.
+            try:
+                state = json.loads(path.read_text())
+            except (FileNotFoundError, json.JSONDecodeError):
+                return None
             state['pid'] = 123
             worker._write_private_json(path, state)
         real_popen = subprocess.Popen
@@ -162,17 +166,36 @@ class SharedRefsTests(unittest.TestCase):
                 self.assertEqual(self.launch(self.repo, f'after-{status}')['status'], 'running')
                 self.record(self.repo, f'after-{status}', 'complete')
 
-    def assert_unreadable_state_blocks(self, repo, path, run_id='new'):
+    def assert_unreadable_state_blocks(self, repo, path, run_id='new', *, advice=None):
         with self.assertRaises(ValidationIssue) as caught:
             self.launch(repo, run_id)
         self.assertEqual(caught.exception.code, 'native_worker_shared_refs_unreadable_state')
         message = str(caught.exception)
         self.assertIn(str(path), message)
         self.assertIn(run_id, message)
-        self.assertIn('Inspect and repair that state file, or remove it only if no worker is running.', message)
+        self.assertIn(advice or (
+            'Inspect and repair that state file, or remove it only if no worker is running.'
+        ), message)
         self.assertEqual(caught.exception.path, str(path))
         self.assertFalse(worker.native_worker_paths(repo, run_id)[0].exists())
         return message
+
+    def fail_worktree_list(self, *, after=0, stderr='fatal: not a git repository'):
+        real_run = subprocess.run
+        seen = {'count': 0}
+
+        def run(*args, **kwargs):
+            command = args[0] if args else kwargs.get('args')
+            listed = isinstance(command, (list, tuple)) and list(command[:4]) == [
+                'git', 'worktree', 'list', '--porcelain',
+            ]
+            if listed:
+                seen['count'] += 1
+                if seen['count'] > after:
+                    return subprocess.CompletedProcess(list(command), 128, '', stderr)
+            return real_run(*args, **kwargs)
+
+        return seen, mock.patch.object(worker.subprocess, 'run', side_effect=run)
 
     def test_unreadable_or_malformed_state_blocks_launch(self):
         cases = (
@@ -196,10 +219,13 @@ class SharedRefsTests(unittest.TestCase):
                 try:
                     self.assert_unreadable_state_blocks(self.repo, path, f'new-{name}')
                 finally:
-                    if as_directory and path.is_dir():
+                    if path.is_dir():
                         path.rmdir()
                     elif path.exists():
                         path.unlink()
+                    run_dir = path.parent
+                    if run_dir.is_dir() and not any(run_dir.iterdir()):
+                        run_dir.rmdir()
 
     def _raise_on_native_worker_scandir(self, directory):
         real_scandir = os.scandir
@@ -264,6 +290,92 @@ class SharedRefsTests(unittest.TestCase):
             self.assertEqual(self.launch(scratch, 'fixture-run')['status'], 'running')
         self.assertNotIn('native_worker_shared_refs_unreadable_state', output.getvalue())
         self.assertNotIn(str(planted), output.getvalue())
+        self.assertEqual(worker._repository_native_worker_runs(scratch), [])
+
+    def test_git_worktree_list_failure_fails_closed_for_a_real_checkout(self):
+        seen, patched = self.fail_worktree_list()
+        with patched:
+            with self.assertRaises(ValidationIssue) as caught:
+                worker._repository_native_worker_runs(self.repo, launch_run_id='new')
+        self.assertEqual(seen['count'], 1)
+        self.assertEqual(caught.exception.code, 'native_worker_shared_refs_unreadable_state')
+        message = str(caught.exception)
+        self.assertIn('git worktree list --porcelain', message)
+        self.assertIn('new', message)
+        self.assertIn(str(self.repo), message)
+        self.assertEqual(caught.exception.path, str(self.repo))
+        self.assertIn(
+            'Inspect the Git checkout and retry after git worktree list --porcelain succeeds.',
+            message,
+        )
+
+        output = io.StringIO()
+        seen, patched = self.fail_worktree_list(stderr='fatal: unable to read worktrees')
+        with patched, contextlib.redirect_stderr(output):
+            self.assertEqual(
+                worker._repository_native_worker_runs(self.repo, fail_closed=False, launch_run_id='new'),
+                [],
+            )
+        warning = output.getvalue()
+        self.assertIn('Warning: cannot read native worker state', warning)
+        self.assertIn(str(self.repo), warning)
+        self.assertNotIn('native_worker_shared_refs_unreadable_state', warning)
+
+    def test_git_worktree_list_failure_during_launch_scan_fails_closed(self):
+        seen, patched = self.fail_worktree_list(after=1, stderr='fatal: unable to read worktrees')
+        with patched:
+            with self.assertRaises(ValidationIssue) as caught:
+                self.launch(self.repo, 'new')
+        self.assertGreaterEqual(seen['count'], 2)
+        self.assertEqual(caught.exception.code, 'native_worker_shared_refs_unreadable_state')
+        self.assertIn('git worktree list --porcelain', str(caught.exception))
+        self.assertIn('new', str(caught.exception))
+        self.assertFalse(worker.native_worker_paths(self.repo, 'new')[0].exists())
+
+    def test_missing_state_json_blocks_except_the_launching_run_directory(self):
+        linked = self.root / 'linked'
+        self.git(self.repo, 'worktree', 'add', '-b', 'feature/b', str(linked))
+        missing = self.record(linked, 'other', 'executing')
+        missing.unlink()
+        advice = 'Inspect the run directory, or remove it only if no worker is running.'
+        message = self.assert_unreadable_state_blocks(
+            self.repo, missing.parent, 'new-missing', advice=advice,
+        )
+        self.assertIn('has no state.json', message)
+        missing.parent.rmdir()
+
+        sibling = worker.native_worker_paths(linked, 'new')[0]
+        sibling.parent.mkdir(parents=True)
+        own = worker.native_worker_paths(self.repo, 'new')[0]
+        own.parent.mkdir(parents=True)
+        with self.assertRaises(ValidationIssue) as caught:
+            self.launch(self.repo, 'new')
+        self.assertEqual(caught.exception.code, 'native_worker_shared_refs_unreadable_state')
+        self.assertEqual(caught.exception.path, str(sibling.parent))
+        self.assertIn(advice, str(caught.exception))
+        self.assertFalse(own.exists())
+        sibling.parent.rmdir()
+
+        self.assertEqual(self.launch(linked, 'new', repo_root=self.repo)['status'], 'running')
+        self.assertTrue(own.is_file())
+
+    def test_only_recognized_terminal_statuses_are_exempt(self):
+        for status in ('paused', 'cancelled', 'archived'):
+            with self.subTest(status=status):
+                self.record(self.repo, 'run-a', status)
+                with self.assertRaises(ValidationIssue) as caught:
+                    self.launch(self.repo, 'run-b')
+                self.assertEqual(caught.exception.code, 'native_worker_shared_refs_active_run')
+                self.assertIn('run-a', str(caught.exception))
+                self.assertFalse(worker.native_worker_paths(self.repo, 'run-b')[0].exists())
+                worker.native_worker_paths(self.repo, 'run-a')[0].unlink()
+
+        self.record_dead_pair(self.repo, 'run-a', status='paused')
+        with mock.patch.object(worker, '_process_identity_matches', return_value=False):
+            with self.assertRaises(ValidationIssue) as caught:
+                self.launch(self.repo, 'run-c')
+        self.assertEqual(caught.exception.code, 'native_worker_shared_refs_active_run')
+        self.assertFalse(worker.native_worker_paths(self.repo, 'run-c')[0].exists())
 
     def record_dead_pair(self, repo, run_id, status='executing'):
         return self.record(
