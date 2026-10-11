@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import contextlib
 import concurrent.futures
+import os
 import threading
 import io
 import json
@@ -178,6 +179,10 @@ class SharedRefsTests(unittest.TestCase):
             ('malformed json', '{broken', False),
             ('non-object', '[]', False),
             ('null', 'null', False),
+            ('empty object', '{}', False),
+            ('null status', '{"status": null, "run_id": "broken"}', False),
+            ('missing run_id', '{"status": "executing"}', False),
+            ('non-string run_id', '{"status": "executing", "run_id": null}', False),
             ('directory', None, True),
         )
         for name, text, as_directory in cases:
@@ -195,6 +200,50 @@ class SharedRefsTests(unittest.TestCase):
                         path.rmdir()
                     elif path.exists():
                         path.unlink()
+
+    def _raise_on_native_worker_scandir(self, directory):
+        real_scandir = os.scandir
+
+        def scandir(target, *args, **kwargs):
+            if Path(target).resolve() == directory.resolve():
+                raise OSError(13, 'Permission denied', str(directory))
+            return real_scandir(target, *args, **kwargs)
+
+        return mock.patch.object(worker.os, 'scandir', side_effect=scandir)
+
+    def test_scandir_oserror_on_native_worker_directory_blocks_launch(self):
+        path = self.record(self.repo, 'hidden', 'executing')
+        directory = path.parent.parent
+        with self._raise_on_native_worker_scandir(directory):
+            self.assert_unreadable_state_blocks(self.repo, directory, 'new-scan')
+
+    def test_unlistable_native_worker_directory_warns_when_not_fail_closed(self):
+        path = self.record(self.repo, 'hidden', 'executing')
+        directory = path.parent.parent
+        output = io.StringIO()
+        with self._raise_on_native_worker_scandir(directory), contextlib.redirect_stderr(output):
+            self.assertEqual(worker._repository_native_worker_runs(self.repo, fail_closed=False), [])
+        warning = output.getvalue()
+        self.assertIn('Warning: cannot read native worker state', warning)
+        self.assertIn(str(directory), warning)
+        self.assertNotIn('native_worker_shared_refs_unreadable_state', warning)
+
+    @unittest.skipIf(os.geteuid() == 0, 'directory mode does not constrain root')
+    def test_unreadable_native_worker_directory_blocks_launch(self):
+        linked = self.root / 'linked'
+        self.git(self.repo, 'worktree', 'add', '-b', 'feature/b', str(linked))
+        path = self.record(linked, 'hidden', 'executing')
+        directory = path.parent.parent
+        directory.chmod(0)
+        self.addCleanup(directory.chmod, 0o700)
+        self.assert_unreadable_state_blocks(self.repo, directory, 'new-mode')
+
+    @unittest.skipIf(os.geteuid() == 0, 'directory mode does not constrain root')
+    def test_unreadable_run_directory_state_file_blocks_like_unreadable_state(self):
+        path = self.record(self.repo, 'hidden', 'executing')
+        path.parent.chmod(0)
+        self.addCleanup(path.parent.chmod, 0o700)
+        self.assert_unreadable_state_blocks(self.repo, path, 'new-run-dir')
 
     def test_unreadable_state_in_linked_worktree_blocks(self):
         linked = self.root / 'linked'

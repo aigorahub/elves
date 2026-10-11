@@ -53,7 +53,9 @@ supervised session. Host-by-host invocation parity lives in the Parallelves pari
 Launching another native worker in a repository that already has an active recorded run (including one
 in a linked worktree) is refused with `native_worker_shared_refs_active_run`; use a separate clone.
 An unreadable or malformed native-worker state file blocks launch with
-`native_worker_shared_refs_unreadable_state`. Inspect and repair that state file, or remove it only
+`native_worker_shared_refs_unreadable_state`. A state object without a string `status` or string
+`run_id` is malformed, and a `.elves/runtime/native-worker` directory that exists but cannot be
+listed blocks the same way. Inspect and repair that state file, or remove it only
 if no worker is running. A recorded active run whose supervisor and worker processes are both gone
 is stale and does not block a new launch. A run that has not recorded pid info yet (for example
 while it is staged or launching) still blocks. Terminal runs do not block.
@@ -141,6 +143,11 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" team-lanes init \
 
 Register each `L1`, `L2`, or later lane with `register --lane L1 --worktree PATH
 --branch BRANCH --session EXACT_SESSION --kind KIND --model MODEL --owns src/area`.
+`team-lanes register` requires lanes in the same Git common directory as the driver,
+so registered lanes are worktrees of that repository. Native-worker lanes that use
+the separate-clone recipe are integrated manually per the operator recipe, outside
+`team-lanes`. Worktree lanes registered with `team-lanes` must not run concurrent
+native workers, because those worktrees share refs.
 Repeat `--owns` for separate roots and `--depends-on` for earlier lane IDs. Every
 mutation and integration gate takes the recorded driver `--actor-session`,
 `--actor-kind`, and `--actor-model`, plus `--state`.

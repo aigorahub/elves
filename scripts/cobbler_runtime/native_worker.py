@@ -1271,6 +1271,33 @@ def _native_worker_launch_lock(repo_root: Path, worktree: Path, *, fixture: bool
             fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
 
+def _reject_unreadable_native_worker_state(
+    path: Path,
+    error: Exception,
+    *,
+    fail_closed: bool,
+    launch_run_id: str | None,
+) -> None:
+    """Fail closed, or warn, when recorded native-worker state cannot be trusted."""
+    if not fail_closed:
+        print(
+            f"Warning: cannot read native worker state {path}: {error}",
+            file=sys.stderr,
+        )
+        return
+    prefix = (
+        f"Cannot launch native worker run `{launch_run_id}`: "
+        if launch_run_id is not None
+        else ""
+    )
+    raise ValidationIssue(
+        "native_worker_shared_refs_unreadable_state",
+        f"{prefix}native worker state {path} is unreadable or malformed ({error}). "
+        "Inspect and repair that state file, or remove it only if no worker is running.",
+        path=str(path),
+    ) from error
+
+
 def _repository_native_worker_runs(
     worktree: Path,
     *,
@@ -1280,8 +1307,10 @@ def _repository_native_worker_runs(
     """Read recorded runs across checkouts that share this repository's refs.
 
     Unreadable or malformed ``state.json`` fails closed so a launch cannot share
-    refs with a worker whose state cannot be inspected. Pass ``fail_closed=False``
-    only for diagnostic enrichment that must not block a terminal write.
+    refs with a worker whose state cannot be inspected. A
+    ``.elves/runtime/native-worker`` directory that exists but cannot be listed
+    fails closed the same way. Pass ``fail_closed=False`` only for diagnostic
+    enrichment that must not block a terminal write.
     """
     result = subprocess.run(
         ["git", "worktree", "list", "--porcelain", "-z"], cwd=worktree,
@@ -1295,29 +1324,51 @@ def _repository_native_worker_runs(
         if not field.startswith("worktree "):
             continue
         checkout = Path(field[len("worktree "):])
-        for path in sorted((checkout / ".elves/runtime/native-worker").glob("*/state.json")):
+        # Path.glob swallows scandir OSError and would hide every run here.
+        root = checkout / ".elves" / "runtime" / "native-worker"
+        try:
+            exists = root.exists()
+        except OSError as error:
+            _reject_unreadable_native_worker_state(
+                root, error, fail_closed=fail_closed, launch_run_id=launch_run_id,
+            )
+            continue
+        if not exists:
+            continue
+        try:
+            if not root.is_dir() or not os.access(root, os.R_OK | os.X_OK):
+                raise OSError(f"{root} exists but cannot be listed")
+            with os.scandir(root) as scan:
+                entries = list(scan)
+        except OSError as error:
+            _reject_unreadable_native_worker_state(
+                root, error, fail_closed=fail_closed, launch_run_id=launch_run_id,
+            )
+            continue
+        state_paths: list[Path] = []
+        for entry in entries:
+            try:
+                is_run_dir = entry.is_dir(follow_symlinks=False)
+            except OSError:
+                is_run_dir = True
+            if is_run_dir:
+                state_paths.append(Path(entry.path) / "state.json")
+        for path in sorted(state_paths):
             try:
                 state = json.loads(path.read_text(encoding="utf-8"))
                 if not isinstance(state, dict):
                     raise ValueError("state is not an object")
+                if not isinstance(state.get("status"), str) or not isinstance(state.get("run_id"), str):
+                    raise ValueError("state object requires a string status and run_id")
+            except FileNotFoundError:
+                continue
             except (OSError, ValueError) as error:
-                if not fail_closed:
-                    print(
-                        f"Warning: cannot read native worker state {path}: {error}",
-                        file=sys.stderr,
-                    )
-                    continue
-                prefix = (
-                    f"Cannot launch native worker run `{launch_run_id}`: "
-                    if launch_run_id is not None
-                    else ""
+                # A run directory whose state.json exists but cannot be read is
+                # unreadable state, not an unlistable native-worker directory.
+                _reject_unreadable_native_worker_state(
+                    path, error, fail_closed=fail_closed, launch_run_id=launch_run_id,
                 )
-                raise ValidationIssue(
-                    "native_worker_shared_refs_unreadable_state",
-                    f"{prefix}native worker state {path} is unreadable or malformed ({error}). "
-                    "Inspect and repair that state file, or remove it only if no worker is running.",
-                    path=str(path),
-                ) from error
+                continue
             runs.append({**state, "recorded_worktree": str(checkout)})
     return runs
 
