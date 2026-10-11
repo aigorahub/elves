@@ -91,7 +91,7 @@ evidence. This prewalk lane is non-yolo
 ## Parallelves parity
 
 On every host, a lane running a native worker needs its own clone with its own origin; a second
-worktree of the same repository is not enough because worktrees share refs. A second launch in
+worktree of the same repository is not enough because worktrees share refs. Launching another native worker in
 the same repository is refused with `native_worker_shared_refs_active_run` on every host.
 
 The Parallelves contract (`references/parallelves.md`) has identical semantics on Claude Code and

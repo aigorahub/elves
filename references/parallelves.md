@@ -37,7 +37,9 @@ supervised session. Host-by-host invocation parity lives in the Parallelves pari
 
 1. Make a bare mirror for each lane: `git clone --bare <origin-url> <lanes>/<lane>.git`.
 2. Clone it: `git clone <lanes>/<lane>.git <lanes>/<lane>`, then create the lane branch
-   with `git -C <lanes>/<lane> switch -c <lane-branch>`.
+   from the completed trunk-batch tip with
+   `git -C <lanes>/<lane> switch -c <lane-branch> origin/<trunk-branch>` (push the trunk branch to
+   the mirror first if it is not on origin yet).
 3. Launch the native worker with `--repo-root` and `--worktree` set to that clone.
    Its origin is the lane's bare mirror; worker progress must reach that mirror before integration.
 4. While a worker runs, no other process commits, branches, tags, fetches, or pushes in
@@ -48,7 +50,7 @@ supervised session. Host-by-host invocation parity lives in the Parallelves pari
    `git fetch <lanes>/<lane>.git <lane-branch>`, then `git merge --no-ff FETCH_HEAD`.
    Use a regular merge commit, and wait until any worker in the integration repository has ended.
 
-A second native-worker launch whose repository already has an active recorded run (including one
+Launching another native worker in a repository that already has an active recorded run (including one
 in a linked worktree) is refused with `native_worker_shared_refs_active_run`; use a separate clone.
 
 Launches serialize the active-run scan and initial state registration with a lock in the

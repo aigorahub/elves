@@ -108,7 +108,7 @@ in this file, it is not project vocabulary — plain English wins.
 - **Lane** — one Cobbler-routed writer agent in a Parallelves run: a dedicated checkout and
   feature branch on pairwise-disjoint owned surfaces, under the existing worker authority model.
   A lane running a native worker needs its own clone with its own origin; a second worktree
-  of the same repository does not isolate refs, and a second launch there is refused with
+  of the same repository does not isolate refs, and launching another native worker there is refused with
   `native_worker_shared_refs_active_run` (see `references/parallelves.md`).
 - **Trunk batch** — a serial batch that builds shared foundations before lanes fork (or after a
   reclassification pause); anything two lanes would both need lives in a trunk batch.

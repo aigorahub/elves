@@ -473,7 +473,8 @@ routing outcome, never a mode switch. The deterministic width test (`cobbler_age
 gates the recommendation: `worker.parallel=auto` may only recommend lanes, every decline records a
 concrete `parallel_declined:<gate>:<detail>` reason, and nothing auto-launches. The topology is
 trunk -> lanes -> integration: trunk batches build shared foundations serially, lanes run as
-ordinary workers on pairwise-disjoint owned surfaces in dedicated worktrees, and the driver merges
+ordinary workers on pairwise-disjoint owned surfaces in dedicated checkouts (a native-worker lane
+needs its own clone with its own origin), and the driver merges
 them behind a mandatory cross-lane entropy review. Full contract: `references/parallelves.md`.
 
 ## Git History as Operator UI
@@ -677,7 +678,7 @@ python3 "$ELVES_SKILL_ROOT/scripts/acceptance_contract.py" validate \
 touch the repo (`./scripts/preflight.sh --create-worktree <branch> --base origin/main`; `--dry-run`
 first). The helper prints the branch, worktree path, base ref, and collision tripwire, and does not reuse, delete, or repair existing worktrees. `START_TIP` is the collision tripwire.
 
-A parallel native-worker lane needs its own clone with its own origin; a second worktree shares refs, and a second launch there is refused with `native_worker_shared_refs_active_run` — see `references/parallelves.md` for the operator recipe.
+A parallel native-worker lane needs its own clone with its own origin; a second worktree shares refs, and launching another native worker there is refused with `native_worker_shared_refs_active_run` — see `references/parallelves.md` for the operator recipe.
 
 ## Trusted full-run path (normal happy path)
 
