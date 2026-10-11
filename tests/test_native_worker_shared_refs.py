@@ -176,7 +176,7 @@ class SharedRefsTests(unittest.TestCase):
         self.assertIn(advice or (
             'Inspect and repair that state file, or remove it only if no worker is running.'
         ), message)
-        self.assertEqual(caught.exception.path, str(path))
+        self.assertEqual(Path(caught.exception.path).resolve(), Path(path).resolve())
         self.assertFalse(worker.native_worker_paths(repo, run_id)[0].exists())
         return message
 
@@ -331,7 +331,7 @@ class SharedRefsTests(unittest.TestCase):
         self.assertIn('git worktree list --porcelain', message)
         self.assertIn('new', message)
         self.assertIn(str(self.repo), message)
-        self.assertEqual(caught.exception.path, str(self.repo))
+        self.assertEqual(Path(caught.exception.path).resolve(), Path(self.repo).resolve())
         self.assertIn(
             'Inspect the Git checkout and retry after git worktree list --porcelain succeeds.',
             message,
@@ -383,7 +383,7 @@ class SharedRefsTests(unittest.TestCase):
         self.assertIn('git worktree list --porcelain', message)
         self.assertIn('new', message)
         self.assertIn(str(self.repo), message)
-        self.assertEqual(caught.exception.path, str(self.repo))
+        self.assertEqual(Path(caught.exception.path).resolve(), Path(self.repo).resolve())
         self.assertIn(
             'Inspect the Git checkout and retry after git worktree list --porcelain succeeds.',
             message,
@@ -409,7 +409,7 @@ class SharedRefsTests(unittest.TestCase):
         with self.assertRaises(ValidationIssue) as caught:
             self.launch(self.repo, 'new')
         self.assertEqual(caught.exception.code, 'native_worker_shared_refs_unreadable_state')
-        self.assertEqual(caught.exception.path, str(sibling.parent))
+        self.assertEqual(Path(caught.exception.path).resolve(), Path(sibling.parent).resolve())
         self.assertIn(advice, str(caught.exception))
         self.assertFalse(own.exists())
         sibling.parent.rmdir()

@@ -1240,6 +1240,25 @@ def _git_common_dir(checkout: Path) -> Path | None:
     return (checkout / result.stdout.strip()).resolve() if result.returncode == 0 else None
 
 
+def _git_worktree_list(worktree: Path) -> tuple[subprocess.CompletedProcess[str], list[Path]]:
+    """List registered checkouts with newline ``git worktree list --porcelain``.
+
+    ``--porcelain -z`` needs Git 2.36 or newer. Older Git rejects ``-z`` and a
+    nonzero exit would refuse every launch. Callers still fail closed when this
+    command exits nonzero for a real checkout.
+    """
+    result = subprocess.run(
+        ["git", "worktree", "list", "--porcelain"], cwd=worktree,
+        capture_output=True, text=True, timeout=30, check=False,
+    )
+    paths = [
+        Path(line[len("worktree "):])
+        for line in result.stdout.splitlines()
+        if line.startswith("worktree ")
+    ]
+    return result, paths
+
+
 @contextmanager
 def _native_worker_launch_lock(
     repo_root: Path,
@@ -1254,10 +1273,7 @@ def _native_worker_launch_lock(
         # Non-Git fixtures have no shared repository refs.
         yield
         return
-    registered = subprocess.run(
-        ["git", "worktree", "list", "--porcelain", "-z"], cwd=worktree,
-        capture_output=True, text=True, timeout=30, check=False,
-    )
+    registered, listed = _git_worktree_list(worktree)
     # A nonzero exit cannot prove registration. Falling through would treat
     # empty stdout as a repository mismatch. Non-fixture Git launches fail
     # closed; non-Git fixtures returned above.
@@ -1270,8 +1286,7 @@ def _native_worker_launch_lock(
             fail_closed=True,
             launch_run_id=launch_run_id,
         )
-    checkouts = {Path(field[len("worktree "):]).resolve()
-                 for field in registered.stdout.split("\0") if field.startswith("worktree ")}
+    checkouts = {path.resolve() for path in listed}
     # Every registered checkout has its own .git entry; this also guards against an
     # inherited GIT_DIR making an unrelated directory look like a checkout.
     if (common is None or common != state_common or repo_root.resolve() not in checkouts
@@ -1410,10 +1425,7 @@ def _repository_native_worker_runs(
     and contributes no runs. Pass ``fail_closed=False`` only for diagnostic
     enrichment that must not block a terminal write.
     """
-    result = subprocess.run(
-        ["git", "worktree", "list", "--porcelain", "-z"], cwd=worktree,
-        capture_output=True, text=True, timeout=30, check=False,
-    )
+    result, listed = _git_worktree_list(worktree)
     if result.returncode:
         if _worktree_list_failure_is_non_git(worktree, result):
             return []
@@ -1425,10 +1437,7 @@ def _repository_native_worker_runs(
         )
         return []
     runs: list[dict[str, Any]] = []
-    for field in result.stdout.split("\0"):
-        if not field.startswith("worktree "):
-            continue
-        checkout = Path(field[len("worktree "):])
+    for checkout in listed:
         # Path.glob swallows scandir OSError and would hide every run here.
         root = checkout / ".elves" / "runtime" / "native-worker"
         try:
