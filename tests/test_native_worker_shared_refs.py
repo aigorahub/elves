@@ -234,6 +234,8 @@ class SharedRefsTests(unittest.TestCase):
             ('empty list pid', {'pid': []}),
             ('string supervisor pid', {'supervisor_pid': 'abc'}),
             ('list supervisor pid', {'supervisor_pid': [4343]}),
+            ('fractional pid', {'pid': 999999.75}),
+            ('string-digit pid', {'pid': '4343'}),
         )
         for name, fields in cases:
             with self.subTest(name=name):

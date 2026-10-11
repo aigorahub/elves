@@ -1510,11 +1510,16 @@ def _check_shared_refs_active_run(
         # An unrecognized status is not exempt, even when both processes are gone.
         if status in _NATIVE_WORKER_ACTIVE_STATUSES:
             try:
-                # Lists never reach int() but are still malformed. Other garbage
-                # raises ValueError or TypeError from the identity check.
+                # None (absent pid info) is not dead. Only a positive int is a pid.
+                # Reject bools (an int subclass), floats, numeric strings, negatives,
+                # and containers here so they never reach int() truncation.
                 for pid_value in (other.get("supervisor_pid"), other.get("pid")):
-                    if isinstance(pid_value, (list, tuple, dict)):
+                    if pid_value is None:
+                        continue
+                    if isinstance(pid_value, bool) or not isinstance(pid_value, int):
                         raise TypeError(f"malformed pid: {type(pid_value).__name__}")
+                    if pid_value <= 0:
+                        raise ValueError(f"malformed pid: {pid_value}")
                 supervisor_gone = _process_identity_matches(
                     other.get("supervisor_pid"), other.get("supervisor_pid_start"),
                 ) is False
