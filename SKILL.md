@@ -677,7 +677,7 @@ python3 "$ELVES_SKILL_ROOT/scripts/acceptance_contract.py" validate \
 touch the repo (`./scripts/preflight.sh --create-worktree <branch> --base origin/main`; `--dry-run`
 first). The helper prints the branch, worktree path, base ref, and collision tripwire, and does not reuse, delete, or repair existing worktrees. `START_TIP` is the collision tripwire.
 
-A parallel native-worker lane needs its own clone with its own origin; a second worktree shares refs and is insufficient — see `references/parallelves.md` for the operator recipe.
+A parallel native-worker lane needs its own clone with its own origin; a second worktree shares refs, and a second launch there is refused with `native_worker_shared_refs_active_run` — see `references/parallelves.md` for the operator recipe.
 
 ## Trusted full-run path (normal happy path)
 
