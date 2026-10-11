@@ -390,6 +390,142 @@ class SharedRefsTests(unittest.TestCase):
         )
         self.assertFalse(worker.native_worker_paths(self.repo, 'new')[0].exists())
 
+    def _patch_worktree_list(self, responses):
+        """Return a patch that answers worktree-list calls and runs other git for real."""
+        real_run = subprocess.run
+        calls = []
+
+        def run(*args, **kwargs):
+            command = list(args[0] if args else kwargs.get('args'))
+            if command[:4] == ['git', 'worktree', 'list', '--porcelain']:
+                calls.append(command)
+                kind = 'z' if command[-1:] == ['-z'] else 'plain'
+                stdout, stderr, code = responses[kind]
+                return subprocess.CompletedProcess(command, code, stdout, stderr)
+            return real_run(*args, **kwargs)
+
+        return calls, mock.patch.object(worker.subprocess, 'run', side_effect=run)
+
+    def test_nul_porcelain_keeps_paths_that_contain_newlines(self):
+        odd = self.root / 'odd\nname'
+        run_dir = odd / '.elves' / 'runtime' / 'native-worker' / 'hidden'
+        run_dir.mkdir(parents=True)
+        (run_dir / 'state.json').write_text(json.dumps({
+            'run_id': 'hidden', 'status': 'executing', 'assigned_branch': 'feature/a',
+            'worktree': str(odd),
+        }))
+        stdout = f'worktree {odd}\0HEAD abc\0detached\0\0'
+        calls, patched = self._patch_worktree_list({
+            'z': (stdout, '', 0),
+            'plain': ('', 'fallback should not run', 1),
+        })
+        with patched:
+            with self.assertRaises(ValidationIssue) as caught:
+                worker._check_shared_refs_active_run(self.repo, 'new')
+        self.assertEqual(calls, [['git', 'worktree', 'list', '--porcelain', '-z']])
+        self.assertEqual(caught.exception.code, 'native_worker_shared_refs_active_run')
+        self.assertIn('hidden', str(caught.exception))
+
+    def test_plain_porcelain_fallback_when_z_is_unsupported(self):
+        linked = self.root / 'linked'
+        self.git(self.repo, 'worktree', 'add', '-b', 'feature/b', str(linked))
+        plain = (
+            f'worktree {self.repo}\n'
+            'HEAD abc\n'
+            'bare\n'
+            '\n'
+            f'worktree {linked}\n'
+            'HEAD def\n'
+            'detached\n'
+            'locked\n'
+            '\n'
+            f'worktree {self.root / "with space"}\n'
+            'HEAD ghi\n'
+            'branch refs/heads/feature/a\n'
+            'locked reason here\n'
+            'prunable gitdir file points to non-existent location\n'
+            '\n'
+        )
+        calls, patched = self._patch_worktree_list({
+            'z': ('', "error: unknown switch `z'\n", 129),
+            'plain': (plain, '', 0),
+        })
+        with patched:
+            result, paths = worker._git_worktree_list(self.repo)
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(calls, [
+            ['git', 'worktree', 'list', '--porcelain', '-z'],
+            ['git', 'worktree', 'list', '--porcelain'],
+        ])
+        self.assertEqual(paths, [self.repo, linked, self.root / 'with space'])
+
+    def test_ambiguous_plain_porcelain_fails_closed(self):
+        plain = f'worktree {self.root}/has\nnewline\nHEAD abc\nbranch refs/heads/feature/a\n'
+        calls, patched = self._patch_worktree_list({
+            'z': ('', "error: unknown switch `z'\n", 129),
+            'plain': (plain, '', 0),
+        })
+        with patched:
+            with self.assertRaises(ValidationIssue) as caught:
+                worker._repository_native_worker_runs(self.repo, launch_run_id='new')
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(caught.exception.code, 'native_worker_shared_refs_unreadable_state')
+        message = str(caught.exception)
+        self.assertIn('new', message)
+        self.assertIn(str(self.repo), message)
+        self.assertIn('unrecognized line', message)
+        self.assertEqual(Path(caught.exception.path).resolve(), self.repo.resolve())
+        self.assertIn(
+            'Inspect the Git checkout and retry after git worktree list --porcelain succeeds.',
+            message,
+        )
+
+        output = io.StringIO()
+        with patched, contextlib.redirect_stderr(output):
+            self.assertEqual(
+                worker._repository_native_worker_runs(self.repo, fail_closed=False, launch_run_id='new'),
+                [],
+            )
+        warning = output.getvalue()
+        self.assertIn('Warning: cannot read native worker state', warning)
+        self.assertIn(str(self.repo), warning)
+        self.assertNotIn('native_worker_shared_refs_unreadable_state', warning)
+
+        with patched:
+            with self.assertRaises(ValidationIssue) as caught:
+                with worker._native_worker_launch_lock(self.repo, self.repo, launch_run_id='new'):
+                    pass
+        self.assertEqual(caught.exception.code, 'native_worker_shared_refs_unreadable_state')
+        self.assertIn('unrecognized line', str(caught.exception))
+
+    def test_genuine_worktree_list_failure_does_not_fall_back(self):
+        calls, patched = self._patch_worktree_list({
+            'z': ('', 'fatal: unable to read worktrees', 128),
+            'plain': ('worktree should-not-be-used\n', '', 0),
+        })
+        with patched:
+            with self.assertRaises(ValidationIssue) as caught:
+                worker._repository_native_worker_runs(self.repo, launch_run_id='new')
+        self.assertEqual(calls, [['git', 'worktree', 'list', '--porcelain', '-z']])
+        self.assertEqual(caught.exception.code, 'native_worker_shared_refs_unreadable_state')
+        self.assertIn('git worktree list --porcelain', str(caught.exception))
+        self.assertNotIn('should-not-be-used', str(caught.exception))
+
+    def test_plain_porcelain_nonzero_still_fails_closed(self):
+        calls, patched = self._patch_worktree_list({
+            'z': ('', "error: unknown switch `z'\n", 129),
+            'plain': ('', 'fatal: unable to read worktrees', 128),
+        })
+        with patched:
+            with self.assertRaises(ValidationIssue) as caught:
+                worker._repository_native_worker_runs(self.repo, launch_run_id='new')
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[1], ['git', 'worktree', 'list', '--porcelain'])
+        self.assertEqual(caught.exception.code, 'native_worker_shared_refs_unreadable_state')
+        message = str(caught.exception)
+        self.assertIn('exited 128', message)
+        self.assertIn('unable to read worktrees', message)
+
     def test_missing_state_json_blocks_except_the_launching_run_directory(self):
         linked = self.root / 'linked'
         self.git(self.repo, 'worktree', 'add', '-b', 'feature/b', str(linked))
@@ -416,6 +552,81 @@ class SharedRefsTests(unittest.TestCase):
 
         self.assertEqual(self.launch(linked, 'new', repo_root=self.repo)['status'], 'running')
         self.assertTrue(own.is_file())
+
+    def test_symlinked_runtime_entries_fail_closed(self):
+        runtime = self.repo / '.elves' / 'runtime'
+        runtime.mkdir(parents=True)
+        real = self.root / 'real-native'
+        hidden = real / 'hidden-run'
+        hidden.mkdir(parents=True)
+        state = hidden / 'state.json'
+        state.write_text(json.dumps({
+            'run_id': 'hidden', 'status': 'executing', 'assigned_branch': 'feature/a',
+            'worktree': str(self.repo),
+        }))
+
+        runtime_link = runtime / 'native-worker'
+        runtime_link.symlink_to(real, target_is_directory=True)
+        self.assert_unreadable_state_blocks(self.repo, runtime_link, 'new-runtime-link')
+        runtime_link.unlink()
+
+        broken = runtime / 'native-worker'
+        broken.symlink_to(self.root / 'missing-native', target_is_directory=True)
+        self.assert_unreadable_state_blocks(self.repo, broken, 'new-broken-runtime')
+        broken.unlink()
+
+        native = runtime / 'native-worker'
+        native.mkdir()
+        run_link = native / 'hidden-run'
+        run_link.symlink_to(hidden, target_is_directory=True)
+        message = self.assert_unreadable_state_blocks(self.repo, run_link, 'new-run-link')
+        self.assertIn('is a symlink', message)
+        run_link.unlink()
+
+        holder = native / 'holder'
+        holder.mkdir()
+        state_link = holder / 'state.json'
+        state_link.symlink_to(state)
+        message = self.assert_unreadable_state_blocks(self.repo, state_link, 'new-state-link')
+        self.assertIn('is a symlink', message)
+
+    def test_launching_run_symlink_keeps_current_handling(self):
+        native = self.repo / '.elves' / 'runtime' / 'native-worker'
+        native.mkdir(parents=True)
+        own = worker.native_worker_paths(self.repo, 'new')[0].parent
+        target = self.root / 'own-target'
+        target.mkdir()
+        (target / 'state.json').write_text(json.dumps({
+            'run_id': 'hidden', 'status': 'executing', 'assigned_branch': 'feature/a',
+            'worktree': str(self.repo),
+        }))
+        own.symlink_to(target, target_is_directory=True)
+        # A symlink at the launching run's own directory is still skipped.
+        worker._check_shared_refs_active_run(self.repo, 'new')
+
+        sibling = native / 'sibling'
+        (self.root / 'sibling-target').mkdir()
+        sibling.symlink_to(self.root / 'sibling-target', target_is_directory=True)
+        with self.assertRaises(ValidationIssue) as caught:
+            worker._check_shared_refs_active_run(self.repo, 'new')
+        self.assertEqual(caught.exception.code, 'native_worker_shared_refs_unreadable_state')
+        self.assertIn(str(sibling), str(caught.exception))
+        self.assertIn('is a symlink', str(caught.exception))
+        sibling.unlink()
+        own.unlink()
+
+        own_state = worker.native_worker_paths(self.repo, 'follow')[0]
+        own_state.parent.mkdir()
+        payload = self.root / 'payload.json'
+        payload.write_text(json.dumps({
+            'run_id': 'other', 'status': 'executing', 'assigned_branch': 'feature/a',
+            'worktree': str(self.repo),
+        }))
+        own_state.symlink_to(payload)
+        with self.assertRaises(ValidationIssue) as caught:
+            worker._check_shared_refs_active_run(self.repo, 'follow')
+        self.assertEqual(caught.exception.code, 'native_worker_shared_refs_active_run')
+        self.assertIn('other', str(caught.exception))
 
     def test_only_recognized_terminal_statuses_are_exempt(self):
         for status in ('paused', 'cancelled', 'archived'):

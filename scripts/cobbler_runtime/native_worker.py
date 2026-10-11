@@ -1240,23 +1240,92 @@ def _git_common_dir(checkout: Path) -> Path | None:
     return (checkout / result.stdout.strip()).resolve() if result.returncode == 0 else None
 
 
-def _git_worktree_list(worktree: Path) -> tuple[subprocess.CompletedProcess[str], list[Path]]:
-    """List registered checkouts with newline ``git worktree list --porcelain``.
+# Newline porcelain keys. Anything else can be a worktree path that contained
+# a newline, so the listing is ambiguous. ``-z`` output is NUL-delimited and
+# does not need this check.
+_PORCELAIN_EXACT_LINES = frozenset({"bare", "detached", "locked", "prunable"})
+_PORCELAIN_PREFIXES = ("worktree ", "HEAD ", "branch ", "locked ", "prunable ")
+_PORCELAIN_Z_UNSUPPORTED = re.compile(
+    r"unknown (?:switch|option) [`']-?z['`]|unrecognized argument: -z",
+    re.IGNORECASE,
+)
 
-    ``--porcelain -z`` needs Git 2.36 or newer. Older Git rejects ``-z`` and a
-    nonzero exit would refuse every launch. Callers still fail closed when this
-    command exits nonzero for a real checkout.
+
+def _porcelain_line_is_recognized(line: str) -> bool:
+    return line == "" or line in _PORCELAIN_EXACT_LINES or line.startswith(_PORCELAIN_PREFIXES)
+
+
+def _paths_from_nul_porcelain(stdout: str) -> list[Path]:
+    return [
+        Path(field[len("worktree "):])
+        for field in stdout.split("\0")
+        if field.startswith("worktree ")
+    ]
+
+
+def _porcelain_z_unsupported(result: subprocess.CompletedProcess[str]) -> bool:
+    """True when Git rejected ``-z`` itself (Git older than 2.36)."""
+    if result.returncode == 0:
+        return False
+    text = f"{result.stderr or ''}\n{result.stdout or ''}"
+    return _PORCELAIN_Z_UNSUPPORTED.search(text) is not None
+
+
+def _git_worktree_list(worktree: Path) -> tuple[subprocess.CompletedProcess[str], list[Path] | None]:
+    """List registered checkouts.
+
+    Prefer ``git worktree list --porcelain -z`` so each path is exact. Git
+    older than 2.36 rejects ``-z``; only that failure falls back to newline
+    porcelain. Newline output with a line that is not a recognized porcelain
+    key is ambiguous and comes back as ``None``. Any other nonzero exit is
+    returned unchanged so callers still fail closed.
     """
+    z_result = subprocess.run(
+        ["git", "worktree", "list", "--porcelain", "-z"], cwd=worktree,
+        capture_output=True, text=True, timeout=30, check=False,
+    )
+    if z_result.returncode == 0:
+        return z_result, _paths_from_nul_porcelain(z_result.stdout)
+    if not _porcelain_z_unsupported(z_result):
+        return z_result, []
     result = subprocess.run(
         ["git", "worktree", "list", "--porcelain"], cwd=worktree,
         capture_output=True, text=True, timeout=30, check=False,
     )
+    if result.returncode != 0:
+        return result, []
+    lines = result.stdout.splitlines()
+    if any(not _porcelain_line_is_recognized(line) for line in lines):
+        return result, None
     paths = [
         Path(line[len("worktree "):])
-        for line in result.stdout.splitlines()
+        for line in lines
         if line.startswith("worktree ")
     ]
     return result, paths
+
+
+def _reject_ambiguous_worktree_porcelain(
+    worktree: Path,
+    *,
+    fail_closed: bool,
+    launch_run_id: str | None,
+) -> None:
+    """Fail closed when newline porcelain may have split a registered path."""
+    _reject_unreadable_native_worker_state(
+        worktree,
+        RuntimeError("git worktree list --porcelain output contains an unrecognized line"),
+        fail_closed=fail_closed,
+        launch_run_id=launch_run_id,
+        summary=(
+            f"cannot list worktrees of {worktree} "
+            "(git worktree list --porcelain output contains an unrecognized line; "
+            "a registered path may contain a newline)"
+        ),
+        advice=(
+            "Inspect the Git checkout and retry after git worktree list --porcelain succeeds."
+        ),
+    )
 
 
 @contextmanager
@@ -1274,6 +1343,14 @@ def _native_worker_launch_lock(
         yield
         return
     registered, listed = _git_worktree_list(worktree)
+    # Ambiguous newline porcelain cannot prove which checkouts are registered.
+    # Treat that as unreadable state before the membership check, including
+    # fixture hosts, so it does not surface as a repository mismatch.
+    if listed is None:
+        _reject_ambiguous_worktree_porcelain(
+            worktree, fail_closed=True, launch_run_id=launch_run_id,
+        )
+        listed = []
     # A nonzero exit cannot prove registration. Falling through would treat
     # empty stdout as a repository mismatch. Non-fixture Git launches fail
     # closed; non-Git fixtures returned above.
@@ -1420,12 +1497,20 @@ def _repository_native_worker_runs(
     refs with a worker whose state cannot be inspected. A run directory whose
     ``state.json`` is missing fails closed the same way, except the launching
     run's own directory. A ``.elves/runtime/native-worker`` directory that exists
-    but cannot be listed fails closed the same way. On a Git checkout, ``git
-    worktree list`` failure fails closed; a non-Git fixture has no shared refs
-    and contributes no runs. Pass ``fail_closed=False`` only for diagnostic
-    enrichment that must not block a terminal write.
+    but cannot be listed fails closed the same way. A symlink at that directory,
+    a symlinked run directory, or a symlinked ``state.json`` fails closed the
+    same way; the launching run's own directory keeps its previous handling.
+    On a Git checkout, ``git worktree list`` failure fails closed, and newline
+    porcelain with an unrecognized line is ambiguous and fails closed. A non-Git
+    fixture has no shared refs and contributes no runs. Pass ``fail_closed=False``
+    only for diagnostic enrichment that must not block a terminal write.
     """
     result, listed = _git_worktree_list(worktree)
+    if listed is None:
+        _reject_ambiguous_worktree_porcelain(
+            worktree, fail_closed=fail_closed, launch_run_id=launch_run_id,
+        )
+        return []
     if result.returncode:
         if _worktree_list_failure_is_non_git(worktree, result):
             return []
@@ -1441,10 +1526,22 @@ def _repository_native_worker_runs(
         # Path.glob swallows scandir OSError and would hide every run here.
         root = checkout / ".elves" / "runtime" / "native-worker"
         try:
+            # exists() is false for a broken symlink and follows a live one,
+            # which would skip or redirect this tree.
+            runtime_is_symlink = root.is_symlink()
             exists = root.exists()
         except OSError as error:
             _reject_unreadable_native_worker_state(
                 root, error, fail_closed=fail_closed, launch_run_id=launch_run_id,
+            )
+            continue
+        if runtime_is_symlink:
+            _reject_unreadable_native_worker_state(
+                root,
+                OSError(f"{root} is a symlink"),
+                fail_closed=fail_closed,
+                launch_run_id=launch_run_id,
+                summary=f"native worker runtime directory {root} is a symlink",
             )
             continue
         if not exists:
@@ -1461,13 +1558,45 @@ def _repository_native_worker_runs(
             continue
         state_paths: list[Path] = []
         for entry in entries:
+            entry_path = Path(entry.path)
+            try:
+                symlinked = entry.is_symlink()
+            except OSError:
+                symlinked = False
+            if symlinked:
+                # follow_symlinks=False used to skip these entirely, including a
+                # link that hides another run. The launching run's own directory
+                # stays skipped, which is the previous handling.
+                if not _is_launch_run_directory(entry_path, own_run_dir):
+                    _reject_unreadable_native_worker_state(
+                        entry_path,
+                        OSError(f"{entry_path} is a symlink"),
+                        fail_closed=fail_closed,
+                        launch_run_id=launch_run_id,
+                        summary=f"native worker run directory {entry_path} is a symlink",
+                    )
+                continue
             try:
                 is_run_dir = entry.is_dir(follow_symlinks=False)
             except OSError:
                 is_run_dir = True
             if is_run_dir:
-                state_paths.append(Path(entry.path) / "state.json")
+                state_paths.append(entry_path / "state.json")
         for path in sorted(state_paths):
+            try:
+                state_is_symlink = path.is_symlink()
+            except OSError:
+                # An unreadable directory still fails when state.json is read.
+                state_is_symlink = False
+            if state_is_symlink and not _is_launch_run_directory(path.parent, own_run_dir):
+                _reject_unreadable_native_worker_state(
+                    path,
+                    OSError(f"{path} is a symlink"),
+                    fail_closed=fail_closed,
+                    launch_run_id=launch_run_id,
+                    summary=f"native worker state {path} is a symlink",
+                )
+                continue
             try:
                 state = json.loads(path.read_text(encoding="utf-8"))
                 if not isinstance(state, dict):
