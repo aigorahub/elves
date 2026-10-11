@@ -1241,7 +1241,13 @@ def _git_common_dir(checkout: Path) -> Path | None:
 
 
 @contextmanager
-def _native_worker_launch_lock(repo_root: Path, worktree: Path, *, fixture: bool = False):
+def _native_worker_launch_lock(
+    repo_root: Path,
+    worktree: Path,
+    *,
+    fixture: bool = False,
+    launch_run_id: str | None = None,
+):
     common = _git_common_dir(worktree)
     state_common = _git_common_dir(repo_root)
     if common is None and state_common is None and fixture:
@@ -1252,6 +1258,18 @@ def _native_worker_launch_lock(repo_root: Path, worktree: Path, *, fixture: bool
         ["git", "worktree", "list", "--porcelain", "-z"], cwd=worktree,
         capture_output=True, text=True, timeout=30, check=False,
     )
+    # A nonzero exit cannot prove registration. Falling through would treat
+    # empty stdout as a repository mismatch. Non-fixture Git launches fail
+    # closed; non-Git fixtures returned above.
+    if registered.returncode and not fixture and not _worktree_list_failure_is_non_git(
+        worktree, registered,
+    ):
+        _reject_failed_worktree_list(
+            worktree,
+            registered,
+            fail_closed=True,
+            launch_run_id=launch_run_id,
+        )
     checkouts = {Path(field[len("worktree "):]).resolve()
                  for field in registered.stdout.split("\0") if field.startswith("worktree ")}
     # Every registered checkout has its own .git entry; this also guards against an
@@ -1348,6 +1366,32 @@ def _worktree_list_failure_is_non_git(
     return _git_common_dir(worktree) is None
 
 
+def _reject_failed_worktree_list(
+    worktree: Path,
+    result: subprocess.CompletedProcess[str],
+    *,
+    fail_closed: bool,
+    launch_run_id: str | None,
+) -> None:
+    """Report a failed ``git worktree list`` on a real Git checkout."""
+    detail = " ".join((result.stderr or result.stdout or "git worktree list failed").split())
+    if len(detail) > 300:
+        detail = detail[:300] + "..."
+    _reject_unreadable_native_worker_state(
+        worktree,
+        RuntimeError(f"git worktree list --porcelain exited {result.returncode}: {detail}"),
+        fail_closed=fail_closed,
+        launch_run_id=launch_run_id,
+        summary=(
+            f"cannot list worktrees of {worktree} "
+            f"(git worktree list --porcelain exited {result.returncode}: {detail})"
+        ),
+        advice=(
+            "Inspect the Git checkout and retry after git worktree list --porcelain succeeds."
+        ),
+    )
+
+
 def _repository_native_worker_runs(
     worktree: Path,
     *,
@@ -1373,21 +1417,11 @@ def _repository_native_worker_runs(
     if result.returncode:
         if _worktree_list_failure_is_non_git(worktree, result):
             return []
-        detail = " ".join((result.stderr or result.stdout or "git worktree list failed").split())
-        if len(detail) > 300:
-            detail = detail[:300] + "..."
-        _reject_unreadable_native_worker_state(
+        _reject_failed_worktree_list(
             worktree,
-            RuntimeError(f"git worktree list --porcelain exited {result.returncode}: {detail}"),
+            result,
             fail_closed=fail_closed,
             launch_run_id=launch_run_id,
-            summary=(
-                f"cannot list worktrees of {worktree} "
-                f"(git worktree list --porcelain exited {result.returncode}: {detail})"
-            ),
-            advice=(
-                "Inspect the Git checkout and retry after git worktree list --porcelain succeeds."
-            ),
         )
         return []
     runs: list[dict[str, Any]] = []
@@ -1452,7 +1486,11 @@ def _repository_native_worker_runs(
                     path, error, fail_closed=fail_closed, launch_run_id=launch_run_id,
                 )
                 continue
-            runs.append({**state, "recorded_worktree": str(checkout)})
+            runs.append({
+                **state,
+                "recorded_worktree": str(checkout),
+                "state_path": str(path),
+            })
     return runs
 
 
@@ -1471,12 +1509,25 @@ def _check_shared_refs_active_run(
         # Missing pid info (for example staged or launching) is not dead.
         # An unrecognized status is not exempt, even when both processes are gone.
         if status in _NATIVE_WORKER_ACTIVE_STATUSES:
-            supervisor_gone = _process_identity_matches(
-                other.get("supervisor_pid"), other.get("supervisor_pid_start"),
-            ) is False
-            worker_gone = _process_identity_matches(
-                other.get("pid"), other.get("pid_start"),
-            ) is False
+            try:
+                # Lists never reach int() but are still malformed. Other garbage
+                # raises ValueError or TypeError from the identity check.
+                for pid_value in (other.get("supervisor_pid"), other.get("pid")):
+                    if isinstance(pid_value, (list, tuple, dict)):
+                        raise TypeError(f"malformed pid: {type(pid_value).__name__}")
+                supervisor_gone = _process_identity_matches(
+                    other.get("supervisor_pid"), other.get("supervisor_pid_start"),
+                ) is False
+                worker_gone = _process_identity_matches(
+                    other.get("pid"), other.get("pid_start"),
+                ) is False
+            except (ValueError, TypeError) as error:
+                _reject_unreadable_native_worker_state(
+                    Path(other["state_path"]),
+                    error,
+                    fail_closed=True,
+                    launch_run_id=run_id,
+                )
             if supervisor_gone and worker_gone:
                 print(
                     f"Warning: native worker run `{other.get('run_id')}` is recorded as "
@@ -2355,7 +2406,10 @@ def launch_native_worker(
     )
     worktree = Path(launch_spec.cwd).resolve()
     with _native_worker_launch_lock(
-        repo_root, worktree, fixture=launch_spec.host == "fixture",
+        repo_root,
+        worktree,
+        fixture=launch_spec.host == "fixture",
+        launch_run_id=run_id,
     ):
         # Recheck under the lock to protect simultaneous relaunches as well.
         if state_path.exists():

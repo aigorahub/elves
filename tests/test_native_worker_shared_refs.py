@@ -227,6 +227,32 @@ class SharedRefsTests(unittest.TestCase):
                     if run_dir.is_dir() and not any(run_dir.iterdir()):
                         run_dir.rmdir()
 
+    def test_malformed_pid_is_unreadable_state(self):
+        cases = (
+            ('string pid', {'pid': 'abc'}),
+            ('list pid', {'pid': ['nope']}),
+            ('empty list pid', {'pid': []}),
+            ('string supervisor pid', {'supervisor_pid': 'abc'}),
+            ('list supervisor pid', {'supervisor_pid': [4343]}),
+        )
+        for name, fields in cases:
+            with self.subTest(name=name):
+                slug = name.replace(' ', '-')
+                path = self.record(self.repo, f'bad-{slug}', 'executing', **fields)
+                try:
+                    message = self.assert_unreadable_state_blocks(
+                        self.repo, path, f'new-{slug}',
+                    )
+                    self.assertIn('malformed', message)
+                finally:
+                    if path.is_dir():
+                        path.rmdir()
+                    elif path.exists():
+                        path.unlink()
+                    run_dir = path.parent
+                    if run_dir.is_dir() and not any(run_dir.iterdir()):
+                        run_dir.rmdir()
+
     def _raise_on_native_worker_scandir(self, directory):
         real_scandir = os.scandir
 
@@ -330,6 +356,36 @@ class SharedRefsTests(unittest.TestCase):
         self.assertEqual(caught.exception.code, 'native_worker_shared_refs_unreadable_state')
         self.assertIn('git worktree list --porcelain', str(caught.exception))
         self.assertIn('new', str(caught.exception))
+        self.assertFalse(worker.native_worker_paths(self.repo, 'new')[0].exists())
+
+    def test_git_worktree_list_failure_during_launch_lock_fails_closed(self):
+        # The preliminary listing runs before the active-run scan. A real Git
+        # launch must not report a repository mismatch when that listing fails.
+        packet = self.root / 'packet.md'
+        packet.write_text('fixture packet')
+        spec = worker.NativeWorkerSpec(
+            host='codex', profile='codex', effort='low', model_policy='exact',
+            requested_model='gpt-5.4', separate_session=True, cwd=str(self.repo),
+            argv=(sys.executable,), stdin_packet=True, session_id_source='stream',
+        )
+        seen, patched = self.fail_worktree_list(stderr='fatal: unable to read worktrees')
+        with patched:
+            with self.assertRaises(ValidationIssue) as caught:
+                worker.launch_native_worker(
+                    repo_root=self.repo, run_id='new', spec=spec, packet=packet,
+                    cli_path=REPO_ROOT / 'scripts/cobbler_agents.py',
+                )
+        self.assertEqual(seen['count'], 1)
+        self.assertEqual(caught.exception.code, 'native_worker_shared_refs_unreadable_state')
+        message = str(caught.exception)
+        self.assertIn('git worktree list --porcelain', message)
+        self.assertIn('new', message)
+        self.assertIn(str(self.repo), message)
+        self.assertEqual(caught.exception.path, str(self.repo))
+        self.assertIn(
+            'Inspect the Git checkout and retry after git worktree list --porcelain succeeds.',
+            message,
+        )
         self.assertFalse(worker.native_worker_paths(self.repo, 'new')[0].exists())
 
     def test_missing_state_json_blocks_except_the_launching_run_directory(self):
