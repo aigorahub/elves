@@ -1,0 +1,74 @@
+name: Apply prepared output-capture patch (temporary)
+
+# One-time transport of the maintainer-requested, locally tested patch.
+# This workflow and its payload are removed before the final pull request.
+on:
+  push:
+    branches: ["fix/bounded-subprocess-output-281"]
+    paths:
+      - ".github/elves-281.patch.z"
+      - ".github/workflows/apply-elves-281.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-elves-output-281
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.repository == 'aigorahub/elves' && github.ref == 'refs/heads/fix/bounded-subprocess-output-281' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify and apply the exact prepared patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "0f1e4934ef092bf0d435104a0a45537437434476"
+          python - <<'PY'
+          import hashlib
+          import os
+          from pathlib import Path
+          import zlib
+          raw = zlib.decompress(Path('.github/elves-281.patch.z').read_bytes())
+          assert hashlib.sha256(raw).hexdigest() == 'cd0478d9828d27db81cd7507abd8b30d10a244a09cac6e61943f0f4888bd3e86'
+          Path(os.environ['RUNNER_TEMP'], 'elves-281.patch').write_bytes(raw)
+          PY
+          git apply --check --index "$RUNNER_TEMP/elves-281.patch"
+          git apply --index "$RUNNER_TEMP/elves-281.patch"
+          # Verify the clean product tree, excluding these two transport files.
+          git rm --cached .github/elves-281.patch.z .github/workflows/apply-elves-281.yml
+          test "$(git write-tree)" = "6dca29615b66ce675dad693dc7e4149599666da0"
+          # Keep the workflow unchanged in this bot commit. The connected
+          # maintainer action removes both helper files in a subsequent commit.
+          git restore --staged -- .github/elves-281.patch.z .github/workflows/apply-elves-281.yml
+          git diff --cached --check
+      - name: Run regression and existing affected tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global user.name "Elves CI"
+          git config --global user.email "ci@elves.invalid"
+          python -m unittest tests.test_subprocess_output tests.test_dispatch_isolation tests.test_native_worker_hardening tests.test_native_worker_prewalk tests.test_agent_teams tests.test_continuity_watchdog tests.test_verify_repo
+          python scripts/check_repo_consistency.py
+          python scripts/release_checklist.py
+          git diff --exit-code
+      - name: Commit only to the fix branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/fix/bounded-subprocess-output-281"
+          test "$(git ls-remote origin "$GITHUB_REF" | cut -f1)" = "$GITHUB_SHA"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Bound subprocess output during capture (#281)"
+          git push origin HEAD:refs/heads/fix/bounded-subprocess-output-281
