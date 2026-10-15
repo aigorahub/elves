@@ -1,21 +1,17 @@
 name: Apply prepared output-capture patch (temporary)
 
-# One-time transport of the maintainer-requested, locally tested patch.
-# This workflow and its payload are removed before the final pull request.
+# One-time transport of the maintainer-requested patch. Removed before the PR.
 on:
   push:
     branches: ["fix/bounded-subprocess-output-281"]
     paths:
       - ".github/elves-281.patch.z"
       - ".github/workflows/apply-elves-281.yml"
-
 permissions:
   contents: write
-
 concurrency:
   group: apply-elves-output-281
   cancel-in-progress: false
-
 jobs:
   apply:
     if: github.repository == 'aigorahub/elves' && github.ref == 'refs/heads/fix/bounded-subprocess-output-281' && github.event_name == 'push'
@@ -33,7 +29,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD^)" = "0f1e4934ef092bf0d435104a0a45537437434476"
+          test "$(git rev-parse HEAD^)" = "206cf917af5362a95e37c04c98eed924cc489df1"
           python - <<'PY'
           import hashlib
           import os
@@ -45,11 +41,26 @@ jobs:
           PY
           git apply --check --index "$RUNNER_TEMP/elves-281.patch"
           git apply --index "$RUNNER_TEMP/elves-281.patch"
-          # Verify the clean product tree, excluding these two transport files.
+          # Match the repository's release-aligned metadata convention.
+          # This prepares the patch version; it does not tag or publish a release.
+          python - <<'PY'
+          from pathlib import Path
+          for name, count in [('SKILL.md', 2), ('AGENTS.md', 1), ('README.md', 1), ('guide/index.html', 1)]:
+              p = Path(name)
+              s = p.read_text()
+              assert s.count('2.40.0') == count, name
+              p.write_text(s.replace('2.40.0', '2.40.1'))
+          p = Path('CHANGELOG.md')
+          s = p.read_text()
+          old = '## [Unreleased]\n\n### Fixed\n'
+          assert s.count(old) == 1
+          s = s.replace(old, '## [Unreleased]\n\n## [2.40.1] - 2026-10-15\n\n### Fixed\n', 1)
+          s = s.replace('subprocess regressions cover the affected paths. No release or merge is implied.', 'subprocess regressions cover the affected paths.')
+          p.write_text(s)
+          PY
+          git add SKILL.md AGENTS.md README.md guide/index.html CHANGELOG.md
           git rm --cached .github/elves-281.patch.z .github/workflows/apply-elves-281.yml
-          test "$(git write-tree)" = "6dca29615b66ce675dad693dc7e4149599666da0"
-          # Keep the workflow unchanged in this bot commit. The connected
-          # maintainer action removes both helper files in a subsequent commit.
+          test "$(git write-tree)" = "23264d42d6d6119be39968a4db33ae8dc82daa63"
           git restore --staged -- .github/elves-281.patch.z .github/workflows/apply-elves-281.yml
           git diff --cached --check
       - name: Run regression and existing affected tests
