@@ -1,5 +1,5 @@
 ---
-version: "2.40.0"
+version: "2.40.1"
 ---
 
 # Elves: Codex repository adapter
@@ -12,6 +12,11 @@ Claude Code and Codex (see `references/host-parity.md`).
 
 The task-first user guide is published at `https://aigorahub.github.io/elves/`. This adapter and
 `SKILL.md` remain authoritative when the guide is too short to cover an edge case.
+
+## Subprocess capture safety
+
+Use the host-neutral capture budgets and recovery contract in
+`references/subprocess-output.md` and SKILL.md `## Subprocess capture safety`.
 
 ## Cobbler
 

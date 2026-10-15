@@ -4,6 +4,16 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.40.1] - 2026-10-15
+
+### Fixed
+
+- Bound subprocess stdout/stderr during capture, native-worker lines and persisted
+  logs, and OMP identity-discovery reads (#281). Overflow fails explicitly and
+  follows cleanup rather than accepting partial output; callbacks no longer spool
+  unlimited child output to temporary files. Documented budgets and deterministic
+  subprocess regressions cover the affected paths.
+
 ## [2.40.0] - 2026-10-10
 
 ### Fixed

@@ -1142,6 +1142,7 @@ def _capture_omp_session_id(state, root, repo_root):
     """
     import re
     from uuid import UUID
+    from .storage import read_bounded_artifact_bytes
 
     candidates = [
         root / "omp.ndjson",
@@ -1154,7 +1155,13 @@ def _capture_omp_session_id(state, root, repo_root):
         try:
             if not path.is_file() or path.is_symlink():
                 continue
-            text = path.read_text(encoding="utf-8", errors="replace")
+            text = read_bounded_artifact_bytes(
+                path, max_bytes=16 * 1024 * 1024,
+            ).decode("utf-8", errors="replace")
+        except ValueError:
+            # Do not bind identity from a truncated prefix: conflicting sessions
+            # may exist beyond the budget. Reject this discovery attempt.
+            return None
         except OSError:
             continue
         session_id = None
