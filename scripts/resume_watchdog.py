@@ -30,6 +30,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from cobbler_runtime import continuity  # noqa: E402
+from cobbler_runtime.subprocess_output import OutputLimitExceeded, run_bounded  # noqa: E402
 
 SUBPROCESS_TIMEOUT_SECONDS = 600
 QUIET_CODES = frozenset({"full_run_resume_prepare_live"})
@@ -48,14 +49,11 @@ def _run_hub(config: dict, verb_args: list[str]) -> subprocess.CompletedProcess[
         str(config["repo_root"]),
         "--json",
     ]
-    return subprocess.run(
-        argv,
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        timeout=SUBPROCESS_TIMEOUT_SECONDS,
-        check=False,
-    )
+    try:
+        return run_bounded(argv, timeout=SUBPROCESS_TIMEOUT_SECONDS)
+    except OutputLimitExceeded as exc:
+        # Never classify a partial result as permission to resume a run.
+        return subprocess.CompletedProcess(argv, 125, b"", str(exc).encode("utf-8"))
 
 
 def _classify(completed: subprocess.CompletedProcess[bytes]) -> tuple[str, str]:
