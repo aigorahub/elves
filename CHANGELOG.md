@@ -4,6 +4,12 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.41.0] - 2026-10-16
+
+### Changed
+
+- Agy reviews and re-reviews no longer require `/boost`. The adapter sends the plain review prompt in plan mode, and the decoder no longer requires system Boost expansion, so `agy_boost_unverified` is gone. Context coverage, exact-commit evidence, separate reviewer sessions, and transport checks are unchanged. Updated the skill, review rules, team reference, README, and guide.
+
 ## [2.40.0] - 2026-10-10
 
 ### Fixed

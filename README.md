@@ -8,7 +8,7 @@ Oh My Pi (omp) driver plans and reviews; a subscription-native (or optional exte
 implements; durable run files let the work survive context compaction. You write the plan and own
 the merge decision. The agent does the middle.
 
-**Current release: v2.40.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.41.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 Implementation runs get a draft PR at the first useful pushed commit,
@@ -680,13 +680,13 @@ chat. Root cause over band-aids; centralize over duplicate; extend over create; 
 technology. The human owns what is worth building and whether it merges — the agent owns the
 middle.
 
-Agy reviews always use `/boost` in plan mode, including reviews of fixes.
-The reviewer uses a separate session from the code writers. Boost failure
-requires an authorized independent fallback or a block; a plain Agy response
-does not satisfy review. Pass the absolute admitted workspace to all Boost
-workers. Use a supervised terminal when headless transport is unqualified.
-Keep required isolation. Approve scoped review actions and wait for child
-completion plus a final report at the exact commit. Headless success alone
+Agy reviews, including reviews of fixes, run as plain reviews in plan mode.
+`/boost` is not required. The reviewer uses a separate session from the code
+writers. If the Agy route fails, use an authorized independent fallback or
+report a block. Pass the absolute admitted workspace in the review request.
+Use a supervised terminal when headless transport is unqualified. Keep
+required isolation. Approve scoped review actions and wait for a final report
+at the exact commit. Headless success alone
 does not prove a review. See [the review rules](references/review-subagent.md).
 
 A clean Agy review also needs context coverage. Read changed files, relevant
