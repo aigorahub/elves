@@ -1078,8 +1078,8 @@ def build_readonly_invocation(
             if exact_session:
                 # Exact conversation resume — planning context for later review.
                 argv_list.extend(["--conversation", exact_session])
-            # Every review, including a lightweight or resumed review, uses Boost.
-            # Do not infer a review role from words in a planning task.
+            # Reviews send the plain prompt. Do not infer a review role from words
+            # in a planning task.
             review_role = str(role or profile).strip().lower()
             if review_role in {"review", "lightweight_review"}:
                 if not work_cwd or not Path(work_cwd).is_absolute():
@@ -1089,12 +1089,13 @@ def build_readonly_invocation(
                     )
                 full_prompt = (
                     f"Admitted review workspace: {work_cwd}\n"
-                    "Give this absolute workspace path and these constraints to every child. "
+                    "If you delegate, give this absolute workspace path and these constraints "
+                    "to every child. "
                     "Use absolute paths for file reads. Return findings only. Do not edit files, "
                     "commit, push, merge, or change permissions. Read the supplied diff and "
                     "commit evidence; the admitted snapshot may have no .git directory. "
-                    "Do not assume shell commands are permitted. Wait for the investigation "
-                    "and verification results before returning the final structured role report. "
+                    "Do not assume shell commands are permitted. Wait for any delegated work "
+                    "to finish before returning the final structured role report. "
                     "A delegation notice is not a completed review. Report denied reads or "
                     "missing evidence as a block. Include the reviewed commit in evidence. "
                     "Read every changed file and the relevant callers, tests, repository "
@@ -1112,12 +1113,7 @@ def build_readonly_invocation(
                     f"Expected reviewed head from the context packet: {packet_obj.get('head_sha') or 'not supplied; report missing context rather than guessing'}\n\n"
                     + full_prompt
                 )
-            agy_prompt = (
-                "/boost " + full_prompt
-                if review_role in {"review", "lightweight_review"}
-                else full_prompt
-            )
-            argv_list.extend(["--print", agy_prompt, "--mode", "plan", "--output-format", "stream-json"])
+            argv_list.extend(["--print", full_prompt, "--mode", "plan", "--output-format", "stream-json"])
             if requested_model:
                 argv_list.extend(["--model", str(requested_model)])
             argv_list.extend(extras)
@@ -1129,7 +1125,7 @@ def build_readonly_invocation(
                 tool_scope="read-only",
                 sandbox_scope="ephemeral",
                 notes=(
-                    "Antigravity CLI (agy) headless --print; reviews require /boost. "
+                    "Antigravity CLI (agy) headless --print in plan mode. "
                     "Pin the selected model from the live agy catalog. Not Lane A / not "
                     "host-import write-lease qualified. Experimental implement: host "
                     "launches agy with --dangerously-skip-permissions separately. "
@@ -1678,13 +1674,6 @@ def decode_agy_jsonl(
     if result.get("denied_actions"):
         raise ValidationIssue("agy_denied_actions", "Agy reported denied tool actions", hint=guidance)
     review = expected_role in {"review", "lightweight_review"}
-    if review:
-        commands = init.get("expanded_commands", [])
-        if not isinstance(commands, list) or not any(
-            isinstance(command, dict) and command.get("name") == "boost"
-            and command.get("type") == "system" for command in commands
-        ):
-            raise ValidationIssue("agy_boost_unverified", "Agy did not confirm system Boost expansion", hint=guidance)
     # Only the final result may supply a report. Intermediate agent text and
     # subagent DONE events can describe delegation, not completed child work.
     try:
@@ -1710,7 +1699,7 @@ def decode_agy_jsonl(
         actual_model=model,
         model_evidence_source="agy.init.model" if model else None,
         session_id=session,
-        transport_notes=("agy-jsonl", "boost-expanded" if review else "native-result",
+        transport_notes=("agy-jsonl", "review-coverage" if review else "native-result",
                          "host-must-verify-terminal-review-evidence"),
     )
 
