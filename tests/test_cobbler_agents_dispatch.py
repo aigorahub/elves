@@ -2112,9 +2112,11 @@ class AdapterBuilderTests(unittest.TestCase):
                 role="review",
                 repo_root=Path(tmp),
             )
-            self.assertTrue(agy.argv[agy.argv.index("--print") + 1].startswith("/boost "))
-            self.assertIn(f"Admitted review workspace: {tmp}", agy.argv[agy.argv.index("--print") + 1])
-            self.assertIn("Give this absolute workspace path", agy.argv[agy.argv.index("--print") + 1])
+            self.assertTrue(
+                agy.argv[agy.argv.index("--print") + 1].startswith(f"Admitted review workspace: {tmp}")
+            )
+            self.assertNotIn("/boost", agy.argv[agy.argv.index("--print") + 1])
+            self.assertIn("give this absolute workspace path", agy.argv[agy.argv.index("--print") + 1])
             self.assertIn("review_coverage", agy.argv[agy.argv.index("--print") + 1])
             self.assertIn("repository instructions", agy.argv[agy.argv.index("--print") + 1])
             self.assertEqual(agy.argv[agy.argv.index("--output-format") + 1], "stream-json")
@@ -2125,8 +2127,13 @@ class AdapterBuilderTests(unittest.TestCase):
                     packet_path=packet, prompt_path=prompt, executable="agy",
                     task="review the patch", repo_root=Path(tmp),
                 )
-                self.assertEqual(
+                self.assertFalse(
                     invocation.argv[invocation.argv.index("--print") + 1].startswith("/boost "),
+                )
+                self.assertEqual(
+                    invocation.argv[invocation.argv.index("--print") + 1].startswith(
+                        "Admitted review workspace: "
+                    ),
                     review_role != "planning",
                 )
             for disabled in ("--disable-slash-commands", "--disable-slash-commands=true",
@@ -2184,7 +2191,9 @@ class AdapterBuilderTests(unittest.TestCase):
                 role="review",
                 repo_root=Path(tmp),
             )
-            self.assertTrue(agy_resume.argv[agy_resume.argv.index("--print") + 1].startswith("/boost "))
+            self.assertTrue(
+                agy_resume.argv[agy_resume.argv.index("--print") + 1].startswith("Admitted review workspace: ")
+            )
             self.assertIn("--conversation", agy_resume.argv)
             self.assertIn("11111111-2222-3333-4444-555555555555", agy_resume.argv)
 
@@ -2718,8 +2727,7 @@ class RemediationBlockerTests(unittest.TestCase):
         def events():
             return [
                 {"event": "init", "conversation_id": "parent-session", "init": {
-                    "model": "gemini-3.8-flash-high",
-                    "expanded_commands": [{"name": "boost", "type": "system"}]}},
+                    "model": "gemini-3.8-flash-high", "expanded_commands": []}},
                 {"event": "result", "result": {"conversation_id": "parent-session",
                     "status": "SUCCESS", "response": json.dumps(envelope)}},
             ]
@@ -2737,13 +2745,20 @@ class RemediationBlockerTests(unittest.TestCase):
         rows[-1]["result"]["structured_output"] = envelope
         rows[-1]["result"]["response"] = ""
         self.assertEqual(decode(rows).role_report["verdict"], "pass")
+        # A plain review needs no slash command expansion; an expanded command is tolerated.
+        for commands in ([], [{"name": "boost", "type": "system"}]):
+            with self.subTest(expanded_commands=commands):
+                rows = events()
+                rows[0]["init"]["expanded_commands"] = commands
+                self.assertEqual(decode(rows).role_report["verdict"], "pass")
+        rows = events()
+        rows[0]["init"].pop("expanded_commands")
+        self.assertEqual(decode(rows).role_report["verdict"], "pass")
         for change, code in (
             (lambda r: r[-1]["result"].update(status="ERROR"), "agy_failed_status"),
             (lambda r: r[-1]["result"].update(status="WAITING"), "agy_failed_status"),
             (lambda r: r[-1]["result"].update(denied_actions=[{"action": "command"}]), "agy_denied_actions"),
             (lambda r: r[-1]["result"].update(conversation_id="other-session"), "agy_invalid_transport"),
-            (lambda r: r[0]["init"].update(expanded_commands=[]), "agy_boost_unverified"),
-            (lambda r: r[0]["init"].update(expanded_commands=[{"name": "boost", "type": "skill"}]), "agy_boost_unverified"),
             (lambda r: r[-1]["result"].update(response="I delegated the review and am waiting."), "agy_missing_review_report"),
         ):
             with self.subTest(code=code):

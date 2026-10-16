@@ -115,7 +115,7 @@ has the configured timeout. There is no recursive fanout. The command performs
 model calls only through the existing configured adapters. A route that lacks
 qualified native host execution returns unavailable, rather than a fabricated
 proposal. Live model availability and exact session resume still need the existing
-route preflight. Agy retains its qualified plan mode and Boost review procedure.
+route preflight. Agy retains its qualified plan mode review procedure.
 
 ## Optional Lantern reports
 
