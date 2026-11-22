@@ -143,9 +143,8 @@ review, required checks, or exact-head readiness gates.
 
 ## Agy review requirements
 
-Every Agy review and re-review uses `/boost`, including lightweight reviews.
-Keep plan mode and slash command expansion enabled. Never pass
-`--disable-slash-commands` or retry the review without Boost. Prefer
+Agy reviews and re-reviews, including lightweight reviews, send the plain
+review prompt in plan mode. No `/boost` prefix is required. Prefer
 `gemini-3.8-flash-high` when the live Agy catalog lists it and the user did
 not name another model. This preference does not authorize a model change
 on an exact session resume.
@@ -168,8 +167,8 @@ does not define it. Do not infer an API contract from its name.
 Before a verdict, list the paths read, the relevant context paths, missing
 context, and each exclusion with its reason. Read the context before forming
 conclusions. For each finding, state the expected behavior from code or docs,
-the failure path, and the evidence that could disprove it. The Boost verifier
-must check those claims and the coverage gaps independently.
+the failure path, and the evidence that could disprove it. The host must
+check those claims and the coverage gaps independently.
 
 Headless review output uses an envelope with `role_report` and
 `review_coverage`. The role report keeps the existing schema. Coverage has:
@@ -197,28 +196,27 @@ required evidence blocks a clean review even when Agy reports high confidence.
 Apply the same coverage checks to supervised terminal reports. Never count
 a list of file names as proof that those files were read.
 
-Confirm Boost activation from the actual CLI output or events. If Boost
-fails, is unavailable, or cannot be confirmed active, mark the Agy route
-unavailable. Use an independent fallback only within existing user route
-authority. A plain Agy response cannot satisfy required review. The host
+If the Agy route fails or is unavailable, mark it unavailable. Use an
+independent fallback only within existing user route authority. The host
 still needs a completed report at the exact commit before landing.
 
 The review request must name the absolute admitted workspace, base, and head.
-Pass that workspace to every Boost worker. Children can start in Agy's scratch
-folder. An isolated snapshot has supplied diff and commit evidence; do not
-send children to the original checkout or assume the snapshot has Git history.
+If Agy delegates, it passes that workspace to every child. Children can start
+in Agy's scratch folder. An isolated snapshot has supplied diff and commit
+evidence; do not send the reviewer to the original checkout or assume the
+snapshot has Git history.
 
 Headless launch is conditional on transport qualification. Agy can return
 `SUCCESS` and exit zero after denying a required tool. Require native session
-and model evidence, system Boost expansion, completed child work, and a valid
-final report. Reject delegation notices, tool denials, and missing reports.
-The JSON decoder checks transport and report shape. The host must still
-verify the reviewed commit and child completion before accepting the review.
+and model evidence and a valid final report. Reject delegation notices, tool
+denials, and missing reports. The JSON decoder checks transport and report
+shape. The host must still verify the reviewed commit before accepting the
+review.
 
 When headless transport is unqualified, use an authorized supervised terminal
 seat with `agy --model <listed-id> --effort <listed-effort> --mode plan`.
-Send the review request with its Boost command once. Keep the terminal alive
-until the children finish. Inspect `/agents` and child events when the parent
+Send the review request once. Keep the terminal alive until the review
+finishes. If Agy delegates, inspect `/agents` and child events when the parent
 looks idle. Approve only required review reads or checks at a verified
 permission card. Do not grant all shell commands or enable a bypass flag.
 After an expired permission, inspect the child before resuming its work.
@@ -240,13 +238,12 @@ failure remains a transport block.
    `herdr agent start <review-name> --kind agy --pane <pane-id> --
    --model gemini-3.8-flash-high --effort high --mode plan`.
 2. At the ready prompt, send one request in this form:
-   `/boost Review PR <number> at head <sha> against base <sha>. Workspace:
-   <absolute-path>. Pass this path and these rules to every worker. Return
-   findings only. Do not edit, commit, push, or merge. Check each finding
-   against counterevidence. Wait for investigation and verification before
-   the final report. Name the exact reviewed commit and any missing evidence.`
-3. Read the parent and child state. Agy can show a ready parent prompt while
-   Boost works. Use `/agents` for local state. At a visible child permission
+   `Review PR <number> at head <sha> against base <sha>. Workspace:
+   <absolute-path>. Return findings only. Do not edit, commit, push, or
+   merge. Check each finding against counterevidence. Name the exact reviewed
+   commit and any missing evidence.`
+3. Read the session state. If Agy delegates, it can show a ready parent prompt
+   while children work; use `/agents` for local state. At a visible permission
    card, read the exact command or path. Approve one required read or check
    with the key shown by that card. Current cards show `ctrl+k approve` and
    `alt+j manage`. Confirm the tool result. Never press a key at a login or
@@ -254,27 +251,24 @@ failure remains a transport block.
    Check active review seats for permission cards at least every 20 seconds.
    Live child requests expired after 60 seconds. Re-read the current card
    immediately before approval; a new request can replace an expired one.
-4. Wait for the final report and completed Boost workers. Compare claimed
+4. Wait for the final report. Compare claimed
    checks with actual tool results. Compare the head and base with host Git
    records. Reject a mismatched commit ID. Reject a report that says all checks
    passed when required reads or tests were denied. Fix valid findings,
-   commit and push, then request a Boost review of the new exact head only
-   after the previous workers have stopped. Preserve the reviewer session
+   commit and push, then request a review of the new exact head only after
+   the previous review has stopped. Preserve the reviewer session
    with `agy --conversation <exact-id> --model <same-id> --effort <same-effort>
    --mode plan` after a process stop. Do not start a competing reviewer.
    Bind the parent ID from root CLI events or the launch record. Herdr can
-   report a Boost child ID as `agent_session`; do not adopt it as the parent.
+   report a child ID as `agent_session`; do not adopt it as the parent.
    Check the recorded resume argv with
    `herdr pane process-info --pane <pane-id>` before recovery.
 
-The live CLI test on 2026-09-05 used Gemini 3.8 Flash High and confirmed
-Boost investigation plus a separate verification worker. Initial print mode
-denied reads and returned a delegation response. An interactive resume
+The live CLI test on 2026-09-05 used Gemini 3.8 Flash High. Initial print
+mode denied reads and returned a delegation response. An interactive resume
 allowed scoped reads. This is terminal transport evidence, not proof that
 the isolated headless adapter works on another machine. Keep the final
 review result separate from this transport test.
-
-See [Google's Boost guide](https://www.antigravity.google/docs/boost/).
 
 ## Review Route Context
 

@@ -122,7 +122,8 @@ for batch in (1, 2, 3):
     })
     emit("heartbeat", batch, f"heartbeat after batch {batch}", head=head)
 
-report.write_text(json.dumps({
+_report_tmp = report.with_name("." + report.name + ".tmp")
+_report_tmp.write_text(json.dumps({
     "run_id": os.environ["ELVES_FULL_RUN_RUN_ID"],
     "attempt": int(os.environ["ELVES_FULL_RUN_ATTEMPT"]),
     "session_id": session,
@@ -135,7 +136,8 @@ report.write_text(json.dumps({
     "commits": commits,
     "blockers": [],
     "merge_authority": False,
-}, indent=2) + "\n")
+}, indent=2) + "\n", encoding="utf-8")
+os.replace(_report_tmp, report)
 emit("run_complete", 3, "fake multi-batch run complete", head=head)
 '''
 
@@ -239,7 +241,8 @@ subprocess.run(
 emit("commit_pushed", 1, "devin commit", head=new_head)
 emit("gate_result", 1, "devin gates ok", head=new_head)
 emit("batch_complete", 1, "devin batch complete", head=new_head)
-report.write_text(json.dumps({
+_report_tmp = report.with_name("." + report.name + ".tmp")
+_report_tmp.write_text(json.dumps({
     "run_id": os.environ["ELVES_FULL_RUN_RUN_ID"],
     "attempt": int(os.environ["ELVES_FULL_RUN_ATTEMPT"]),
     "session_id": session,
@@ -255,7 +258,8 @@ report.write_text(json.dumps({
     "commits": [new_head],
     "blockers": [],
     "merge_authority": False,
-}, indent=2) + "\n")
+}, indent=2) + "\n", encoding="utf-8")
+os.replace(_report_tmp, report)
 pause = os.environ.get("ELVES_FAKE_DEVIN_PAUSE")
 if pause:
     time.sleep(float(pause))
@@ -346,7 +350,8 @@ subprocess.run(
 emit("commit_pushed", 1, "omp commit", head=new_head)
 emit("gate_result", 1, "omp gates ok", head=new_head)
 emit("batch_complete", 1, "omp batch complete", head=new_head)
-report.write_text(json.dumps({
+_report_tmp = report.with_name("." + report.name + ".tmp")
+_report_tmp.write_text(json.dumps({
     "run_id": os.environ["ELVES_FULL_RUN_RUN_ID"],
     "attempt": int(os.environ["ELVES_FULL_RUN_ATTEMPT"]),
     "session_id": session,
@@ -362,7 +367,8 @@ report.write_text(json.dumps({
     "commits": [new_head],
     "blockers": [],
     "merge_authority": False,
-}, indent=2) + "\n")
+}, indent=2) + "\n", encoding="utf-8")
+os.replace(_report_tmp, report)
 emit("run_complete", 1, "fake omp run complete", head=new_head)
 """
 
@@ -8739,6 +8745,10 @@ class FullRunLifecycleTests(unittest.TestCase):
                 self.repo,
                 session_id=self.session,
                 grant_devin_auth=True,
+            )
+            # Wait for report publication and supervisor reaping before monitoring.
+            await_supervised_reap(
+                self.repo, self.session, timeout_seconds=deadline_seconds
             )
             deadline = time.time() + deadline_seconds
             status: dict[str, object] = {"state": "pending"}
