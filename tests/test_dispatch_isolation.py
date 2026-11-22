@@ -2217,13 +2217,15 @@ class IsolationSandboxRegressionTests(unittest.TestCase):
                     "SAKANA_API_KEY": "proc-isolation-sentinel",
                 }
             )
+            # Ubuntu's uutils readlink rejects the synthetic executable path.
             probe = (
-                'test "$(readlink /proc/self/exe)" = "$CODEX_FUGU_REAL_CODEX" '
-                '&& test -x "$(readlink /proc/self/exe)" '
+                "SELF_EXE=$(/usr/bin/perl -e 'print readlink(\"/proc/self/exe\") // \"\"')\n"
+                'test "$SELF_EXE" = "$CODEX_FUGU_REAL_CODEX" '
+                '&& test -x "$SELF_EXE" '
                 "&& test ! -r /proc/1/environ "
                 "&& test ! -r /proc/$$/environ "
                 '&& printf "self=%s\\nparent_environ=blocked\\n" '
-                '"$(readlink /proc/self/exe)"'
+                '"$SELF_EXE"'
             )
 
             argv = wrap_argv_with_sandbox(

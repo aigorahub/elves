@@ -483,6 +483,10 @@ def _compile_native_grok_launcher(
     script.write_text(script_source, encoding="utf-8")
     source = root / f"{name}-launcher.c"
     source.write_text(
+        "#define _POSIX_C_SOURCE 200809L\n"
+        "/* First, before any #include: strict -std=c99 hides POSIX setenv and\n"
+        "   execv on glibc unless POSIX.1-2008 is requested. GCC 14+ rejects the\n"
+        "   implicit declaration; macOS clang exposes them by default. calloc is ISO C. */\n"
         "#include <stdlib.h>\n"
         "#include <unistd.h>\n"
         'static volatile const char marker[] = "GROK_AUTH_PATH";\n'
