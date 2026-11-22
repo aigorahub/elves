@@ -20,13 +20,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest
+          - os: blacksmith-6vcpu-macos-15
             python: "3.12"
             observational: false
-          - os: ubuntu-latest
+          - os: blacksmith-4vcpu-ubuntu-2404
             python: "3.12"
             observational: true
-          - os: ubuntu-latest
+          - os: blacksmith-4vcpu-ubuntu-2404
             python: "3.10"
             observational: true
     runs-on: ${{ matrix.os }}
