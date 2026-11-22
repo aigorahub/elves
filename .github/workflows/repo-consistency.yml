@@ -75,11 +75,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: blacksmith-4vcpu-ubuntu-2604
+          - os: blacksmith-4vcpu-ubuntu-2404
             python-version: "3.10"
-          - os: blacksmith-4vcpu-ubuntu-2604
+          - os: blacksmith-4vcpu-ubuntu-2404
             python-version: "3.12"
-          - os: blacksmith-4vcpu-ubuntu-2604
+          - os: blacksmith-4vcpu-ubuntu-2404
             python-version: "3.14"
           - os: blacksmith-6vcpu-macos-15
             python-version: "3.12"
@@ -130,7 +130,7 @@ jobs:
 
   check:
     needs: verify
-    runs-on: blacksmith-4vcpu-ubuntu-2604
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     if: ${{ always() }}
     steps:
       - name: Require every matrix verify cell
