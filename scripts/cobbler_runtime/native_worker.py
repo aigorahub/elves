@@ -2204,6 +2204,11 @@ def _final_head(worktree: Path) -> str | None:
     )
 
 
+NATIVE_OUTPUT_LINE_MAX_BYTES = 1024 * 1024
+NATIVE_OUTPUT_STREAM_MAX_BYTES = 64 * 1024 * 1024
+NATIVE_OUTPUT_LOG_MAX_BYTES = 128 * 1024 * 1024
+
+
 def _run_worker_phase(
     *,
     state_path: Path,
@@ -2219,6 +2224,7 @@ def _run_worker_phase(
     input_file_prefix: str | None = None,
 ) -> _PhaseResult:
     from .context import redact_text
+    from .subprocess_output import OutputLimitExceeded, iter_bounded_lines
 
     is_prewalk_run = state.get("mode") == "prewalk"
     phase_key = "prewalk" if phase.startswith("prewalk") else "execution"
@@ -2305,8 +2311,8 @@ def _run_worker_phase(
                 ),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True,
-                bufsize=1,
+                text=False,
+                bufsize=0,
                 close_fds=True,
             )
             state["pid"] = child.pid
@@ -2333,28 +2339,29 @@ def _run_worker_phase(
                 }
                 phase_state.setdefault("attempts", []).append(phase_attempt)
             _write_private_json(state_path, state)
-            selector = selectors.DefaultSelector()
-            assert child.stdout is not None and child.stderr is not None
-            selector.register(child.stdout, selectors.EVENT_READ, "stdout")
-            selector.register(child.stderr, selectors.EVENT_READ, "stderr")
-            while selector.get_map():
-                for key, _ in selector.select(timeout=0.2):
-                    line = key.fileobj.readline()
-                    if not line:
-                        selector.unregister(key.fileobj)
-                        continue
+            try:
+                log_bytes = log_path.stat().st_size
+                for stream_name, line in iter_bounded_lines(
+                    child, max_line_bytes=NATIVE_OUTPUT_LINE_MAX_BYTES,
+                    max_stream_bytes=NATIVE_OUTPUT_STREAM_MAX_BYTES,
+                ):
                     redacted = redact_text(line.rstrip("\n"))
                     # Transient markers classify transport health only: stderr
                     # lines and structured provider error events. Task stdout
                     # content never flips the transient classification.
-                    if key.data == "stderr" and _transient_provider_failure(redacted.text):
+                    if stream_name == "stderr" and _transient_provider_failure(redacted.text):
                         transient_transport_failure = True
-                    wrapper = {"stream": key.data, "line": redacted.text}
+                    wrapper = {"stream": stream_name, "line": redacted.text}
                     if is_prewalk_run:
                         wrapper["phase"] = phase
-                    log.write(json.dumps(wrapper, sort_keys=True) + "\n")
+                    record = json.dumps(wrapper, sort_keys=True) + "\n"
+                    record_bytes = len(record.encode("utf-8"))
+                    if log_bytes + record_bytes > NATIVE_OUTPUT_LOG_MAX_BYTES:
+                        raise OutputLimitExceeded("native worker log", NATIVE_OUTPUT_LOG_MAX_BYTES)
+                    log.write(record)
+                    log_bytes += record_bytes
                     log.flush()
-                    event = _parse_provider_event(line) if key.data == "stdout" else None
+                    event = _parse_provider_event(line) if stream_name == "stdout" else None
                     if event is not None:
                         provider_event_count += 1
                         if _is_provider_error_event(event) and _transient_provider_failure(
@@ -2380,14 +2387,25 @@ def _run_worker_phase(
                                         session_id=observed,
                                     )
                                 _write_private_json(state_path, state)
-                    elif key.data == "stderr":
+                    elif stream_name == "stderr":
                         stderr_tail = (stderr_tail + redacted.text + "\n")[
                             -_NATIVE_WORKER_STDERR_TAIL_CHARS:
                         ]
-            code = child.wait()
-            for stream in (child.stdout, child.stderr):
-                if stream is not None:
-                    stream.close()
+                code = child.wait()
+            except OutputLimitExceeded as exc:
+                state["stderr_tail"] = stderr_tail.rstrip("\n") or None
+                state["failure_detail"] = str(exc)
+                _write_private_json(state_path, state)
+                raise ValidationIssue("native_worker_output_limit", str(exc)) from exc
+            finally:
+                # Do not leave the producer running after capture/decoding fails.
+                # Native workers share the supervisor group: never killpg here.
+                if child.poll() is None:
+                    child.kill()
+                child.wait(timeout=5)
+                for stream in (child.stdout, child.stderr):
+                    if stream is not None:
+                        stream.close()
     finally:
         if prompt_path is not None:
             prompt_path.unlink(missing_ok=True)

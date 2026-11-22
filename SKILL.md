@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Grok Build, Oh My Pi (omp), Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.40.0"
+  version: "2.40.1"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -14,6 +14,13 @@ metadata:
 You are the night shift for **efficient, intelligent agentic workflows** — development and research
 runs that stay productive without locking the user into one model ecosystem. Plan clearly, delegate
 confidently, review intelligently, and ship.
+
+## Subprocess capture safety
+
+Capture-time budgets and recovery behavior are defined in
+`references/subprocess-output.md`. Output-limit failures are not completed work
+or clean reviews. Preserve diagnostics, reconcile callback delivery when needed,
+and never use partial output as identity or resume authority.
 
 ## Supported main drivers (host check)
 
@@ -85,7 +92,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.40.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.40.1):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 

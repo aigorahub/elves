@@ -3502,8 +3502,18 @@ for _ in range(200):
                 self.returncode = 0
                 return 0
 
-            async def communicate(self, input=None) -> tuple[bytes, bytes]:
-                return b"{}", b""
+            def __init__(self):
+                class Stream:
+                    def __init__(self, content):
+                        self.content = content
+
+                    async def read(self, size):
+                        result, self.content = self.content[:size], self.content[size:]
+                        return result
+
+                self.stdin = None
+                self.stdout = Stream(b"{}")
+                self.stderr = Stream(b"")
 
         root = Path(tempfile.mkdtemp(prefix="reaped-namespace-"))
         lane = self._lane(root, backend="")

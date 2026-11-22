@@ -38,6 +38,7 @@ if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
 from consistency_engine import read_frontmatter_version  # noqa: E402
+from cobbler_runtime.subprocess_output import OutputLimitExceeded, run_bounded  # noqa: E402
 from cobbler_runtime.context import (  # noqa: E402
     is_secret_env_name,
     redact_text,
@@ -127,15 +128,16 @@ def _run(
     timeout: float = _DEFAULT_STEP_TIMEOUT_SECONDS,
 ) -> subprocess.CompletedProcess[str]:
     try:
-        return subprocess.run(
-            cmd,
-            cwd=str(cwd),
-            text=True,
-            capture_output=True,
-            check=False,
-            env=_verification_environment(),
-            stdin=subprocess.DEVNULL,
-            timeout=timeout,
+        return run_bounded(
+            cmd, cwd=str(cwd), text=True,
+            env=_verification_environment(), timeout=timeout,
+        )
+    except OutputLimitExceeded as exc:
+        return subprocess.CompletedProcess(
+            cmd, returncode=125,
+            stdout=exc.stdout.decode("utf-8", errors="replace"),
+            stderr=exc.stderr.decode("utf-8", errors="replace")
+            + f"\n{exc} (treated as failure)",
         )
     except subprocess.TimeoutExpired as exc:
         stdout = exc.stdout

@@ -13,6 +13,7 @@ import uuid
 from typing import Any
 
 from .schema import ValidationIssue
+from .subprocess_output import OutputLimitExceeded, run_bounded
 
 CHECKPOINTS = ('after-staging', 'batch-boundary', 'packet-boundary', 'before-review', 'before-readiness', 'before-landing')
 MAX_BYTES = 1024 * 1024
@@ -65,19 +66,22 @@ class CallbackAdapter:
         command = [self.config['executable'], '--state-dir', self.config['state_dir'], *args]
         if Path(command[0]).suffix.lower() == '.py':
             command.insert(0, sys.executable)
-        with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
-            try:
-                result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=out, stderr=err,
-                                        timeout=self.config.get('timeout_seconds', 10), check=False,
-                                        env={key:value for key,value in os.environ.items() if key in {'PATH','HOME','USERPROFILE','SYSTEMROOT','WINDIR','TEMP','TMP','TMPDIR','LANG','LC_ALL','PYTHONUTF8'}})
-            except subprocess.TimeoutExpired as exc:
-                raise fail('team_callback_ambiguous', 'Callback timed out; retain its message ID and reconcile') from exc
-            except OSError as exc:
-                raise fail('team_callback_unavailable', 'Callback executable could not start') from exc
-            out.seek(0)
-            raw = out.read(MAX_BYTES + 1)
-        if len(raw) > MAX_BYTES:
-            raise fail('team_callback_output', 'Callback output exceeded the size limit')
+        try:
+            result = run_bounded(
+                command, timeout=self.config.get('timeout_seconds', 10),
+                max_stdout=MAX_BYTES, max_stderr=MAX_BYTES,
+                env={key: value for key, value in os.environ.items()
+                     if key in {'PATH', 'HOME', 'USERPROFILE', 'SYSTEMROOT', 'WINDIR',
+                                'TEMP', 'TMP', 'TMPDIR', 'LANG', 'LC_ALL', 'PYTHONUTF8'}},
+            )
+        except OutputLimitExceeded as exc:
+            raise fail('team_callback_output',
+                       'Callback output exceeded the size limit; retain its message ID and reconcile') from exc
+        except subprocess.TimeoutExpired as exc:
+            raise fail('team_callback_ambiguous', 'Callback timed out; retain its message ID and reconcile') from exc
+        except OSError as exc:
+            raise fail('team_callback_unavailable', 'Callback executable could not start') from exc
+        raw = result.stdout
         if result.returncode and not raw.strip():
             raise fail('team_callback_failed', 'Callback executable returned failure without a JSON result')
         try:

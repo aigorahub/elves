@@ -31,6 +31,7 @@ from .adapters import (
     validate_extra_args,
 )
 from .context import redact_text
+from .subprocess_output import AsyncCapture, OutputLimitExceeded
 from .dispatch_models import LaneSpec
 from .isolation import (
     IsolationSpec,
@@ -50,6 +51,8 @@ PROCESS_GROUP_VERIFY_POLL_SECONDS = 0.05
 PROCESS_GROUP_VERIFY_ATTEMPTS = 20
 PROCESS_GROUP_SETTLE_SECONDS = 0.25
 POST_CONTAINMENT_DRAIN_SECONDS = 2.0
+EXTERNAL_STDOUT_MAX_BYTES = 32 * 1024 * 1024
+EXTERNAL_STDERR_MAX_BYTES = 8 * 1024 * 1024
 DESCENDANT_POLL_SECONDS = 0.5
 DESCENDANT_VERIFY_ATTEMPTS = 24
 
@@ -1487,19 +1490,20 @@ async def run_external_subprocess(
     result: dict[str, Any]
     communication_task: asyncio.Task[tuple[bytes, bytes]] | None = None
     containment_finalized = False
+    capture = AsyncCapture(EXTERNAL_STDOUT_MAX_BYTES, EXTERNAL_STDERR_MAX_BYTES)
     try:
         runtime_error: Exception | None = None
-        communication_coro = proc.communicate(input=plan.stdin_bytes)
+        communication_coro = capture.communicate(proc, input=plan.stdin_bytes)
         try:
             communication_task = asyncio.create_task(communication_coro)
         except BaseException:
             communication_coro.close()
             raise
         try:
-            # communicate() drains concurrently so a chatty leader cannot block;
-            # native Darwin identity observes exit independently of pipe EOF.
+            # Bounded drains run concurrently; overflow wakes this wait immediately.
+            # Native Darwin identity still observes exit independently of pipe EOF.
             await asyncio.wait_for(
-                (
+                capture.wait_for_exit(
                     _wait_for_supervised_leader_exit(supervisor, proc)
                     if supervisor is not None
                     else proc.wait()
@@ -1543,8 +1547,10 @@ async def run_external_subprocess(
             raise
         except Exception as exc:  # noqa: BLE001
             runtime_error = runtime_error or exc
-            stdout_b, stderr_b = b"", b""
+            stdout_b, stderr_b = capture.stdout.value(), capture.stderr.value()
 
+        # A short-lived producer may exit before the drain observes its last bytes.
+        runtime_error = capture.error() or runtime_error
         stdout_raw = (stdout_b or b"").decode("utf-8", errors="replace")
         stderr_raw = (stderr_b or b"").decode("utf-8", errors="replace")
         containment_failed = (
@@ -1568,7 +1574,8 @@ async def run_external_subprocess(
         elif runtime_error is not None:
             result = {
                 "ok": False,
-                "failure_class": "execution_failure",
+                "failure_class": ("output_limit" if isinstance(runtime_error, OutputLimitExceeded)
+                                  else "execution_failure"),
                 "reason": (
                     "execution_runtime_error: "
                     f"{type(runtime_error).__name__}: {runtime_error}"

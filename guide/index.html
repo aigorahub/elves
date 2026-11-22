@@ -512,7 +512,7 @@
     <div class="masthead-inner">
       <div class="brand-row">
         <a class="wordmark" href="https://github.com/aigorahub/elves">Elves</a>
-        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.40.0 source and releases on GitHub</a>
+        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.40.1 source and releases on GitHub</a>
       </div>
       <h1>Using Elves</h1>
       <p class="intro">Plan with the main agent, hand implementation to a separate worker, then
@@ -1342,6 +1342,13 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" review-route --host claude
 
       <section id="troubleshooting">
         <h2>Troubleshooting</h2>
+        <h3>Subprocess output limit</h3>
+        <p>An output-limit failure means a provider or helper exceeded a capture
+          budget, not that its work or review completed. Preserve the diagnostic
+          output and investigate the noisy process. Callback failures can leave
+          delivery ambiguous: retain the message ID and reconcile before retrying.
+          See <a href="https://github.com/aigorahub/elves/blob/main/references/subprocess-output.md">subprocess output budgets</a>
+          for exact ceilings and recovery behavior.</p>
 
         <details>
           <summary>I do not see worker output.</summary>
