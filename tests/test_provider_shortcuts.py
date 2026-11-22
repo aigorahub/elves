@@ -30,6 +30,17 @@ from cobbler_runtime import fugu as fugu_mod  # noqa: E402
 HAS_FS_SANDBOX = detect_fs_sandbox_backend() is not None
 
 
+# Ubuntu's uutils multicall tools reject the synthetic /proc/self/exe in Fugu lanes.
+_FUGU_WRITE_NULS = (
+    "/usr/bin/perl -e 'open my $file, \">:raw\", $ARGV[0] or die $!; "
+    "print {$file} \"\\0\" x $ARGV[1] or die $!; close $file or die $!;'"
+)
+
+
+def _fugu_sleep(seconds: float) -> str:
+    return f"/usr/bin/perl -e 'select(undef, undef, undef, $ARGV[0])' {seconds:g}"
+
+
 class SlowBody:
     def __init__(self, payload: object, interval: float = 0.1):
         self.encoded = json.dumps(payload).encode("utf-8")
@@ -298,7 +309,19 @@ class LocalCliRunnerTests(unittest.TestCase):
             "else\n"
             "  printf 'snapshot-write=<blocked>\\n'\n"
             "fi\n"
-            "/usr/bin/env -u SAKANA_API_KEY /bin/sh -c 'if [ -r \"/proc/$PPID/environ\" ] && tr \"\\000\" \"\\n\" < \"/proc/$PPID/environ\" | grep -aEq \"^SAKANA_API_KEY=\"; then printf \"proc-parent-key=<visible>\\n\"; else printf \"proc-parent-key=<hidden>\\n\"; fi'\n"
+            "(unset SAKANA_API_KEY; exec /usr/bin/perl -e '\n"
+            "  my $state = \"hidden\";\n"
+            "  if (open my $environ, \"<:raw\", \"/proc/\" . getppid() . \"/environ\") {\n"
+            "    local $/ = \"\\0\";\n"
+            "    while (defined(my $entry = <$environ>)) {\n"
+            "      if (index($entry, \"SAKANA_API_KEY=\") == 0) {\n"
+            "        $state = \"visible\";\n"
+            "        last;\n"
+            "      }\n"
+            "    }\n"
+            "  }\n"
+            "  print \"proc-parent-key=<$state>\\n\";\n"
+            "')\n"
             "while IFS= read -r line || [ -n \"$line\" ]; do \n"
             "  printf 'prompt=<%s>\\n' \"$line\"\n"
             "done\n",
@@ -331,7 +354,7 @@ class LocalCliRunnerTests(unittest.TestCase):
             "printf '{\"type\":\"thread.started\",\"thread_id\":\"019f0000-0000-7000-8000-000000000002\"}\\n'\n"
             "# External sandbox wrappers may normalize our intentional cutoff to status 1.\n"
             "trap 'exit 1' INT TERM\n"
-            "while :; do sleep 1; done\n",
+            f"while :; do {_fugu_sleep(1)}; done\n",
             encoding="utf-8",
         )
         binary.chmod(0o755)
@@ -358,7 +381,7 @@ class LocalCliRunnerTests(unittest.TestCase):
             "printf '{\"type\":\"thread.started\",\"thread_id\":\"019f0000-0000-7000-8000-000000000003\"}\\n'\n"
             "printf '{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"STALE_EVENT_MESSAGE\"}}\\n'\n"
             "trap 'exit 1' INT TERM\n"
-            "while :; do sleep 1; done\n",
+            f"while :; do {_fugu_sleep(1)}; done\n",
             encoding="utf-8",
         )
         binary.chmod(0o755)
@@ -373,12 +396,12 @@ class LocalCliRunnerTests(unittest.TestCase):
             "while IFS= read -r LINE || [ -n \"$LINE\" ]; do :; done\n"
             "if [ \"$IS_RESUME\" = 1 ]; then\n"
             "  trap '' INT TERM\n"
-            "  sleep 10\n"
+            f"  {_fugu_sleep(10)}\n"
             "  exit 0\n"
             "fi\n"
             "printf '{\"type\":\"thread.started\",\"thread_id\":\"019f0000-0000-7000-8000-000000000004\"}\\n'\n"
             "trap 'exit 1' INT TERM\n"
-            "while :; do sleep 1; done\n",
+            f"while :; do {_fugu_sleep(1)}; done\n",
             encoding="utf-8",
         )
         binary.chmod(0o755)
@@ -394,7 +417,7 @@ class LocalCliRunnerTests(unittest.TestCase):
         binary = root / "codex-fugu"
         if delayed_write:
             action = (
-                "( /bin/sleep 2; printf 'late\\n' > \"$PWD/late-output.txt\" ) &"
+                f"( {_fugu_sleep(2)}; printf 'late\\n' > \"$PWD/late-output.txt\" ) &"
             )
         elif setsid:
             action = (
@@ -402,15 +425,15 @@ class LocalCliRunnerTests(unittest.TestCase):
                 "'POSIX::setsid(); sleep 30' &"
             )
         else:
-            action = "/bin/sleep 30 &"
+            action = f"{_fugu_sleep(30)} &"
+        settle_delay = 0.5 if setsid else 0.2
         binary.write_text(
             "#!/bin/sh\n"
             "while IFS= read -r _LINE || [ -n \"$_LINE\" ]; do :; done\n"
             f"{action}\n"
             "CHILD=$!\n"
             "printf 'descendant-pid=<%s>\\n' \"$CHILD\"\n"
-            + ("/bin/sleep 0.5\n" if setsid else "/bin/sleep 0.2\n")
-            +
+            f"{_fugu_sleep(settle_delay)}\n"
             "exit 0\n",
             encoding="utf-8",
         )
@@ -422,9 +445,8 @@ class LocalCliRunnerTests(unittest.TestCase):
         binary.write_text(
             "#!/bin/sh\n"
             "while IFS= read -r _LINE || [ -n \"$_LINE\" ]; do :; done\n"
-            "/bin/dd if=/dev/zero of=\"$HOME/provider-growth.bin\" "
-            "bs=4096 count=16 2>/dev/null\n"
-            "/bin/sleep 5\n",
+            f'{_FUGU_WRITE_NULS} "$HOME/provider-growth.bin" {4096 * 16} 2>/dev/null\n'
+            f"{_fugu_sleep(5)}\n",
             encoding="utf-8",
         )
         binary.chmod(0o755)
@@ -435,13 +457,9 @@ class LocalCliRunnerTests(unittest.TestCase):
         binary.write_text(
             "#!/bin/sh\n"
             "while IFS= read -r _LINE || [ -n \"$_LINE\" ]; do :; done\n"
-            "COUNT=0\n"
-            "while [ ! -e \"$HOME/.final-audit-ready\" ] && [ \"$COUNT\" -lt 300 ]; do\n"
-            "  /bin/sleep 0.01\n"
-            "  COUNT=$((COUNT + 1))\n"
-            "done\n"
-            "/bin/dd if=/dev/zero of=\"$HOME/provider-final-growth.bin\" "
-            "bs=4096 count=1 2>/dev/null\n"
+            "/usr/bin/perl -e 'for (1..300) { last if -e $ARGV[0]; "
+            "select(undef, undef, undef, 0.01); }' \"$HOME/.final-audit-ready\"\n"
+            f'{_FUGU_WRITE_NULS} "$HOME/provider-final-growth.bin" 4096 2>/dev/null\n'
             "exit 0\n",
             encoding="utf-8",
         )
@@ -453,8 +471,9 @@ class LocalCliRunnerTests(unittest.TestCase):
         binary.write_text(
             "#!/bin/sh\n"
             "while IFS= read -r _LINE || [ -n \"$_LINE\" ]; do :; done\n"
-            "/usr/bin/mkfifo \"$HOME/provider-runtime.pipe\"\n"
-            "/bin/sleep 5\n",
+            "/usr/bin/perl -MPOSIX -e 'POSIX::mkfifo($ARGV[0], 0666) or die $!;' "
+            "\"$HOME/provider-runtime.pipe\"\n"
+            f"{_fugu_sleep(5)}\n",
             encoding="utf-8",
         )
         binary.chmod(0o755)
@@ -545,8 +564,7 @@ class LocalCliRunnerTests(unittest.TestCase):
         binary.write_text(
             "#!/bin/sh\n"
             "while IFS= read -r _LINE || [ -n \"$_LINE\" ]; do :; done\n"
-            "/bin/dd if=/dev/zero bs=1048577 count=1 2>/dev/null "
-            "| /usr/bin/tr '\\000' x\n"
+            "/usr/bin/perl -e 'print \"x\" x 1048577 or die $!;'\n"
             "printf '\\n'\n"
             "printf '{\"type\":\"thread.started\","
             "\"thread_id\":\"019f0000-0000-7000-8000-000000000005\"}\\n'\n"
@@ -568,16 +586,17 @@ class LocalCliRunnerTests(unittest.TestCase):
             "for ARG in \"$@\"; do [ \"$ARG\" = \"resume\" ] && IS_RESUME=1; done\n"
             "while IFS= read -r _LINE || [ -n \"$_LINE\" ]; do :; done\n"
             f"OUTSIDE={str(outside)!r}\n"
-            "rm -f \"$TMPDIR/fugu-ultra-events.jsonl\" \"$TMPDIR/fugu-ultra-final.txt\"\n"
-            "ln -s \"$OUTSIDE\" \"$TMPDIR/fugu-ultra-events.jsonl\"\n"
-            "ln -s \"$OUTSIDE\" \"$TMPDIR/fugu-ultra-final.txt\"\n"
+            "/usr/bin/perl -e 'my $target = shift;\n"
+            "  for my $path (@ARGV) { unlink $path or $!{ENOENT} or die $!; }\n"
+            "  for my $path (@ARGV) { symlink $target, $path or die $!; }\n"
+            "' \"$OUTSIDE\" \"$TMPDIR/fugu-ultra-events.jsonl\" \"$TMPDIR/fugu-ultra-final.txt\"\n"
             "if [ \"$IS_RESUME\" = 1 ]; then\n"
             "  printf '%s\\n' '{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"SAFE_FINAL\"}}'\n"
             "  exit 0\n"
             "fi\n"
             "printf '%s\\n' '{\"type\":\"thread.started\",\"thread_id\":\"019f0000-0000-7000-8000-000000000006\"}'\n"
             "trap 'exit 1' INT TERM\n"
-            "while :; do sleep 1; done\n",
+            f"while :; do {_fugu_sleep(1)}; done\n",
             encoding="utf-8",
         )
         binary.chmod(0o755)
@@ -1619,7 +1638,7 @@ class LocalCliRunnerTests(unittest.TestCase):
                 "while IFS= read -r LINE || [ -n \"$LINE\" ]; do :; done\n"
                 "printf 'PARTIAL_FINDING: auth refresh races on logout\\n'\n"
                 "trap 'exit 1' INT TERM\n"
-                "while :; do sleep 1; done\n",
+                f"while :; do {_fugu_sleep(1)}; done\n",
                 encoding="utf-8",
             )
             fake.chmod(0o755)
@@ -1774,7 +1793,7 @@ class LocalCliRunnerTests(unittest.TestCase):
             bin_dir = root / "bin"
             bin_dir.mkdir()
             sleeper = bin_dir / "codex-fugu"
-            sleeper.write_text("#!/bin/sh\nsleep 10\n", encoding="utf-8")
+            sleeper.write_text(f"#!/bin/sh\n{_fugu_sleep(10)}\n", encoding="utf-8")
             sleeper.chmod(0o755)
             self.make_fake(bin_dir, "codex")
             repo = root / "repo"
