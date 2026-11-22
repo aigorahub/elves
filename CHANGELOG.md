@@ -4,6 +4,18 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.42.0] - 2026-11-21
+
+### Changed
+
+- Agent rules from #288 (thanks @matthew-aigora) now live in SKILL.md, where every host reads them,
+  instead of the Codex-only AGENTS.md adapter: test selection and test-evidence rules under Test
+  Integrity, a comment rule in Code Quality Philosophy, dependency/config/fixture/environment
+  changes on the Validate impact path, the evidence shape of a blocking finding in Proof and
+  convergent review, and impossible acceptance criteria in the Completion Contract. Rules that
+  conflict with the current review, landing, and test-integrity contracts were left out.
+- AGENTS.md: completed the truncated v2.22 runtime-helpers line as a pointer to SKILL.md.
+
 ## [2.41.0] - 2026-10-16
 
 ### Changed
