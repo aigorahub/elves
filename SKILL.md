@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Grok Build, Oh My Pi (omp), Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.41.0"
+  version: "2.42.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -92,7 +92,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.41.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.42.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
@@ -409,6 +409,9 @@ chats are for execution; handoff docs are for memory. Rewrite live survival-guid
 10. **Anti-accretion:** no new repo meta-tooling, coined terms, or config keys without an explicit
     plan acceptance criterion that names the user-visible overnight-run value. Prefer deleting or
     quarantining unused surface over adding process around it.
+11. **Comments explain why:** Give non-obvious reasons, such as invariants types cannot express,
+    external constraints, workarounds, or intentional edge cases. Omit filler and restatements. Keep
+    each comment self-contained and accurate as nearby code changes.
 
 Reviewers: the current codebase is source of truth, not training data. Pass today's date to review
 subagents.
@@ -732,7 +735,8 @@ Impact path: changed surface → affected consumer → selected test. Touched-su
 broad at high-risk checkpoints and **terminal** (full suite or project full gate). Do not re-run a
 large full suite between ordinary batches when the impact path is green. Bug-fix protocol for
 blockers: category → category test → fix all. Queue pure advisories under **Deferred hygiene**
-(survival guide + execution-log digest); drain at terminal. Details:
+(survival guide + execution-log digest); drain at terminal. Dependency, config, fixture, and
+environment changes are on the impact path. Rerun the checks they affect. Details:
 `references/validation-guide.md`.
 
 ### 7. Review
@@ -793,6 +797,27 @@ Rule out collision first. Otherwise fetch and merge (no rebase). Complex conflic
 Never weaken, delete, or skip a test merely to obtain green. Legitimate behavior-driven updates
 with preserved/improved coverage and evidence are allowed.
 
+- Beyond the bug-fix protocol's category tests, aim tests at costly failures involving money, data
+  loss, security, runtime boundaries (model output, request bodies, files, user input), or silent
+  wrong answers.
+- Use the fewest tests that catch real failures. Extend an existing test before adding one. Never
+  add a test only to raise a coverage number (configured coverage gates still apply).
+- Use the cheapest reliable test at the boundary where the risk is; when wiring or rendering is the
+  risk, prefer integration or E2E proof within the plan's test strategy.
+- Do not duplicate what the type checker enforces, assert tautologies (expected values computed by
+  the code under test), or mock the system under test. Assertion-snapshot tests are off by default.
+- A bug-fix or behavior-change test must fail on a comparable baseline without the change, because
+  of the defect or missing behavior; a missing new API alone is insufficient. Characterization tests
+  may pass on both. Simplify elaborate setup.
+- Each regression or failure-mode test names the input or state that breaks things; behavioral tests
+  assert behavior at the boundary, not internals.
+- Never require an exact match of free-form model-generated wording. Keep exact checks for
+  deterministic contracts (schemas, required identifiers, tool arguments, limits, pinned phrases in
+  authored docs). Define semantic tolerances before the run. Loosening one after a failure is
+  weakening a test.
+- Claim a pass only from a run you observed or a recorded result you verified (delegated report,
+  a passing non-skipped CI test record, or permitted proof reuse), and name the commit tested.
+
 ## Compaction Recovery
 
 1. Survival guide (Stop Gate + Run Control first)
@@ -803,6 +828,10 @@ with preserved/improved coverage and evidence are allowed.
 ## Completion Contract
 
 Landable is **plan Acceptance with proof** — not green CI + `status: complete`.
+
+If a plan Acceptance criterion is impossible as written, record why and a proposed alternative in
+the execution log and report. Never mark it met or redefine it silently. Changing accepted criteria
+needs user approval, so the criterion stays unmet and blocks landing.
 
 Before batch `status: complete`: **impact** gates green for this batch (not necessarily full-suite
 mid-run), regression attestation on the impact path, non-empty
@@ -848,6 +877,9 @@ See `references/proof-and-review.md`.
 - Re-review = revision delta + unresolved blockers only
 - New blockers need serious regression / acceptance or constitution breach / security / data
   integrity / revision-introduced failure
+- A blocking defect finding states its trigger, the affected surface (the code path where one
+  applies), the impact, and the evidence. A change can expose a defect in unchanged code on its
+  impact path.
 - Cleanup-only operational changes do not invalidate product proof
 - Stop on sufficient exact-tip evidence, not absence of reviewer suggestions
 

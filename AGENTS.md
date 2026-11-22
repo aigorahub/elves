@@ -1,5 +1,5 @@
 ---
-version: "2.41.0"
+version: "2.42.0"
 ---
 
 # Elves: Codex repository adapter
@@ -233,4 +233,6 @@ divergence, fix this file to re-point at SKILL rather than re-forking protocol t
 
 Treat stale user-facing docs as **PENDING-DOCS** until updated (see SKILL.md).
 
-Runtime helpers (v2.22): `planning_harvest`, `tool_output_compact`,
+Runtime helpers (v2.22): `planning_harvest`, `tool_output_compact`, the any-model worker pin,
+Parallelves `validate_lane_staging` / `LaneSupervisor`, and the `fugu` module — see SKILL.md
+`## v2.22 runtime helpers (planning harvest, compact output, lanes)`.
