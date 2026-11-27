@@ -63,7 +63,8 @@ Each line has a 16 KiB limit including the newline. Writers hold an exclusive
 `flock` on a sibling lock file while assigning the ID and writing the line with
 one append operation. This requires a local filesystem with POSIX file locking
 on macOS, Linux, or WSL2. Readers report malformed complete lines and skip them.
-They wait for a newline before processing a line.
+They wait for a newline before processing a line. A writer discards an unfinished
+last line before appending. Complete lines stay in place.
 
 ## Commands
 
@@ -84,7 +85,13 @@ open "$snapshot"
 
 `read` and `follow` accept `--kind`, `--author` (exact seat name), `--since`
 (exclusive ID), `--open-questions`, and `--json`. Follow prints matching history
-and checks for new complete lines every half second. Stop it with Ctrl-C.
+and checks for new complete lines every half second. With `--open-questions`,
+follow reports when a question it displayed closes. Stop it with Ctrl-C.
+Use `post --file`, `--commit`, and `--reply-to` repeatedly to add references,
+and `--pr` for one pull request. `read --json` returns entries and malformed
+line numbers. `follow --json` writes one entry or question-closure event per
+line to stdout and reports malformed lines on stderr.
+
 The HTML snapshot puts open owner questions first. It has no scripts or external
 assets. Use a new output path for each snapshot.
 

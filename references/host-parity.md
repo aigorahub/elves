@@ -16,6 +16,7 @@ prewalk contract.
 | Native / host work | Separate custom/background session; supervised CLI uses safe mode and classifier-approved commits | Separate custom agent or sandboxed `codex exec`; narrow Git roots permit commits | Host-native Grok session or qualified/experimental two-phase worker | Host-native omp session; separate native worker uses run-scoped `--profile` |
 | Exact-session prewalk | cached proof, automatic required canary, or explicit experimental mode | same | same | same (omp product `--prewalk` is never Elves prewalk) |
 | Visibility | Proven native agent view or exact private-log follow command | Proven native agent view or exact private-log follow command | Live session + run docs; same memory/landing ownership | Live session + run docs; same memory/landing ownership |
+| [Run message board](message-board.md) | Same `board` helper | Same `board` helper | Same helper and driver relay for isolated workers | Same helper and driver relay for isolated workers |
 | Grok Build goal | proven enhancement or one-packet fallback (worker) | same (worker) | host-native path; goal mode is not a substitute for prewalk | n/a (not Grok) |
 | Confidence-guided review | Attach terminal `review_context.review_prompt_block`, or derive the same table from native `Confidence:` trailers | Same machine-produced block/table and Final Readiness output section | Same contract when workers emit trailers/blocks | Same contract when workers emit trailers/blocks |
 
