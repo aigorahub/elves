@@ -512,7 +512,7 @@
     <div class="masthead-inner">
       <div class="brand-row">
         <a class="wordmark" href="https://github.com/aigorahub/elves">Elves</a>
-        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.43.0 source and releases on GitHub</a>
+        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.44.0 source and releases on GitHub</a>
       </div>
       <h1>Using Elves</h1>
       <p class="intro">Plan with the main agent, hand implementation to a separate worker, then
@@ -1303,11 +1303,14 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" preferences reset</code></
         <div class="code-block">
           <button class="copy" type="button" data-copy="message-board-code">Copy</button>
           <pre><code id="message-board-code">python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" board init --session .elves-session.json
+python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" board post --session .elves-session.json --author seat --role worker --host codex --kind question --status open --result "Which input should we use?"
 python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" board follow --session .elves-session.json --open-questions
 python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" board html --session .elves-session.json --output board.html
 open board.html</code></pre>
         </div>
-        <p>The HTML snapshot highlights open owner questions at the top and works offline.
+        <p>Use <code>--result</code> for the outcome. <code>--subject</code> is a deprecated alias.
+          Supply one result flag and the kind's status.</p>
+        <p>The offline HTML snapshot highlights open owner questions at the top and marks closed questions in the history.
           Run the HTML command again to refresh the same file.
           The board grants no approval or landing authority.
           See the <a href="https://github.com/aigorahub/elves/blob/main/references/message-board.md">message board commands and posting rules</a>.</p>

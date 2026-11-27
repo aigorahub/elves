@@ -824,6 +824,14 @@ def load_api_break_approvals(
     if not isinstance(entries, list):
         return False, [], "public-API approval manifest approvals must be a list"
 
+    accepted_releases = {release_version}
+    skill_path = root / "SKILL.md"
+    if release_version == "Unreleased" and skill_path.is_file():
+        # Both CI workflows must be able to use the same versioned approval.
+        current_version = read_frontmatter_version(skill_path)
+        if current_version is not None:
+            accepted_releases.add(current_version)
+
     expected_entry_keys = {"surface", "release", "reason", "plan_path"}
     surfaces: list[str] = []
     seen: set[str] = set()
@@ -848,7 +856,7 @@ def load_api_break_approvals(
         entry_release = entry.get("release")
         if not isinstance(entry_release, str) or not entry_release.strip():
             return False, [], f"{prefix} release must be non-empty"
-        if entry_release != release_version:
+        if entry_release not in accepted_releases:
             return False, [], (
                 f"{prefix} is stale for release {release_version}: "
                 f"declares {entry_release}"
