@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Grok Build, Oh My Pi (omp), Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.43.0"
+  version: "2.44.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -92,7 +92,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.43.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.44.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
@@ -986,6 +986,8 @@ During staging, the driver runs
 `python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" board init --session <session.json>`
 and shares the recorded absolute board path with the seats. Use `board post` to
 append updates, `board follow` to watch live, and `board html` for a local snapshot.
+Use a one-line BLUF with the kind's status, tag factual claims, and include full
+SBAR for findings and handoffs. Require this shape in worker packets.
 The board is optional coordination data and grants no authority. If a sandbox
 blocks access, the driver relays the worker's update. Copy durable decisions into
 the run records. See [the run message board contract](references/message-board.md).

@@ -141,8 +141,8 @@ open "$snapshot"
 `read` and `follow` accept `--kind`, `--author` (exact seat name), `--since`
 (exclusive ID), `--open-questions`, and `--json`. Repeat `--status` to match any
 of the supplied statuses. Use `--unverified` to match entries with an absent
-or nonverified BLUF tag, or with any nonverified evidence item. Terminal text marks each open
-question with `OPEN QUESTION`. Follow prints matching history and checks for
+or nonverified BLUF tag, or with any nonverified evidence item. Terminal text
+marks each open question with `OPEN QUESTION` after the first line. Follow prints matching history and checks for
 new complete lines every half second. It reports when a question it marked
 open closes. Stop it with Ctrl-C.
 Use `post --entry-file PATH` or `--entry-file -` for a JSON object with
@@ -177,6 +177,8 @@ or the send fails, the post reports that outcome and keeps the saved entry.
 | `board_anchor_invalid` | A supplied anchor is empty, invalid, or has more than one line. |
 | `board_evidence_invalid` | Evidence is not a list of claims with nonempty text and supported fields. |
 | `board_entry_file_invalid` | The file or stdin is empty, unreadable, too large, malformed, has unknown keys, or conflicts with flags. |
+| `board_entry_invalid` | An author, body, or reference field has the wrong format. |
+| `board_subject_removed` | Use `--result` with `--status` in place of `--subject`. |
 
 ## Hosts and restricted workers
 

@@ -4,6 +4,16 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.44.0] - 2026-11-27
+
+### Changed
+
+- Run board posts now require a one-line BLUF and kind-specific status. Findings
+  and handoffs require SBAR. Evidence tags mark claims and verified claims carry
+  anchors. Readers keep v1 entries readable and assign new IDs after them.
+  The post format draws on the BLUF, SBAR, and calibration skills from the
+  [MIT-licensed Dialect plugin by NaiKiDEV](https://github.com/naikidev/claude-plugins/tree/main/plugins/dialect/skills).
+
 ## [2.43.0] - 2026-11-27
 
 ### Added
