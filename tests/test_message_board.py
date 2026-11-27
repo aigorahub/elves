@@ -22,7 +22,7 @@ class MessageBoardTests(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name)
-        self.path = self.root / "messages.jsonl"
+        self.path = self.root / "message-board.jsonl"
 
     def board(self, action: str, *args: str, check: bool = True) -> subprocess.CompletedProcess:
         return subprocess.run(
@@ -51,19 +51,25 @@ class MessageBoardTests(unittest.TestCase):
     def test_corrupt_lines_and_oversized_posts_do_not_lose_committed_rows(self) -> None:
         self.post("First")
         with self.path.open("ab") as stream:
-            stream.write(b'{bad json}\n' + b"x" * 20000 + b'\n{"partial":')
+            stream.write(b'{bad json}\n' + b"x" * 20000 + b'\n{"schema":"elves-message-board-v1","id":')
         before = self.path.read_bytes()
         oversized = self.post("Too long", "--body", "x" * 16384, check=False)
         self.assertNotEqual(oversized.returncode, 0)
         self.assertEqual(json.loads(oversized.stdout)["code"], "board_entry_too_large")
         self.assertEqual(self.path.read_bytes(), before)
 
+        unsafe_tail = self.post("Preserve malformed content", check=False)
+        self.assertNotEqual(unsafe_tail.returncode, 0)
+        self.assertEqual(json.loads(unsafe_tail.stdout)["code"], "board_unsafe_tail")
+        self.assertEqual(self.path.read_bytes(), before)
+        with self.path.open("ab") as stream:
+            stream.write(b"\n")
         result = json.loads(self.post("Second").stdout)
         self.assertEqual(result["entry"]["id"], 2)
-        self.assertEqual(result["malformed_lines"], [2, 3])
+        self.assertEqual(result["malformed_lines"], [2, 3, 4])
         result = json.loads(self.board("read", "--json").stdout)
         self.assertEqual([row["subject"] for row in result["entries"]], ["First", "Second"])
-        self.assertEqual(result["malformed_lines"], [2, 3])
+        self.assertEqual(result["malformed_lines"], [2, 3, 4])
 
     def test_secret_is_removed_from_author_body_references_and_relay(self) -> None:
         secret = "sk-" + "fixture" * 4
@@ -98,10 +104,14 @@ class MessageBoardTests(unittest.TestCase):
         )
         result = json.loads(self.board("read", "--json", "--open-questions", "--since", "1").stdout)
         self.assertEqual([row["id"] for row in result["entries"]], [2])
+        terminal = self.board("read").stdout
+        self.assertIn("\nOPEN QUESTION #2 ", terminal)
+        self.assertNotIn('\n  ""', terminal)
 
         output = self.root / "board.html"
         self.board("html", "--output", str(output))
         document = output.read_text()
+        self.assertIn("<section class='open-questions'>", document)
         self.assertLess(document.index("&lt;script&gt;subject"), document.index("Other entries"))
         for field in ("<script>", "<iframe", "<seat>", "<ref>"):
             self.assertNotIn(field, document)
@@ -109,7 +119,7 @@ class MessageBoardTests(unittest.TestCase):
             self.assertIn(field, document)
 
         # Hold back the newline of a valid driver reply until follow is polling.
-        reply_path = self.root / "reply.jsonl"
+        reply_path = self.root / "reply" / "message-board.jsonl"
         reply = json.loads(subprocess.run(
             [*BOARD, "post", "--board", str(reply_path), "--author", "lead",
              "--role", "lead", "--host", "claude", "--kind", "handoff",
@@ -137,6 +147,32 @@ class MessageBoardTests(unittest.TestCase):
                 if proc.poll() is None:
                     proc.kill()
                     proc.wait(timeout=10)
+
+        self.board("html", "--output", str(output))
+        refreshed = output.read_text()
+        self.assertIn("No open questions.", refreshed)
+        self.assertLess(refreshed.index("Other entries"), refreshed.index("&lt;script&gt;subject"))
+
+    def test_session_cannot_redirect_posts_to_another_file(self) -> None:
+        checkout = self.root / "checkout"
+        checkout.mkdir()
+        subprocess.run(["git", "init", "-q", str(checkout)], check=True, timeout=10)
+        target = self.root.resolve() / "other" / "message-board.jsonl"
+        target.parent.mkdir()
+        original = b"Data from another program"
+        target.write_bytes(original)
+        session = checkout / ".elves-session.json"
+        session.write_text(json.dumps({"run_id": "board-test", "message_board": str(target)}))
+
+        result = subprocess.run(
+            [*BOARD, "post", "--session", str(session), "--author", "seat", "--role", "worker",
+             "--host", "codex", "--kind", "status", "--subject", "An ordinary update"],
+            capture_output=True, text=True, timeout=CLI_TIMEOUT,
+        )
+
+        self.assertEqual(target.read_bytes(), original)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(json.loads(result.stdout)["code"], "board_session_conflict")
 
     def test_linked_worktrees_share_a_board_that_cannot_change_landing(self) -> None:
         main = self.root / "main"

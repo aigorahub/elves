@@ -547,11 +547,12 @@ def cmd_board(args: argparse.Namespace) -> int:
             path = message_board.initialize(args.session.expanduser().absolute())
             print(json.dumps({"ok": True, "message_board": str(path)}))
             return 0
-        path = (
-            args.board.expanduser().absolute()
-            if args.board is not None
-            else message_board.session_board(args.session.expanduser())
-        )
+        if args.board is not None:
+            path = args.board.expanduser().absolute()
+            if path.name != message_board.BOARD_FILENAME:
+                raise message_board.BoardError("board_filename_invalid", "The board file must be named message-board.jsonl.")
+        else:
+            path = message_board.session_board(args.session.expanduser())
         if action == "post":
             entry, warnings = message_board.post(
                 path,
@@ -570,7 +571,9 @@ def cmd_board(args: argparse.Namespace) -> int:
         if action == "html":
             _, entries, warnings = message_board.read_rows(path)
             output = args.output.expanduser().absolute()
-            if output.resolve() in (path.resolve(), path.with_name(f"{path.name}.lock").resolve()):
+            output = output.parent.resolve() / output.name
+            board_path = path.parent.resolve() / path.name
+            if output in (board_path, board_path.with_name(f"{board_path.name}.lock")):
                 raise message_board.BoardError("board_output_conflict", "Use a separate path for the snapshot.")
             message_board.write_html(output, entries, warnings)
             print(json.dumps({"ok": True, "output": str(output), "malformed_lines": warnings}))
@@ -594,12 +597,14 @@ def _print_board(args: argparse.Namespace, path: Path) -> int:
     cursor = message_board.Cursor()
     shown_questions = set()
     following = args.board_action == "follow"
+    show_closures = following and (args.open_questions or not args.json)
     try:
         while True:
             cursor, entries, warnings = message_board.read_rows(path, cursor)
+            closed = message_board.closed_question_ids(entries)
             selected = message_board.select_entries(
                 entries, kind=args.kind, author=args.author, since=args.since,
-                open_questions=args.open_questions,
+                open_questions=args.open_questions, closed=closed,
             )
             if args.json and not following:
                 print(json.dumps({"ok": True, "entries": selected, "malformed_lines": warnings}))
@@ -607,15 +612,17 @@ def _print_board(args: argparse.Namespace, path: Path) -> int:
             for line in warnings:
                 warning = {"code": "board_malformed_line", "line": line}
                 print(json.dumps(warning) if args.json else f"Skipped malformed board line {line}.", file=sys.stderr)
-            if following and args.open_questions:
-                closed = shown_questions & message_board.closed_question_ids(entries)
-                for identifier in sorted(closed):
+            if show_closures:
+                for identifier in sorted(shown_questions & closed):
                     notice = json.dumps({"closed_question": identifier}) if args.json else f"Question #{identifier} closed."
                     print(notice, flush=True)
                 shown_questions.difference_update(closed)
-                shown_questions.update(entry["id"] for entry in selected)
             for entry in selected:
-                print(json.dumps(entry) if args.json else message_board.format_entry(entry), flush=True)
+                open_question = message_board.is_open_question(entry, closed)
+                if show_closures and open_question:
+                    shown_questions.add(entry["id"])
+                rendered = json.dumps(entry) if args.json else message_board.format_entry(entry, open_question=open_question)
+                print(rendered, flush=True)
             if not following:
                 return 0
             time.sleep(message_board.POLL_SECONDS)
@@ -2886,7 +2893,7 @@ def _add_board_parser(sub: Any) -> None:
             command.add_argument("--via", help="Seat name of the driver who relayed the entry")
             command.add_argument("--notify-hc", metavar="TERMINAL_ID")
         elif action == "html":
-            command.add_argument("--output", type=Path, required=True, help="New HTML file")
+            command.add_argument("--output", type=Path, required=True, help="HTML snapshot to create or replace")
         else:
             command.add_argument("--kind", choices=message_board.KINDS)
             command.add_argument("--author", help="Exact seat name")

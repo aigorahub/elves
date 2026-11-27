@@ -17,10 +17,10 @@ which is shared by the main checkout and linked worktrees. The file is
 It stays in local Git metadata because the survival guide and execution log can
 live in tracked `docs/elves/`. The path needs no project ignore rule.
 
-Use `--session <session.json>` to read the recorded path or `--board <path>` to use
-a path directly. Share the same absolute path with each seat. The first post
-creates the file. Init is a driver operation. Run it before concurrent session
-updates.
+Use `--session <session.json>` to verify and use the canonical path, or
+`--board <path>/message-board.jsonl` to use a path directly. Share the same
+absolute path with each seat. The first post creates the file. Init is a driver
+operation. Run it before concurrent session updates.
 
 ## Entries
 
@@ -64,7 +64,9 @@ Each line has a 16 KiB limit including the newline. Writers hold an exclusive
 one append operation. This requires a local filesystem with POSIX file locking
 on macOS, Linux, or WSL2. Readers report malformed complete lines and skip them.
 They wait for a newline before processing a line. A writer discards an unfinished
-last line before appending. Complete lines stay in place.
+board entry only if all complete lines are valid. An unrecognized tail or a tail
+after a malformed line makes the writer refuse the append. Complete lines stay
+in place.
 
 ## Commands
 
@@ -84,16 +86,17 @@ open "$snapshot"
 ```
 
 `read` and `follow` accept `--kind`, `--author` (exact seat name), `--since`
-(exclusive ID), `--open-questions`, and `--json`. Follow prints matching history
-and checks for new complete lines every half second. With `--open-questions`,
-follow reports when a question it displayed closes. Stop it with Ctrl-C.
+(exclusive ID), `--open-questions`, and `--json`. Terminal text marks each open
+question with `OPEN QUESTION`. Follow prints matching history and checks for
+new complete lines every half second. It reports when a question it marked
+open closes. Stop it with Ctrl-C.
 Use `post --file`, `--commit`, and `--reply-to` repeatedly to add references,
 and `--pr` for one pull request. `read --json` returns entries and malformed
 line numbers. `follow --json` writes one entry or question-closure event per
 line to stdout and reports malformed lines on stderr.
 
-The HTML snapshot puts open owner questions first. It has no scripts or external
-assets. Use a new output path for each snapshot.
+The HTML snapshot highlights open owner questions at the top. It has no scripts
+or external assets. Run `board html` with the same output path to refresh it.
 
 Add `--notify-hc <terminal-id>` to a post to send a wake-up after the entry is
 saved. The message contains only `board entry N is for you`. If `hc` is missing

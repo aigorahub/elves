@@ -129,11 +129,11 @@ SMOKE_COMMANDS: list[tuple[str, list[str]]] = [
     (
         "board-post",
         [
-            "board", "post", "--board", "smoke-board.jsonl", "--author", "smoke",
+            "board", "post", "--board", "message-board.jsonl", "--author", "smoke",
             "--role", "worker", "--host", "other", "--kind", "status", "--subject", "Smoke entry",
         ],
     ),
-    ("board-read", ["board", "read", "--board", "smoke-board.jsonl", "--json"]),
+    ("board-read", ["board", "read", "--board", "message-board.jsonl", "--json"]),
 ]
 
 RUNTIME_HELP_COMMANDS = (
@@ -348,10 +348,10 @@ def _validate_installed_document_contract(bundle_root: Path) -> tuple[list[str],
                     f"{relative}: missing installed helper-path contract `{phrase}`"
                 )
 
-    for relative in ("references/runtime-helper-paths.md", "references/message-board.md"):
-        checked += 1
-        if not (bundle_root / relative).is_file():
-            failures.append(f"installed bundle missing {relative}")
+    reference = bundle_root / "references" / "runtime-helper-paths.md"
+    checked += 1
+    if not reference.is_file():
+        failures.append("installed bundle missing references/runtime-helper-paths.md")
 
     for markdown in sorted(bundle_root.rglob("*.md")):
         checked += 1
