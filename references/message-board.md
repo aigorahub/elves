@@ -148,16 +148,21 @@ open closes. Stop it with Ctrl-C.
 Use `post --entry-file PATH` or `--entry-file -` for a JSON object with
 `sbar`, `evidence`, `body`, or `refs`. Supply BLUF fields with flags.
 The file has a 64 KiB input limit and the stored entry still has a 16 KiB limit.
-An input key cannot also be supplied by a flag. The `refs` object can omit
+A nonempty `--body` conflicts with the `body` key. A reference flag with a
+non-default value conflicts with the `refs` key. The `refs` object can omit
 unused keys. Pipe the JSON or redirect a file when using `-`.
+
+Use `--result` for the BLUF result. `--subject` is a deprecated alias and
+prints a notice to stderr. Supply one result flag and the required `--status`.
 
 Use `post --file`, `--commit`, and `--reply-to` repeatedly to add references,
 and `--pr` for one pull request. `read --json` returns entries and malformed
 line numbers. `follow --json` writes one entry or question-closure event per
 line to stdout and reports malformed lines on stderr.
 
-The HTML snapshot highlights open owner questions at the top. It has no scripts
-or external assets. Run `board html` with the same output path to refresh it.
+The HTML snapshot highlights open owner questions at the top and marks closed
+questions in the history. It has no scripts or external assets. Run `board html`
+with the same output path to refresh it.
 
 Add `--notify-hc <terminal-id>` to a post to send a wake-up after the entry is
 saved. The message contains only `board entry N is for you`. If `hc` is missing
@@ -178,7 +183,7 @@ or the send fails, the post reports that outcome and keeps the saved entry.
 | `board_evidence_invalid` | Evidence is not a list of claims with nonempty text and supported fields. |
 | `board_entry_file_invalid` | The file or stdin is empty, unreadable, too large, malformed, has unknown keys, or conflicts with flags. |
 | `board_entry_invalid` | An author, body, or reference field has the wrong format. |
-| `board_subject_removed` | Use `--result` with `--status` in place of `--subject`. |
+| `board_result_conflict` | Both `--result` and its deprecated alias `--subject` were supplied. |
 
 ## Hosts and restricted workers
 

@@ -43,6 +43,7 @@ TAGS = ("verified", "inferred", "not-verified")
 REQUIRED_TAG_KINDS = ("finding", "verdict", "handoff", "status")
 REQUIRED_SBAR_KINDS = ("finding", "handoff")
 SBAR_FIELDS = ("situation", "background", "assessment", "recommendation")
+CLOSED_QUESTION_NOTE = "Question closed."
 HOSTS = ("claude", "codex", "grok", "omp", "other")
 DRIVER_ROLES = ("driver", "lead")
 ROLE_KINDS = {
@@ -460,7 +461,7 @@ def _details_lines(entry: dict) -> Iterator[str]:
 def format_entry(entry: dict, *, open_question: bool) -> str:
     lines = [_bluf_line(entry)]
     if entry["kind"] == "question":
-        lines.append("OPEN QUESTION" if open_question else "Question closed.")
+        lines.append("OPEN QUESTION" if open_question else CLOSED_QUESTION_NOTE)
     lines.extend(_details_lines(entry))
     if entry["body"]:
         lines.append(_display_text(entry["body"]))
@@ -468,8 +469,9 @@ def format_entry(entry: dict, *, open_question: bool) -> str:
 
 
 def write_html(output: Path, entries: list[dict], warnings: list[int]) -> None:
-    def article(entry: dict) -> str:
+    def article(entry: dict, *, open_question: bool) -> str:
         heading = html.escape(_bluf_line(entry))
+        note = f"<p>{CLOSED_QUESTION_NOTE}</p>" if entry["kind"] == "question" and not open_question else ""
         lines = "\n".join(map(html.escape, _details_lines(entry)))
         structured = f"<pre>{lines}</pre>" if lines else ""
         body = f'<pre>{html.escape(entry["body"])}</pre>' if entry["body"] else ""
@@ -480,14 +482,15 @@ def write_html(output: Path, entries: list[dict], warnings: list[int]) -> None:
         fields = {key: entry[key] for key in ("refs", "via", "redacted", "schema") if key in entry}
         details = html.escape(json.dumps(fields, indent=2))
         return (
-            f"<article><h3>{heading}</h3>{structured}{body}<p>{metadata}</p>"
+            f"<article><h3>{heading}</h3>{note}{structured}{body}<p>{metadata}</p>"
             f"<details><summary>References and entry details</summary><pre>{details}</pre></details></article>"
         )
 
     closed = closed_question_ids(entries)
     questions, history = [], []
     for entry in entries:
-        (questions if is_open_question(entry, closed) else history).append(article(entry))
+        open_question = is_open_question(entry, closed)
+        (questions if open_question else history).append(article(entry, open_question=open_question))
     warning = f"<p>Skipped malformed lines {', '.join(map(str, warnings))}.</p>" if warnings else ""
     document = (
         "<!doctype html>\n<html lang='en'><head><meta charset='utf-8'>"

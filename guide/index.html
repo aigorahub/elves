@@ -1308,7 +1308,9 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" board follow --session .el
 python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" board html --session .elves-session.json --output board.html
 open board.html</code></pre>
         </div>
-        <p>The HTML snapshot highlights open owner questions at the top and works offline.
+        <p>Use <code>--result</code> for the outcome. <code>--subject</code> is a deprecated alias.
+          Supply one result flag and the kind's status.</p>
+        <p>The offline HTML snapshot highlights open owner questions at the top and marks closed questions in the history.
           Run the HTML command again to refresh the same file.
           The board grants no approval or landing authority.
           See the <a href="https://github.com/aigorahub/elves/blob/main/references/message-board.md">message board commands and posting rules</a>.</p>

@@ -68,7 +68,10 @@ class MessageBoardTests(unittest.TestCase):
         self.assertEqual((first["schema"], first["id"]), ("elves-message-board-v2", 8))
         with self.path.open("ab") as stream:
             stream.write(b'{"schema":"elves-message-board-v2","id":')
-        self.post("Second new entry")
+        alias = self.board("post", "--author", "seat", "--role", "worker", "--host", "codex",
+                           "--kind", "claim", "--status", "in-progress", "--subject", "Second new entry")
+        self.assertEqual(alias.stderr.strip().splitlines(), ["--subject is deprecated. Use --result."])
+        self.assertEqual(json.loads(alias.stdout)["entry"]["bluf"]["result"], "Second new entry")
         snapshot = json.loads(self.board("read", "--json").stdout)
         self.assertEqual(snapshot["malformed_lines"], [])
         self.assertEqual([row["id"] for row in snapshot["entries"]], [3, 7, 8, 9])
@@ -89,6 +92,7 @@ class MessageBoardTests(unittest.TestCase):
             ("claim", "in-progress", "Taking the task", ("--tag", "assured"), None, "board_tag_invalid"),
             ("claim", "in-progress", "Taking the task", (), {"result": "Other result"}, "board_entry_file_invalid"),
             ("claim", "in-progress", "Taking the task", ("--file", "project.txt"), {"refs": {}}, "board_entry_file_invalid"),
+            ("claim", "in-progress", "Taking the task", ("--body", "Flag body"), {"body": "File body"}, "board_entry_file_invalid"),
         )
         for kind, status, result, flags, details, code in cases:
             with self.subTest(kind=kind, status=status, flags=flags, details=details):
@@ -105,8 +109,10 @@ class MessageBoardTests(unittest.TestCase):
         empty = self.board("post", *flags, "--status", "in-progress", "--result", "Taking task",
                            "--entry-file", "-", check=False, input="")
         self.assertEqual(json.loads(empty.stdout)["code"], "board_entry_file_invalid")
-        removed = self.board("post", *flags, "--subject", "Old command", check=False)
-        self.assertIn("--result", json.loads(removed.stdout)["error"])
+        conflict = self.board("post", *flags, "--status", "in-progress", "--result", "New command",
+                              "--subject", "Old command", check=False)
+        self.assertNotEqual(conflict.returncode, 0)
+        self.assertEqual(json.loads(conflict.stdout)["code"], "board_result_conflict")
         self.assertEqual(self.path.read_bytes(), V1_LINES)
         self.assertEqual(list(self.root.iterdir()), [self.path])
 
@@ -117,11 +123,12 @@ class MessageBoardTests(unittest.TestCase):
                      "assessment": "The third input may need coverage", "recommendation": "Driver assigns the next check"},
             "evidence": [{"text": "Two inputs passed", "tag": "verified", "anchor": "sample-check exit 0"},
                          {"text": "A third input may need coverage", "tag": "inferred"}],
+            "body": "Sample details",
             "refs": {"files": ["sample.txt"]},
         }))
         self.board("post", "--author", "worker", "--role", "worker", "--host", "codex", "--kind", "handoff",
                    "--status", "ready", "--result", "Sample ready for review", "--tag", "verified",
-                   "--anchor", "sample-check exit 0", "--entry-file", str(handoff))
+                   "--anchor", "sample-check exit 0", "--body", "", "--entry-file", str(handoff))
         self.board("post", "--author", "reviewer", "--role", "reviewer", "--host", "other", "--kind", "verdict",
                    "--status", "pass", "--result", "Sample passes review", "--tag", "verified", "--anchor", "entry 1")
         self.board("post", "--author", "worker", "--role", "worker", "--host", "codex", "--kind", "question",
@@ -131,6 +138,7 @@ class MessageBoardTests(unittest.TestCase):
         self.assertEqual([entry["id"] for entry in by_status["entries"]], [1, 2])
         unverified = json.loads(self.board("read", "--json", "--unverified").stdout)
         self.assertEqual([entry["id"] for entry in unverified["entries"]], [1, 3])
+        self.assertEqual(unverified["entries"][0]["body"], "Sample details")
         self.assertEqual(unverified["entries"][0]["refs"]["files"], ["sample.txt"])
 
         lines = self.board("read", "--status", "ready").stdout.splitlines()
@@ -170,12 +178,14 @@ class MessageBoardTests(unittest.TestCase):
 
     def test_secret_is_removed_from_author_body_references_and_relay(self) -> None:
         secret = "sk-" + "fixture" * 4
+        slots = ("situation", "background", "assessment", "recommendation")
         self.board(
             "post", "--author", secret, "--role", "worker", "--host", "codex",
             "--kind", "status", "--status", "done", "--result", secret, "--tag", "verified", "--anchor", secret,
             "--body", secret, "--entry-file", "-",
             "--file", secret, "--commit", secret, "--pr", secret, "--via", secret,
-            input=json.dumps({"evidence": [{"text": secret, "tag": "verified", "anchor": secret}]}),
+            input=json.dumps({"evidence": [{"text": secret, "tag": "verified", "anchor": secret}],
+                              "sbar": dict.fromkeys(slots, secret)}),
         )
         raw = self.path.read_text()
         self.assertNotIn(secret, raw)
@@ -186,6 +196,7 @@ class MessageBoardTests(unittest.TestCase):
         self.assertEqual(entry["body"], replacement)
         self.assertEqual(entry["bluf"], {"status": "done", "result": replacement, "tag": "verified", "anchor": replacement})
         self.assertEqual(entry["evidence"], [{"text": replacement, "tag": "verified", "anchor": replacement}])
+        self.assertEqual(entry["sbar"], dict.fromkeys(slots, replacement))
         self.assertEqual(entry["via"], replacement)
         self.assertEqual(entry["refs"], {
             "files": [replacement], "commits": [replacement], "pr": replacement, "entries": [],
@@ -251,6 +262,7 @@ class MessageBoardTests(unittest.TestCase):
         self.board("html", "--output", str(output))
         refreshed = output.read_text()
         self.assertIn("No open questions.", refreshed)
+        self.assertIn("<p>Question closed.</p>", refreshed)
         self.assertLess(refreshed.index("Other entries"), refreshed.index("&lt;script&gt;question"))
 
     def test_session_cannot_redirect_posts_to_another_file(self) -> None:

@@ -552,7 +552,7 @@ def cmd_board(args: argparse.Namespace) -> int:
             if path.name != message_board.BOARD_FILENAME:
                 raise message_board.BoardError("board_filename_invalid", "The board file must be named message-board.jsonl.")
         else:
-            path = message_board.session_board(args.session.expanduser())
+            path = message_board.session_board(args.session.expanduser().absolute())
         if action == "post":
             bluf, details = _board_post_input(args)
             entry, warnings = message_board.post(
@@ -594,18 +594,25 @@ def cmd_board(args: argparse.Namespace) -> int:
 
 
 def _board_post_input(args: argparse.Namespace) -> tuple[dict, dict]:
+    result = args.result
+    if args.subject is not None:
+        if result is not None:
+            raise message_board.BoardError("board_result_conflict", "Use only one of --result and --subject.")
+        print("--subject is deprecated. Use --result.", file=sys.stderr)
+        result = args.subject
     details = (
         message_board.load_entry_file(args.entry_file, getattr(sys.stdin, "buffer", None))
         if args.entry_file is not None else {}
     )
+    defaults = {"files": [], "commits": [], "pr": None, "entries": []}
     refs = {"files": args.file, "commits": args.commit, "pr": args.pr, "entries": args.reply_to}
-    flags = {key: value for key, value in refs.items() if value is not None}
-    if ("body" in details and args.body is not None) or ("refs" in details and flags):
+    flags = {key: value for key, value in refs.items() if value != defaults[key]}
+    if ("body" in details and args.body) or ("refs" in details and flags):
         raise message_board.BoardError("board_entry_file_invalid", "Supply body or references in the entry file or flags, not both.")
-    if args.body is not None:
+    if args.body:
         details["body"] = args.body
-    details["refs"] = {"files": [], "commits": [], "pr": None, "entries": []} | details.get("refs", {}) | flags
-    bluf = {"status": args.status, "result": args.result}
+    details["refs"] = defaults | details.get("refs", {}) | flags
+    bluf = {"status": args.status, "result": result}
     for field in ("tag", "anchor"):
         value = getattr(args, field)
         if value is not None:
@@ -2876,17 +2883,11 @@ class _NoAbbrevArgumentParser(argparse.ArgumentParser):
 
 
 class _BoardArgumentParser(_NoAbbrevArgumentParser):
-    def error(self, message: str, *, code: str = "board_arguments_invalid") -> None:
-        print(json.dumps({"ok": False, "code": code, "error": redact_text(
+    def error(self, message: str) -> None:
+        print(json.dumps({"ok": False, "code": "board_arguments_invalid", "error": redact_text(
             message, exact_values=collect_secret_env_values()
         ).text}))
         self.exit(2)
-
-
-class _RemovedBoardSubject(argparse.Action):
-    def __call__(self, parser: _BoardArgumentParser, namespace: argparse.Namespace,
-                 values: Any, option_string: str | None = None) -> None:
-        parser.error("Use --result for the BLUF outcome and --status for its status.", code="board_subject_removed")
 
 
 def _add_board_parser(sub: Any) -> None:
@@ -2913,15 +2914,15 @@ def _add_board_parser(sub: Any) -> None:
             command.add_argument("--kind", choices=message_board.KINDS, required=True)
             command.add_argument("--status", help="BLUF status for the kind")
             command.add_argument("--result", help="One-line BLUF outcome")
-            command.add_argument("--subject", action=_RemovedBoardSubject, nargs="?", help=argparse.SUPPRESS)
+            command.add_argument("--subject", help="Deprecated alias for --result")
             command.add_argument("--tag", help="BLUF evidence tag")
             command.add_argument("--anchor", help="BLUF evidence pointer")
             command.add_argument("--entry-file", metavar="PATH", help="Structured entry JSON file or - for stdin")
-            command.add_argument("--body")
-            command.add_argument("--file", action="append")
-            command.add_argument("--commit", action="append")
+            command.add_argument("--body", default="")
+            command.add_argument("--file", action="append", default=[])
+            command.add_argument("--commit", action="append", default=[])
             command.add_argument("--pr")
-            command.add_argument("--reply-to", type=int, action="append")
+            command.add_argument("--reply-to", type=int, action="append", default=[])
             command.add_argument("--via", help="Seat name of the driver who relayed the entry")
             command.add_argument("--notify-hc", metavar="TERMINAL_ID")
         elif action == "html":
