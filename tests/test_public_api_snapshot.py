@@ -462,10 +462,23 @@ class PublicApiSnapshotRegressionTests(unittest.TestCase):
             )
             self.assertEqual(result["breaking"], [])
 
-    def test_changed_default_is_breaking(self) -> None:
+    def test_changed_optional_flag_default_is_compatible(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             self._write_cli(root)
+            self._commit_baseline(root)
+            self._replace_cli(root, 'default="safe"', 'default="fast"')
+
+            result = compatibility_gate(root, required=True, base_ref="origin/main")
+
+            self.assertTrue(result["ok"], result)
+            self.assertIn("cli:cobbler_agents worker refresh", result["diff"]["compatible_changes"])
+
+    def test_changed_positional_default_is_breaking(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            self._write_cli(root)
+            self._replace_cli(root, '"--mode", choices=', '"mode", nargs="?", choices=')
             self._commit_baseline(root)
             self._replace_cli(root, 'default="safe"', 'default="fast"')
 
@@ -482,7 +495,7 @@ class PublicApiSnapshotRegressionTests(unittest.TestCase):
             root = Path(raw)
             self._write_cli(root)
             self._commit_baseline(root)
-            self._replace_cli(root, 'default="safe"', 'default="fast"')
+            self._replace_cli(root, 'choices=["safe", "fast"]', 'choices=["safe"]')
             surface = "cli:cobbler_agents worker refresh"
 
             blocked = compatibility_gate(root, required=True, base_ref="origin/main")

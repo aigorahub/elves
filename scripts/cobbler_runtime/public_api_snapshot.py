@@ -1823,11 +1823,11 @@ def _cli_break_reasons(baseline_signature: str, current_signature: str) -> list[
     """Return backward-incompatible CLI contract changes.
 
     Help prose, handler function names, print-call multiplicity, new optional
-    arguments, new option aliases, new choices, new JSON keys, and new
-    subcommands are compatible.  Existing invocation syntax and behavior stay
-    fail-closed: removed flags/commands/keys, newly required inputs, changed
-    defaults/consts/types/arity, narrowed choices, newly exclusive or required
-    groups, and exit-code contract changes are breaking.
+    arguments, new option aliases, new choices, new JSON keys, new subcommands,
+    and changed defaults on optional flags are compatible. Removed flags,
+    commands, or keys, newly required inputs, changed actions, consts, types,
+    arity, or defaults on other inputs, narrowed choices, newly exclusive or
+    required groups, and exit-code contract changes are breaking.
     """
     if baseline_signature == current_signature:
         return []
@@ -1903,7 +1903,14 @@ def _cli_break_reasons(baseline_signature: str, current_signature: str) -> list[
         if missing_flags:
             reasons.append(f"{label} removed flag(s): {', '.join(missing_flags)}")
 
+        optional_flag = (
+            bool(baseline_flags and current_flags)
+            and not baseline_argument.get("required")
+            and not current_argument.get("required")
+        )
         for field_name in ("action", "const", "default", "nargs", "type"):
+            if field_name == "default" and optional_flag:
+                continue
             if baseline_argument.get(field_name) != current_argument.get(field_name):
                 reasons.append(
                     f"{label} changed {field_name}: "

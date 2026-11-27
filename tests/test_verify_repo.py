@@ -551,6 +551,19 @@ class VerifyRepoUnitTests(unittest.TestCase):
         self.assertEqual(surfaces, [surface])
         self.assertIn("Unreleased", message)
 
+    def test_current_skill_release_approval_loads_for_both_ci_forms(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            self._write_approval_repo(root, self._approval_manifest(release="2.44.0"))
+            (root / "SKILL.md").write_text('---\nmetadata:\n  version: "2.44.0"\n---\n', encoding="utf-8")
+            subprocess.run(["git", "add", "SKILL.md"], cwd=root, check=True)
+
+            for version in ("Unreleased", "2.44.0"):
+                with self.subTest(version=version):
+                    ok, surfaces, message = self.verify.load_api_break_approvals(root, release_version=version)
+                    self.assertTrue(ok, message)
+                    self.assertEqual(surfaces, ["cli:cobbler_agents session list"])
+
     def test_explicit_release_rejects_stale_unreleased_approvals(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)

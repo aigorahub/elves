@@ -14,6 +14,9 @@ All notable changes to the Elves skill are documented here.
   `--result`. Readers keep v1 entries readable and assign new IDs after them.
   The post format draws on the BLUF, SBAR, and calibration skills from the
   [MIT-licensed Dialect plugin by NaiKiDEV](https://github.com/naikidev/claude-plugins/tree/main/plugins/dialect/skills).
+- The public API check reports changed defaults on optional CLI flags as
+  compatible. An Unreleased approval check accepts entries for the current
+  skill version, so both CI workflows can use the same versioned approval.
 
 ## [2.43.0] - 2026-11-27
 
