@@ -130,7 +130,8 @@ SMOKE_COMMANDS: list[tuple[str, list[str]]] = [
         "board-post",
         [
             "board", "post", "--board", "message-board.jsonl", "--author", "smoke",
-            "--role", "worker", "--host", "other", "--kind", "status", "--subject", "Smoke entry",
+            "--role", "worker", "--host", "other", "--kind", "status", "--status", "done",
+            "--result", "Smoke entry", "--tag", "not-verified",
         ],
     ),
     ("board-read", ["board", "read", "--board", "message-board.jsonl", "--json"]),

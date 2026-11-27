@@ -20,13 +20,29 @@ from .storage import atomic_write_json, digest_key, directory_lock, guard_repo_p
 from .subprocess_output import OutputLimitExceeded, run_bounded
 
 
-SCHEMA = "elves-message-board-v1"
+SCHEMA = "elves-message-board-v2"
+LEGACY_SCHEMA = "elves-message-board-v1"
 BOARD_FILENAME = "message-board.jsonl"
-ENTRY_PREFIX = f'{{"schema":"{SCHEMA}",'.encode("ascii")
+ENTRY_PREFIXES = tuple(f'{{"schema":"{schema}",'.encode("ascii") for schema in (SCHEMA, LEGACY_SCHEMA))
 # Bound each append and keep corrupt lines from filling a reader's line buffer.
 MAX_LINE_BYTES = 16 * 1024
+MAX_ENTRY_FILE_BYTES = 64 * 1024
 POLL_SECONDS = 0.5
-KINDS = ("claim", "release", "finding", "verdict", "handoff", "question", "status")
+KIND_STATUSES = {
+    "claim": ("in-progress",),
+    "release": ("done",),
+    "finding": ("blocking", "advisory"),
+    "verdict": ("pass", "fail"),
+    "handoff": ("ready", "blocked"),
+    "question": ("open",),
+    "status": ("in-progress", "done", "blocked", "failed"),
+}
+KINDS = tuple(KIND_STATUSES)
+STATUSES = tuple(dict.fromkeys(status for choices in KIND_STATUSES.values() for status in choices))
+TAGS = ("verified", "inferred", "not-verified")
+REQUIRED_TAG_KINDS = ("finding", "verdict", "handoff", "status")
+REQUIRED_SBAR_KINDS = ("finding", "handoff")
+SBAR_FIELDS = ("situation", "background", "assessment", "recommendation")
 HOSTS = ("claude", "codex", "grok", "omp", "other")
 DRIVER_ROLES = ("driver", "lead")
 ROLE_KINDS = {
@@ -35,7 +51,9 @@ ROLE_KINDS = {
     "reviewer": ("finding", "verdict", "status", "question"),
     "owner": ("status",),
 }
-ENTRY_KEYS = {"schema", "id", "time", "author", "kind", "subject", "body", "refs", "redacted"}
+ENTRY_KEYS = {"schema", "id", "time", "author", "kind", "body", "refs", "redacted"}
+REF_KEYS = {"files", "commits", "pr", "entries"}
+ENTRY_FILE_KEYS = {"sbar", "evidence", "body", "refs"}
 
 
 class BoardError(Exception):
@@ -94,13 +112,11 @@ def _positive_id(value: object) -> bool:
     return type(value) is int and value > 0
 
 
-def _valid_entry(entry: object) -> bool:
-    if not isinstance(entry, dict) or entry.keys() - {"via"} != ENTRY_KEYS:
-        return False
+def _valid_common_fields(entry: dict) -> bool:
     author, refs = entry["author"], entry["refs"]
     if not isinstance(author, dict) or author.keys() != {"seat", "role", "host"}:
         return False
-    if not isinstance(refs, dict) or refs.keys() != {"files", "commits", "pr", "entries"}:
+    if not isinstance(refs, dict) or refs.keys() != REF_KEYS:
         return False
     role = author["role"]
     if not isinstance(role, str) or entry["kind"] not in ROLE_KINDS.get(role, ()):
@@ -112,11 +128,9 @@ def _valid_entry(entry: object) -> bool:
     except ValueError:
         return False
     return (
-        entry["schema"] == SCHEMA
-        and _positive_id(entry["id"])
+        _positive_id(entry["id"])
         and _valid_text(author["seat"])
         and author["host"] in HOSTS
-        and _valid_text(entry["subject"])
         and isinstance(entry["body"], str)
         and ("via" not in entry or _valid_text(entry["via"]))
         and (refs["pr"] is None or _valid_text(refs["pr"]))
@@ -127,6 +141,100 @@ def _valid_entry(entry: object) -> bool:
             for values in (refs["files"], refs["commits"], entry["redacted"])
         )
     )
+
+
+def _single_line(value: object) -> bool:
+    return isinstance(value, str) and _valid_text(value) and value.splitlines() == [value]
+
+
+def _validate_tag(claim: dict, *, required: bool) -> None:
+    tag = claim.get("tag")
+    if "tag" not in claim:
+        if required:
+            raise BoardError("board_tag_required", "Supply an evidence tag for this claim.")
+    elif tag not in TAGS:
+        raise BoardError("board_tag_invalid", "Use verified, inferred, or not-verified for the evidence tag.")
+    anchor = claim.get("anchor")
+    # A pointer lets a reader check the claim. Its author declares it, so its presence proves nothing.
+    if tag == "verified" and not _valid_text(anchor):
+        raise BoardError("board_verified_needs_anchor", "A verified claim needs an evidence anchor.")
+    if "anchor" in claim and not _single_line(anchor):
+        raise BoardError("board_anchor_invalid", "An evidence anchor must be a nonempty single line.")
+
+
+def _validate_entry(entry: object) -> None:
+    invalid = BoardError("board_entry_invalid", "The entry has an invalid schema, author, body, or reference.")
+    if not isinstance(entry, dict):
+        raise invalid
+    schema = entry.get("schema")
+    if schema == LEGACY_SCHEMA:
+        if entry.keys() - {"via"} != ENTRY_KEYS | {"subject"} or not _valid_text(entry["subject"]):
+            raise invalid
+    elif schema == SCHEMA:
+        if entry.keys() - {"via", "sbar", "evidence"} != ENTRY_KEYS | {"bluf"}:
+            raise invalid
+    else:
+        raise invalid
+    if not _valid_common_fields(entry):
+        raise invalid
+    if schema == LEGACY_SCHEMA:
+        return
+
+    kind, bluf = entry["kind"], entry["bluf"]
+    if not isinstance(bluf, dict) or bluf.keys() - {"tag", "anchor"} != {"status", "result"} or not _single_line(bluf["result"]):
+        raise BoardError("board_bluf_invalid", "The BLUF result must be a nonempty single line.")
+    if bluf["status"] not in KIND_STATUSES[kind]:
+        allowed = ", ".join(KIND_STATUSES[kind])
+        raise BoardError("board_status_not_allowed", f"The {kind} kind requires one of these statuses: {allowed}.")
+    _validate_tag(bluf, required=kind in REQUIRED_TAG_KINDS)
+
+    if "sbar" in entry:
+        sbar = entry["sbar"]
+        if not isinstance(sbar, dict) or sbar.keys() != set(SBAR_FIELDS) or not all(map(_valid_text, sbar.values())):
+            raise BoardError("board_sbar_incomplete", "Supply all four nonempty SBAR fields.")
+    elif kind in REQUIRED_SBAR_KINDS:
+        raise BoardError("board_sbar_required", "A finding or handoff requires SBAR.")
+
+    evidence = entry.get("evidence", [])
+    if not isinstance(evidence, list):
+        raise BoardError("board_evidence_invalid", "Evidence must be a list of claims.")
+    for claim in evidence:
+        if not isinstance(claim, dict) or claim.keys() - {"tag", "anchor"} != {"text"} or not _valid_text(claim["text"]):
+            raise BoardError("board_evidence_invalid", "An evidence claim needs text and supports only text, tag, and anchor.")
+        _validate_tag(claim, required=True)
+
+
+def _json_object(pairs: list[tuple]) -> dict:
+    obj = dict(pairs)
+    if len(obj) != len(pairs):
+        raise ValueError("Duplicate JSON key")
+    return obj
+
+
+def load_entry_file(path: str, stdin: BinaryIO | None) -> dict:
+    invalid = BoardError("board_entry_file_invalid", "Use a JSON object up to 64 KiB in the entry file or stdin.")
+    try:
+        if path == "-":
+            if stdin is None or stdin.isatty():
+                raise invalid
+            raw = stdin.read(MAX_ENTRY_FILE_BYTES + 1)
+        else:
+            fd = os.open(Path(path).expanduser(), os.O_RDONLY | os.O_NONBLOCK)
+            with os.fdopen(fd, "rb") as stream:
+                if not stat.S_ISREG(os.fstat(fd).st_mode):
+                    raise invalid
+                raw = stream.read(MAX_ENTRY_FILE_BYTES + 1)
+        if not raw or len(raw) > MAX_ENTRY_FILE_BYTES:
+            raise invalid
+        entry = json.loads(raw.decode("utf-8"), object_pairs_hook=_json_object)
+    except (OSError, ValueError, RecursionError) as exc:
+        raise invalid from exc
+    if not isinstance(entry, dict) or entry.keys() - ENTRY_FILE_KEYS:
+        raise BoardError("board_entry_file_invalid", "The entry file accepts only sbar, evidence, body, and refs.")
+    refs = entry.get("refs", {})
+    if not isinstance(refs, dict) or refs.keys() - REF_KEYS or not isinstance(entry.get("body", ""), str):
+        raise BoardError("board_entry_file_invalid", "Use a text body and the supported fields in the refs object.")
+    return entry
 
 
 def _redaction_patterns(value: object, exact_values: frozenset[str]) -> Iterator[str]:
@@ -149,7 +257,7 @@ class Cursor:
 
 def _complete_rows(
     stream: BinaryIO, cursor: Cursor
-) -> Iterator[tuple[Cursor, dict | None]]:
+) -> Iterator[tuple[Cursor, dict | None, int]]:
     stream.seek(cursor.offset)
     line_no = cursor.line
     while chunk := stream.readline(MAX_LINE_BYTES + 1):
@@ -161,14 +269,17 @@ def _complete_rows(
         if not chunk.endswith(b"\n"):
             return
         entry = None
+        identifier = 0
         if not oversized:
             try:
                 candidate = json.loads(chunk.decode("utf-8"))
-                if _valid_entry(candidate):
-                    entry = candidate
-            except (ValueError, RecursionError):
+                if isinstance(candidate, dict) and candidate.get("schema") in (SCHEMA, LEGACY_SCHEMA) and _positive_id(candidate.get("id")):
+                    identifier = candidate["id"]
+                _validate_entry(candidate)
+                entry = candidate
+            except (BoardError, ValueError, RecursionError):
                 pass
-        yield Cursor(stream.tell(), line_no), entry
+        yield Cursor(stream.tell(), line_no), entry, identifier
 
 
 def _open_file(path: Path, *, write: bool = False) -> BinaryIO:
@@ -185,7 +296,7 @@ def _open_file(path: Path, *, write: bool = False) -> BinaryIO:
 
 
 def post(
-    path: Path, *, author: dict, kind: str, subject: str, body: str, refs: dict, via: str | None
+    path: Path, *, author: dict, kind: str, bluf: dict, details: dict, via: str | None
 ) -> tuple[dict, list[int]]:
     if kind not in ROLE_KINDS.get(author["role"], ()):
         raise BoardError("board_kind_forbidden", "The stated role cannot post this kind.")
@@ -195,21 +306,22 @@ def post(
         "time": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         "author": author,
         "kind": kind,
-        "subject": subject,
-        "body": body,
-        "refs": refs,
+        "bluf": bluf,
+        "body": details.get("body", ""),
+        "refs": details["refs"],
         "redacted": [],
     }
+    for field in ("sbar", "evidence"):
+        if field in details:
+            entry[field] = details[field]
     if via is not None:
         entry["via"] = via
-    if not _valid_entry(entry):
-        raise BoardError("board_entry_invalid", "The entry has an invalid author, subject, or reference.")
+    _validate_entry(entry)
     exact_values = collect_secret_env_values()
     patterns = sorted(set(_redaction_patterns(entry, exact_values)))
     entry = redact_structure(entry, exact_values=exact_values)
     entry["redacted"] = patterns
-    if not _valid_entry(entry):
-        raise BoardError("board_entry_invalid", "Redaction changed a required entry field.")
+    _validate_entry(entry)
     # Check before opening the board. The assigned ID can add a few more bytes.
     _encode_line(entry)
 
@@ -219,18 +331,17 @@ def post(
         with _open_file(path, write=True) as stream:
             offset = 0
             last_id = 0
-            for cursor, old in _complete_rows(stream, Cursor()):
+            for cursor, old, identifier in _complete_rows(stream, Cursor()):
                 offset = cursor.offset
+                last_id = max(last_id, identifier)
                 if old is None:
                     warnings.append(cursor.line)
-                else:
-                    last_id = max(last_id, old["id"])
             entry["id"] = last_id + 1
             line = _encode_line(entry)
             fd = stream.fileno()
             if os.fstat(fd).st_size > offset:
                 stream.seek(offset)
-                if warnings or stream.read(len(ENTRY_PREFIX)) != ENTRY_PREFIX:
+                if warnings or not stream.read(max(map(len, ENTRY_PREFIXES))).startswith(ENTRY_PREFIXES):
                     raise BoardError("board_unsafe_tail", "Cannot remove the unfinished line from this board.")
                 # Keep unknown bytes. Only a recognizable append on a valid board can be repaired.
                 os.ftruncate(fd, offset)
@@ -256,7 +367,7 @@ def read_rows(path: Path, cursor: Cursor = Cursor()) -> tuple[Cursor, list[dict]
     except FileNotFoundError:
         return cursor, entries, warnings
     with stream:
-        for cursor, entry in _complete_rows(stream, cursor):
+        for cursor, entry, _ in _complete_rows(stream, cursor):
             if entry is None:
                 warnings.append(cursor.line)
             else:
@@ -280,7 +391,7 @@ def is_open_question(entry: dict, closed: set[int]) -> bool:
 
 def select_entries(
     entries: list[dict], *, kind: str | None, author: str | None, since: int,
-    open_questions: bool, closed: set[int],
+    open_questions: bool, closed: set[int], statuses: list[str], unverified: bool,
 ) -> list[dict]:
     return [
         entry for entry in entries
@@ -288,7 +399,15 @@ def select_entries(
         and (kind is None or entry["kind"] == kind)
         and (author is None or entry["author"]["seat"] == author)
         and (not open_questions or is_open_question(entry, closed))
+        and (not statuses or entry.get("bluf", {}).get("status") in statuses)
+        and (not unverified or _is_unverified(entry))
     ]
+
+
+def _is_unverified(entry: dict) -> bool:
+    return entry.get("bluf", {}).get("tag") != "verified" or any(
+        claim["tag"] != "verified" for claim in entry.get("evidence", [])
+    )
 
 
 def notify(terminal: str, entry_id: int) -> str:
@@ -310,28 +429,58 @@ def notify(terminal: str, entry_id: int) -> str:
     return "sent" if result.returncode == 0 else "failed"
 
 
+def _display_text(text: str) -> str:
+    return "".join(char if char.isprintable() else json.dumps(char)[1:-1] for char in text)
+
+
+def _tag_label(claim: dict) -> str:
+    return claim.get("tag", "not-verified").replace("-", " ")
+
+
+def _bluf_line(entry: dict) -> str:
+    bluf = entry.get("bluf", {})
+    status = f'{bluf["status"].upper()} ' if bluf else ""
+    seat = _display_text(entry["author"]["seat"])
+    result = _display_text(bluf["result"] if bluf else entry["subject"])
+    return f'#{entry["id"]} {status}{entry["kind"]} {seat} [{_tag_label(bluf)}]: {result}'
+
+
+def _details_lines(entry: dict) -> Iterator[str]:
+    if "sbar" in entry:
+        for field in SBAR_FIELDS:
+            yield f"{field[0].upper()}: {_display_text(entry['sbar'][field])}"
+    for claim in entry.get("evidence", []):
+        anchor = f" (anchor: {_display_text(claim['anchor'])})" if "anchor" in claim else ""
+        yield f"[{_tag_label(claim)}] {_display_text(claim['text'])}{anchor}"
+    bluf = entry.get("bluf", {})
+    if "anchor" in bluf:
+        yield f"BLUF anchor: {_display_text(bluf['anchor'])}"
+
+
 def format_entry(entry: dict, *, open_question: bool) -> str:
-    author = entry["author"]
-    subject = json.dumps(entry["subject"])
-    seat = json.dumps(author["seat"])
-    label = "OPEN QUESTION " if open_question else ""
-    body = f'\n  {json.dumps(entry["body"])}' if entry["body"] else ""
-    return f'{label}#{entry["id"]} {entry["time"]} {entry["kind"]} from {seat} {subject}{body}'
+    lines = [_bluf_line(entry)]
+    if entry["kind"] == "question":
+        lines.append("OPEN QUESTION" if open_question else "Question closed.")
+    lines.extend(_details_lines(entry))
+    if entry["body"]:
+        lines.append(_display_text(entry["body"]))
+    return "\n  ".join(lines)
 
 
 def write_html(output: Path, entries: list[dict], warnings: list[int]) -> None:
     def article(entry: dict) -> str:
-        subject = html.escape(entry["subject"])
+        heading = html.escape(_bluf_line(entry))
+        lines = "\n".join(map(html.escape, _details_lines(entry)))
+        structured = f"<pre>{lines}</pre>" if lines else ""
         body = f'<pre>{html.escape(entry["body"])}</pre>' if entry["body"] else ""
         author = entry["author"]
         metadata = html.escape(
-            f'#{entry["id"]} {entry["time"]} · {entry["kind"]} · '
-            f'{author["seat"]} ({author["role"]}, {author["host"]})'
+            f'{entry["time"]} ({author["role"]}, {author["host"]})'
         )
         fields = {key: entry[key] for key in ("refs", "via", "redacted", "schema") if key in entry}
         details = html.escape(json.dumps(fields, indent=2))
         return (
-            f"<article><h3>{subject}</h3><p>{metadata}</p>{body}"
+            f"<article><h3>{heading}</h3>{structured}{body}<p>{metadata}</p>"
             f"<details><summary>References and entry details</summary><pre>{details}</pre></details></article>"
         )
 

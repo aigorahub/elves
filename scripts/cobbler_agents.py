@@ -554,13 +554,13 @@ def cmd_board(args: argparse.Namespace) -> int:
         else:
             path = message_board.session_board(args.session.expanduser())
         if action == "post":
+            bluf, details = _board_post_input(args)
             entry, warnings = message_board.post(
                 path,
                 author={"seat": args.author, "role": args.role, "host": args.host},
                 kind=args.kind,
-                subject=args.subject,
-                body=args.body,
-                refs={"files": args.file, "commits": args.commit, "pr": args.pr, "entries": args.reply_to},
+                bluf=bluf,
+                details=details,
                 via=args.via,
             )
             payload = {"ok": True, "entry": entry, "malformed_lines": warnings}
@@ -593,6 +593,26 @@ def cmd_board(args: argparse.Namespace) -> int:
     return 1
 
 
+def _board_post_input(args: argparse.Namespace) -> tuple[dict, dict]:
+    details = (
+        message_board.load_entry_file(args.entry_file, getattr(sys.stdin, "buffer", None))
+        if args.entry_file is not None else {}
+    )
+    refs = {"files": args.file, "commits": args.commit, "pr": args.pr, "entries": args.reply_to}
+    flags = {key: value for key, value in refs.items() if value is not None}
+    if ("body" in details and args.body is not None) or ("refs" in details and flags):
+        raise message_board.BoardError("board_entry_file_invalid", "Supply body or references in the entry file or flags, not both.")
+    if args.body is not None:
+        details["body"] = args.body
+    details["refs"] = {"files": [], "commits": [], "pr": None, "entries": []} | details.get("refs", {}) | flags
+    bluf = {"status": args.status, "result": args.result}
+    for field in ("tag", "anchor"):
+        value = getattr(args, field)
+        if value is not None:
+            bluf[field] = value
+    return bluf, details
+
+
 def _print_board(args: argparse.Namespace, path: Path) -> int:
     cursor = message_board.Cursor()
     shown_questions = set()
@@ -605,6 +625,7 @@ def _print_board(args: argparse.Namespace, path: Path) -> int:
             selected = message_board.select_entries(
                 entries, kind=args.kind, author=args.author, since=args.since,
                 open_questions=args.open_questions, closed=closed,
+                statuses=args.status, unverified=args.unverified,
             )
             if args.json and not following:
                 print(json.dumps({"ok": True, "entries": selected, "malformed_lines": warnings}))
@@ -2856,7 +2877,13 @@ class _NoAbbrevArgumentParser(argparse.ArgumentParser):
 
 class _BoardArgumentParser(_NoAbbrevArgumentParser):
     def error(self, message: str) -> None:
-        print(json.dumps({"ok": False, "code": "board_arguments_invalid", "error": redact_text(
+        code = "board_arguments_invalid"
+        if message.startswith("unrecognized arguments:") and any(
+            arg == "--subject" or arg.startswith("--subject=") for arg in message.split()
+        ):
+            code = "board_subject_removed"
+            message = "Use --result for the BLUF outcome and --status for its status."
+        print(json.dumps({"ok": False, "code": code, "error": redact_text(
             message, exact_values=collect_secret_env_values()
         ).text}))
         self.exit(2)
@@ -2884,12 +2911,16 @@ def _add_board_parser(sub: Any) -> None:
             command.add_argument("--role", choices=tuple(message_board.ROLE_KINDS), required=True)
             command.add_argument("--host", choices=message_board.HOSTS, required=True)
             command.add_argument("--kind", choices=message_board.KINDS, required=True)
-            command.add_argument("--subject", required=True)
-            command.add_argument("--body", default="")
-            command.add_argument("--file", action="append", default=[])
-            command.add_argument("--commit", action="append", default=[])
+            command.add_argument("--status", help="BLUF status for the kind")
+            command.add_argument("--result", help="One-line BLUF outcome")
+            command.add_argument("--tag", help="BLUF evidence tag")
+            command.add_argument("--anchor", help="BLUF evidence pointer")
+            command.add_argument("--entry-file", metavar="PATH", help="Structured entry JSON file or - for stdin")
+            command.add_argument("--body")
+            command.add_argument("--file", action="append")
+            command.add_argument("--commit", action="append")
             command.add_argument("--pr")
-            command.add_argument("--reply-to", type=int, action="append", default=[])
+            command.add_argument("--reply-to", type=int, action="append")
             command.add_argument("--via", help="Seat name of the driver who relayed the entry")
             command.add_argument("--notify-hc", metavar="TERMINAL_ID")
         elif action == "html":
@@ -2899,6 +2930,8 @@ def _add_board_parser(sub: Any) -> None:
             command.add_argument("--author", help="Exact seat name")
             command.add_argument("--since", type=int, default=0, metavar="ID", help="Show IDs greater than this ID")
             command.add_argument("--open-questions", action="store_true")
+            command.add_argument("--status", choices=message_board.STATUSES, action="append", default=[])
+            command.add_argument("--unverified", action="store_true", help="Show entries with an unchecked claim")
             command.add_argument("--json", action="store_true")
 
 
