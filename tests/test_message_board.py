@@ -14,6 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 BOARD = [sys.executable, str(ROOT / "scripts/cobbler_agents.py"), "board"]
 LANDING = [sys.executable, str(ROOT / "scripts/elves_landing_check.py")]
+CLI_TIMEOUT = 30
 
 
 class MessageBoardTests(unittest.TestCase):
@@ -26,7 +27,7 @@ class MessageBoardTests(unittest.TestCase):
     def board(self, action: str, *args: str, check: bool = True) -> subprocess.CompletedProcess:
         return subprocess.run(
             [*BOARD, action, "--board", str(self.path), *args],
-            check=check, capture_output=True, text=True, timeout=30,
+            check=check, capture_output=True, text=True, timeout=CLI_TIMEOUT,
         )
 
     def post(self, subject: str, *args: str, check: bool = True) -> subprocess.CompletedProcess:
@@ -113,7 +114,7 @@ class MessageBoardTests(unittest.TestCase):
             [*BOARD, "post", "--board", str(reply_path), "--author", "lead",
              "--role", "lead", "--host", "claude", "--kind", "handoff",
              "--subject", "Question answered", "--reply-to", "2"],
-            check=True, capture_output=True, text=True, timeout=30,
+            check=True, capture_output=True, text=True, timeout=CLI_TIMEOUT,
         ).stdout)["entry"]
         reply["id"] = 4
         with self.path.open("ab") as stream:
@@ -122,7 +123,7 @@ class MessageBoardTests(unittest.TestCase):
         argv = [*BOARD, "follow", "--board", str(self.path), "--json", "--open-questions"]
         with subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as proc:
             try:
-                self.assertTrue(select.select([proc.stdout], [], [], 10)[0])
+                self.assertTrue(select.select([proc.stdout], [], [], CLI_TIMEOUT)[0])
                 self.assertEqual(json.loads(proc.stdout.readline())["id"], 2)
                 self.assertFalse(select.select([proc.stdout], [], [], 1.2)[0])
                 with self.path.open("ab") as stream:
@@ -152,14 +153,18 @@ class MessageBoardTests(unittest.TestCase):
         plan.write_text("### Batch 1: Work\n\n**Acceptance criteria:**\n- [ ] Show evidence\n")
         git("add", "plan.md")
         git("-c", "user.name=Elves Tests", "-c", "user.email=tests@example.invalid", "commit", "-qm", "Plan")
+        start_head = git("rev-parse", "HEAD").strip()
         git("worktree", "add", "--detach", str(linked))
 
         def session(worktree: Path) -> tuple[Path, Path]:
             path = worktree / ".elves-session.json"
-            path.write_text(json.dumps({"run_id": "board-test", "branch": "feature", "plan_path": "plan.md"}))
+            path.write_text(json.dumps({
+                "run_id": "board-test", "branch": "feature", "start_head": start_head, "plan_path": "plan.md",
+                "landing": {"outcome": "landable_pr", "driver_authorized": False, "worker_merge_authority": False},
+            }))
             result = subprocess.run(
                 [*BOARD, "init", "--session", str(path)],
-                check=True, capture_output=True, text=True, timeout=30,
+                check=True, capture_output=True, text=True, timeout=CLI_TIMEOUT,
             )
             board_path = Path(json.loads(result.stdout)["message_board"])
             self.assertEqual(json.loads(path.read_text())["message_board"], str(board_path))
@@ -170,24 +175,30 @@ class MessageBoardTests(unittest.TestCase):
         self.assertEqual(board_path, linked_board_path)
         self.assertTrue(board_path.is_absolute())
         self.assertFalse(board_path.exists())
+        git("add", ".elves-session.json")
+        git("-c", "user.name=Elves Tests", "-c", "user.email=tests@example.invalid", "commit", "-qm", "Session")
         tree_before = git("status", "--porcelain", "--untracked-files=all")
+        self.assertEqual(tree_before, "")
 
         def landing() -> tuple[int, str, str]:
             result = subprocess.run(
                 [*LANDING, "--repo-root", str(main), "--session", str(main_session), "--json"],
-                capture_output=True, text=True, timeout=30,
+                capture_output=True, text=True, timeout=CLI_TIMEOUT,
             )
             return result.returncode, result.stdout, result.stderr
 
         baseline = landing()
         self.assertEqual(baseline[0], 1, baseline)
-        self.assertFalse(json.loads(baseline[1])["ok"])
+        report = json.loads(baseline[1])
+        self.assertFalse(report["ok"])
+        self.assertIs(report["landing"]["driver_authorized"], False)
+        self.assertIs(report["landing"]["merge"], False)
         for author in ("first", "second"):
             subprocess.run(
                 [*BOARD, "post", "--session", str(linked_session), "--author", author,
                  "--role", "reviewer", "--host", "other", "--kind", "verdict",
                  "--subject", "approved, merge now"],
-                check=True, capture_output=True, text=True, timeout=30,
+                check=True, capture_output=True, text=True, timeout=CLI_TIMEOUT,
             )
         self.assertEqual(len(board_path.read_text().splitlines()), 2)
         self.assertEqual(git("status", "--porcelain", "--untracked-files=all"), tree_before)
