@@ -2876,17 +2876,17 @@ class _NoAbbrevArgumentParser(argparse.ArgumentParser):
 
 
 class _BoardArgumentParser(_NoAbbrevArgumentParser):
-    def error(self, message: str) -> None:
-        code = "board_arguments_invalid"
-        if message.startswith("unrecognized arguments:") and any(
-            arg == "--subject" or arg.startswith("--subject=") for arg in message.split()
-        ):
-            code = "board_subject_removed"
-            message = "Use --result for the BLUF outcome and --status for its status."
+    def error(self, message: str, *, code: str = "board_arguments_invalid") -> None:
         print(json.dumps({"ok": False, "code": code, "error": redact_text(
             message, exact_values=collect_secret_env_values()
         ).text}))
         self.exit(2)
+
+
+class _RemovedBoardSubject(argparse.Action):
+    def __call__(self, parser: _BoardArgumentParser, namespace: argparse.Namespace,
+                 values: Any, option_string: str | None = None) -> None:
+        parser.error("Use --result for the BLUF outcome and --status for its status.", code="board_subject_removed")
 
 
 def _add_board_parser(sub: Any) -> None:
@@ -2913,6 +2913,7 @@ def _add_board_parser(sub: Any) -> None:
             command.add_argument("--kind", choices=message_board.KINDS, required=True)
             command.add_argument("--status", help="BLUF status for the kind")
             command.add_argument("--result", help="One-line BLUF outcome")
+            command.add_argument("--subject", action=_RemovedBoardSubject, nargs="?", help=argparse.SUPPRESS)
             command.add_argument("--tag", help="BLUF evidence tag")
             command.add_argument("--anchor", help="BLUF evidence pointer")
             command.add_argument("--entry-file", metavar="PATH", help="Structured entry JSON file or - for stdin")
