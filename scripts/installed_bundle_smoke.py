@@ -126,6 +126,14 @@ SMOKE_COMMANDS: list[tuple[str, list[str]]] = [
     ("setup-dry-run", ["setup", "--dry-run", "--json"]),
     ("onboard-plan", ["onboard", "plan", "--json"]),
     ("implement-status", ["implement", "status", "--json"]),
+    (
+        "board-post",
+        [
+            "board", "post", "--board", "message-board.jsonl", "--author", "smoke",
+            "--role", "worker", "--host", "other", "--kind", "status", "--subject", "Smoke entry",
+        ],
+    ),
+    ("board-read", ["board", "read", "--board", "message-board.jsonl", "--json"]),
 ]
 
 RUNTIME_HELP_COMMANDS = (

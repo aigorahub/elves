@@ -1,5 +1,5 @@
 ---
-version: "2.42.0"
+version: "2.43.0"
 ---
 
 # Elves: Codex repository adapter
@@ -43,6 +43,9 @@ workflow contracts that mandate them (SKILL.md worker-failure recovery, labor co
 Skill Memory) apply to all four hosts unchanged. Usage is filled only by
 `usage aggregate --records-file`; close and reconcile do not write `usage_observed`.
 See the guide's "v2.24 run tools" section.
+
+The `board` verb uses the same host-neutral CLI for run messages and owner questions.
+See [the run message board contract](references/message-board.md).
 
 `review-route` joins them as a host-neutral helper on the same CLI surface and the same honesty
 boundary: it selects an available review route and records requested route, actual route, and

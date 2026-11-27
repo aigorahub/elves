@@ -4,6 +4,14 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.43.0] - 2026-11-27
+
+### Added
+
+- A shared run message board for seat claims, findings, handoffs, owner questions,
+  and status. The host-neutral CLI supports filtered reads, live follow, local
+  HTML snapshots, and optional Herdr wake-ups. Board entries grant no authority.
+
 ## [2.42.0] - 2026-11-21
 
 ### Changed

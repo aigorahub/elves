@@ -8,7 +8,7 @@ Oh My Pi (omp) driver plans and reviews; a subscription-native (or optional exte
 implements; durable run files let the work survive context compaction. You write the plan and own
 the merge decision. The agent does the middle.
 
-**Current release: v2.42.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
+**Current release: v2.43.0**. See [`CHANGELOG.md`](CHANGELOG.md) for version history. Coined terms
 are defined once in [`references/glossary.md`](references/glossary.md).
 
 Implementation runs get a draft PR at the first useful pushed commit,
@@ -604,6 +604,8 @@ authoritative for Claude Code, Codex, Grok Build, and Oh My Pi code work.
 **Templates and reports**
 - [`references/elves-report-template.html`](references/elves-report-template.html) — end-of-run
   report
+- [`references/message-board.md`](references/message-board.md) explains how to post coordination
+  updates, follow owner questions, and write a local HTML snapshot. The board grants no authority.
 - [`references/runtime-helper-paths.md`](references/runtime-helper-paths.md) — installed vs
   source-checkout helper paths
 

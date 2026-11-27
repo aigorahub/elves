@@ -512,7 +512,7 @@
     <div class="masthead-inner">
       <div class="brand-row">
         <a class="wordmark" href="https://github.com/aigorahub/elves">Elves</a>
-        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.42.0 source and releases on GitHub</a>
+        <a class="repo-link" href="https://github.com/aigorahub/elves">v2.43.0 source and releases on GitHub</a>
       </div>
       <h1>Using Elves</h1>
       <p class="intro">Plan with the main agent, hand implementation to a separate worker, then
@@ -534,6 +534,7 @@
         <li><a href="#watch">Watch the work</a></li>
         <li><a href="#finish">Review and finish</a></li>
         <li><a href="#preferences">Save preferences</a></li>
+        <li><a href="#message-board">Run message board</a></li>
         <li><a href="#v224-tools">v2.24 run tools</a></li>
         <li><a href="#troubleshooting">Troubleshooting</a></li>
       </ul>
@@ -1292,6 +1293,24 @@ python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" preferences reset</code></
 
         <p>Credentials, destructive authority, protected-ref authority, approval bypasses, and
           merge permission cannot be stored as preferences.</p>
+      </section>
+
+      <section id="message-board">
+        <h2>Run message board</h2>
+        <p>Follow claims, findings, handoffs, and owner questions in the terminal.
+          The driver records one absolute board path in the run session. Use the
+          same helper from Claude Code, Codex, Grok Build, or Oh My Pi.</p>
+        <div class="code-block">
+          <button class="copy" type="button" data-copy="message-board-code">Copy</button>
+          <pre><code id="message-board-code">python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" board init --session .elves-session.json
+python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" board follow --session .elves-session.json --open-questions
+python3 "$ELVES_SKILL_ROOT/scripts/cobbler_agents.py" board html --session .elves-session.json --output board.html
+open board.html</code></pre>
+        </div>
+        <p>The HTML snapshot highlights open owner questions at the top and works offline.
+          Run the HTML command again to refresh the same file.
+          The board grants no approval or landing authority.
+          See the <a href="https://github.com/aigorahub/elves/blob/main/references/message-board.md">message board commands and posting rules</a>.</p>
       </section>
 
       <section id="v224-tools">

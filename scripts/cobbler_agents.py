@@ -18,6 +18,8 @@ Commands:
   setup [--json]             Inventory tools and write local .elves/models.toml
   onboard plan|show|apply|probe
                              Model onboarding: interview packet, update routes, probe
+  board init|post|read|follow|html
+                             Local run message board
 
 This entry point stays thin; implementation lives under scripts/cobbler_runtime/.
 """
@@ -30,6 +32,7 @@ import json
 import math
 import os
 import sys
+import time
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -45,6 +48,7 @@ from cobbler_runtime.adapters import (  # noqa: E402
     workspace_sandbox_write_profile,
 )
 from cobbler_runtime.acceptance import normalize_batch_id  # noqa: E402
+from cobbler_runtime import message_board  # noqa: E402
 from cobbler_runtime.parallel_lanes import (  # noqa: E402
     DECLINE_NO_LANES,
     DECLINE_PARTITION_INVALID,
@@ -534,6 +538,98 @@ def cmd_usage(args: argparse.Namespace) -> int:
         return 1
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0
+
+
+def cmd_board(args: argparse.Namespace) -> int:
+    action = args.board_action
+    try:
+        if action == "init":
+            path = message_board.initialize(args.session.expanduser().absolute())
+            print(json.dumps({"ok": True, "message_board": str(path)}))
+            return 0
+        if args.board is not None:
+            path = args.board.expanduser().absolute()
+            if path.name != message_board.BOARD_FILENAME:
+                raise message_board.BoardError("board_filename_invalid", "The board file must be named message-board.jsonl.")
+        else:
+            path = message_board.session_board(args.session.expanduser())
+        if action == "post":
+            entry, warnings = message_board.post(
+                path,
+                author={"seat": args.author, "role": args.role, "host": args.host},
+                kind=args.kind,
+                subject=args.subject,
+                body=args.body,
+                refs={"files": args.file, "commits": args.commit, "pr": args.pr, "entries": args.reply_to},
+                via=args.via,
+            )
+            payload = {"ok": True, "entry": entry, "malformed_lines": warnings}
+            if args.notify_hc is not None:
+                payload["notification"] = message_board.notify(args.notify_hc, entry["id"])
+            print(json.dumps(payload))
+            return 0
+        if action == "html":
+            _, entries, warnings = message_board.read_rows(path)
+            output = args.output.expanduser().absolute()
+            output = output.parent.resolve() / output.name
+            board_path = path.parent.resolve() / path.name
+            if output in (board_path, board_path.with_name(f"{board_path.name}.lock")):
+                raise message_board.BoardError("board_output_conflict", "Use a separate path for the snapshot.")
+            message_board.write_html(output, entries, warnings)
+            print(json.dumps({"ok": True, "output": str(output), "malformed_lines": warnings}))
+            return 0
+        if args.since < 0:
+            raise message_board.BoardError("board_since_invalid", "The since ID must be nonnegative.")
+        return _print_board(args, path)
+    except message_board.BoardError as exc:
+        code, error = exc.code, str(exc)
+    except (StorageError, ValidationIssue) as exc:
+        code, error = exc.code, exc.message
+    except (OSError, ValueError, RuntimeError) as exc:
+        code, error = "board_io_error", str(exc)
+    print(json.dumps({"ok": False, "code": code, "error": redact_text(
+        error, exact_values=collect_secret_env_values()
+    ).text}))
+    return 1
+
+
+def _print_board(args: argparse.Namespace, path: Path) -> int:
+    cursor = message_board.Cursor()
+    shown_questions = set()
+    following = args.board_action == "follow"
+    show_closures = following and (args.open_questions or not args.json)
+    try:
+        while True:
+            cursor, entries, warnings = message_board.read_rows(path, cursor)
+            closed = message_board.closed_question_ids(entries)
+            selected = message_board.select_entries(
+                entries, kind=args.kind, author=args.author, since=args.since,
+                open_questions=args.open_questions, closed=closed,
+            )
+            if args.json and not following:
+                print(json.dumps({"ok": True, "entries": selected, "malformed_lines": warnings}))
+                return 0
+            for line in warnings:
+                warning = {"code": "board_malformed_line", "line": line}
+                print(json.dumps(warning) if args.json else f"Skipped malformed board line {line}.", file=sys.stderr)
+            if show_closures:
+                for identifier in sorted(shown_questions & closed):
+                    notice = json.dumps({"closed_question": identifier}) if args.json else f"Question #{identifier} closed."
+                    print(notice, flush=True)
+                shown_questions.difference_update(closed)
+            for entry in selected:
+                open_question = message_board.is_open_question(entry, closed)
+                if show_closures and open_question:
+                    shown_questions.add(entry["id"])
+                rendered = json.dumps(entry) if args.json else message_board.format_entry(entry, open_question=open_question)
+                print(rendered, flush=True)
+            if not following:
+                return 0
+            time.sleep(message_board.POLL_SECONDS)
+    except KeyboardInterrupt:
+        if following:
+            return 0
+        raise
 
 
 def cmd_salvage(args: argparse.Namespace) -> int:
@@ -2758,6 +2854,54 @@ class _NoAbbrevArgumentParser(argparse.ArgumentParser):
         super().__init__(*args, **kwargs)
 
 
+class _BoardArgumentParser(_NoAbbrevArgumentParser):
+    def error(self, message: str) -> None:
+        print(json.dumps({"ok": False, "code": "board_arguments_invalid", "error": redact_text(
+            message, exact_values=collect_secret_env_values()
+        ).text}))
+        self.exit(2)
+
+
+def _add_board_parser(sub: Any) -> None:
+    board = sub.add_parser("board", help="Post, read, follow, or export a local run message board")
+    actions = board.add_subparsers(dest="board_action", required=True, parser_class=_BoardArgumentParser)
+    init = actions.add_parser("init", help="Record the run's board path in the session")
+    init.add_argument("--session", type=Path, required=True)
+    init.set_defaults(func=cmd_board)
+    for action, help_text in (
+        ("post", "Append an entry"),
+        ("read", "Read a board snapshot"),
+        ("follow", "Read a board and wait for new entries"),
+        ("html", "Write a local HTML snapshot"),
+    ):
+        command = actions.add_parser(action, help=help_text)
+        location = command.add_mutually_exclusive_group(required=True)
+        location.add_argument("--session", type=Path, help="Session JSON with the board path")
+        location.add_argument("--board", type=Path, help="Explicit board file path")
+        command.set_defaults(func=cmd_board)
+        if action == "post":
+            command.add_argument("--author", required=True, help="Seat name")
+            command.add_argument("--role", choices=tuple(message_board.ROLE_KINDS), required=True)
+            command.add_argument("--host", choices=message_board.HOSTS, required=True)
+            command.add_argument("--kind", choices=message_board.KINDS, required=True)
+            command.add_argument("--subject", required=True)
+            command.add_argument("--body", default="")
+            command.add_argument("--file", action="append", default=[])
+            command.add_argument("--commit", action="append", default=[])
+            command.add_argument("--pr")
+            command.add_argument("--reply-to", type=int, action="append", default=[])
+            command.add_argument("--via", help="Seat name of the driver who relayed the entry")
+            command.add_argument("--notify-hc", metavar="TERMINAL_ID")
+        elif action == "html":
+            command.add_argument("--output", type=Path, required=True, help="HTML snapshot to create or replace")
+        else:
+            command.add_argument("--kind", choices=message_board.KINDS)
+            command.add_argument("--author", help="Exact seat name")
+            command.add_argument("--since", type=int, default=0, metavar="ID", help="Show IDs greater than this ID")
+            command.add_argument("--open-questions", action="store_true")
+            command.add_argument("--json", action="store_true")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = _NoAbbrevArgumentParser(
         prog="cobbler_agents.py",
@@ -2866,6 +3010,8 @@ def build_parser() -> argparse.ArgumentParser:
                 "--edits-file", required=True, help="JSON file: {\"edits\": [...]}"
             )
         _learn_item.set_defaults(func=cmd_learnings)
+
+    _add_board_parser(sub)
 
     usage = sub.add_parser(
         "usage",
