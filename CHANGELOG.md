@@ -4,6 +4,14 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.45.0] - 2026-11-27
+
+### Added
+
+- A registered Lantern lead can use saved Codex usage resets when the team
+  file grants them. Run Control records the setup. Worker recovery covers
+  refill waits, saved fallback order, and recovery of the same session.
+
 ## [2.44.0] - 2026-11-27
 
 ### Changed

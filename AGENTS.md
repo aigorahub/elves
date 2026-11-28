@@ -1,5 +1,5 @@
 ---
-version: "2.44.0"
+version: "2.45.0"
 ---
 
 # Elves: Codex repository adapter
@@ -190,7 +190,7 @@ provider usage, but not merge, protected-ref, secret, or approval-bypass authori
   Review)
 - **Worker failure recovery:** transient provider errors back off and resume without consuming
   the re-drive budget; workers keep an untracked progress ledger under `.elves/runtime/`
-  (SKILL.md Worker failure recovery)
+  (SKILL.md Worker failure recovery). See that rule for saved Codex usage resets on Lantern teams.
 - **Confidence-guided review:** attach the terminal full-run
   `review_context.review_prompt_block` verbatim, or derive the identical table from native
   `Confidence:` trailers; Claude Code/Codex semantics are identical

@@ -81,6 +81,7 @@ session-cookie approach. All existing auth tests must pass. The public API surfa
 
 - **E2E mode:** [chat-to-work | chat-to-land | legacy-two-call | direct]
 - **Work driver:** [host-native | grok-build | devin-cli | untrusted-writer]
+- **Saved Codex usage resets:** [off | Lantern space, registered lead terminal, and saved team name]
 - **Implementation lane:** [fast | untrusted]
 - **Delegation scope:** [none | batch | full_run]
 - **Git mode:** [host_only | branch_progress | detached_lease]

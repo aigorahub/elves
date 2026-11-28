@@ -5,7 +5,7 @@ license: MIT
 compatibility: Works with Claude Code, Codex, Grok Build, Oh My Pi (omp), Claude.ai, and any Agent Skills compatible platform. Requires git and gh CLI.
 metadata:
   author: John Ennis
-  version: "2.44.0"
+  version: "2.45.0"
   argument-hint: Path to plan file, or plan text directly.
 ---
 
@@ -92,7 +92,7 @@ handoff remains valid for huge/unstable plans.
 `references/joyful-runs-contract.md`, `landing-authority.md`, `follow-mode.md`,
 `proof-and-review.md`, `host-parity.md`, `schema-and-acceptance.md`, `prewalk.md`.
 
-**User guide (v2.44.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
+**User guide (v2.45.0):** `https://aigorahub.github.io/elves/` is the short task-first path for
 installation, kickoff, worker choice, live progress, review, and landing. The references above
 remain the detailed workflow contracts.
 
@@ -450,6 +450,11 @@ refreshed at each milestone and never committed — so a cold re-drive starts or
 gate or worker runs triggers a health check (near-zero CPU time against long wall time is the
 hang signature). After repeated transient deaths in one batch, the driver may split the batch or
 take it host-native without that counting against the budget; document the decision.
+For a stopped Codex worker or a clean handoff about to exhaust its quota, the registered
+lead of a Lantern team uses Lantern's saved reset helper when its team file grants resets.
+Follow its wait and fallback order. Resume the same worker only when the helper confirms
+recovery. If the Lantern setup or grant is absent, report the usage block under the existing
+recovery rule. See [saved Codex usage resets](references/adaptive-worker-routing.md#saved-codex-usage-resets).
 Before consuming the re-drive budget for a **substantive** failure, run the deterministic futile
 re-drive guard (`cobbler_agents.py redrive record-failure|evaluate|status`): a re-drive candidate
 whose worktree fingerprint is identical to the previous substantive failure of the same batch is
@@ -555,6 +560,9 @@ build. Say that in the report rather than filing thirty issues.
 
 Persist under `## Run Control`. **Finite** (default) ends at completion. **Open-ended** continues
 until explicit stop or true blocker — checkpoints are not completion.
+
+Record **Saved Codex usage resets** as off or give the Lantern space, registered lead
+terminal, and saved team name. Lantern verifies the current grant before each reset.
 
 ### Open-ended rules
 
