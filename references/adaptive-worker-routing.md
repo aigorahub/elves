@@ -53,6 +53,41 @@ Repository prohibition is always a veto. A current-run or global `provider=grok`
 consent; repository `allow_grok=true` is not consent. Availability, preference, recommendation,
 consent, and prohibition are separate facts.
 
+## Saved Codex usage resets
+
+Lantern manages saved Codex usage resets for a registered native Herdr team.
+The owner's saved Lantern team file sets `usage_resets.max_per_run`.
+An absent setting or a cap of zero disables spending. Record the setup in
+Run Control. Use Lantern home to register the team and record any assignment
+changes. The team file and current assignment govern each request.
+
+Use the `bin/codex_resets.py` path from the Lantern setup. From the lead
+terminal, run `status --seat <terminal-id>` to read the current balance.
+Use `consume --seat <terminal-id> --stage spent` after a structured Codex
+usage limit stops the turn. An early check is allowed when the turn ended,
+the worktree is clean and pushed, and the next packet is ready. Use
+`consume --seat <terminal-id> --stage low --worktree "<worker worktree path>" --reason "<one line>"`.
+Get the worker worktree path from the session's `worktree_path`. Give the
+reason that packet is likely to exhaust the active model quota before
+refill. Let healthy turns finish.
+
+If Lantern returns `wait`, wait until the refill and recheck. If the weekly
+window is limiting, check the saved reset before fallback. For a 5 hour
+limit alone, check the saved cross provider fallback first. Use
+`--no-qualified-fallback` only when the saved fallback check finds none.
+If a reset cannot recover the seat, apply the saved fallback rule or report
+the usage block. If the helper returns `pending`, recheck so Lantern can
+settle the saved attempt against its original assignment. If the result
+names a `settled_seat`, give the result to that seat's lead and check the
+current seat again. After `expired` or `void`, check again if the current
+seat still meets a trigger. Report `unresolved` for operator review.
+
+Resume the same session only when Lantern confirms recovery. Keep one
+active assignment. Record the outcome, confirmed resets used, saved resets
+left and next expiry in the execution log, a board status post and the final
+report. Use unknown for values Codex omits. If Lantern does not manage the
+team or the team has no grant, use the existing worker recovery rule.
+
 ## Deterministic recommendation
 
 `route-worker` performs no model inference and reports provider, transport, model policy, effort,
