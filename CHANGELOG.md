@@ -4,6 +4,14 @@ All notable changes to the Elves skill are documented here.
 
 ## [Unreleased]
 
+## [2.45.1] - 2026-11-27
+
+### Changed
+
+- Saved Codex usage resets follow the Lantern 0.19.8 defaults: one reset per
+  run unless the team file sets a zero cap, and early resets only below 1%
+  usage left.
+
 ## [2.45.0] - 2026-11-27
 
 ### Added

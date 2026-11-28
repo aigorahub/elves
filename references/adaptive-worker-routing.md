@@ -57,7 +57,8 @@ consent, and prohibition are separate facts.
 
 Lantern manages saved Codex usage resets for a registered native Herdr team.
 The owner's saved Lantern team file sets `usage_resets.max_per_run`.
-An absent setting or a cap of zero disables spending. Record the setup in
+An absent setting grants one reset per run. A cap of zero disables spending.
+An early reset needs less than `switch_below` percent left, default 1. Record the setup in
 Run Control. Use Lantern home to register the team and record any assignment
 changes. The team file and current assignment govern each request.
 
