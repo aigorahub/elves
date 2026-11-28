@@ -65,18 +65,22 @@ Use the `bin/codex_resets.py` path from the Lantern setup. From the lead
 terminal, run `status --seat <terminal-id>` to read the current balance.
 Use `consume --seat <terminal-id> --stage spent` after a structured Codex
 usage limit stops the turn. An early check is allowed when the turn ended,
-the worktree is clean and pushed, and the next packet is ready. Pass
-`--stage low --reason "<one line>"` with the reason that packet is likely to
-exhaust the active model quota before refill. Let healthy turns finish.
+the worktree is clean and pushed, and the next packet is ready. Use
+`consume --seat <terminal-id> --stage low --worktree "<worker worktree path>" --reason "<one line>"`.
+Get the worker worktree path from the session's `worktree_path`. Give the
+reason that packet is likely to exhaust the active model quota before
+refill. Let healthy turns finish.
 
 If Lantern returns `wait`, wait until the refill and recheck. If the weekly
 window is limiting, check the saved reset before fallback. For a 5 hour
 limit alone, check the saved cross provider fallback first. Use
 `--no-qualified-fallback` only when the saved fallback check finds none.
 If a reset cannot recover the seat, apply the saved fallback rule or report
-the usage block. If the helper returns `pending`, let Lantern settle the
-existing attempt through the same lead and seat. Report an `unresolved`
-attempt for operator review.
+the usage block. If the helper returns `pending`, recheck so Lantern can
+settle the saved attempt against its original assignment. If the result
+names a `settled_seat`, give the result to that seat's lead and check the
+current seat again. After `expired` or `void`, check again if the current
+seat still meets a trigger. Report `unresolved` for operator review.
 
 Resume the same session only when Lantern confirms recovery. Keep one
 active assignment. Record the outcome, confirmed resets used, saved resets
